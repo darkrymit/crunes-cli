@@ -71,5 +71,13 @@ export function createFsUtils(dir, checkPermission, pluginDir = null) {
       })
       return results.map(r => r.replace(/\\/g, '/'))
     },
+
+    async write(relPath, content) {
+      const token = canonicalizePath(dir, relPath)
+      const abs = resolveToAbs(dir, pluginDir, relPath)
+      if (checkPermission) checkPermission('fs.write', token)
+      await fs.mkdir(path.dirname(abs), { recursive: true })
+      await fs.writeFile(abs, content, 'utf8')
+    },
   }
 }

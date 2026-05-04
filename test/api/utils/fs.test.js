@@ -200,3 +200,29 @@ describe('createFsUtils — glob', () => {
     expect(spy).toHaveBeenCalledWith('fs.glob', './src/*.ts')
   })
 })
+
+describe('createFsUtils — file writing', () => {
+  let dir
+
+  beforeEach(async () => {
+    dir = await makeTempDir()
+  })
+
+  it('writes to a new file and creates parent directories', async () => {
+    const fsUtils = createFsUtils(dir, null)
+    await fsUtils.write('./new-dir/sub-dir/file.txt', 'new content')
+    expect(await fs.readFile(path.join(dir, 'new-dir/sub-dir/file.txt'), 'utf8')).toBe('new content')
+  })
+
+  it('throws PermissionError if write is not allowed', async () => {
+    const fsUtils = createFsUtils(dir, checkerFor(['fs.write:./allowed.txt']))
+    await expect(fsUtils.write('./denied.txt', 'content')).rejects.toThrow(PermissionError)
+  })
+
+  it('checks fs.write capability', async () => {
+    const spy = vi.fn()
+    const fsUtils = createFsUtils(dir, spy)
+    await fsUtils.write('./test.txt', 'content').catch(() => {})
+    expect(spy).toHaveBeenCalledWith('fs.write', './test.txt')
+  })
+})

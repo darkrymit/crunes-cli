@@ -12,6 +12,12 @@ globalThis.utils = {
     read:   (p, o) => $__utils_fs_read.apply(undefined, [p, o ? JSON.stringify(o) : undefined], { result: { promise: true } }),
     exists: (p)    => $__utils_fs_exists.apply(undefined, [p], { result: { promise: true } }),
     glob:   (p, o) => $__utils_fs_glob.apply(undefined, [p, o ? JSON.stringify(o) : undefined], { result: { promise: true } }).then(JSON.parse),
+    write:  (p, c) => $__utils_fs_write.apply(undefined, [p, c], { result: { promise: true } }),
+    replace: async (p, regex, replacement) => {
+      const content = await globalThis.utils.fs.read(p);
+      const newContent = content.replace(regex, replacement);
+      await globalThis.utils.fs.write(p, newContent);
+    },
   },
   shell: (cmd, o) => $__utils_shell.apply(undefined, [cmd, o ? JSON.stringify(o) : undefined], { result: { promise: true } })
     .then(r => { try { return JSON.parse(r) } catch { return r } }),

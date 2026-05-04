@@ -12,7 +12,7 @@ export class PermissionError extends Error {
 }
 
 function normalizePermission(perm) {
-  if (perm.startsWith('fs.read:') || perm.startsWith('fs.exists:') || perm.startsWith('fs.glob:')) {
+  if (perm.startsWith('fs.read:') || perm.startsWith('fs.write:') || perm.startsWith('fs.exists:') || perm.startsWith('fs.glob:')) {
     const [cap, ...rest] = perm.split(':')
     const val = rest.join(':')
     if (

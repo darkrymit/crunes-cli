@@ -34,6 +34,9 @@ async function injectUtils(isolate, context, utils, runeCallback, vars) {
     const results = await utils.fs.glob(pattern, opts ? JSON.parse(opts) : undefined)
     return JSON.stringify(results)
   }))
+  await jail.set('$__utils_fs_write', new ivm.Reference(async (relPath, content) => {
+    return utils.fs.write(relPath, content)
+  }))
   await jail.set('$__utils_shell', new ivm.Reference(async (cmd, opts) => {
     const result = await utils.shell(cmd, opts ? JSON.parse(opts) : undefined)
     if (typeof result === 'string') return result

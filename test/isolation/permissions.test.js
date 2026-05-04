@@ -43,7 +43,7 @@ describe('computeEffectivePermissions', () => {
       'use'
     )
     expect(result.deny).toContain('shell:**')
-    expect(result.deny).toContain('fs.write:**')
+    expect(result.deny).toContain('fs.write:./**')
   })
 
   it('normalizes fs.read and fs.glob relative paths to use ./ prefix', () => {
@@ -60,6 +60,15 @@ describe('computeEffectivePermissions', () => {
       'use'
     )
     expect(result2.allow).toEqual(['fs.read:./package.json'])
+  })
+
+  it('normalizes fs.write relative paths to use ./ prefix', () => {
+    const result = computeEffectivePermissions(
+      { use: { allow: ['fs.write:src/*.js'] } },
+      undefined,
+      'use'
+    )
+    expect(result.allow).toEqual(['fs.write:./src/*.js'])
   })
 })
 
