@@ -31,16 +31,18 @@ function normalizePermission(perm) {
 
 /**
  * Compute effective allow/deny from plugin.json permissions + optional project override.
- *
- * allow replaces  — project allow fully overrides plugin allow.
- * deny  combines  — project deny merges with plugin deny; a denial at any level is permanent.
+ * Must be namespaced under the requested lifecycle (e.g. `use`).
  */
-export function computeEffectivePermissions(pluginPerms, projectPerms) {
-  const pluginAllow = (pluginPerms?.allow ?? []).map(normalizePermission)
-  const pluginDeny  = (pluginPerms?.deny ?? []).map(normalizePermission)
+export function computeEffectivePermissions(pluginPerms, projectPerms, lifecycle) {
+  const namespacePlugin = pluginPerms?.[lifecycle] || {}
+  const namespaceProject = projectPerms?.[lifecycle]
+
+  const pluginAllow = (namespacePlugin.allow ?? []).map(normalizePermission)
+  const pluginDeny  = (namespacePlugin.deny ?? []).map(normalizePermission)
+  
   return {
-    allow: (projectPerms?.allow ?? pluginAllow).map(normalizePermission),
-    deny:  [...pluginDeny, ...(projectPerms?.deny ?? []).map(normalizePermission)],
+    allow: (namespaceProject?.allow ?? pluginAllow).map(normalizePermission),
+    deny:  [...pluginDeny, ...(namespaceProject?.deny ?? []).map(normalizePermission)],
   }
 }
 

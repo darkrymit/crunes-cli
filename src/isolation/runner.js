@@ -123,7 +123,6 @@ async function injectConsole(isolate, context) {
  * @param {string[]} args             - rune arguments
  * @param {string}   projectDir       - project root (cwd for the rune)
  * @param {string}   [nodeModulesDir] - node_modules path for import resolution (plugin only)
- * @param {object}   [pluginDeps]     - declared deps from plugin.json (plugin only)
  * @param {number}   [isolateMemoryMb]
  * @param {number}   [isolateTimeoutMs]
  */
@@ -136,6 +135,7 @@ export async function runRuneInIsolate(runeFile, effective, args, projectDir, {
   isolateTimeoutMs = 30_000,
   sections = null,
   vars = {},
+  lifecycle = 'use',
 } = {}) {
   const augmented = pluginDir
     ? { allow: [...effective.allow, 'fs.read:@plugin/**'], deny: effective.deny }
@@ -165,11 +165,12 @@ export async function runRuneInIsolate(runeFile, effective, args, projectDir, {
     // so it must stay until then — but must not remain accessible to rune code after that.
     // We delete it via context.eval after evaluate() completes below.
 
-    // Compile the rune module. Conditionally capture the generate export into globalThis
+    // Compile the rune module. Conditionally capture the target export into globalThis
     // so context.eval() can call it. The typeof guard prevents ReferenceError when the
-    // rune does not export generate — the missing-export check below handles that case.
+    // rune does not export it — the missing-export check below handles that case.
     const runeSrc    = await fs.readFile(runeFile, 'utf8')
-    const patchedSrc = runeSrc + '\nif (typeof generate !== "undefined") globalThis.__crunes_generate = generate;\n'
+    const exportBinding = `\nif (typeof ${lifecycle} !== "undefined") globalThis.__crunes_target = ${lifecycle};\n`
+    const patchedSrc = runeSrc + exportBinding
     if (isVerbose) console.error(`[crunes:debug] compiling Module...`)
     const runeMod    = await isolate.compileModule(patchedSrc, { filename: runeFile })
 
@@ -191,17 +192,17 @@ export async function runRuneInIsolate(runeFile, effective, args, projectDir, {
     if (isVerbose) console.error(`[crunes:debug] cleaning up $__hostRequire...`)
     await context.eval('delete globalThis.$__hostRequire')
 
-    if (!await runeMod.namespace.get('generate', { reference: true })) {
-      throw new Error(`Rune "${runeFile}" does not export a generate() function.`)
+    if (!await runeMod.namespace.get(lifecycle, { reference: true })) {
+      throw new Error(`Rune "${runeFile}" does not export a ${lifecycle}() function.`)
     }
 
-    // Drive the async generate() call from inside the isolate.
-    // __crunes_generate and utils are globals set above.
+    // Drive the async target call from inside the isolate.
+    // __crunes_target and utils are globals set above.
     // context.eval with { promise: true } correctly awaits the async result.
-    if (isVerbose) console.error(`[crunes:debug] extracting generate() result...`)
+    if (isVerbose) console.error(`[crunes:debug] extracting ${lifecycle}() result...`)
     const resultJson = await context.eval(
       `(async () => {
-        const r = await __crunes_generate(
+        const r = await __crunes_target(
           ${JSON.stringify(projectDir)},
           ${JSON.stringify(args)},
           utils,
@@ -235,15 +236,16 @@ export async function runPluginRune(pluginDir, runeKey, pluginJson, effective, a
     isolateTimeoutMs: opts.isolateTimeoutMs,
     sections:         opts.sections ?? null,
     vars:             opts.vars ?? {},
+    lifecycle:        opts.lifecycle ?? 'use',
   })
 }
 
 /**
  * Compute effective permissions and run a plugin rune. Convenience wrapper for core.js.
  */
-export async function executePluginRune({ pluginDir, runeKey, pluginJson, projectPerms, projectVars = {}, args, projectDir, opts, runeCallback, sections }) {
+export async function executePluginRune({ pluginDir, runeKey, pluginJson, projectPerms, projectVars = {}, args, projectDir, opts, runeCallback, sections, lifecycle = 'use' }) {
   const runePerms     = pluginJson.runes[runeKey]?.permissions ?? {}
-  const effective     = computeEffectivePermissions(runePerms, projectPerms)
+  const effective     = computeEffectivePermissions(runePerms, projectPerms, lifecycle)
   const runeVars      = pluginJson.runes[runeKey]?.vars ?? {}
   const effectiveVars = { ...runeVars, ...projectVars }
   return runPluginRune(pluginDir, runeKey, pluginJson, effective, args, projectDir, {
@@ -251,5 +253,6 @@ export async function executePluginRune({ pluginDir, runeKey, pluginJson, projec
     runeCallback,
     sections,
     vars: effectiveVars,
+    lifecycle,
   })
 }

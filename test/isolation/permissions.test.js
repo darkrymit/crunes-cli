@@ -7,51 +7,57 @@ import {
 
 describe('computeEffectivePermissions', () => {
   it('uses plugin allow when no project override', () => {
-    const result = computeEffectivePermissions({ allow: ['fs.read:**'] }, undefined)
+    const result = computeEffectivePermissions({ use: { allow: ['fs.read:**'] } }, undefined, 'use')
     expect(result.allow).toEqual(['fs.read:./**'])
   })
 
   it('project allow fully replaces plugin allow', () => {
     const result = computeEffectivePermissions(
-      { allow: ['fs.read:**'] },
-      { allow: ['fs.read:src/**'] }
+      { use: { allow: ['fs.read:**'] } },
+      { use: { allow: ['fs.read:src/**'] } },
+      'use'
     )
     expect(result.allow).toEqual(['fs.read:./src/**'])
   })
 
   it('merges plugin deny and project deny', () => {
     const result = computeEffectivePermissions(
-      { allow: [], deny: ['shell:**'] },
-      { deny: ['fs.read:/etc/**'] }
+      { use: { allow: [], deny: ['shell:**'] } },
+      { use: { deny: ['fs.read:/etc/**'] } },
+      'use'
     )
     expect(result.deny).toContain('shell:**')
     expect(result.deny).toContain('fs.read:/etc/**')
   })
 
   it('handles missing allow/deny gracefully', () => {
-    const result = computeEffectivePermissions({}, undefined)
+    const result = computeEffectivePermissions({}, undefined, 'use')
     expect(result.allow).toEqual([])
     expect(result.deny).toEqual([])
   })
 
   it('project deny adds to plugin deny even when project allow is set', () => {
     const result = computeEffectivePermissions(
-      { allow: ['fs.read:**'], deny: ['shell:**'] },
-      { allow: ['fs.read:**'], deny: ['fs.write:**'] }
+      { use: { allow: ['fs.read:**'], deny: ['shell:**'] } },
+      { use: { allow: ['fs.read:**'], deny: ['fs.write:**'] } },
+      'use'
     )
     expect(result.deny).toContain('shell:**')
     expect(result.deny).toContain('fs.write:**')
   })
+
   it('normalizes fs.read and fs.glob relative paths to use ./ prefix', () => {
     const result = computeEffectivePermissions(
-      { allow: ['fs.read:package.json'] },
-      { allow: ['fs.glob:src/*.js'] }
+      { use: { allow: ['fs.read:package.json'] } },
+      { use: { allow: ['fs.glob:src/*.js'] } },
+      'use'
     )
     expect(result.allow).toEqual(['fs.glob:./src/*.js'])
 
     const result2 = computeEffectivePermissions(
-      { allow: ['fs.read:package.json'] },
-      undefined
+      { use: { allow: ['fs.read:package.json'] } },
+      undefined,
+      'use'
     )
     expect(result2.allow).toEqual(['fs.read:./package.json'])
   })

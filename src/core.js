@@ -141,6 +141,7 @@ export async function runRune(dir, config, key, args, opts = {}, _callStack = []
       pluginDir, runeKey, pluginJson, projectPerms, projectVars, args,
       projectDir: dir, opts: config, runeCallback,
       sections: opts.sections ?? null,
+      lifecycle: 'use',
     })
     return normaliseResult(result)
   }
@@ -158,6 +159,7 @@ export async function runRune(dir, config, key, args, opts = {}, _callStack = []
         pluginDir, runeKey, pluginJson, projectPerms, projectVars, args,
         projectDir: dir, opts: config, runeCallback,
         sections: opts.sections ?? null,
+        lifecycle: 'use',
       })
       return normaliseResult(result)
     }
@@ -178,6 +180,7 @@ export async function runRune(dir, config, key, args, opts = {}, _callStack = []
       pluginDir, runeKey, pluginJson, projectPerms, projectVars, args,
       projectDir: dir, opts: config, runeCallback,
       sections: opts.sections ?? null,
+      lifecycle: 'use',
     })
     return normaliseResult(result)
   }
@@ -185,11 +188,12 @@ export async function runRune(dir, config, key, args, opts = {}, _callStack = []
   // Local rune — always isolated
   const fullPath = join(dir, entry.path)
   const basePerms = entry.permissions ?? { allow: [], deny: [] }
-  const effective = computeEffectivePermissions(basePerms, config.permissions?.[key])
+  const effective = computeEffectivePermissions(basePerms, config.permissions?.[key], 'use')
   const result = await runRuneInIsolate(fullPath, effective, args, dir, {
     runeCallback,
     sections: opts.sections ?? null,
     vars: entry.vars ?? {},
+    lifecycle: 'use',
   })
   return normaliseResult(result)
 }
