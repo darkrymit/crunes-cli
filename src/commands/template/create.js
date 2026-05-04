@@ -4,20 +4,29 @@ import { intro, outro, text, cancel } from '@clack/prompts'
 import { output } from '../../utils/output.js'
 
 function templateStub(name) {
-  return (
-    `export async function generate(dir, args, utils, opts) {\n` +
-    `  // dir  — absolute path to the user's project root\n` +
-    `  // args — string[] passed via $key=arg1,arg2\n` +
-    `  // utils — { md, tree, section, fs, shell, rune }\n` +
-    `  // opts.sections — string[] | null — requested sections (performance hint)\n` +
-    `\n` +
-    `  const content = [\n` +
-    `    utils.md.h3('${name}'),\n` +
-    `    utils.md.ul(['Replace with real output']),\n` +
-    `  ].join('\\n');\n` +
-    `  return utils.section('example-md', { type: 'markdown', content });\n` +
-    `}\n`
-  )
+  return [
+    `// permissions:`,
+    `//   use:`,
+    `//     allow: []  — add patterns like fs.read:./** if you use utils.fs`,
+    `//     deny:  []`,
+    ``,
+    `export async function use(dir, args, utils) {`,
+    `  // dir   — absolute path to the user's project root`,
+    `  // args  — string[] passed via $key=arg1,arg2`,
+    `  // utils — { md, tree, section, fs, json, shell, fetch, env, vars, rune }`,
+    `  //`,
+    `  // utils.section.selected()         → string[] | null — requested section patterns`,
+    `  // utils.section.match(name)        → bool            — true if section is requested`,
+    `  // utils.section.create(name, data) → Section         — build a section object`,
+    ``,
+    `  const content = [`,
+    `    utils.md.h3('${name}'),`,
+    `    utils.md.ul(['Replace with real output']),`,
+    `  ].join('\\n');`,
+    `  return utils.section.create('example-md', { type: 'markdown', content });`,
+    `}`,
+    ``,
+  ].join('\n')
 }
 
 export async function handler({
