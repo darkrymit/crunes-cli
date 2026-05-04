@@ -6,31 +6,45 @@ import { output } from '../utils/output.js';
 const VALID_FORMATS = ['tree', 'markdown'];
 
 function template(key, format) {
-  const header =
-    `export function generate(dir, args, utils) {\n` +
-    `  // args: string[] passed from $${key}(arg1, arg2)\n`;
+  const header = [
+    `// permissions:`,
+    `//   use:`,
+    `//     allow: []  \u2014 add patterns like fs.read:./** if you use utils.fs`,
+    `//     deny:  []`,
+    ``,
+    `export async function use(dir, args, utils) {`,
+    `  // dir   \u2014 absolute path to the user's project root`,
+    `  // args  \u2014 string[] passed via $${key}=arg1,arg2`,
+    `  // utils \u2014 { md, tree, section, fs, json, shell, fetch, env, vars, rune }`,
+    `  //`,
+    `  // utils.section.selected()         \u2192 string[] | null \u2014 requested section patterns`,
+    `  // utils.section.match(name)        \u2192 bool            \u2014 true if section is requested`,
+    `  // utils.section.create(name, data) \u2192 Section         \u2014 build a section object`,
+  ].join('\n');
 
   if (format === 'tree') {
-    return (
-      header +
-      `  const root = utils.tree.node('${key}', 'Root description', [\n` +
-      `    utils.tree.node('child', 'Child description'),\n` +
-      `  ]);\n` +
-      `  return utils.section('example-tree', { type: 'tree', root });\n` +
-      `}\n`
-    );
+    return header + '\n' + [
+      ``,
+      `  const root = utils.tree.node('${key}', 'Root description', [`,
+      `    utils.tree.node('child', 'Child description'),`,
+      `  ]);`,
+      `  return utils.section.create('example-tree', { type: 'tree', root });`,
+      `}`,
+      ``,
+    ].join('\n');
   }
 
   // markdown
-  return (
-    header +
-    `  const content = [\n` +
-    `    utils.md.h3('${key}'),\n` +
-    `    utils.md.ul(['Replace with real data']),\n` +
-    `  ].join('\\n');\n` +
-    `  return utils.section('example-md', { type: 'markdown', content });\n` +
-    `}\n`
-  );
+  return header + '\n' + [
+    ``,
+    `  const content = [`,
+    `    utils.md.h3('${key}'),`,
+    `    utils.md.ul(['Replace with real data']),`,
+    `  ].join('\\n');`,
+    `  return utils.section.create('example-md', { type: 'markdown', content });`,
+    `}`,
+    ``,
+  ].join('\n');
 }
 
 export async function handler({
