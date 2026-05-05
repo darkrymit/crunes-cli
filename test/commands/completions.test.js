@@ -2,8 +2,8 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { resolveCompletions } from '../../src/commands/completions.js'
-import { buildProgram } from '../../src/program.js'
+import { resolveCompletions } from '../../src/cli/commands/completions.js'
+import { buildProgram } from '../../src/cli/program.js'
 
 const program = buildProgram()
 const TOP = ['use','version','doctor','check','bench','list','init','create','plugin','template','marketplace','completions']

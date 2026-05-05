@@ -14,10 +14,10 @@ const embedIsolateSourcesPlugin = {
 
     build.onLoad({ filter: /.*/, namespace: 'embed-isolate-sources' }, async () => {
       const [mdSrc, treeSrc, utilsSrc, consoleSrc] = await Promise.all([
-        readFile('./src/api/utils/md.js', 'utf8'),
-        readFile('./src/api/utils/tree.js', 'utf8'),
-        readFile('./src/isolation/utils-bootstrap.js', 'utf8'),
-        readFile('./src/isolation/console-bootstrap.js', 'utf8'),
+        readFile('./src/rune/api/md.js', 'utf8'),
+        readFile('./src/rune/api/tree.js', 'utf8'),
+        readFile('./src/rune/isolation/utils-bootstrap.js', 'utf8'),
+        readFile('./src/rune/isolation/console-bootstrap.js', 'utf8'),
       ])
 
       return {
@@ -34,7 +34,7 @@ const embedIsolateSourcesPlugin = {
 }
 
 await esbuild.build({
-  entryPoints: ['src/cli.js'],
+  entryPoints: ['src/cli/cli.js'],
   bundle: true,
   platform: 'node',
   format: 'esm',
