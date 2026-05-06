@@ -1,21 +1,28 @@
 # CLI Knowledge Base
 
-> AI-first documentation vault for the crunes-cli. Covers Key Decisions and Gotchas for each module.
+AI-first documentation vault. Start here for context before working on any module.
 
 ## Modules
-- [[modules/cli]] — Entry point & command registration
-- [[modules/core]] — Config loading & error types
-- [[modules/marketplace]] — Marketplace source management
-- [[modules/plugin]] — Plugin registry, install, consent
-- [[modules/rune]] — VM Sandboxing, permissions, utils API
-- [[modules/rune.isolation]] — isolated-vm lifecycle and bridge
-- [[modules/rune.permissions]] — Permission computation
-- [[modules/rune.api]] — Utils API surface for rune authors
-- [[modules/shared]] — Rendering and output
-- [[modules/template]] — Rune template management
+
+| Module | Note | Source |
+|--------|------|--------|
+| CLI | [[modules/cli]] | `src/cli/` |
+| Core | [[modules/core]] | `src/core/` |
+| Marketplace | [[modules/marketplace]] | `src/marketplace/` |
+| Plugin | [[modules/plugin]] | `src/plugin/` |
+| Rune | [[modules/rune]] | `src/rune/` |
+| Rune — API | [[modules/rune.api]] | `src/rune/api/` |
+| Rune — Isolation | [[modules/rune.isolation]] | `src/rune/isolation/` |
+| Rune — Permissions | [[modules/rune.permissions]] | `src/rune/permissions/` |
+| Shared | [[modules/shared]] | `src/shared/` |
+| Template | [[modules/template]] | `src/template/` |
 
 ## Flows
-- [[flows/use]] — The `crunes use` execution pipeline
+
+| Flow | Note |
+|------|------|
+| crunes use | [[flows/use]] |
 
 ## System
-- [[system/architecture]] — Core philosophy and module map
+
+- [[system/architecture]] — stack, module map, design principles
