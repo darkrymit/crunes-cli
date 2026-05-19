@@ -39,6 +39,17 @@ globalThis.utils = {
     read:   (p, o) => $__utils_json_read.apply(undefined, [p, o ? JSON.stringify(o) : undefined], { result: { promise: true } }).then(JSON.parse),
     get:    (p, q, d) => $__utils_json_get.apply(undefined, [p, q, d !== undefined ? JSON.stringify(d) : undefined], { result: { promise: true } }).then(JSON.parse),
     getAll: (p, q, d) => $__utils_json_getAll.apply(undefined, [p, q, d !== undefined ? JSON.stringify(d) : undefined], { result: { promise: true } }).then(JSON.parse),
+    write: (p, d, o) => $__utils_json_write.apply(undefined, [p, JSON.stringify(d), o ? JSON.stringify(o) : undefined], { result: { promise: true } }),
+    modify: async (filepath, callback, opts = {}) => {
+      const { initial, spaces = 2 } = opts
+      const missing = !(await globalThis.utils.fs.exists(filepath))
+      if (missing && initial === undefined) {
+        await globalThis.utils.json.read(filepath)
+      }
+      const data = missing ? JSON.parse(JSON.stringify(initial)) : await globalThis.utils.json.read(filepath)
+      const result = await callback(data, { exists: !missing })
+      await globalThis.utils.json.write(filepath, result !== undefined ? result : data, { spaces })
+    },
   },
   fetch: (url, opts) => $__utils_fetch
     .apply(undefined, [url, opts ? JSON.stringify(opts) : undefined], { result: { promise: true } })

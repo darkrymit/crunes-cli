@@ -50,5 +50,20 @@ export function createJsonUtils(dir, fsUtils) {
       const results = JSONPath({ path: jsonPath, json: obj, wrap: true })
       return results.length === 0 ? defaultValue : results
     },
+
+    async write(relPath, data, { spaces = 2 } = {}) {
+      const content = JSON.stringify(data, null, spaces) + '\n'
+      await fsUtils.write(relPath, content)
+    },
+
+    async modify(relPath, callback, { initial, spaces = 2 } = {}) {
+      const missing = !(await fsUtils.exists(relPath))
+      if (missing && initial === undefined) {
+        await this.read(relPath)
+      }
+      const data = missing ? structuredClone(initial) : await this.read(relPath)
+      const result = await callback(data, { exists: !missing })
+      await this.write(relPath, result !== undefined ? result : data, { spaces })
+    },
   }
 }
