@@ -72,6 +72,13 @@ async function injectUtils(isolate, context, utils, runeCallback, vars) {
   await jail.set('$__utils_json_write', new ivm.Reference(async (relPath, dataJson, optsJson) => {
     await utils.json.write(relPath, JSON.parse(dataJson), optsJson ? JSON.parse(optsJson) : undefined)
   }))
+  await jail.set('$__utils_yaml_read', new ivm.Reference(async (relPath, optsJson) => {
+    const result = await utils.yaml.read(relPath, optsJson ? JSON.parse(optsJson) : undefined)
+    return JSON.stringify(result)
+  }))
+  await jail.set('$__utils_yaml_write', new ivm.Reference(async (relPath, dataJson, optsJson) => {
+    await utils.yaml.write(relPath, JSON.parse(dataJson), optsJson ? JSON.parse(optsJson) : undefined)
+  }))
   await jail.set('$__utils_fetch', new ivm.Reference(async (url, optsJson) => {
     const res = await utils.fetch(url, optsJson ? JSON.parse(optsJson) : undefined)
     return JSON.stringify({
