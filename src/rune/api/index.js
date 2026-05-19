@@ -4,6 +4,7 @@ import { createFsUtils } from './fs.js'
 import { createShellUtils } from './shell.js'
 import { createJsonUtils } from './json.js'
 import { createYamlUtils } from './yaml.js'
+import { createXmlUtils } from './xml.js'
 import { createFetchUtils } from './fetch.js'
 import { createEnvUtils } from './env.js'
 import { createVarsUtils } from './vars.js'
@@ -35,6 +36,7 @@ export function createUtils(dir, checkPermission = null, pluginDir = null, permi
     shell: createShellUtils(dir, checkPermission),
     json:  createJsonUtils(dir, fs),
     yaml:  createYamlUtils(dir, fs),
+    xml:   createXmlUtils(dir, fs),
     fetch: createFetchUtils(checkPermission),
     env:   createEnvUtils(dir, checkPermission, permissions),
     vars:  createVarsUtils(vars),
