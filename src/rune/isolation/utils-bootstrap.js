@@ -60,7 +60,9 @@ globalThis.utils = {
       if (missing && initial === undefined) {
         await globalThis.utils.yaml.read(filepath)
       }
-      const data = missing ? JSON.parse(JSON.stringify(initial)) : await globalThis.utils.yaml.read(filepath)
+      const data = missing
+        ? JSON.parse(JSON.stringify(initial))
+        : await globalThis.utils.yaml.read(filepath)
       const result = await callback(data, { exists: !missing })
       await globalThis.utils.yaml.write(filepath, result !== undefined ? result : data, { indent })
     },
