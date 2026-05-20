@@ -122,6 +122,30 @@ globalThis.utils = {
       }
     },
   },
+  sqlite: {
+    open: async (location, name) => {
+      const id = await $__utils_sqlite_open.apply(undefined, [location, name ?? null], { result: { promise: true } })
+      const db = {
+        query: (sql, params = []) =>
+          $__utils_sqlite_query.apply(undefined, [id, sql, params.length ? JSON.stringify(params) : null], { result: { promise: true } })
+            .then(JSON.parse),
+        get: (sql, params = []) =>
+          $__utils_sqlite_get.apply(undefined, [id, sql, params.length ? JSON.stringify(params) : null], { result: { promise: true } })
+            .then(r => r !== null ? JSON.parse(r) : null),
+        exec: (sql, params = []) =>
+          $__utils_sqlite_exec.apply(undefined, [id, sql, params.length ? JSON.stringify(params) : null], { result: { promise: true } })
+            .then(JSON.parse),
+        transaction: async (fn) => {
+          await db.exec('BEGIN')
+          try { await fn(); await db.exec('COMMIT') }
+          catch (e) { await db.exec('ROLLBACK'); throw e }
+        },
+        close: () =>
+          $__utils_sqlite_close.apply(undefined, [id], { result: { promise: true } }),
+      }
+      return db
+    },
+  },
   md,
   tree,
 }

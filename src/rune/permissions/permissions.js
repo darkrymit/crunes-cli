@@ -26,7 +26,8 @@ function normalizePermission(perm) {
       return `${cap}:./${val}`
     }
   }
-  if (perm.startsWith('cache.read:') || perm.startsWith('cache.write:')) {
+  if (perm.startsWith('cache.read:') || perm.startsWith('cache.write:') ||
+      perm.startsWith('sqlite.read:') || perm.startsWith('sqlite.write:')) {
     const colonIdx = perm.indexOf(':')
     const cap      = perm.slice(0, colonIdx)
     const rest     = perm.slice(colonIdx + 1)

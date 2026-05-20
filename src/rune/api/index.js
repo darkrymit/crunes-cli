@@ -10,6 +10,7 @@ import { createEnvUtils } from './env.js'
 import { createVarsUtils } from './vars.js'
 import { createArchiveUtils } from './archive.js'
 import { createCacheUtils } from './cache.js'
+import { createSqliteUtils } from './sqlite.js'
 import micromatch from 'micromatch'
 
 export function createSectionUtils(patterns) {
@@ -30,7 +31,8 @@ export function createSectionUtils(patterns) {
 
 export function createUtils(dir, checkPermission = null, pluginDir = null, permissions = { allow: [], deny: [] }, vars = {}, requestedSections = null, pluginId = null) {
   const fs = createFsUtils(dir, checkPermission, pluginDir)
-  return {
+  const sqlite = createSqliteUtils(dir, checkPermission, pluginId)
+  const utils = {
     md,
     tree: treeUtils,
     section: createSectionUtils(requestedSections),
@@ -44,5 +46,7 @@ export function createUtils(dir, checkPermission = null, pluginDir = null, permi
     vars:    createVarsUtils(vars),
     archive: createArchiveUtils(dir, checkPermission),
     cache:   createCacheUtils(dir, checkPermission, pluginId),
+    sqlite,
   }
+  return { utils, dispose: () => sqlite.dispose() }
 }

@@ -152,6 +152,38 @@ async function injectUtils(isolate, context, utils, runeCallback, vars) {
     await handle.clear()
   }))
 
+  const sqliteHandles    = new Map()
+  let   nextSqliteHandle = 0
+
+  await jail.set('$__utils_sqlite_open', new ivm.Reference(async (location, name) => {
+    const handle = utils.sqlite.openHandle(location, name ?? 'default')
+    const id = String(nextSqliteHandle++)
+    sqliteHandles.set(id, handle)
+    return id
+  }))
+  await jail.set('$__utils_sqlite_query', new ivm.Reference(async (id, sql, paramsJson) => {
+    const handle = sqliteHandles.get(id)
+    if (!handle) throw new Error(`Invalid sqlite handle: ${id}`)
+    return JSON.stringify(handle.query(sql, paramsJson ? JSON.parse(paramsJson) : []))
+  }))
+  await jail.set('$__utils_sqlite_get', new ivm.Reference(async (id, sql, paramsJson) => {
+    const handle = sqliteHandles.get(id)
+    if (!handle) throw new Error(`Invalid sqlite handle: ${id}`)
+    const row = handle.get(sql, paramsJson ? JSON.parse(paramsJson) : [])
+    return row !== null ? JSON.stringify(row) : null
+  }))
+  await jail.set('$__utils_sqlite_exec', new ivm.Reference(async (id, sql, paramsJson) => {
+    const handle = sqliteHandles.get(id)
+    if (!handle) throw new Error(`Invalid sqlite handle: ${id}`)
+    return JSON.stringify(handle.exec(sql, paramsJson ? JSON.parse(paramsJson) : []))
+  }))
+  await jail.set('$__utils_sqlite_close', new ivm.Reference(async (id) => {
+    const handle = sqliteHandles.get(id)
+    if (!handle) return
+    handle.close()
+    sqliteHandles.delete(id)
+  }))
+
   await jail.set('$__vars', JSON.stringify(vars))
 
   const [mdMod, treeMod, utilsMod] = await Promise.all([
@@ -211,7 +243,7 @@ export async function runRuneInIsolate(runeFile, effective, args, projectDir, {
     ? { allow: [...effective.allow, 'fs.read:@plugin/**'], deny: effective.deny }
     : effective
   const checkPermission = makePermissionChecker(augmented)
-  const utils           = createUtils(projectDir, checkPermission, pluginDir ?? null, augmented, vars, sections, pluginId)
+  const { utils, dispose } = createUtils(projectDir, checkPermission, pluginDir ?? null, augmented, vars, sections, pluginId)
 
   if (isVerbose) console.error(`[crunes:debug] creating Isolate...`)
   const isolate = new ivm.Isolate({ memoryLimit: isolateMemoryMb })
@@ -287,6 +319,7 @@ export async function runRuneInIsolate(runeFile, effective, args, projectDir, {
     return JSON.parse(resultJson)
   } finally {
     if (isVerbose) console.error(`[crunes:debug] disposing Isolate...`)
+    dispose()
     isolate.dispose()
   }
 }
