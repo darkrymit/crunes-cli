@@ -115,6 +115,38 @@ async function injectUtils(isolate, context, utils, runeCallback, vars) {
   await jail.set('$__utils_archive_tar', new ivm.Reference(async (source, dest) => {
     await utils.archive.tar(source, dest)
   }))
+
+  const cacheHandles    = new Map()
+  let   nextCacheHandle = 0
+
+  await jail.set('$__utils_cache_open', new ivm.Reference(async (location, name) => {
+    const handle = utils.cache.openHandle(location, name ?? 'default')
+    const id = String(nextCacheHandle++)
+    cacheHandles.set(id, handle)
+    return id
+  }))
+  await jail.set('$__utils_cache_set', new ivm.Reference(async (id, key, valueJson, ttl) => {
+    const handle = cacheHandles.get(id)
+    if (!handle) throw new Error(`Invalid cache handle: ${id}`)
+    await handle.set(key, JSON.parse(valueJson), ttl !== null ? Number(ttl) : null)
+  }))
+  await jail.set('$__utils_cache_get', new ivm.Reference(async (id, key) => {
+    const handle = cacheHandles.get(id)
+    if (!handle) throw new Error(`Invalid cache handle: ${id}`)
+    const value = await handle.get(key)
+    return value !== null ? JSON.stringify(value) : null
+  }))
+  await jail.set('$__utils_cache_delete', new ivm.Reference(async (id, key) => {
+    const handle = cacheHandles.get(id)
+    if (!handle) throw new Error(`Invalid cache handle: ${id}`)
+    await handle.delete(key)
+  }))
+  await jail.set('$__utils_cache_clear', new ivm.Reference(async (id) => {
+    const handle = cacheHandles.get(id)
+    if (!handle) throw new Error(`Invalid cache handle: ${id}`)
+    await handle.clear()
+  }))
+
   await jail.set('$__vars', JSON.stringify(vars))
 
   const [mdMod, treeMod, utilsMod] = await Promise.all([
@@ -168,12 +200,13 @@ export async function runRuneInIsolate(runeFile, effective, args, projectDir, {
   sections = null,
   vars = {},
   lifecycle = 'use',
+  pluginId = null,
 } = {}) {
   const augmented = pluginDir
     ? { allow: [...effective.allow, 'fs.read:@plugin/**'], deny: effective.deny }
     : effective
   const checkPermission = makePermissionChecker(augmented)
-  const utils           = createUtils(projectDir, checkPermission, pluginDir ?? null, augmented, vars, sections)
+  const utils           = createUtils(projectDir, checkPermission, pluginDir ?? null, augmented, vars, sections, pluginId)
 
   if (isVerbose) console.error(`[crunes:debug] creating Isolate...`)
   const isolate = new ivm.Isolate({ memoryLimit: isolateMemoryMb })
@@ -262,6 +295,9 @@ export async function runPluginRune(pluginDir, runeKey, pluginJson, effective, a
     nodeModulesDir,
     pluginDeps:       pluginJson.dependencies ?? {},
     pluginDir,
+    pluginId:         pluginJson.name && pluginJson.version
+                        ? `${pluginJson.name}@${pluginJson.version}`
+                        : null,
     runeCallback:     opts.runeCallback ?? null,
     isolateMemoryMb:  opts.isolateMemoryMb,
     isolateTimeoutMs: opts.isolateTimeoutMs,

@@ -26,6 +26,25 @@ function normalizePermission(perm) {
       return `${cap}:./${val}`
     }
   }
+  if (perm.startsWith('cache.read:') || perm.startsWith('cache.write:')) {
+    const colonIdx = perm.indexOf(':')
+    const cap      = perm.slice(0, colonIdx)
+    const rest     = perm.slice(colonIdx + 1)
+    const sepIdx   = rest.lastIndexOf(':')
+    const rawLoc   = sepIdx === -1 ? rest      : rest.slice(0, sepIdx)
+    const rawName  = sepIdx === -1 ? 'default' : rest.slice(sepIdx + 1)
+    let loc = rawLoc
+    if (
+      !loc.startsWith('./') &&
+      !loc.startsWith('../') &&
+      !loc.startsWith('~/') &&
+      !loc.startsWith('/') &&
+      !/^[a-zA-Z]:/.test(loc)
+    ) {
+      loc = './' + loc
+    }
+    return `${cap}:${loc}:${rawName}`
+  }
   return perm
 }
 

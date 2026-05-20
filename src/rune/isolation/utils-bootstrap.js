@@ -111,6 +111,17 @@ globalThis.utils = {
     untar: (s, d) => $__utils_archive_untar.apply(undefined, [s, d], { result: { promise: true } }),
     tar:   (s, d) => $__utils_archive_tar.apply(undefined,   [s, d], { result: { promise: true } }),
   },
+  cache: {
+    open: async (location, name) => {
+      const id = await $__utils_cache_open.apply(undefined, [location, name ?? null], { result: { promise: true } })
+      return {
+        set:    (k, v, ttl) => $__utils_cache_set.apply(undefined, [id, k, JSON.stringify(v), ttl ?? null], { result: { promise: true } }),
+        get:    (k)          => $__utils_cache_get.apply(undefined, [id, k], { result: { promise: true } }).then(r => r !== null ? JSON.parse(r) : null),
+        delete: (k)          => $__utils_cache_delete.apply(undefined, [id, k], { result: { promise: true } }),
+        clear:  ()           => $__utils_cache_clear.apply(undefined, [id], { result: { promise: true } }),
+      }
+    },
+  },
   md,
   tree,
 }
