@@ -39,6 +39,7 @@ function docToJs(node) {
         for (let j = 1; j < val.items.length; j++) {
           if (val.items[j]?.commentBefore) result[`#comment:${key}[${j}]`] = trimComment(val.items[j].commentBefore)
         }
+        if (val.flow) result[`#flow:${key}`] = true
       }
       if (isScalar(val) && val.type && val.type !== 'PLAIN') {
         const styleMap = {
@@ -73,6 +74,7 @@ function buildNode(doc, data, arrayItemComments = {}) {
     const inlines = {}
     const styles = {}
     const arrayComments = {}
+    const flows = {}
 
     for (const k of Object.keys(data)) {
       const cm = k.match(/^#comment:([^\[]+)$/)
@@ -87,6 +89,8 @@ function buildNode(doc, data, arrayItemComments = {}) {
       if (il) { inlines[il[1]] = data[k]; continue }
       const st = k.match(/^#style:(.+)$/)
       if (st) { styles[st[1]] = data[k]; continue }
+      const fl = k.match(/^#flow:(.+)$/)
+      if (fl) { flows[fl[1]] = data[k]; continue }
     }
 
     const map = doc.createNode({})
@@ -96,6 +100,7 @@ function buildNode(doc, data, arrayItemComments = {}) {
       const keyNode = doc.createNode(k)
       if (comments[k]) keyNode.commentBefore = ' ' + comments[k].split('\n').join('\n ')
       const valNode = buildNode(doc, data[k], arrayComments[k] || {})
+      if (flows[k] && isSeq(valNode)) valNode.flow = true
       if (inlines[k]) valNode.comment = ' ' + inlines[k]
       if (styles[k] && isScalar(valNode)) {
         const styleMap = {
@@ -137,7 +142,7 @@ function buildDoc(data, { indent = 2 } = {}) {
   doc.contents = buildNode(doc, data)
   if (head) doc.commentBefore = ' ' + head
   if (tail) doc.comment = ' ' + tail
-  const content = doc.toString({ indent })
+  const content = doc.toString({ indent, nullStr: '' })
   return content.endsWith('\n') ? content : content + '\n'
 }
 
