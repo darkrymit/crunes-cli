@@ -135,7 +135,7 @@ export async function installPlugin(source, projectDir, provenance = {}) {
       consentedPermissions[key] = collectAllowFromRune(rune)
     }
 
-    await registerPlugin({ name, version, path: cacheDir, consentedPermissions, ...provenance })
+    await registerPlugin({ name, version, path: cacheDir, local: isLocal, consentedPermissions, ...provenance })
     await addPluginToProjectConfig(projectDir, pluginKey)
 
     return { installed: true, name: pluginKey, version }
@@ -199,14 +199,16 @@ export async function uninstallPlugin(pluginKey, projectDir) {
   const entry = registry.plugins?.[pluginKey]
   if (!entry) throw new Error(`Plugin "${pluginKey}" is not installed.`)
 
-  try {
-    const stat = await fs.lstat(entry.path)
-    if (stat.isSymbolicLink()) {
-      await fs.unlink(entry.path)
-    } else {
-      await fs.rm(entry.path, { recursive: true, force: true })
-    }
-  } catch { /* already gone */ }
+  if (!entry.local) {
+    try {
+      const stat = await fs.lstat(entry.path)
+      if (stat.isSymbolicLink()) {
+        await fs.unlink(entry.path)
+      } else {
+        await fs.rm(entry.path, { recursive: true, force: true })
+      }
+    } catch { /* already gone */ }
+  }
 
   await removePlugin(pluginKey)
   await removePluginFromProjectConfig(projectDir, pluginKey)
