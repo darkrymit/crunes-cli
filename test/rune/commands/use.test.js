@@ -29,6 +29,44 @@ describe('parseKeyToken', () => {
   })
 })
 
+describe('handler configRoot', () => {
+  let written
+
+  beforeEach(() => {
+    loadConfig.mockReturnValue({ runes: { docs: { path: 'runes/docs.js' } } })
+    written = ''
+    vi.spyOn(process.stdout, 'write').mockImplementation(s => { written += s })
+    vi.spyOn(process, 'exit').mockImplementation(() => {})
+    runRune.mockResolvedValue([])
+  })
+
+  afterEach(() => {
+    vi.clearAllMocks()
+    vi.restoreAllMocks()
+  })
+
+  it('loads config from configRoot when it differs from projectRoot', async () => {
+    await handler({ keys: ['docs'], projectRoot: '/project', configRoot: '/config-repo' })
+    expect(loadConfig).toHaveBeenCalledWith('/config-repo')
+  })
+
+  it('passes configDir to runRune when configRoot is set', async () => {
+    await handler({ keys: ['docs'], projectRoot: '/project', configRoot: '/config-repo' })
+    expect(runRune).toHaveBeenCalledWith(
+      '/project',
+      expect.anything(),
+      'docs',
+      [],
+      expect.objectContaining({ configDir: '/config-repo' })
+    )
+  })
+
+  it('falls back to projectRoot for configRoot when not provided', async () => {
+    await handler({ keys: ['docs'], projectRoot: '/project' })
+    expect(loadConfig).toHaveBeenCalledWith('/project')
+  })
+})
+
 describe('handler section filtering', () => {
   let written
 

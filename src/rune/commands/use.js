@@ -36,10 +36,11 @@ export async function handler({
   format = 'md',
   failFast = false,
   projectRoot = process.cwd(),
+  configRoot = projectRoot,
 }) {
   let config
   try {
-    config = loadConfig(projectRoot)
+    config = loadConfig(configRoot)
   } catch (err) {
     output.error(`Config unreadable: ${err.message}`)
     output.info('Run `crunes init` to create a config file.')
@@ -55,7 +56,7 @@ export async function handler({
     let sections
     try {
       if (isVerbose) console.error(`[crunes:debug] Loading rune "${key}"`)
-      sections = await runRune(projectRoot, config, key, args, { sections: sectionFilter })
+      sections = await runRune(projectRoot, config, key, args, { sections: sectionFilter, configDir: configRoot })
       if (isVerbose) console.error(`[crunes:debug] Rune "${key}" completed with ${sections?.length ?? 0} sections`)
     } catch (err) {
       const msg = isVerbose ? (err.stack || err.message) : err.message

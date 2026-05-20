@@ -7,10 +7,11 @@ export async function handler({
   format = 'md',
   plain = false,
   projectRoot = process.cwd(),
+  configRoot = projectRoot,
 } = {}) {
   let config;
   try {
-    config = loadConfig(projectRoot);
+    config = loadConfig(configRoot);
   } catch (err) {
     output.error(`Config unreadable: ${err.message}`);
     output.info('Run `crunes init` to create a config file.');

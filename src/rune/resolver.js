@@ -69,6 +69,8 @@ async function resolveRuneFromPlugins(config, runeKey) {
 }
 
 export async function runRune(dir, config, key, args, opts = {}, _callStack = []) {
+  const configDir = opts.configDir ?? dir
+
   let localOnly = false
   if (key.startsWith('local:')) {
     key = key.slice(6)
@@ -80,7 +82,7 @@ export async function runRune(dir, config, key, args, opts = {}, _callStack = []
   }
 
   const nextStack = [..._callStack, key]
-  const runeCallback = (childKey, childArgs) => runRune(dir, config, childKey, childArgs, {}, nextStack)
+  const runeCallback = (childKey, childArgs) => runRune(dir, config, childKey, childArgs, { configDir }, nextStack)
 
   const pluginMatch = localOnly ? null : await resolvePluginRune(config, key)
   if (pluginMatch) {
@@ -134,7 +136,7 @@ export async function runRune(dir, config, key, args, opts = {}, _callStack = []
     return normaliseResult(result)
   }
 
-  const fullPath = join(dir, entry.path)
+  const fullPath = join(configDir, entry.path)
   const basePerms = entry.permissions ?? { allow: [], deny: [] }
   const effective = computeEffectivePermissions(basePerms, config.permissions?.[key], 'use')
   const result = await runRuneInIsolate(fullPath, effective, args, dir, {

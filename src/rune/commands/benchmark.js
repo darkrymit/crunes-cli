@@ -37,10 +37,11 @@ export async function handler({
   runs = 1,
   plain = false,
   projectRoot = process.cwd(),
+  configRoot = projectRoot,
 } = {}) {
   let config
   try {
-    config = loadConfig(projectRoot)
+    config = loadConfig(configRoot)
   } catch (err) {
     output.error(`Config unreadable: ${err.message}`)
     output.info('Run `crunes init` to create a config file.')
@@ -72,12 +73,12 @@ export async function handler({
     let err = null
 
     // Warmup run — discarded, avoids cold-start skewing first measurement
-    try { await runRune(projectRoot, config, k, [], {}) } catch {}
+    try { await runRune(projectRoot, config, k, [], { configDir: configRoot }) } catch {}
 
     for (let i = 0; i < runs; i++) {
       const t0 = performance.now()
       try {
-        await runRune(projectRoot, config, k, [], {})
+        await runRune(projectRoot, config, k, [], { configDir: configRoot })
       } catch (e) {
         err = e
         break

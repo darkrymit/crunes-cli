@@ -12,6 +12,7 @@ export function buildProgram() {
     .option('-y, --yes', 'assume yes to all prompts and skip interactive mode (also auto-detected in non-TTY environments)')
     .option('-p, --plain', 'plain output: no colors, no box-drawing, plain symbols — optimised for AI/pipe use')
     .option('--cwd <path>', 'project root to use instead of the current working directory')
+    .option('--ccd <path>', 'config directory — where .crunes/config.json and local rune files live (default: --cwd)')
     .option('--verbose', 'print full error stack traces and other verbose output')
 
   program.hook('preAction', (_thisCommand, actionCommand) => {
@@ -24,6 +25,11 @@ export function buildProgram() {
   function projectRoot() {
     const cwd = program.opts().cwd
     return cwd ? path.resolve(process.cwd(), cwd) : process.cwd()
+  }
+
+  function configRoot() {
+    const ccd = program.opts().ccd
+    return ccd ? path.resolve(process.cwd(), ccd) : projectRoot()
   }
 
   program
@@ -41,7 +47,7 @@ export function buildProgram() {
     .action(async (key, opts) => {
       const { handler } = await import('../rune/commands/use.js')
       const keys = [key, ...opts.and]
-      await handler({ keys, format: opts.format, failFast: !!opts.failFast, projectRoot: projectRoot() })
+      await handler({ keys, format: opts.format, failFast: !!opts.failFast, projectRoot: projectRoot(), configRoot: configRoot() })
     })
 
   program
@@ -66,7 +72,7 @@ export function buildProgram() {
     .description('Run a rune and validate its output shape')
     .action(async (key) => {
       const { handler } = await import('../rune/commands/check.js')
-      await handler({ key, projectRoot: projectRoot() })
+      await handler({ key, projectRoot: projectRoot(), configRoot: configRoot() })
     })
 
   program
@@ -79,7 +85,7 @@ export function buildProgram() {
     .option('--runs <n>', 'number of runs to average (default: 1)', v => parseInt(v, 10), 1)
     .action(async (key, opts) => {
       const { handler } = await import('../rune/commands/benchmark.js')
-      await handler({ key, runs: opts.runs, plain: !!program.opts().plain, projectRoot: projectRoot() })
+      await handler({ key, runs: opts.runs, plain: !!program.opts().plain, projectRoot: projectRoot(), configRoot: configRoot() })
     })
 
   program
@@ -88,7 +94,7 @@ export function buildProgram() {
     .addOption(new Option('--format <format>', 'output format').choices(['md', 'json']).default('md'))
     .action(async (opts) => {
       const { handler } = await import('../rune/commands/list.js')
-      await handler({ format: opts.format, plain: !!program.opts().plain, projectRoot: projectRoot() })
+      await handler({ format: opts.format, plain: !!program.opts().plain, projectRoot: projectRoot(), configRoot: configRoot() })
     })
 
   program
