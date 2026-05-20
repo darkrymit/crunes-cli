@@ -8,6 +8,7 @@ import { createXmlUtils } from './xml.js'
 import { createFetchUtils } from './fetch.js'
 import { createEnvUtils } from './env.js'
 import { createVarsUtils } from './vars.js'
+import { createArchiveUtils } from './archive.js'
 import micromatch from 'micromatch'
 
 export function createSectionUtils(patterns) {
@@ -38,7 +39,8 @@ export function createUtils(dir, checkPermission = null, pluginDir = null, permi
     yaml:  createYamlUtils(dir, fs),
     xml:   createXmlUtils(dir, fs),
     fetch: createFetchUtils(checkPermission),
-    env:   createEnvUtils(dir, checkPermission, permissions),
-    vars:  createVarsUtils(vars),
+    env:     createEnvUtils(dir, checkPermission, permissions),
+    vars:    createVarsUtils(vars),
+    archive: createArchiveUtils(dir, checkPermission),
   }
 }

@@ -39,7 +39,7 @@ await esbuild.build({
   platform: 'node',
   format: 'esm',
   outfile: 'dist/cli.js',
-  external: ['isolated-vm'],
+  external: ['isolated-vm', '@aws-sdk/client-s3'],
   inject: ['./require-shim.js'],
   plugins: [embedIsolateSourcesPlugin],
 })

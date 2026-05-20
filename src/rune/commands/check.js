@@ -4,7 +4,7 @@ import { loadConfig } from '../../core/config.js'
 import { runRune } from '../resolver.js'
 import { output } from '../../shared/output.js'
 
-const GATED_UTILS = ['utils.fs', 'utils.shell', 'utils.fetch', 'utils.env']
+const GATED_UTILS = ['utils.fs', 'utils.shell', 'utils.fetch', 'utils.env', 'utils.archive']
 
 export function scanPermissionWarnings(runeSource) {
   return GATED_UTILS.filter(u => runeSource.includes(u))

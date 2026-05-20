@@ -105,6 +105,12 @@ globalThis.utils = {
     get: (key, fallback = undefined) => Object.hasOwn(__vars, key) ? __vars[key] : fallback,
     has: (key) => Object.hasOwn(__vars, key),
   },
+  archive: {
+    unzip: (s, d) => $__utils_archive_unzip.apply(undefined, [s, d], { result: { promise: true } }),
+    zip:   (s, d) => $__utils_archive_zip.apply(undefined,   [s, d], { result: { promise: true } }),
+    untar: (s, d) => $__utils_archive_untar.apply(undefined, [s, d], { result: { promise: true } }),
+    tar:   (s, d) => $__utils_archive_tar.apply(undefined,   [s, d], { result: { promise: true } }),
+  },
   md,
   tree,
 }

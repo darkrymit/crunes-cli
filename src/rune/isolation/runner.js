@@ -103,6 +103,18 @@ async function injectUtils(isolate, context, utils, runeCallback, vars) {
   await jail.set('$__utils_env_has', new ivm.Reference(async (key) => {
     return utils.env.has(key)
   }))
+  await jail.set('$__utils_archive_unzip', new ivm.Reference(async (source, dest) => {
+    await utils.archive.unzip(source, dest)
+  }))
+  await jail.set('$__utils_archive_zip', new ivm.Reference(async (source, dest) => {
+    await utils.archive.zip(source, dest)
+  }))
+  await jail.set('$__utils_archive_untar', new ivm.Reference(async (source, dest) => {
+    await utils.archive.untar(source, dest)
+  }))
+  await jail.set('$__utils_archive_tar', new ivm.Reference(async (source, dest) => {
+    await utils.archive.tar(source, dest)
+  }))
   await jail.set('$__vars', JSON.stringify(vars))
 
   const [mdMod, treeMod, utilsMod] = await Promise.all([
