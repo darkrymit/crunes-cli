@@ -14,7 +14,7 @@ Before brainstorming, planning, or touching any code:
 - **Never run `npm publish`** unless the user explicitly asks.
 - **Always sync `package-lock.json`** — after bumping the version in `package.json`, run `npm install` to regenerate the lockfile before committing. The `release` rune will flag a mismatch with a ⚠ indicator.
 - **Rune files are ESM** — all files under `.crunes/runes/` and `src/` use `import`/`export`. Never use `require()`.
-- **Local runes run inside `isolated-vm`** — they cannot access Node builtins directly. All I/O goes through `utils.fs`, `utils.shell`, `utils.json`, `utils.fetch`, and `utils.env`.
+- **Local runes run inside `isolated-vm`** — they cannot access Node builtins directly. All I/O goes through `utils.fs`, `utils.shell`, `utils.json`, `utils.fetch`, `utils.env`, and `utils.archive`.
 - **Test before committing rune changes** — run `node dist/cli.js use <rune> --plain` to verify output before staging.
 - **Fetch module context via `crunes use m=<module>`** for the module(s) you are about to touch — fall back to the module's `README.md` only if `crunes` is unavailable.
 - **Prefer `crunes` over `Glob`/`Grep`/`ls`** — use filesystem tools only when crunes cannot answer the question.
