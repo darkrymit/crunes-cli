@@ -37,8 +37,8 @@ export function buildProgram() {
     .description(
       'Use one or more runes and output the result.\n' +
       '  Key format: [source:]name[=arg1,arg2][::section1,section2]\n' +
-      '  local:name  — resolve from project config only\n' +
-      '  plugin:name — resolve directly from an enabled plugin\n' +
+      '  project:name  — resolve from project config only\n' +
+      '  plugin:name   — resolve directly from an enabled plugin\n' +
       '  name        — auto-resolve: project config first, then enabled plugins'
     )
     .addOption(new Option('--format <format>', 'output format').choices(['md', 'json']).default('md'))
@@ -80,7 +80,7 @@ export function buildProgram() {
     .description(
       'Time rune execution and report which runes are fast, ok, or slow.\n' +
       '  Benchmarks all registered runes when no key is given.\n' +
-      '  Key supports local:name, plugin:name, or bare name (same as crunes use).'
+      '  Key supports project:name, plugin:name, or bare name (same as crunes use).'
     )
     .option('--runs <n>', 'number of runs to average (default: 1)', v => parseInt(v, 10), 1)
     .action(async (key, opts) => {
@@ -186,7 +186,7 @@ export function buildProgram() {
 
   template
     .command('list [template-source]')
-    .description('List available templates. [template-source] can be "local" (project config only) or a plugin name; omit to list all.')
+    .description('List available templates. [template-source] can be "project" (project config only) or a plugin name; omit to list all.')
     .addOption(new Option('--format <format>', 'output format').choices(['md', 'json']).default('md'))
     .action(async (source, opts) => {
       const { handler } = await import('../template/commands/list.js')
@@ -197,8 +197,8 @@ export function buildProgram() {
     .command('use <template>')
     .description(
       'Copy a template into the project as a new rune and register it in config.\n' +
-      '  local:name  — use a template defined in this project\'s config\n' +
-      '  plugin:name — use a template from a specific installed plugin\n' +
+      '  project:name  — use a template defined in this project\'s config\n' +
+      '  plugin:name   — use a template from a specific installed plugin\n' +
       '  name        — auto-resolve: project config first, then installed plugins'
     )
     .option('--as <new-rune>', 'register the rune under a different key (default: template name)')

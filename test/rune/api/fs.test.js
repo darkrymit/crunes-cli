@@ -226,3 +226,42 @@ describe('createFsUtils — file writing', () => {
     expect(spy).toHaveBeenCalledWith('fs.write', './test.txt')
   })
 })
+
+describe('createFsUtils — @project/ paths', () => {
+  let dir
+
+  beforeEach(async () => {
+    dir = await makeTempDir()
+    await writeFile(dir, 'src/utils/foo.ts', 'export {}')
+  })
+
+  it('@project/ token normalizes to ./relative path', async () => {
+    const spy = vi.fn()
+    await createFsUtils(dir, spy).read('@project/src/utils/foo.ts').catch(() => {})
+    expect(spy).toHaveBeenCalledWith('fs.read', './src/utils/foo.ts')
+  })
+
+  it('@project/ resolves to project root and reads file content', async () => {
+    const checker = checkerFor(['fs.read:./src/**'])
+    const content = await createFsUtils(dir, checker).read('@project/src/utils/foo.ts')
+    expect(content).toBe('export {}')
+  })
+
+  it('@project/ read is blocked when fs.read not granted', async () => {
+    const checker = checkerFor([])
+    await expect(createFsUtils(dir, checker).read('@project/src/utils/foo.ts'))
+      .rejects.toThrow()
+  })
+
+  it('@project/ exists checks correct path', async () => {
+    const spy = vi.fn().mockReturnValue(undefined)
+    await createFsUtils(dir, spy).exists('@project/src/utils/foo.ts').catch(() => {})
+    expect(spy).toHaveBeenCalledWith('fs.read', './src/utils/foo.ts')
+  })
+
+  it('@project/ write normalizes token to ./relative path', async () => {
+    const spy = vi.fn()
+    await createFsUtils(dir, spy).write('@project/out/result.txt', 'hi').catch(() => {})
+    expect(spy).toHaveBeenCalledWith('fs.write', './out/result.txt')
+  })
+})

@@ -12,28 +12,30 @@ export async function handler({
 } = {}) {
   const results = []
 
-  // Load local/shortcut templates from config.json
-  if (!source || source === 'local') {
+  // Load project/shortcut templates from config.json
+  if (!source || source === 'project') {
     let config = { templates: {} }
     try { config = loadConfig(projectRoot) } catch {}
     const templates = config.templates ?? {}
     for (const [name, entry] of Object.entries(templates)) {
       if (typeof entry === 'string') {
-        results.push({ source: 'local', template: name, name, description: '' })
+        results.push({ source: 'project', template: name, name, description: '' })
       } else if (entry.path) {
-        results.push({ source: 'local', template: name, name: entry.name ?? name, description: entry.description ?? '' })
+        results.push({ source: 'project', template: name, name: entry.name ?? name, description: entry.description ?? '' })
       } else if (entry.plugin) {
-        results.push({ source: 'local', template: name, name: entry.name ?? name, description: entry.description ?? '', plugin: entry.plugin })
+        results.push({ source: 'project', template: name, name: entry.name ?? name, description: entry.description ?? '', plugin: entry.plugin })
+      } else {
+        results.push({ source: 'project', template: name, name: entry.name ?? name, description: entry.description ?? '' })
       }
     }
   }
 
   // Load plugin templates
-  if (!source || source !== 'local') {
+  if (!source || source !== 'project') {
     const registry = await loadRegistry()
 
     // Validate that specified plugin exists
-    if (source && source !== 'local') {
+    if (source && source !== 'project') {
       const found = Object.keys(registry.plugins ?? {}).some(k => k === source || k.slice(k.indexOf('@') + 1) === source)
       if (!found) {
         output.error(`Plugin "${source}" is not installed.`)

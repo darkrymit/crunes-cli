@@ -10,6 +10,11 @@ import * as EMBEDDED from './embedded.js'
 
 const hostRequire = createRequire(import.meta.url)
 
+export function getPluginRunePath(pluginDir, runeKey, pluginJson) {
+  const runeRelPath = (pluginJson.runes?.[runeKey])?.path ?? `runes/${runeKey}.js`
+  return path.join(pluginDir, runeRelPath)
+}
+
 async function compileStaticModule(isolate, key) {
   return isolate.compileModule(EMBEDDED[key], { filename: `crunes:${key}` })
 }
@@ -246,6 +251,7 @@ export async function runRuneInIsolate(runeFile, effective, args, projectDir, {
       pluginDeps,
       effective.allow,
       effective.deny,
+      projectDir,
     )
     if (isVerbose) console.error(`[crunes:debug] instantiating Module...`)
     await runeMod.instantiate(context, resolver)
@@ -289,7 +295,7 @@ export async function runRuneInIsolate(runeFile, effective, args, projectDir, {
  * Run a plugin rune in isolation. Resolves the rune file from pluginDir/runes/<runeKey>.js.
  */
 export async function runPluginRune(pluginDir, runeKey, pluginJson, effective, args, projectDir, opts = {}) {
-  const runeFile       = path.join(pluginDir, 'runes', `${runeKey}.js`)
+  const runeFile       = getPluginRunePath(pluginDir, runeKey, pluginJson)
   const nodeModulesDir = path.join(pluginDir, 'node_modules')
   return runRuneInIsolate(runeFile, effective, args, projectDir, {
     nodeModulesDir,

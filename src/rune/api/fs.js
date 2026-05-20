@@ -11,6 +11,7 @@ function canonicalizePath(dir, inputPath) {
   const p = inputPath.replace(/\\/g, '/')
 
   if (p.startsWith('@plugin/')) return p
+  if (p.startsWith('@project/')) return './' + p.slice('@project/'.length)
   if (p === '~' || p.startsWith('~/')) return p
   if (path.isAbsolute(inputPath)) return p
 
@@ -23,6 +24,9 @@ function resolveToAbs(dir, pluginDir, inputPath) {
   if (inputPath.startsWith('@plugin/')) {
     if (!pluginDir) throw new Error('@plugin/ paths are only available in plugin runes')
     return path.join(pluginDir, inputPath.slice('@plugin/'.length))
+  }
+  if (inputPath.startsWith('@project/')) {
+    return path.join(dir, inputPath.slice('@project/'.length))
   }
   if (inputPath === '~' || inputPath.startsWith('~/') || inputPath.startsWith('~\\')) {
     return path.join(os.homedir(), inputPath.slice(1))

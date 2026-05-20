@@ -72,8 +72,8 @@ export async function runRune(dir, config, key, args, opts = {}, _callStack = []
   const configDir = opts.configDir ?? dir
 
   let localOnly = false
-  if (key.startsWith('local:')) {
-    key = key.slice(6)
+  if (key.startsWith('project:')) {
+    key = key.slice(8)
     localOnly = true
   }
 
@@ -136,7 +136,7 @@ export async function runRune(dir, config, key, args, opts = {}, _callStack = []
     return normaliseResult(result)
   }
 
-  const fullPath = join(configDir, entry.path)
+  const fullPath = join(configDir, entry.path ?? `.crunes/runes/${key}.js`)
   const basePerms = entry.permissions ?? { allow: [], deny: [] }
   const effective = computeEffectivePermissions(basePerms, config.permissions?.[key], 'use')
   const result = await runRuneInIsolate(fullPath, effective, args, dir, {

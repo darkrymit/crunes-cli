@@ -10,9 +10,9 @@ import { output } from '../../shared/output.js'
  * Resolve a template given an optional source name and template name.
  * Returns { type: 'local'|'shortcut'|'plugin', templateName, entry, pluginEntry?, pluginJson?, templateMeta? }
  */
-async function resolveTemplate(sourceName, templateName, projectRoot) {
-  // Check local/shortcut templates first (unless an explicit plugin source is given)
-  if (!sourceName || sourceName === 'local') {
+export async function resolveTemplate(sourceName, templateName, projectRoot) {
+  // Check project/shortcut templates first (unless an explicit plugin source is given)
+  if (!sourceName || sourceName === 'project') {
     let config = { templates: {} }
     try { config = loadConfig(projectRoot) } catch {}
     const templates = config.templates ?? {}
@@ -24,8 +24,9 @@ async function resolveTemplate(sourceName, templateName, projectRoot) {
       if (entry.plugin) {
         return { type: 'shortcut', templateName, entry }
       }
+      return { type: 'local', templateName, entry: { ...entry, path: `.crunes/templates/${templateName}.js` } }
     }
-    if (sourceName === 'local') return null
+    if (sourceName === 'project') return null
   }
 
   // Check plugin templates
@@ -130,12 +131,14 @@ export async function handler({
       output.error(`Template shortcut "${templateName}" → "${pluginRef}" not found in plugin.`)
       process.exit(1)
     }
-    const srcPath = path.join(pluginEntry.path, 'templates', `${pluginTemplateKey}.js`)
+    const templateRelPath = meta?.path ?? `templates/${pluginTemplateKey}.js`
+    const srcPath = path.join(pluginEntry.path, templateRelPath)
     await fs.copyFile(srcPath, runeAbsPath)
     templateMeta = { ...meta, ...(resolved.entry.name && { name: resolved.entry.name }), ...(resolved.entry.description && { description: resolved.entry.description }) }
 
   } else if (resolved.type === 'plugin') {
-    const srcPath = path.join(resolved.pluginEntry.path, 'templates', `${resolved.templateName}.js`)
+    const templateRelPath = resolved.templateMeta?.path ?? `templates/${resolved.templateName}.js`
+    const srcPath = path.join(resolved.pluginEntry.path, templateRelPath)
     await fs.copyFile(srcPath, runeAbsPath)
     templateMeta = resolved.templateMeta
   }

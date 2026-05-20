@@ -16,7 +16,7 @@ const require = createRequire(import.meta.url)
  *   4. DENY_BUILTINS ∪ effectiveDeny → PermissionError with message
  *   5. Zero-trust default          → PermissionError
  */
-export function createModuleResolver(isolate, pluginDir, pluginNodeModules, pluginDeps, effectiveAllow, effectiveDeny) {
+export function createModuleResolver(isolate, pluginDir, pluginNodeModules, pluginDeps, effectiveAllow, effectiveDeny, projectDir = null) {
   // Cache compiled modules to avoid re-compiling within one isolate lifetime
   const cache = new Map()
 
@@ -45,6 +45,27 @@ export default hostExports.default ?? hostExports;
   }
 
   return async function moduleResolver(specifier, referrer) {
+    // Step 0 — @project/ prefix: import from project root
+    if (specifier.startsWith('@project/')) {
+      if (!projectDir) {
+        throw new Error(`PermissionError: '@project/' imports require a project context`)
+      }
+      const relPath = specifier.slice('@project/'.length)
+      const absPath = path.resolve(projectDir, relPath)
+      const rel = path.relative(projectDir, absPath)
+      if (rel.startsWith('..') || path.isAbsolute(rel)) {
+        throw new Error(`PermissionError: '@project/' path '${specifier}' escapes project root`)
+      }
+      const normalizedRel = './' + rel.replace(/\\/g, '/')
+      const token = `fs.read:${normalizedRel}`
+      const allowed = micromatch.isMatch(token, effectiveAllow)
+      const denied  = effectiveDeny.length > 0 && micromatch.isMatch(token, effectiveDeny)
+      if (!allowed || denied) {
+        throw new Error(`PermissionError: '${specifier}' — add 'fs.read:${normalizedRel}' to allow list.`)
+      }
+      return compileFile(specifier, absPath)
+    }
+
     // Step 1 — relative or absolute path: plugin's own files
     if (specifier.startsWith('.') || specifier.startsWith('/')) {
       const baseDir = referrer?.filename ? path.dirname(referrer.filename) : pluginDir
