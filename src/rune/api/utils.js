@@ -97,6 +97,9 @@ export function canonicalizeLocation(location, { dir } = {}) {
 
 export function getAutoPermits({ pluginId = null, pluginDir = null } = {}) {
   const permits = []
+  if (!pluginDir) {
+    permits.push('fs.read:.crunes/**')
+  }
   if (pluginDir) {
     permits.push('fs.read:@plugin/**', 'fs.write:@plugin/**')
   }

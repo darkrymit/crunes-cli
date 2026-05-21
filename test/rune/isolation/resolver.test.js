@@ -60,3 +60,55 @@ describe('createModuleResolver — @project/ imports', () => {
     expect(isolate.compileModule).toHaveBeenCalledTimes(1)
   })
 })
+
+describe('createModuleResolver — @plugin/ imports', () => {
+  let pluginRoot, projectDir, isolate
+
+  beforeEach(async () => {
+    pluginRoot  = await mkdtemp(join(tmpdir(), 'crunes-resolver-plugin-'))
+    projectDir  = await mkdtemp(join(tmpdir(), 'crunes-resolver-project-'))
+    await mkdir(join(pluginRoot, 'lib'), { recursive: true })
+    await writeFile(join(pluginRoot, 'lib/shared.js'), 'export const msg = "from plugin"')
+    isolate = makeMockIsolate()
+  })
+  afterEach(async () => {
+    await rm(pluginRoot, { recursive: true, force: true })
+    await rm(projectDir, { recursive: true, force: true })
+  })
+
+  it('resolves @plugin/<path> to pluginRootDir/<path>', async () => {
+    const resolver = createModuleResolver(
+      isolate, pluginRoot, pluginRoot, {}, [], [], projectDir, pluginRoot
+    )
+    await resolver('@plugin/lib/shared.js', null)
+    expect(isolate.compileModule).toHaveBeenCalledWith(
+      'export const msg = "from plugin"',
+      expect.objectContaining({ filename: join(pluginRoot, 'lib/shared.js') })
+    )
+  })
+
+  it('throws PermissionError when pluginRootDir is null (project rune)', async () => {
+    const resolver = createModuleResolver(
+      isolate, projectDir, projectDir, {}, [], [], projectDir, null
+    )
+    await expect(resolver('@plugin/lib/shared.js', null))
+      .rejects.toThrow('PermissionError')
+  })
+
+  it('throws PermissionError when @plugin/ path escapes plugin root', async () => {
+    const resolver = createModuleResolver(
+      isolate, pluginRoot, pluginRoot, {}, [], [], projectDir, pluginRoot
+    )
+    await expect(resolver('@plugin/../outside.js', null))
+      .rejects.toThrow('PermissionError')
+  })
+
+  it('caches compiled @plugin/ module on second call', async () => {
+    const resolver = createModuleResolver(
+      isolate, pluginRoot, pluginRoot, {}, [], [], projectDir, pluginRoot
+    )
+    await resolver('@plugin/lib/shared.js', null)
+    await resolver('@plugin/lib/shared.js', null)
+    expect(isolate.compileModule).toHaveBeenCalledTimes(1)
+  })
+})

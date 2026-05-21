@@ -289,6 +289,7 @@ export async function runRuneInIsolate(runeFile, effective, args, projectDir, {
       effective.allow,
       effective.deny,
       projectDir,
+      pluginDir ?? null,
     )
     if (isVerbose) console.error(`[crunes:debug] instantiating Module...`)
     await runeMod.instantiate(context, resolver)

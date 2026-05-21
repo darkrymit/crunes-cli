@@ -16,7 +16,7 @@ const require = createRequire(import.meta.url)
  *   4. DENY_BUILTINS ∪ effectiveDeny → PermissionError with message
  *   5. Zero-trust default          → PermissionError
  */
-export function createModuleResolver(isolate, pluginDir, pluginNodeModules, pluginDeps, effectiveAllow, effectiveDeny, projectDir = null) {
+export function createModuleResolver(isolate, pluginDir, pluginNodeModules, pluginDeps, effectiveAllow, effectiveDeny, projectDir = null, pluginRootDir = null) {
   // Cache compiled modules to avoid re-compiling within one isolate lifetime
   const cache = new Map()
 
@@ -45,7 +45,21 @@ export default hostExports.default ?? hostExports;
   }
 
   return async function moduleResolver(specifier, referrer) {
-    // Step 0 — @project/ prefix: import from project root
+    // Step 0 — @plugin/ prefix: plugin runes only; resolves to pluginRootDir/<path>
+    if (specifier.startsWith('@plugin/')) {
+      if (!pluginRootDir) {
+        throw new Error(`PermissionError: '@plugin/' imports are only available in plugin runes`)
+      }
+      const relPath = specifier.slice('@plugin/'.length)
+      const absPath = path.resolve(pluginRootDir, relPath)
+      const rel = path.relative(pluginRootDir, absPath)
+      if (rel.startsWith('..') || path.isAbsolute(rel)) {
+        throw new Error(`PermissionError: '@plugin/' path '${specifier}' escapes plugin root`)
+      }
+      return compileFile(specifier, absPath)
+    }
+
+    // Step 1 — @project/ prefix: import from project root
     if (specifier.startsWith('@project/')) {
       if (!projectDir) {
         throw new Error(`PermissionError: '@project/' imports require a project context`)

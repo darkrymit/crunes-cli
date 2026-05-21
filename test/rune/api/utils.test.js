@@ -153,11 +153,15 @@ describe('canonicalizeLocation', () => {
 })
 
 describe('getAutoPermits', () => {
-  it('returns [] when called with no args', () => {
-    expect(getAutoPermits()).toEqual([])
+  it('returns .crunes read permit when called with no args (project rune default)', () => {
+    expect(getAutoPermits()).toContain('fs.read:.crunes/**')
   })
-  it('returns [] when pluginId and pluginDir are null', () => {
-    expect(getAutoPermits({ pluginId: null, pluginDir: null })).toEqual([])
+  it('returns .crunes read permit when pluginId and pluginDir are null', () => {
+    expect(getAutoPermits({ pluginId: null, pluginDir: null })).toContain('fs.read:.crunes/**')
+  })
+  it('does not include .crunes permit when pluginDir is set (plugin rune)', () => {
+    const p = getAutoPermits({ pluginDir: '/some/dir' })
+    expect(p).not.toContain('fs.read:.crunes/**')
   })
   it('includes fs.read/@plugin and fs.write/@plugin when pluginDir set', () => {
     const p = getAutoPermits({ pluginDir: '/some/dir' })
@@ -178,5 +182,6 @@ describe('getAutoPermits', () => {
     const p = getAutoPermits({ pluginId: 'plug@1.0', pluginDir: '/dir' })
     expect(p).toContain('fs.read:@plugin/**')
     expect(p).toContain('sqlite.read:@plugin-sqlite/**')
+    expect(p).not.toContain('fs.read:.crunes/**')
   })
 })
