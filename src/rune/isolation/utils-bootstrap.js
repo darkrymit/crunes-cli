@@ -147,6 +147,15 @@ globalThis.utils = {
       return db
     },
   },
+  crypto: {
+    hash: {
+      hex:    (algorithm, data) => $__crypto_hash_hex.applySync(undefined,    [algorithm, data]),
+      base64: (algorithm, data) => $__crypto_hash_base64.applySync(undefined, [algorithm, data]),
+    },
+    uuid:   ()     => $__crypto_uuid.applySync(undefined,   []),
+    hex:    (size) => $__crypto_hex.applySync(undefined,    [size]),
+    base64: (size) => $__crypto_base64.applySync(undefined, [size]),
+  },
   md,
   tree,
 }

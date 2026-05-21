@@ -4,6 +4,7 @@ import path from 'node:path'
 import { createRequire } from 'node:module'
 import { createUtils } from '../api/index.js'
 import { getAutoPermits } from '../api/utils.js'
+import { hashHex, hashBase64, uuid as cryptoUuid, hex as cryptoHex, base64 as cryptoBase64 } from '../api/crypto.js'
 import { computeEffectivePermissions, makePermissionChecker } from '../permissions/permissions.js'
 import { isVerbose } from '../../shared/output.js'
 import { createModuleResolver } from './resolver.js'
@@ -187,6 +188,12 @@ async function injectUtils(isolate, context, utils, runeCallback, vars) {
     handle.close()
     sqliteHandles.delete(id)
   }))
+
+  await jail.set('$__crypto_hash_hex',    new ivm.Reference(hashHex))
+  await jail.set('$__crypto_hash_base64', new ivm.Reference(hashBase64))
+  await jail.set('$__crypto_uuid',        new ivm.Reference(cryptoUuid))
+  await jail.set('$__crypto_hex',         new ivm.Reference(cryptoHex))
+  await jail.set('$__crypto_base64',      new ivm.Reference(cryptoBase64))
 
   await jail.set('$__vars', JSON.stringify(vars))
 
