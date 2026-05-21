@@ -16,7 +16,7 @@ const require = createRequire(import.meta.url)
  *   4. DENY_BUILTINS ∪ effectiveDeny → PermissionError with message
  *   5. Zero-trust default          → PermissionError
  */
-export function createModuleResolver(isolate, pluginDir, pluginNodeModules, pluginDeps, effectiveAllow, effectiveDeny, projectDir = null, pluginRootDir = null) {
+export function createModuleResolver(isolate, pluginDir, pluginNodeModules, pluginDeps, effectiveAllow, effectiveDeny, projectDir = null, pluginRootDir = null, virtualModules = new Map()) {
   // Cache compiled modules to avoid re-compiling within one isolate lifetime
   const cache = new Map()
 
@@ -45,6 +45,9 @@ export default hostExports.default ?? hostExports;
   }
 
   return async function moduleResolver(specifier, referrer) {
+    // Step 0 — virtual modules: pre-compiled modules registered by the host
+    if (virtualModules.has(specifier)) return virtualModules.get(specifier)
+
     // Step 0 — @plugin/ prefix: plugin runes only; resolves to pluginRootDir/<path>
     if (specifier.startsWith('@plugin/')) {
       if (!pluginRootDir) {

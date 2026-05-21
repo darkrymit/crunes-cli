@@ -112,3 +112,30 @@ describe('createModuleResolver — @plugin/ imports', () => {
     expect(isolate.compileModule).toHaveBeenCalledTimes(1)
   })
 })
+
+describe('createModuleResolver — virtualModules', () => {
+  let tmp, isolate
+
+  beforeEach(async () => {
+    tmp = await makeTmp()
+    isolate = makeMockIsolate()
+  })
+  afterEach(async () => { await rm(tmp, { recursive: true, force: true }) })
+
+  it('returns module from map when specifier matches', async () => {
+    const mockMod = { evaluate: vi.fn() }
+    const resolver = createModuleResolver(isolate, tmp, tmp, {}, [], [], null, null, new Map([['@utils', mockMod]]))
+    const result = await resolver('@utils', null)
+    expect(result).toBe(mockMod)
+  })
+
+  it('falls through to normal resolution when specifier not in map', async () => {
+    const resolver = createModuleResolver(isolate, tmp, tmp, {}, [], [], null, null, new Map([['@utils', {}]]))
+    await expect(resolver('@something-else', null)).rejects.toThrow('PermissionError')
+  })
+
+  it('works with no virtualModules argument (default empty map)', async () => {
+    const resolver = createModuleResolver(isolate, tmp, tmp, {}, [], [], null, null)
+    await expect(resolver('@utils', null)).rejects.toThrow('PermissionError')
+  })
+})

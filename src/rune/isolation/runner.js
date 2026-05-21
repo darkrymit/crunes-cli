@@ -1,6 +1,7 @@
 import ivm from 'isolated-vm'
 import fs from 'node:fs/promises'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { createRequire } from 'node:module'
 import { createUtils } from '../api/index.js'
 import { getAutoPermits } from '../api/utils.js'
@@ -11,6 +12,15 @@ import { createModuleResolver } from './resolver.js'
 import * as EMBEDDED from './embedded.js'
 
 const hostRequire = createRequire(import.meta.url)
+const __isolationDir = path.dirname(fileURLToPath(import.meta.url))
+
+// Map from embedded key → source file path (used as fallback in dev/test when EMBEDDED is empty)
+const staticModulePaths = {
+  md:      path.join(__isolationDir, '../api/md.js'),
+  tree:    path.join(__isolationDir, '../api/tree.js'),
+  utils:   path.join(__isolationDir, './utils-bootstrap.js'),
+  console: path.join(__isolationDir, './console-bootstrap.js'),
+}
 
 export function getPluginRunePath(pluginDir, runeKey, pluginJson) {
   const runeRelPath = (pluginJson.runes?.[runeKey])?.path ?? `runes/${runeKey}.js`
@@ -18,7 +28,8 @@ export function getPluginRunePath(pluginDir, runeKey, pluginJson) {
 }
 
 async function compileStaticModule(isolate, key) {
-  return isolate.compileModule(EMBEDDED[key], { filename: `crunes:${key}` })
+  const src = EMBEDDED[key] || await fs.readFile(staticModulePaths[key], 'utf8')
+  return isolate.compileModule(src, { filename: `crunes:${key}` })
 }
 
 /**
@@ -28,7 +39,7 @@ async function compileStaticModule(isolate, key) {
  * utils-bootstrap.js imports them and wires globalThis.utils.
  * All modules come from real files on disk — no eval, no embedded code strings.
  */
-async function injectUtils(isolate, context, utils, runeCallback, vars) {
+async function injectUtils(isolate, context, utils, runeCallback, vars, projectDir) {
   const jail = context.global
 
   await jail.set('$__utils_fs_read', new ivm.Reference(async (relPath, opts) => {
@@ -196,6 +207,7 @@ async function injectUtils(isolate, context, utils, runeCallback, vars) {
   await jail.set('$__crypto_base64',      new ivm.Reference(cryptoBase64))
 
   await jail.set('$__vars', JSON.stringify(vars))
+  await jail.set('$__projectDir', projectDir)
 
   const [mdMod, treeMod, utilsMod] = await Promise.all([
     compileStaticModule(isolate, 'md'),
@@ -214,7 +226,8 @@ async function injectUtils(isolate, context, utils, runeCallback, vars) {
 
   await mdMod.evaluate()
   await treeMod.evaluate()
-  await utilsMod.evaluate()  // sets globalThis.utils
+  await utilsMod.evaluate()  // sets globalThis.utils and exports named utils
+  return utilsMod
 }
 
 async function injectConsole(isolate, context) {
@@ -267,7 +280,7 @@ export async function runRuneInIsolate(runeFile, effective, args, projectDir, {
     await context.global.set('$__hostRequire', new ivm.Reference((spec) => hostRequire(spec)))
 
     if (isVerbose) console.error(`[crunes:debug] injecting utils and console...`)
-    await injectUtils(isolate, context, utils, runeCallback, vars)
+    const utilsMod = await injectUtils(isolate, context, utils, runeCallback, vars, projectDir)
     await injectConsole(isolate, context)
 
     if (pluginDir != null) {
@@ -297,6 +310,7 @@ export async function runRuneInIsolate(runeFile, effective, args, projectDir, {
       effective.deny,
       projectDir,
       pluginDir ?? null,
+      new Map([['@utils', utilsMod]])
     )
     if (isVerbose) console.error(`[crunes:debug] instantiating Module...`)
     await runeMod.instantiate(context, resolver)
@@ -318,11 +332,7 @@ export async function runRuneInIsolate(runeFile, effective, args, projectDir, {
     if (isVerbose) console.error(`[crunes:debug] extracting ${lifecycle}() result...`)
     const resultJson = await context.eval(
       `(async () => {
-        const r = await __crunes_target(
-          ${JSON.stringify(projectDir)},
-          ${JSON.stringify(args)},
-          utils
-        );
+        const r = await __crunes_target(${JSON.stringify(args)});
         return JSON.stringify(r);
       })()`,
       { promise: true, timeout: isolateTimeoutMs }

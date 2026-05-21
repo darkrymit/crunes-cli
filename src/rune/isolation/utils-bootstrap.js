@@ -9,6 +9,7 @@ const __vars = JSON.parse($__vars)
 
 globalThis.utils = {
   fs: {
+    cwd:    ()           => $__projectDir,
     read:   (p, o) => $__utils_fs_read.apply(undefined, [p, o ? JSON.stringify(o) : undefined], { result: { promise: true } }),
     exists: (p)    => $__utils_fs_exists.apply(undefined, [p], { result: { promise: true } }),
     glob:   (p, o) => $__utils_fs_glob.apply(undefined, [p, o ? JSON.stringify(o) : undefined], { result: { promise: true } }).then(JSON.parse),
@@ -159,3 +160,6 @@ globalThis.utils = {
   md,
   tree,
 }
+
+export const { fs, shell, section, rune, json, yaml, xml, fetch, env, vars, archive, cache, sqlite, crypto } = globalThis.utils
+export { md, tree }
