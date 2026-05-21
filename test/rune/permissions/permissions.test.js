@@ -104,3 +104,87 @@ describe('makePermissionChecker', () => {
     expect(() => check('fs.read', 'tsconfig.json')).not.toThrow()
   })
 })
+
+describe('normalizePermission — virtual root tokens', () => {
+  it('sqlite.read:@project-sqlite/data/mydb preserved as-is', () => {
+    const result = computeEffectivePermissions(
+      { use: { allow: ['sqlite.read:@project-sqlite/data/mydb'] } },
+      undefined, 'use'
+    )
+    expect(result.allow).toEqual(['sqlite.read:@project-sqlite/data/mydb'])
+  })
+
+  it('sqlite.read:@project-sqlite/** preserved as-is', () => {
+    const result = computeEffectivePermissions(
+      { use: { allow: ['sqlite.read:@project-sqlite/**'] } },
+      undefined, 'use'
+    )
+    expect(result.allow).toEqual(['sqlite.read:@project-sqlite/**'])
+  })
+
+  it('cache.read:@plugin-cache/** preserved as-is', () => {
+    const result = computeEffectivePermissions(
+      { use: { allow: ['cache.read:@plugin-cache/**'] } },
+      undefined, 'use'
+    )
+    expect(result.allow).toEqual(['cache.read:@plugin-cache/**'])
+  })
+
+  it('fs.read:@plugin-sqlite/** not mangled with ./ prefix', () => {
+    const result = computeEffectivePermissions(
+      { use: { allow: ['fs.read:@plugin-sqlite/**'] } },
+      undefined, 'use'
+    )
+    expect(result.allow).toEqual(['fs.read:@plugin-sqlite/**'])
+  })
+
+  it('sqlite.read with regular path still normalizes :name', () => {
+    const result = computeEffectivePermissions(
+      { use: { allow: ['sqlite.read:mydb:default'] } },
+      undefined, 'use'
+    )
+    expect(result.allow).toEqual(['sqlite.read:./mydb:default'])
+  })
+
+  it('@project-sqlite/** permission matches subpath token', () => {
+    const check = makePermissionChecker({
+      allow: ['sqlite.read:@project-sqlite/**'],
+      deny: [],
+    })
+    expect(() => check('sqlite.read', '@project-sqlite/data:mydb')).not.toThrow()
+    expect(() => check('sqlite.read', '@project-sqlite/a/b:mydb')).not.toThrow()
+  })
+
+  it('@project-sqlite/** permission matches root-level token', () => {
+    const check = makePermissionChecker({
+      allow: ['sqlite.read:@project-sqlite/**'],
+      deny: [],
+    })
+    expect(() => check('sqlite.read', '@project-sqlite:catalog')).not.toThrow()
+  })
+
+  it('@plugin-sqlite/** permission matches plugin-sqlite token', () => {
+    const check = makePermissionChecker({
+      allow: ['sqlite.read:@plugin-sqlite/**'],
+      deny: [],
+    })
+    expect(() => check('sqlite.read', '@plugin-sqlite:test')).not.toThrow()
+  })
+})
+
+describe('makePermissionChecker — dotfile paths', () => {
+  it('fs.write:./** matches dotfile directory path', () => {
+    const check = makePermissionChecker({ allow: ['fs.write:./**'], deny: [] })
+    expect(() => check('fs.write', './.output/file.txt')).not.toThrow()
+  })
+
+  it('fs.read:./** matches nested dotfile path', () => {
+    const check = makePermissionChecker({ allow: ['fs.read:./**'], deny: [] })
+    expect(() => check('fs.read', './.hidden/sub/data.json')).not.toThrow()
+  })
+
+  it('fs.write:./** does not match paths outside project root', () => {
+    const check = makePermissionChecker({ allow: ['fs.write:./**'], deny: [] })
+    expect(() => check('fs.write', '../outside/file.txt')).toThrow(PermissionError)
+  })
+})

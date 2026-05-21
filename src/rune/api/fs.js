@@ -1,45 +1,19 @@
 import fs from 'node:fs/promises'
-import os from 'node:os'
 import path from 'node:path'
 import { glob } from 'tinyglobby'
+import { resolvePath, canonicalizeLocation } from './utils.js'
 
 function stripBom(str) {
   return str.charCodeAt(0) === 0xfeff ? str.slice(1) : str
 }
 
-function canonicalizePath(dir, inputPath) {
-  const p = inputPath.replace(/\\/g, '/')
+export function createFsUtils(dir, checkPermission, pluginDir = null, pluginId = null, storeDir = null) {
+  const ctx = () => ({ dir, pluginDir, pluginId, storeDir })
 
-  if (p.startsWith('@plugin/')) return p
-  if (p.startsWith('@project/')) return './' + p.slice('@project/'.length)
-  if (p === '~' || p.startsWith('~/')) return p
-  if (path.isAbsolute(inputPath)) return p
-
-  const resolved = path.resolve(dir, inputPath)
-  const rel = path.relative(dir, resolved).replace(/\\/g, '/')
-  return rel.startsWith('..') ? rel : './' + rel
-}
-
-function resolveToAbs(dir, pluginDir, inputPath) {
-  if (inputPath.startsWith('@plugin/')) {
-    if (!pluginDir) throw new Error('@plugin/ paths are only available in plugin runes')
-    return path.join(pluginDir, inputPath.slice('@plugin/'.length))
-  }
-  if (inputPath.startsWith('@project/')) {
-    return path.join(dir, inputPath.slice('@project/'.length))
-  }
-  if (inputPath === '~' || inputPath.startsWith('~/') || inputPath.startsWith('~\\')) {
-    return path.join(os.homedir(), inputPath.slice(1))
-  }
-  if (path.isAbsolute(inputPath)) return inputPath
-  return path.resolve(dir, inputPath)
-}
-
-export function createFsUtils(dir, checkPermission, pluginDir = null) {
   return {
     async read(relPath, { throw: shouldThrow = true } = {}) {
-      const token = canonicalizePath(dir, relPath)
-      const abs = resolveToAbs(dir, pluginDir, relPath)
+      const token = canonicalizeLocation(relPath, { dir })
+      const abs   = resolvePath(relPath, ctx())
       if (checkPermission) checkPermission('fs.read', token)
       try {
         return stripBom(await fs.readFile(abs, 'utf8'))
@@ -50,8 +24,8 @@ export function createFsUtils(dir, checkPermission, pluginDir = null) {
     },
 
     async exists(relPath) {
-      const token = canonicalizePath(dir, relPath)
-      const abs = resolveToAbs(dir, pluginDir, relPath)
+      const token = canonicalizeLocation(relPath, { dir })
+      const abs   = resolvePath(relPath, ctx())
       if (checkPermission) checkPermission('fs.read', token)
       try {
         await fs.access(abs)
@@ -65,7 +39,7 @@ export function createFsUtils(dir, checkPermission, pluginDir = null) {
       if (path.isAbsolute(pattern)) {
         throw new Error('utils.fs.glob does not support absolute patterns — use a relative pattern.')
       }
-      const token = canonicalizePath(dir, pattern)
+      const token = canonicalizeLocation(pattern, { dir })
       if (checkPermission) checkPermission('fs.glob', token)
       const results = await glob(pattern, {
         cwd: dir,
@@ -77,11 +51,22 @@ export function createFsUtils(dir, checkPermission, pluginDir = null) {
     },
 
     async write(relPath, content) {
-      const token = canonicalizePath(dir, relPath)
-      const abs = resolveToAbs(dir, pluginDir, relPath)
+      const token = canonicalizeLocation(relPath, { dir })
+      const abs   = resolvePath(relPath, ctx())
       if (checkPermission) checkPermission('fs.write', token)
       await fs.mkdir(path.dirname(abs), { recursive: true })
       await fs.writeFile(abs, content, 'utf8')
+    },
+
+    async copy(src, dest) {
+      const srcToken  = canonicalizeLocation(src,  { dir })
+      const destToken = canonicalizeLocation(dest, { dir })
+      if (checkPermission) checkPermission('fs.read',  srcToken)
+      if (checkPermission) checkPermission('fs.write', destToken)
+      const srcAbs  = resolvePath(src,  ctx())
+      const destAbs = resolvePath(dest, ctx())
+      await fs.mkdir(path.dirname(destAbs), { recursive: true })
+      await fs.copyFile(srcAbs, destAbs)
     },
   }
 }

@@ -13,6 +13,7 @@ globalThis.utils = {
     exists: (p)    => $__utils_fs_exists.apply(undefined, [p], { result: { promise: true } }),
     glob:   (p, o) => $__utils_fs_glob.apply(undefined, [p, o ? JSON.stringify(o) : undefined], { result: { promise: true } }).then(JSON.parse),
     write:  (p, c) => $__utils_fs_write.apply(undefined, [p, c], { result: { promise: true } }),
+    copy:   (src, dest) => $__utils_fs_copy.apply(undefined, [src, dest], { result: { promise: true } }),
     replace: async (p, regex, replacement) => {
       const content = await globalThis.utils.fs.read(p);
       const newContent = content.replace(regex, replacement);

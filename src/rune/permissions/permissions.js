@@ -1,6 +1,7 @@
 import micromatch from 'micromatch'
 import { matchFetchPermission } from './permissions-http.js'
 import { matchEnvPermission } from './permissions-env.js'
+import { matchStorePermission } from './permissions-store.js'
 
 export class PermissionError extends Error {
   constructor(capability, value) {
@@ -18,7 +19,7 @@ function normalizePermission(perm) {
     if (
       !val.startsWith('./') &&
       !val.startsWith('../') &&
-      !val.startsWith('@plugin/') &&
+      !val.startsWith('@') &&
       !val.startsWith('~/') &&
       !val.startsWith('/') &&
       !/^[a-zA-Z]:/.test(val) // Windows absolute path
@@ -31,9 +32,10 @@ function normalizePermission(perm) {
     const colonIdx = perm.indexOf(':')
     const cap      = perm.slice(0, colonIdx)
     const rest     = perm.slice(colonIdx + 1)
-    const sepIdx   = rest.lastIndexOf(':')
-    const rawLoc   = sepIdx === -1 ? rest      : rest.slice(0, sepIdx)
-    const rawName  = sepIdx === -1 ? 'default' : rest.slice(sepIdx + 1)
+    if (rest.startsWith('@')) return perm
+    const sepIdx  = rest.lastIndexOf(':')
+    const rawLoc  = sepIdx === -1 ? rest : rest.slice(0, sepIdx)
+    const rawName = sepIdx !== -1 ? rest.slice(sepIdx + 1) : null
     let loc = rawLoc
     if (
       !loc.startsWith('./') &&
@@ -44,6 +46,7 @@ function normalizePermission(perm) {
     ) {
       loc = './' + loc
     }
+    if (rawName === null) return `${cap}:${loc}`
     return `${cap}:${loc}:${rawName}`
   }
   return perm
@@ -84,9 +87,17 @@ export function makePermissionChecker(effective) {
       if (!allowed || denied) throw new PermissionError(capability, value)
       return
     }
+    if (capability === 'sqlite.read' || capability === 'sqlite.write' ||
+        capability === 'cache.read'  || capability === 'cache.write') {
+      const allowed = effective.allow.some(p => matchStorePermission(value, p, capability))
+      const denied  = effective.deny.length > 0 &&
+                      effective.deny.some(p => matchStorePermission(value, p, capability))
+      if (!allowed || denied) throw new PermissionError(capability, value)
+      return
+    }
     const token   = `${capability}:${value}`
-    const allowed = micromatch.isMatch(token, effective.allow)
-    const denied  = effective.deny.length > 0 && micromatch.isMatch(token, effective.deny)
+    const allowed = micromatch.isMatch(token, effective.allow, { dot: true })
+    const denied  = effective.deny.length > 0 && micromatch.isMatch(token, effective.deny, { dot: true })
     if (!allowed || denied) throw new PermissionError(capability, value)
   }
 }

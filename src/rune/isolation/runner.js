@@ -3,6 +3,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { createRequire } from 'node:module'
 import { createUtils } from '../api/index.js'
+import { getAutoPermits } from '../api/utils.js'
 import { computeEffectivePermissions, makePermissionChecker } from '../permissions/permissions.js'
 import { isVerbose } from '../../shared/output.js'
 import { createModuleResolver } from './resolver.js'
@@ -41,6 +42,9 @@ async function injectUtils(isolate, context, utils, runeCallback, vars) {
   }))
   await jail.set('$__utils_fs_write', new ivm.Reference(async (relPath, content) => {
     return utils.fs.write(relPath, content)
+  }))
+  await jail.set('$__utils_fs_copy', new ivm.Reference(async (src, dest) => {
+    await utils.fs.copy(src, dest)
   }))
   await jail.set('$__utils_shell', new ivm.Reference(async (cmd, opts) => {
     const result = await utils.shell(cmd, opts ? JSON.parse(opts) : undefined)
@@ -239,9 +243,10 @@ export async function runRuneInIsolate(runeFile, effective, args, projectDir, {
   lifecycle = 'use',
   pluginId = null,
 } = {}) {
-  const augmented = pluginDir
-    ? { allow: [...effective.allow, 'fs.read:@plugin/**'], deny: effective.deny }
-    : effective
+  const augmented = {
+    allow: [...effective.allow, ...getAutoPermits({ pluginId, pluginDir })],
+    deny: effective.deny,
+  }
   const checkPermission = makePermissionChecker(augmented)
   const { utils, dispose } = createUtils(projectDir, checkPermission, pluginDir ?? null, augmented, vars, sections, pluginId)
 

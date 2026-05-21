@@ -1,30 +1,7 @@
-import { readFileSync } from 'node:fs'
 import fs from 'node:fs/promises'
 import path from 'node:path'
-import { createHash } from 'node:crypto'
+import { resolvePath, canonicalizeLocation } from './utils.js'
 import { getStorePath } from '../../plugin/store.js'
-
-function shortHash(str) {
-  return createHash('sha1').update(str).digest('hex').slice(0, 8)
-}
-
-function getProjectKey(dir) {
-  const hash = shortHash(dir)
-  try {
-    const config = JSON.parse(readFileSync(path.join(dir, '.crunes', 'config.json'), 'utf8'))
-    const name = config.name
-    if (typeof name === 'string' && name.length > 0) return `${name}-${hash}`
-  } catch {}
-  return hash
-}
-
-function canonicalizePath(dir, inputPath) {
-  const p = inputPath.replace(/\\/g, '/')
-  if (path.isAbsolute(inputPath)) return p
-  const resolved = path.resolve(dir, inputPath)
-  const rel = path.relative(dir, resolved).replace(/\\/g, '/')
-  return rel.startsWith('..') ? rel : './' + rel
-}
 
 function assertSerializable(value) {
   try {
@@ -86,37 +63,15 @@ function makeHandle(cacheDir, checkRead, checkWrite) {
   }
 }
 
-export function createCacheUtils(dir, checkPermission, pluginId = null, storeDir = getStorePath()) {
-  function resolveCacheDir(location, name) {
-    if (location === '@plugin-cache') {
-      if (!pluginId) throw new Error('utils.cache: @plugin-cache requires a plugin context')
-      return path.join(storeDir, 'cache', 'plugins', pluginId, name)
-    }
-    if (location === '@project-plugin-cache') {
-      if (!pluginId) throw new Error('utils.cache: @project-plugin-cache requires a plugin context')
-      return path.join(storeDir, 'cache', 'projects', getProjectKey(dir), 'plugins', pluginId, name)
-    }
-    if (location === '@project-cache') {
-      return path.join(storeDir, 'cache', 'projects', getProjectKey(dir), name)
-    }
-    return path.join(path.isAbsolute(location) ? location : path.resolve(dir, location), name)
-  }
-
+export function createCacheUtils(dir, checkPermission, { pluginId = null, storeDir = getStorePath(), projectName = undefined } = {}) {
   return {
     openHandle(location, name = 'default') {
-      const cacheDir = resolveCacheDir(location, name)
-      const autoPermitted = location === '@plugin-cache' ||
-                            location === '@project-plugin-cache' ||
-                            location === '@project-cache'
-      if (autoPermitted) return makeHandle(cacheDir, null, null)
-
-      const canonical = canonicalizePath(dir, location)
-      const checkRead  = checkPermission
-        ? () => checkPermission('cache.read',  `${canonical}:${name}`)
-        : null
-      const checkWrite = checkPermission
-        ? () => checkPermission('cache.write', `${canonical}:${name}`)
-        : null
+      const ctx = { dir, pluginId, storeDir, projectName }
+      const cacheDir = path.join(resolvePath(location, ctx), name)
+      const canon = canonicalizeLocation(location, { dir })
+      const tokenValue = `${canon}:${name}`
+      const checkRead  = checkPermission ? () => checkPermission('cache.read',  tokenValue) : null
+      const checkWrite = checkPermission ? () => checkPermission('cache.write', tokenValue) : null
       return makeHandle(cacheDir, checkRead, checkWrite)
     },
   }

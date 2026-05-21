@@ -1,50 +1,11 @@
-import { mkdirSync, readFileSync } from 'node:fs'
+import { mkdirSync } from 'node:fs'
 import path from 'node:path'
-import { createHash } from 'node:crypto'
 import Database from 'better-sqlite3'
+import { resolvePath, canonicalizeLocation } from './utils.js'
 import { getStorePath } from '../../plugin/store.js'
-
-function shortHash(str) {
-  return createHash('sha1').update(str).digest('hex').slice(0, 8)
-}
-
-function getProjectKey(dir) {
-  const hash = shortHash(dir)
-  try {
-    const config = JSON.parse(readFileSync(path.join(dir, '.crunes', 'config.json'), 'utf8'))
-    const name = config.name
-    if (typeof name === 'string' && name.length > 0) return `${name}-${hash}`
-  } catch {}
-  return hash
-}
-
-function canonicalizePath(dir, inputPath) {
-  const p = inputPath.replace(/\\/g, '/')
-  if (path.isAbsolute(inputPath)) return p
-  const resolved = path.resolve(dir, inputPath)
-  const rel = path.relative(dir, resolved).replace(/\\/g, '/')
-  return rel.startsWith('..') ? rel : './' + rel
-}
 
 function resolveFileName(name) {
   return /\.\w+$/.test(name) ? name : `${name}.sqlite`
-}
-
-function resolveDbPath(dir, pluginId, storeDir, location, name) {
-  const filename = resolveFileName(name)
-  if (location === '@plugin-sqlite') {
-    if (!pluginId) throw new Error('utils.sqlite: @plugin-sqlite requires a plugin context')
-    return path.join(storeDir, 'sqlite', 'plugins', pluginId, filename)
-  }
-  if (location === '@project-plugin-sqlite') {
-    if (!pluginId) throw new Error('utils.sqlite: @project-plugin-sqlite requires a plugin context')
-    return path.join(storeDir, 'sqlite', 'projects', getProjectKey(dir), 'plugins', pluginId, filename)
-  }
-  if (location === '@project-sqlite') {
-    return path.join(storeDir, 'sqlite', 'projects', getProjectKey(dir), filename)
-  }
-  const base = path.isAbsolute(location) ? location : path.resolve(dir, location)
-  return path.join(base, filename)
 }
 
 function makeHandle(dbPath, checkRead, checkWrite, connections) {
@@ -76,21 +37,18 @@ function makeHandle(dbPath, checkRead, checkWrite, connections) {
   }
 }
 
-export function createSqliteUtils(dir, checkPermission, pluginId = null, storeDir = getStorePath()) {
+export function createSqliteUtils(dir, checkPermission, { pluginId = null, storeDir = getStorePath(), projectName = undefined } = {}) {
   const connections = []
 
   return {
     openHandle(location, name = 'default') {
-      const autoPermitted = location === '@plugin-sqlite' ||
-                            location === '@project-plugin-sqlite' ||
-                            location === '@project-sqlite'
-      const dbPath = resolveDbPath(dir, pluginId, storeDir, location, name)
-      if (autoPermitted) return makeHandle(dbPath, null, null, connections)
-
-      const canonical = canonicalizePath(dir, location)
-      const permValue = `${canonical}:${name}`
-      const checkRead  = checkPermission ? () => checkPermission('sqlite.read',  permValue) : null
-      const checkWrite = checkPermission ? () => checkPermission('sqlite.write', permValue) : null
+      const ctx = { dir, pluginId, storeDir, projectName }
+      const base    = resolvePath(location, ctx)
+      const dbPath  = path.join(base, resolveFileName(name))
+      const canon   = canonicalizeLocation(location, { dir })
+      const tokenValue = `${canon}:${name}`
+      const checkRead  = checkPermission ? () => checkPermission('sqlite.read',  tokenValue) : null
+      const checkWrite = checkPermission ? () => checkPermission('sqlite.write', tokenValue) : null
       return makeHandle(dbPath, checkRead, checkWrite, connections)
     },
     dispose() {

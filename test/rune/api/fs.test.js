@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
@@ -263,5 +263,101 @@ describe('createFsUtils — @project/ paths', () => {
     const spy = vi.fn()
     await createFsUtils(dir, spy).write('@project/out/result.txt', 'hi').catch(() => {})
     expect(spy).toHaveBeenCalledWith('fs.write', './out/result.txt')
+  })
+})
+
+describe('createFsUtils — store path resolution', () => {
+  let dir, storeDir
+
+  beforeEach(async () => {
+    dir      = await makeTempDir()
+    storeDir = await makeTempDir()
+  })
+
+  afterEach(async () => {
+    await fs.rm(dir,      { recursive: true, force: true })
+    await fs.rm(storeDir, { recursive: true, force: true })
+  })
+
+  it('@project/ path reads from project dir', async () => {
+    await writeFile(dir, 'sub/file.txt', 'hello')
+    const result = await createFsUtils(dir, null).read('@project/sub/file.txt')
+    expect(result).toBe('hello')
+  })
+
+  it('@project/ canonical token strips to ./subpath', async () => {
+    const spy = vi.fn()
+    await createFsUtils(dir, spy).read('@project/foo.txt').catch(() => {})
+    expect(spy).toHaveBeenCalledWith('fs.read', './foo.txt')
+  })
+
+  it('@plugin-sqlite/ produces verbatim canonical token', async () => {
+    const spy = vi.fn()
+    await createFsUtils(dir, spy, null, 'plug@1.0', storeDir)
+      .exists('@plugin-sqlite/mydb.sqlite').catch(() => {})
+    expect(spy).toHaveBeenCalledWith('fs.read', '@plugin-sqlite/mydb.sqlite')
+  })
+
+  it('@project-sqlite/ produces verbatim canonical token', async () => {
+    const spy = vi.fn()
+    await createFsUtils(dir, spy, null, null, storeDir)
+      .exists('@project-sqlite/mydb.sqlite').catch(() => {})
+    expect(spy).toHaveBeenCalledWith('fs.read', '@project-sqlite/mydb.sqlite')
+  })
+})
+
+describe('createFsUtils — copy', () => {
+  let dir, storeDir
+
+  beforeEach(async () => {
+    dir      = await makeTempDir()
+    storeDir = await makeTempDir()
+  })
+
+  afterEach(async () => {
+    await fs.rm(dir,      { recursive: true, force: true })
+    await fs.rm(storeDir, { recursive: true, force: true })
+  })
+
+  it('copy transfers file contents', async () => {
+    await writeFile(dir, 'src.txt', 'binary-data')
+    await createFsUtils(dir, null).copy('./src.txt', './dest.txt')
+    expect(await fs.readFile(path.join(dir, 'dest.txt'), 'utf8')).toBe('binary-data')
+  })
+
+  it('copy creates destination parent directories', async () => {
+    await writeFile(dir, 'src.txt', 'x')
+    await createFsUtils(dir, null).copy('./src.txt', './deep/nested/dest.txt')
+    const abs = path.join(dir, 'deep', 'nested', 'dest.txt')
+    expect(await fs.readFile(abs, 'utf8')).toBe('x')
+  })
+
+  it('copy checks fs.read on src token', async () => {
+    await writeFile(dir, 'src.txt', 'x')
+    const spy = vi.fn()
+    await createFsUtils(dir, spy).copy('./src.txt', './dest.txt').catch(() => {})
+    expect(spy).toHaveBeenCalledWith('fs.read', './src.txt')
+  })
+
+  it('copy checks fs.write on dest token', async () => {
+    await writeFile(dir, 'src.txt', 'x')
+    const spy = vi.fn()
+    await createFsUtils(dir, spy).copy('./src.txt', './dest.txt').catch(() => {})
+    expect(spy).toHaveBeenCalledWith('fs.write', './dest.txt')
+  })
+
+  it('copy to @plugin-sqlite/ uses verbatim canonical token', async () => {
+    await writeFile(dir, 'seed.sqlite', 'x')
+    const spy = vi.fn()
+    await createFsUtils(dir, spy, null, 'plug@1.0', storeDir)
+      .copy('./seed.sqlite', '@plugin-sqlite/mydb.sqlite').catch(() => {})
+    expect(spy).toHaveBeenCalledWith('fs.write', '@plugin-sqlite/mydb.sqlite')
+  })
+
+  it('copy PermissionError when fs.read not granted', async () => {
+    await writeFile(dir, 'src.txt', 'x')
+    const checker = makePermissionChecker({ allow: [], deny: [] })
+    await expect(createFsUtils(dir, checker).copy('./src.txt', './dest.txt'))
+      .rejects.toThrow(PermissionError)
   })
 })

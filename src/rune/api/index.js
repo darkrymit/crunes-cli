@@ -29,10 +29,10 @@ export function createSectionUtils(patterns) {
   }
 }
 
-export function createUtils(dir, checkPermission = null, pluginDir = null, permissions = { allow: [], deny: [] }, vars = {}, requestedSections = null, pluginId = null) {
-  const fs = createFsUtils(dir, checkPermission, pluginDir)
-  const sqlite = createSqliteUtils(dir, checkPermission, pluginId)
-  const utils = {
+export function createUtils(dir, checkPermission = null, pluginDir = null, permissions = { allow: [], deny: [] }, vars = {}, requestedSections = null, pluginId = null, projectName = undefined) {
+  const fs     = createFsUtils(dir, checkPermission, pluginDir, pluginId)
+  const sqlite = createSqliteUtils(dir, checkPermission, { pluginId, projectName })
+  const utils  = {
     md,
     tree: treeUtils,
     section: createSectionUtils(requestedSections),
@@ -45,7 +45,7 @@ export function createUtils(dir, checkPermission = null, pluginDir = null, permi
     env:     createEnvUtils(dir, checkPermission, permissions),
     vars:    createVarsUtils(vars),
     archive: createArchiveUtils(dir, checkPermission),
-    cache:   createCacheUtils(dir, checkPermission, pluginId),
+    cache:   createCacheUtils(dir, checkPermission, { pluginId, projectName }),
     sqlite,
   }
   return { utils, dispose: () => sqlite.dispose() }
