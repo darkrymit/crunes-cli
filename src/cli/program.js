@@ -127,7 +127,7 @@ export function buildProgram() {
     .option('--description <description>', 'short description of what context this rune provides')
     .action(async (key, opts) => {
       const { handler } = await import('../rune/commands/create.js')
-      await handler({ key, format: opts.format, path: opts.path, name: opts.name, description: opts.description, yes: !!program.opts().yes, projectRoot: projectRoot() })
+      await handler({ key, format: opts.format, path: opts.path, name: opts.name, description: opts.description, yes: !!program.opts().yes, projectRoot: projectRoot(), configRoot: configRoot() })
     })
 
   // Plugin management commands
@@ -231,7 +231,7 @@ export function buildProgram() {
     .option('--description <description>', 'short description of what kind of rune this template produces')
     .action(async (name, opts) => {
       const { handler } = await import('../template/commands/create.js')
-      await handler({ name, path: opts.path, templateName: opts.name, description: opts.description, yes: !!program.opts().yes, projectRoot: projectRoot() })
+      await handler({ name, path: opts.path, templateName: opts.name, description: opts.description, yes: !!program.opts().yes, projectRoot: projectRoot(), configRoot: configRoot() })
     })
 
   // Marketplace commands

@@ -18,18 +18,22 @@ exports[`exampleRune > matches snapshot 1`] = `
 //     allow: []  — add patterns like fs.read:./** if you use utils.fs
 //     deny:  []
 
-export async function use(dir, args, utils) {
-  // dir   — absolute path to the user's project root
-  // args  — string[] passed via $example=arg1,arg2
-  // utils — { md, tree, section, fs, json, shell, fetch, env, vars, rune }
-  //
-  // utils.section.selected()         → string[] | null — requested section patterns
-  // utils.section.match(name)        → bool            — true if section is requested
-  // utils.section.create(name, data) → Section         — build a section object
+import { md, section } from '@utils'
 
-  return utils.section.create('example', {
+// export async function args(b) {
+//   return b
+//     .option('-v, --verbose', 'Verbose output', false)
+//     .build()
+// }
+
+export async function use(args) {
+  // args._         — positional arguments (string[])
+  // args.verbose   — named flag (if args export is defined above)
+  // utils.fs.cwd() — absolute path to the user's project root
+
+  return section.create('example', {
     type: 'markdown',
-    content: utils.md.h3('Example') + '\\n' + utils.md.ul(['Replace with real output']),
+    content: md.h3('Example') + '\\n' + md.ul(['Replace with real output']),
   });
 }
 "
@@ -44,18 +48,22 @@ exports[`exampleTemplate > matches snapshot 1`] = `
 //     allow: []  — add patterns like fs.read:./** if you use utils.fs
 //     deny:  []
 
-export async function use(dir, args, utils) {
-  // dir   — absolute path to the user's project root
-  // args  — string[] passed via $key=arg1,arg2
-  // utils — { md, tree, section, fs, json, shell, fetch, env, vars, rune }
-  //
-  // utils.section.selected()         → string[] | null — requested section patterns
-  // utils.section.match(name)        → bool            — true if section is requested
-  // utils.section.create(name, data) → Section         — build a section object
+import { md, section } from '@utils'
 
-  return utils.section.create('example', {
+// export async function args(b) {
+//   return b
+//     .option('-v, --verbose', 'Verbose output', false)
+//     .build()
+// }
+
+export async function use(args) {
+  // args._         — positional arguments (string[])
+  // args.verbose   — named flag (if args export is defined above)
+  // utils.fs.cwd() — absolute path to the user's project root
+
+  return section.create('example', {
     type: 'markdown',
-    content: utils.md.h3('Example') + '\\n' + utils.md.ul(['Replace with real output']),
+    content: md.h3('Example') + '\\n' + md.ul(['Replace with real output']),
   });
 }
 "

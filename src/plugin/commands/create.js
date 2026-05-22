@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync, readdirSync, existsSync } from 'node:fs'
+import { mkdir, writeFile, readdir } from 'node:fs/promises'
 import { join, resolve, dirname } from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { intro, outro, text, confirm, cancel } from '@clack/prompts'
@@ -60,18 +60,22 @@ export function exampleRune() {
 //     allow: []  — add patterns like fs.read:./** if you use utils.fs
 //     deny:  []
 
-export async function use(dir, args, utils) {
-  // dir   — absolute path to the user's project root
-  // args  — string[] passed via $example=arg1,arg2
-  // utils — { md, tree, section, fs, json, shell, fetch, env, vars, rune }
-  //
-  // utils.section.selected()         → string[] | null — requested section patterns
-  // utils.section.match(name)        → bool            — true if section is requested
-  // utils.section.create(name, data) → Section         — build a section object
+import { md, section } from '@utils'
 
-  return utils.section.create('example', {
+// export async function args(b) {
+//   return b
+//     .option('-v, --verbose', 'Verbose output', false)
+//     .build()
+// }
+
+export async function use(args) {
+  // args._         — positional arguments (string[])
+  // args.verbose   — named flag (if args export is defined above)
+  // utils.fs.cwd() — absolute path to the user's project root
+
+  return section.create('example', {
     type: 'markdown',
-    content: utils.md.h3('Example') + '\\n' + utils.md.ul(['Replace with real output']),
+    content: md.h3('Example') + '\\n' + md.ul(['Replace with real output']),
   });
 }
 `
@@ -86,18 +90,22 @@ export function exampleTemplate() {
 //     allow: []  — add patterns like fs.read:./** if you use utils.fs
 //     deny:  []
 
-export async function use(dir, args, utils) {
-  // dir   — absolute path to the user's project root
-  // args  — string[] passed via $key=arg1,arg2
-  // utils — { md, tree, section, fs, json, shell, fetch, env, vars, rune }
-  //
-  // utils.section.selected()         → string[] | null — requested section patterns
-  // utils.section.match(name)        → bool            — true if section is requested
-  // utils.section.create(name, data) → Section         — build a section object
+import { md, section } from '@utils'
 
-  return utils.section.create('example', {
+// export async function args(b) {
+//   return b
+//     .option('-v, --verbose', 'Verbose output', false)
+//     .build()
+// }
+
+export async function use(args) {
+  // args._         — positional arguments (string[])
+  // args.verbose   — named flag (if args export is defined above)
+  // utils.fs.cwd() — absolute path to the user's project root
+
+  return section.create('example', {
     type: 'markdown',
-    content: utils.md.h3('Example') + '\\n' + utils.md.ul(['Replace with real output']),
+    content: md.h3('Example') + '\\n' + md.ul(['Replace with real output']),
   });
 }
 `
@@ -162,17 +170,15 @@ export async function handler({
 
   const outDir = resolve(projectRoot, out ?? name)
 
-  if (existsSync(outDir)) {
-    let entries = []
-    try { entries = readdirSync(outDir) } catch {}
-    if (entries.length > 0) {
-      if (isNonInteractive) {
-        output.error(`Output directory "${outDir}" already exists and is not empty. Provide --out pointing to an empty location.`)
-        process.exit(1)
-      }
-      const ok = await confirm({ message: `"${outDir}" already exists and is not empty. Overwrite?` })
-      if (!ok || ok === Symbol.for('clack:cancel')) { cancel('Cancelled.'); return }
+  let entries = []
+  try { entries = await readdir(outDir) } catch {}
+  if (entries.length > 0) {
+    if (isNonInteractive) {
+      output.error(`Output directory "${outDir}" already exists and is not empty. Provide --out pointing to an empty location.`)
+      process.exit(1)
     }
+    const ok = await confirm({ message: `"${outDir}" already exists and is not empty. Overwrite?` })
+    if (!ok || ok === Symbol.for('clack:cancel')) { cancel('Cancelled.'); return }
   }
 
   const opts = { name, description, author, license }
@@ -187,8 +193,8 @@ export async function handler({
   ]
 
   for (const [filePath, content] of files) {
-    mkdirSync(dirname(filePath), { recursive: true })
-    writeFileSync(filePath, content)
+    await mkdir(dirname(filePath), { recursive: true })
+    await writeFile(filePath, content)
   }
 
   const successMsg = `Created ${outDir}`

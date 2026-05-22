@@ -1,29 +1,33 @@
-import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs'
+import { mkdir, writeFile, readFile, rename } from 'node:fs/promises'
 import { join, dirname } from 'node:path'
 import { intro, outro, text, cancel } from '@clack/prompts'
 import { output } from '../../shared/output.js'
 
-function templateStub(name) {
+export function templateStub(name) {
   return [
     `// permissions:`,
     `//   use:`,
     `//     allow: []  — add patterns like fs.read:./** if you use utils.fs`,
     `//     deny:  []`,
     ``,
-    `export async function use(dir, args, utils) {`,
-    `  // dir   — absolute path to the user's project root`,
-    `  // args  — string[] passed via $key=arg1,arg2`,
-    `  // utils — { md, tree, section, fs, json, shell, fetch, env, vars, rune }`,
-    `  //`,
-    `  // utils.section.selected()         → string[] | null — requested section patterns`,
-    `  // utils.section.match(name)        → bool            — true if section is requested`,
-    `  // utils.section.create(name, data) → Section         — build a section object`,
+    `import { md, section } from '@utils'`,
+    ``,
+    `// export async function args(b) {`,
+    `//   return b`,
+    `//     .option('-v, --verbose', 'Verbose output', false)`,
+    `//     .build()`,
+    `// }`,
+    ``,
+    `export async function use(args) {`,
+    `  // args._         — positional arguments (string[])`,
+    `  // args.verbose   — named flag (if args export is defined above)`,
+    `  // utils.fs.cwd() — absolute path to the project root`,
     ``,
     `  const content = [`,
-    `    utils.md.h3('${name}'),`,
-    `    utils.md.ul(['Replace with real output']),`,
+    `    md.h3('${name}'),`,
+    `    md.ul(['Replace with real output']),`,
     `  ].join('\\n');`,
-    `  return utils.section.create('example-md', { type: 'markdown', content });`,
+    `  return section.create('example-md', { type: 'markdown', content });`,
     `}`,
     ``,
   ].join('\n')
@@ -36,6 +40,7 @@ export async function handler({
   description,
   yes = false,
   projectRoot = process.cwd(),
+  configRoot = projectRoot,
 } = {}) {
   const isNonInteractive = yes || !process.stdout.isTTY
 
@@ -74,25 +79,25 @@ export async function handler({
   }
 
   templateRelPath = templateRelPath ?? `.crunes/templates/${name}.js`
-  const templateAbsPath = join(projectRoot, templateRelPath)
+  const templateAbsPath = join(configRoot, templateRelPath)
 
-  mkdirSync(dirname(templateAbsPath), { recursive: true })
-  writeFileSync(templateAbsPath, templateStub(name))
+  await mkdir(dirname(templateAbsPath), { recursive: true })
+  await writeFile(templateAbsPath, templateStub(name))
 
-  // Register in config under templates key
-  const configPath = join(projectRoot, '.crunes', 'config.json')
+  const configPath = join(configRoot, '.crunes', 'config.json')
+  await mkdir(dirname(configPath), { recursive: true })
   let config = { runes: {} }
-  if (existsSync(configPath)) {
-    try { config = JSON.parse(readFileSync(configPath, 'utf8')) } catch {}
-  }
+  try { config = JSON.parse(await readFile(configPath, 'utf8')) } catch {}
 
   const entry = {
     path: templateRelPath,
     ...(templateName && { name: templateName }),
-    ...(description && { description })
+    ...(description && { description }),
   }
   config.templates = { ...(config.templates ?? {}), [name]: entry }
-  writeFileSync(configPath, JSON.stringify(config, null, 2) + '\n')
+  const tmpPath = configPath + '.tmp'
+  await writeFile(tmpPath, JSON.stringify(config, null, 2) + '\n', 'utf8')
+  await rename(tmpPath, configPath)
 
   if (!isNonInteractive) {
     outro(`Created ${templateRelPath}\nUse it with: crunes template use ${name}`)

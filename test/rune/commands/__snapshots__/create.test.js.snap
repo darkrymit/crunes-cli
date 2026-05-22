@@ -1,0 +1,56 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`template > markdown format matches snapshot 1`] = `
+"// permissions:
+//   use:
+//     allow: []  — add patterns like fs.read:./** if you use utils.fs
+//     deny:  []
+
+import { md, section } from '@utils'
+
+// export async function args(b) {
+//   return b
+//     .option('-v, --verbose', 'Verbose output', false)
+//     .build()
+// }
+
+export async function use(args) {
+  // args._         — positional arguments (string[])
+  // args.verbose   — named flag (if args export is defined above)
+  // utils.fs.cwd() — absolute path to the project root
+
+  const content = [
+    md.h3('mykey'),
+    md.ul(['Replace with real data']),
+  ].join('\\n');
+  return section.create('example-md', { type: 'markdown', content });
+}
+"
+`;
+
+exports[`template > tree format matches snapshot 1`] = `
+"// permissions:
+//   use:
+//     allow: []  — add patterns like fs.read:./** if you use utils.fs
+//     deny:  []
+
+import { md, section, tree } from '@utils'
+
+// export async function args(b) {
+//   return b
+//     .option('-v, --verbose', 'Verbose output', false)
+//     .build()
+// }
+
+export async function use(args) {
+  // args._         — positional arguments (string[])
+  // args.verbose   — named flag (if args export is defined above)
+  // utils.fs.cwd() — absolute path to the project root
+
+  const root = tree.node('mykey', 'Root description', [
+    tree.node('child', 'Child description'),
+  ]);
+  return section.create('example-tree', { type: 'tree', root });
+}
+"
+`;

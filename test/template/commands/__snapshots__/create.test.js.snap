@@ -1,0 +1,29 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`templateStub > matches snapshot 1`] = `
+"// permissions:
+//   use:
+//     allow: []  — add patterns like fs.read:./** if you use utils.fs
+//     deny:  []
+
+import { md, section } from '@utils'
+
+// export async function args(b) {
+//   return b
+//     .option('-v, --verbose', 'Verbose output', false)
+//     .build()
+// }
+
+export async function use(args) {
+  // args._         — positional arguments (string[])
+  // args.verbose   — named flag (if args export is defined above)
+  // utils.fs.cwd() — absolute path to the project root
+
+  const content = [
+    md.h3('mytemplate'),
+    md.ul(['Replace with real output']),
+  ].join('\\n');
+  return section.create('example-md', { type: 'markdown', content });
+}
+"
+`;

@@ -6,6 +6,7 @@ Shared domain logic used across multiple feature modules. Full docs: `docs/knowl
 
 - **config.js** — `loadConfig(dir)` — reads and parses `.crunes/config.json` for the given project root.
 - **errors.js** — `CircularRuneError` — thrown when a rune call chain loops back on itself.
+- **commands/init.js** — `handler()` — creates `.crunes/config.json` in the project root if it doesn't exist.
 
 ## Related Modules
 

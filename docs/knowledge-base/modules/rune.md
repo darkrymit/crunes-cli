@@ -22,7 +22,7 @@ The key token format parsed by `parseKeyToken` in `commands/use.js` is `[prefix:
 - **`isolation/`** — Sandboxed VM lifecycle: create isolate → compile static modules → inject `$__` bridges → compile rune ESM → evaluate → collect sections.
 - **`api/`** — The `utils` object rune authors interact with: `fs`, `shell`, `json`, `fetch`, `env`, `vars`, `md`, `tree`, `section`.
 - **`permissions/`** — `computeEffectivePermissions` and per-operation checkers (`fs`, `http`, `env`, `shell`).
-- **`commands/`** — CLI handlers: `use`, `list`, `init`, `create`, `check`, `bench`.
+- **`commands/`** — CLI handlers: `use`, `list`, `create`, `check`, `bench`.
 
 ## Concepts
 
@@ -69,6 +69,43 @@ The key token format parsed by `parseKeyToken` in `commands/use.js` is `[prefix:
 | `utils.section` | `create`, `match`, `selected` | — |
 | `utils.vars` | `get` | — |
 | `utils.rune` | `(key, args)` | inherits target rune's permissions |
+| `utils.yaml` | `read`, `parse`, `stringify` | inherits `fs.read:` for `read` |
+| `utils.xml` | `read`, `parse`, `stringify` | inherits `fs.read:` for `read` |
+| `utils.archive` | `read`, `write` | `fs.read:`, `fs.write:` |
+| `utils.cache` | `get`, `set`, `has`, `del`, `clear` | — |
+| `utils.sqlite` | `query`, `queryAll`, `exec` | `fs.read:`, `fs.write:` |
+| `utils.crypto` | `hashHex`, `hashBase64`, `uuid`, `hex`, `base64` | — |
+
+## Rune Authoring
+
+Every rune must export a `use` function with a **single `args` parameter** — the runner calls `use(parsedArgs)` with one argument (the parsed yargs result as a plain object). The old three-argument signature `use(dir, args, utils)` is broken at runtime: `dir` receives the args object, `args` and `utils` are `undefined`.
+
+```js
+import { md, section } from '@utils'
+
+export async function use(args) {
+  // args._         — positional arguments (string[])
+  // args.verbose   — named flag value (if args() export is defined)
+  // utils.fs.cwd() — absolute path to the project root (via globalThis.utils)
+}
+```
+
+The `@utils` import resolves to `utils-bootstrap.js` inside the isolate. It re-exports every namespace from `globalThis.utils` as named exports, so `import { md, section, fs } from '@utils'` works. `globalThis.utils` is also still accessible directly.
+
+**Typed arguments** — export an `args` function using the builder API:
+
+```js
+export async function args(b) {
+  return b
+    .option('-v, --verbose', 'Verbose output', false)
+    .option('-c, --count <number>', 'Max results', 10)
+    .positional('<target>', 'Target path')
+    .example('crunes use myrune foo', 'Basic use')
+    .build()
+}
+```
+
+The runner calls `args(builder)` before `use(parsedArgs)` and passes the schema to yargs for parsing. If `args` is not exported, all positional arguments land in `parsedArgs._` as strings.
 
 ## Flows
 
