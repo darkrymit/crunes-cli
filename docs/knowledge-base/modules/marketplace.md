@@ -25,6 +25,10 @@ A marketplace is a named source that publishes a `marketplace.json` index of ava
 
 **`resolvedPath` for relative source resolution:** `fetchMarketplace` returns `{ data, resolvedPath }`. For github/npm cache, `resolvedPath` is the cache directory. For local, it is the directory containing `marketplace.json` (with `.crunes-plugin/` stripped — see gotchas). `resolvePluginSource` uses `resolvedPath` to resolve relative plugin source paths (`./plugins/my-plugin`) to absolute paths or absolute URLs.
 
+## Flows
+
+- [[flows/plugin-install]] — marketplace resolution is step 1 of the install flow; `resolveFromMarketplace` is the external API consumed by `plugin install` and `plugin update`
+
 ## Key Decisions
 
 - **No automatic refresh for remote sources:** Remote marketplace indexes (github, npm) require an explicit `crunes marketplace update` to pull the latest index. This prevents unexpected network calls during plugin install and keeps installs reproducible — the installed version comes from the cached index, not whatever is latest upstream.

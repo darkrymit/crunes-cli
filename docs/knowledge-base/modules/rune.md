@@ -22,7 +22,7 @@ The key token format parsed by `parseKeyToken` in `commands/use.js` is `[prefix:
 - **`isolation/`** — Sandboxed VM lifecycle: create isolate → compile static modules → inject `$__` bridges → compile rune ESM → evaluate → collect sections.
 - **`api/`** — The `utils` object rune authors interact with: `fs`, `shell`, `json`, `fetch`, `env`, `vars`, `md`, `tree`, `section`.
 - **`permissions/`** — `computeEffectivePermissions` and per-operation checkers (`fs`, `http`, `env`, `shell`).
-- **`commands/`** — CLI handlers: `use`, `list`, `create`, `check`, `bench`.
+- **`commands/`** — CLI handlers: `use`, `list`, `create`, `check`, `bench`. All key-accepting commands (`use`, `check`, `bench`) share the same `parseKeyToken` parser from `use.js` — they all support the `[prefix:]name[=arg1,arg2][::section1,section2]` token syntax. `bench` requires a key (no fallback to "run all"), supports `--runs <n>` to average multiple timed runs, and `--warmup` to execute one discarded run before timing starts.
 
 ## Concepts
 
@@ -57,24 +57,51 @@ The key token format parsed by `parseKeyToken` in `commands/use.js` is `[prefix:
 
 ## API Surface
 
-| Namespace | Functions | Permission token |
+All namespaces are available as named exports from `@utils` inside the isolate. The full export list from `utils-bootstrap.js` line 164:
+```js
+export const { fs, shell, section, rune, json, yaml, xml, fetch, env, vars, archive, cache, sqlite, crypto } = globalThis.utils
+export { md, tree }
+```
+
+| Namespace | Methods | Permission token |
 |---|---|---|
-| `utils.fs` | `read`, `exists`, `glob`, `write` | `fs.read:`, `fs.exists:`, `fs.glob:`, `fs.write:` |
-| `utils.shell` | `(cmd, opts)` | `shell:<cmd>` |
-| `utils.json` | `read`, `get`, `getAll` | inherits `fs.read:` |
-| `utils.fetch` | `(url, opts)` | `fetch:<url>` |
-| `utils.env` | `get`, `has` | `env:<source>:<key-glob>` |
-| `utils.md` | Pure — no I/O | — |
-| `utils.tree` | Pure — no I/O | — |
-| `utils.section` | `create`, `match`, `selected` | — |
-| `utils.vars` | `get` | — |
-| `utils.rune` | `(key, args)` | inherits target rune's permissions |
-| `utils.yaml` | `read`, `parse`, `stringify` | inherits `fs.read:` for `read` |
-| `utils.xml` | `read`, `parse`, `stringify` | inherits `fs.read:` for `read` |
-| `utils.archive` | `read`, `write` | `fs.read:`, `fs.write:` |
-| `utils.cache` | `get`, `set`, `has`, `del`, `clear` | — |
-| `utils.sqlite` | `query`, `queryAll`, `exec` | `fs.read:`, `fs.write:` |
-| `utils.crypto` | `hashHex`, `hashBase64`, `uuid`, `hex`, `base64` | — |
+| `fs` | `cwd()`, `read`, `exists`, `glob`, `write`, `copy`, `replace` | `fs.read:`, `fs.write:`, `fs.glob:` |
+| `shell` | `(cmd, opts)` | `shell:<cmd-prefix>` |
+| `json` | `read`, `get`, `getAll`, `write`, `modify` | inherits `fs.read:` / `fs.write:` |
+| `yaml` | `read`, `write`, `modify` | inherits `fs.read:` / `fs.write:` |
+| `xml` | `read`, `write`, `modify` | inherits `fs.read:` / `fs.write:` |
+| `fetch` | `(url, opts)` | `fetch:<METHOD>:<url>` |
+| `env` | `get`, `has` | `env:<source>:<key-glob>` |
+| `vars` | `get`, `has` | — |
+| `md` | Pure markdown builders | — |
+| `tree` | Pure tree builders | — |
+| `section` | `create`, `match`, `selected` | — |
+| `rune` | `(key, args)` | inherits target rune's permissions |
+| `archive` | `unzip`, `zip`, `untar`, `tar` | `fs.read:`, `fs.write:` |
+| `cache` | `open(location, name?)` → handle | `cache.read:`, `cache.write:` |
+| `sqlite` | `open(location, name?)` → db | `sqlite.read:`, `sqlite.write:` |
+| `crypto` | `hash.hex`, `hash.base64`, `uuid`, `hex`, `base64` | — |
+
+**`fs.replace`** is implemented in `utils-bootstrap.js`, not `api/fs.js` — it's a read+write composite: reads the file, runs `String.replace(regex, replacement)`, writes back.
+
+**`json.modify` / `yaml.modify` / `xml.modify`** have host-side implementations in `api/json.js`, `api/yaml.js`, `api/xml.js`, but those are NOT the versions runes call. Inside the isolate, `utils-bootstrap.js` has separate implementations that call `globalThis.utils.fs.exists` → `read` → `write` in sequence. They are NOT injected as host References — they run entirely inside the isolate. Callbacks receive `(data, { exists })` and can return the new value or mutate in place (returning `undefined` preserves the mutated object).
+
+**`cache.open` / `sqlite.open`** — the host-side implementations are `openHandle()` on the respective api class, but `utils-bootstrap.js` wraps them as `open()`. Inside the isolate these are async because `open` obtains a handle ID from the host and stores it; subsequent `get`/`set`/`query` calls reference the ID.
+
+**Virtual location tokens** for `cache` and `sqlite` (`resolvePath` in `api/utils.js`):
+
+| Token | Resolves to | Available in |
+|---|---|---|
+| `@project-cache` | `<store>/cache/projects/<project-key>` | Local + plugin runes |
+| `@project-plugin-cache` | `<store>/cache/projects/<key>/plugins/<pluginId>` | Plugin runes only |
+| `@plugin-cache` | `<store>/cache/plugins/<pluginId>` | Plugin runes only |
+| `@project-sqlite` | `<store>/sqlite/projects/<project-key>` | Local + plugin runes |
+| `@project-plugin-sqlite` | `<store>/sqlite/projects/<key>/plugins/<pluginId>` | Plugin runes only |
+| `@plugin-sqlite` | `<store>/sqlite/plugins/<pluginId>` | Plugin runes only |
+
+**Auto-grants** (`getAutoPermits` in `api/utils.js`):
+- Local runes: `fs.read:.crunes/**`
+- Plugin runes: `fs.read:@plugin/**`, `fs.write:@plugin/**`, plus `cache.*` and `sqlite.*` for all `@plugin-*` and `@project-plugin-*` virtual stores
 
 ## Rune Authoring
 
@@ -84,9 +111,9 @@ Every rune must export a `use` function with a **single `args` parameter** — t
 import { md, section } from '@utils'
 
 export async function use(args) {
-  // args._         — positional arguments (string[])
-  // args.verbose   — named flag value (if args() export is defined)
-  // utils.fs.cwd() — absolute path to the project root (via globalThis.utils)
+  // args._       — positional arguments (string[])
+  // args.verbose — named flag value (if args() export is defined)
+  // fs.cwd()     — absolute path to the project root
 }
 ```
 
@@ -113,17 +140,27 @@ The runner calls `args(builder)` before `use(parsedArgs)` and passes the schema 
 
 ## Gotchas & Debugging
 
-- **`utils.section()` vs `utils.section.create()`:** `utils.section` is an object (`{ create, match, selected }`), not a function. Runes still calling `utils.section(name, data)` will throw `TypeError: utils.section is not a function` at runtime with no further context.
+- **`section()` vs `section.create()`:** `section` is an object (`{ create, match, selected }`), not a function. Runes still calling `section(name, data)` or `utils.section(name, data)` will throw `TypeError: section is not a function` at runtime with no further context.
 
 - **Module compilation order matters:** `mdMod`, `treeMod`, `utilsMod` must all be compiled and instantiated before any are evaluated. `utilsMod` imports from `mdMod` and `treeMod` — evaluating in the wrong order causes "module not linked" errors.
 
-- **`isolateTimeoutMs` is per-`eval` call, not total wall-clock:** A rune making many sequential `utils.fs.read` calls can exceed real elapsed time while staying under the per-call limit. If a rune hangs, check for loops over large globs.
+- **`isolateTimeoutMs` is per-`eval` call, not total wall-clock:** A rune making many sequential `fs.read` calls can exceed real elapsed time while staying under the per-call limit. If a rune hangs, check for loops over large globs.
 
-- **`utils.fs.glob` `onlyDirectories: true`:** Returns only directories. `onlyFiles: true` (default) returns only files. Both options are passed through to `fast-glob`.
+- **`fs.glob` `onlyDirectories: true`:** Returns only directories. `onlyFiles: true` (default) returns only files. Both options are passed through to `tinyglobby`. Absolute patterns throw immediately.
 
-- **`utils.json.get` returns the first match for a JSONPath expression.** Use `utils.json.getAll` for expressions that may match multiple nodes.
+- **`json.get` returns the first JSONPath match.** Use `json.getAll` for expressions that may match multiple nodes.
 
-- **Lifecycle namespacing is mandatory in permissions:** A flat top-level `{ "allow": [...] }` in `plugin.json` or config produces an empty permission set silently. This was the root cause of a real bug where plugin runes appeared to have no permissions despite correct `plugin.json` authoring.
+- **`json.modify` / `yaml.modify` / `xml.modify` callback semantics:** The callback receives `(data, { exists })`. If the callback returns a value, that replaces the entire file content. If it returns `undefined` (implicit or explicit), the (mutated) `data` argument is used. Forgetting to `return` the new object is a common bug when building a new structure instead of mutating.
+
+- **`cache.open` and `sqlite.open` are async:** They negotiate a handle ID with the host. Forgetting `await` before `open()` means all subsequent `.get()`/`.set()` calls operate on a Promise, not a handle — they will throw silently.
+
+- **`@project-plugin-cache` / `@project-plugin-sqlite` require a plugin context:** Calling these from a local rune throws `Error: @project-plugin-cache requires a plugin context`. Use `@project-cache` / `@project-sqlite` for local runes.
+
+- **`env.get` only resolves keys that match a declared `env:` permission pattern.** A key not covered by any `allow` pattern returns `undefined` (or the fallback), even if the key exists in `process.env`. There is no "env access denied" error — it silently falls through to the fallback.
+
+- **`env:` permission source is a filename, not `process.env`:** `env:process:KEY` reads `process.env`. `env:.env:KEY` reads the project's `.env` file. Using `env:KEY` (missing the source segment) produces a pattern that never matches and silently returns undefined.
+
+- **Lifecycle namespacing is mandatory in permissions:** A flat top-level `{ "allow": [...] }` in `plugin.json` is rejected at install time — `validatePluginJson` throws `plugin.json: rune "X" must have lifecycle-scoped permissions (e.g. permissions.use.allow)`. Project config overrides are not validated the same way and silently produce an empty set if a flat `allow` is used there.
 
 - **`normalizePermission` prepends `./`:** `fs.read:package.json` is normalized to `fs.read:./package.json`. A permission declared as `fs.read:./package.json` and a check for `package.json` (without `./`) will NOT match. Always use the normalized path in permission tokens.
 

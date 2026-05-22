@@ -1,6 +1,6 @@
 # rune/isolation
 
-Sandboxed VM lifecycle via `isolated-vm`. Manages isolate creation, script compilation, and teardown for both local runes and plugin runes. Full docs: `docs/knowledge-base/modules/rune.isolation.md` (pending)
+Sandboxed VM lifecycle via `isolated-vm`. Manages isolate creation, script compilation, and teardown for both local runes and plugin runes. Full docs: `docs/knowledge-base/modules/rune.md`
 
 ## Key Files
 
@@ -9,6 +9,7 @@ Sandboxed VM lifecycle via `isolated-vm`. Manages isolate creation, script compi
 - **utils-bootstrap.js** — Source string embedded at build time; in-isolate stub that proxies all `utils.*` calls back to the host over the `isolated-vm` reference channel.
 - **console-bootstrap.js** — Source string embedded at build time; console shim that forwards `console.log` / `error` from inside the isolate to the host process.
 - **builtins.js** — Built-in polyfills injected into every isolate (e.g. `structuredClone`, `URL`).
+- **embedded.js** — Dev/test stub that exports empty strings for `md`, `tree`, `utils`, and `console` source strings. At build time the esbuild `embed-isolate-sources` plugin replaces this import with the real source strings in-memory; this file is never present in `dist/cli.js`.
 
 ## Related Modules
 

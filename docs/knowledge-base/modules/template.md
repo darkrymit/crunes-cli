@@ -25,9 +25,13 @@ A template is a rune scaffold — a `.js` file that can be copied into `.crunes/
 
 **Template metadata cascade:** The template's `plugin.json` (or local config entry) can declare `name`, `description`, and `permissions`. These become the config entry defaults. CLI flags `--name`, `--description` override them. `--as <key>` sets the rune key (default: template name).
 
+## Flows
+
+- [[flows/template-use]] — full resolution chain (local → shortcut → plugin), file copy, metadata merge, config write
+
 ## Key Decisions
 
-- **Plugin template paths are hardcoded to `<pluginDir>/templates/<key>.js`:** `use.js` constructs the source path as `path.join(pluginEntry.path, 'templates', `${templateName}.js`)`. A plugin that stores templates elsewhere will silently fail with `ENOENT` at copy time. There is no configurable template path in `plugin.json`.
+- **Plugin template paths default to `<pluginDir>/templates/<key>.js` but are overridable:** `use.js` constructs the source path as `path.join(pluginEntry.path, meta?.path ?? \`templates/${templateName}.js\`)`. A plugin can override the path via a `path` field in its template metadata in `plugin.json`. Without that field, the default `templates/<key>.js` is used and a plugin that stores templates elsewhere will fail with `ENOENT`.
 
 - **`template use` overwrites the rune config entry unconditionally (in non-interactive mode):** In TTY mode it prompts for overwrite confirmation if the rune file already exists. With `--yes` or in a non-TTY environment, it proceeds without confirmation. The config entry is always overwritten — there is no merge of existing permissions or vars.
 
@@ -39,4 +43,4 @@ A template is a rune scaffold — a `.js` file that can be copied into `.crunes/
 
 - **`--as <key>` controls the rune key but not the file path independently:** The rune file defaults to `.crunes/runes/<outputKey>.js`. Using `--as other-key` changes the registration key and the default file path together. Override the file path separately with `--path` if needed.
 
-- **Shortcut plugin resolution uses bare plugin name, not full `marketplace@name` key:** `resolvePluginKey(pluginBareName, registry)` searches the registry for a plugin whose name matches the bare name after `@`. If two plugins from different marketplaces have the same bare name, the first match wins silently.
+- **Shortcut plugin resolution uses bare plugin name, not full `marketplace@name` key:** `resolvePluginKey(pluginBareName, registry)` searches the registry for a plugin whose name matches the bare name after `@`. If two plugins from different marketplaces have the same bare name, it throws `Ambiguous plugin "X". Use the full key: ...` — it does NOT silently pick one.

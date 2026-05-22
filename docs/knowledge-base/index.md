@@ -7,6 +7,7 @@ AI-first documentation vault. Start here for context before working on any modul
 | Module | Note | Source |
 |--------|------|--------|
 | CLI | [[modules/cli]] | `src/cli/` |
+| Help | [[modules/help]] | `src/help/` |
 | Core | [[modules/core]] | `src/core/` |
 | Marketplace | [[modules/marketplace]] | `src/marketplace/` |
 | Plugin | [[modules/plugin]] | `src/plugin/` |
@@ -19,6 +20,9 @@ AI-first documentation vault. Start here for context before working on any modul
 | Flow | Note |
 |------|------|
 | crunes use | [[flows/use]] |
+| crunes plugin install | [[flows/plugin-install]] |
+| crunes plugin create | [[flows/plugin-create]] |
+| crunes template use | [[flows/template-use]] |
 
 ## System
 

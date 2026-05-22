@@ -1,6 +1,6 @@
 # core
 
-Shared domain logic used across multiple feature modules. Full docs: `docs/knowledge-base/modules/core.md` (pending)
+Shared domain logic used across multiple feature modules. Full docs: `docs/knowledge-base/modules/core.md`
 
 ## Key Files
 

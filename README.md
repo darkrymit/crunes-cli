@@ -16,9 +16,11 @@ Requires Node.js ≥ 20.
 crunes init                    Create .crunes/config.json in the current project
 crunes create [key]            Scaffold a new rune and register it in config
 crunes use <key> [-a <key>...] Use one or more runes and output the result (use --fail-fast to stop on error)
-crunes bench [key]             Time rune execution and report performance (use --runs <n> to average)
+crunes check <key>             Run a rune and validate its output shape
+crunes bench <key>             Time rune execution and report fast/ok/slow (use --runs <n> to average, --warmup to add a discarded warm-up run)
 crunes list                    List all registered runes
 crunes version                 Print the installed version and check for updates
+crunes help rune <key>         Show usage, argument schema, and examples for a rune
 ```
 
 **Template management:**
@@ -78,7 +80,7 @@ crunes use docs -a api=v2 # runs multiple runes in batch
 
 ## Key Syntax
 
-Commands that accept a `<key>` (like `crunes use` and `crunes bench`) support the following syntax:
+Commands that accept a `<key>` (like `crunes use`, `crunes bench`, and `crunes check`) support the following syntax:
 
 `[source:]name[=arg1,arg2][::section1,section2]`
 
@@ -91,45 +93,72 @@ Commands that accept a `<key>` (like `crunes use` and `crunes bench`) support th
 
 ## Rune API
 
-A rune is an ES module that exports a `generate` function:
+A rune is an ES module that exports a `use` function and imports utilities via `@utils`:
 
 ```js
-export async function generate(dir, args, utils, opts) { ... }
+import { md, section } from '@utils'
+
+export async function use(args) {
+  // args._         — positional arguments (string[])
+  // args.verbose   — named flag value (if args() export is defined)
+  return section.create('my-section', {
+    type: 'markdown',
+    content: md.h3('Hello!'),
+  })
+}
 ```
 
-| Parameter | Description |
-|---|---|
-| `dir` | Absolute path to the project root |
-| `args` | `string[]` parsed from `$key=arg1,arg2` tokens |
-| `utils` | Injected utilities — see below |
-| `opts` | Config options (e.g. `opts.sections` for performance hinting) |
+Every namespace is a named export from `@utils`:
+
+```js
+import { md, tree, section, fs, shell, json, yaml, xml,
+         fetch, env, vars, archive, cache, sqlite, crypto, rune } from '@utils'
+```
+
+**Typed arguments** — export an `args` function using the builder API:
+
+```js
+export async function args(b) {
+  return b
+    .option('-v, --verbose', 'Verbose output', false)
+    .option('-c, --count <number>', 'Max results', 10)
+    .positional('<target>', 'Target path')
+    .example('crunes use myrune foo', 'Basic use')
+    .build()
+}
+```
 
 ### Return values
 
-**Single section (Shape A):**
+**Single section:**
 
 ```js
-return { type: 'markdown', content: '...' };
+return section.create('my-section', { type: 'markdown', content: '...' })
 // or
-return { type: 'tree', root: utils.tree.node('src', 'Source root') };
+return section.create('my-section', { type: 'tree', root: tree.node('src', 'Source root') })
 ```
 
-**Multiple sections (Shape B):**
+**Multiple sections:**
 
 ```js
 return [
-  utils.section('context', { type: 'markdown', content: '...' }, { title: 'Setup', attrs: { id: 'setup' } }),
-  utils.section('context', { type: 'tree', root: ... }, { title: 'Structure', attrs: { id: 'structure' } }),
-];
+  section.create('setup',     { type: 'markdown', content: '...' }),
+  section.create('structure', { type: 'tree',     root: tree.node('src', 'Source root') }),
+]
 ```
 
-### `utils.md` — Markdown builders
+---
+
+### `md` — Markdown builders
+
+All functions are pure (no I/O).
 
 | Function | Output |
 |---|---|
 | `md.h1(text)` | `# text\n` |
 | `md.h2(text)` | `## text\n` |
 | `md.h3(text)` | `### text\n` |
+| `md.p(text)` | `text\n` |
 | `md.bold(text)` | `**text**` |
 | `md.italic(text)` | `_text_` |
 | `md.code(text)` | `` `text` `` |
@@ -139,49 +168,290 @@ return [
 | `md.link(text, url)` | `[text](url)` |
 | `md.table(headers, rows)` | GFM table |
 
-### `utils.tree` — Tree builders
+---
+
+### `tree` — Tree builders
+
+Pure — no I/O.
 
 ```js
-utils.tree.node(name, description, children?)
+tree.node(name, description, children?)
 // → { name, description, children: [] }
 
-utils.tree.format(root, { style: 'tree' | 'list', bullet: '-' | '*' | '+' }?)
+tree.format(root, { style: 'tree' | 'list', bullet: '-' | '*' | '+' }?)
 // → formatted string
 ```
 
-### `utils.section` — Section builder
+---
+
+### `section` — Section builder
 
 ```js
-utils.section(name, data, { title?, attrs? }?)
+section.create(name, data, { title?, attrs? }?)
 // → { name, title, attrs, data }
+// name must be kebab-case; data must be { type: 'markdown', content } or { type: 'tree', root }
+
+section.match(name)
+// → boolean — true if name matches the active ::sections filter (use for early-exit optimisation)
+
+section.selected()
+// → string[] | null — the active section filter list, or null if no filter is active
 ```
 
-### `utils.fs` — Filesystem access
+---
 
-All paths are relative to `dir` and are sandboxed to the project root.
+### `fs` — Filesystem access
+
+Permission token: `fs.read:`, `fs.write:`, `fs.glob:` (local runes: unrestricted; plugin runes: declared in `plugin.json`).
 
 ```js
-await utils.fs.read(relPath, { throw: true }?)
+fs.cwd()
+// → string — absolute path to the project root
+
+await fs.read(relPath, { throw: true }?)
 // → string | null   (null only when throw: false and file missing)
 
-await utils.fs.exists(relPath)
+await fs.exists(relPath)
 // → boolean
 
-await utils.fs.glob(pattern, { ignore?: string[], onlyDirectories?: boolean }?)
-// → string[]   (forward-slash paths)
+await fs.glob(pattern, { ignore?: string[], onlyDirectories?: boolean }?)
+// → string[]   (forward-slash paths, relative to project root)
+
+await fs.write(relPath, content)
+// → void — creates parent directories automatically
+
+await fs.copy(src, dest)
+// → void — creates parent directories automatically; copies a single file
+
+await fs.replace(relPath, regex, replacement)
+// → void — reads, applies String.replace(regex, replacement), writes back
 ```
 
-### `utils.shell` — Shell commands
+**Path prefixes:**
+
+| Prefix | Resolves to |
+|---|---|
+| `relative/path` | Project root |
+| `@project/path` | Project root (explicit alias) |
+| `@plugin/path` | Plugin install directory (plugin runes only) |
+| `~/path` | User home directory |
+
+---
+
+### `shell` — Shell execution
+
+Permission token: `shell:<cmd-prefix>` (exact-prefix match against the full command string).
 
 ```js
-await utils.shell(cmd, { throw: true, trim: true, timeout: 30000, env }?)
-// → string (stdout)          when trim: true (default)
-// → { stdout, stderr, exitCode }  when trim: false
+await shell(cmd, { throw?: true, trim?: true, timeout?: 30000, env?: {} }?)
+// → string          when trim: true (default) — trimmed stdout
+// → { stdout, stderr, exitCode }   when trim: false
 ```
 
 Throws `ShellError` (with `.stdout`, `.stderr`, `.exitCode`) on non-zero exit unless `throw: false`.
 
-> **Plugin runes:** `utils.fs` and `utils.shell` are permission-gated. Allowed patterns are declared in `plugin.json` and shown during consent. Local runes have unrestricted access.
+---
+
+### `json` — JSON files
+
+Inherits `fs.read:` / `fs.write:` permission tokens.
+
+```js
+await json.read(relPath, { throw?: true }?)
+// → object | null
+
+await json.get(relPath, jsonPath, defaultValue?)
+// → any — first JSONPath match, or defaultValue
+
+await json.getAll(relPath, jsonPath, defaultValue?)
+// → any[] — all JSONPath matches, or defaultValue (default: [])
+
+await json.write(relPath, data, { spaces?: 2 }?)
+// → void
+
+await json.modify(relPath, async (data, { exists }) => { ... }, { initial?, spaces?: 2 }?)
+// → void — reads file (or uses initial if missing), calls callback, writes result back
+//   callback may return a new value or mutate data in place (return undefined = use mutated data)
+//   throws if file missing and initial is not provided
+```
+
+---
+
+### `yaml` — YAML files
+
+Inherits `fs.read:` / `fs.write:` permission tokens. Preserves comments and formatting on round-trips.
+
+```js
+await yaml.read(relPath, { throw?: true }?)
+// → object | null
+
+await yaml.write(relPath, data, { indent?: 2 }?)
+// → void
+
+await yaml.modify(relPath, async (data, { exists }) => { ... }, { initial?, indent?: 2 }?)
+// → void — same semantics as json.modify
+```
+
+---
+
+### `xml` — XML files
+
+Inherits `fs.read:` / `fs.write:` permission tokens. Attributes use `@_` prefix; comments use `#comment`.
+
+```js
+await xml.read(relPath, { throw?: true }?)
+// → object | null
+
+await xml.write(relPath, data, { indent?: 2 }?)
+// → void
+
+await xml.modify(relPath, async (data, { exists }) => { ... }, { initial?, indent?: 2 }?)
+// → void — same semantics as json.modify
+```
+
+---
+
+### `fetch` — HTTP client
+
+Permission token: `fetch:<METHOD>:<url>` (e.g., `fetch:GET:https://api.example.com/*`).
+
+```js
+const res = await fetch(url, { method?: 'GET', headers?: {}, body?, timeout?: 30000 }?)
+// res.ok         — boolean
+// res.status     — number
+// res.statusText — string
+// res.headers    — object
+// await res.text() — string
+// await res.json() — any
+```
+
+Throws `FetchError` on network errors or timeouts.
+
+---
+
+### `env` — Environment variables
+
+Permission token: `env:<source>:<key-glob>` where source is `process` or a `.env` filename (e.g., `env:process:API_*`, `env:.env:*`).
+
+```js
+env.get(key, fallback?)
+// → string | fallback — reads from process.env or .env files per allowed patterns
+
+env.has(key)
+// → boolean
+```
+
+---
+
+### `vars` — Static config values
+
+Values come from the `vars` field in `.crunes/config.json` for the rune entry. No permission gate.
+
+```js
+vars.get(key, fallback?)
+// → any
+
+vars.has(key)
+// → boolean
+```
+
+---
+
+### `archive` — Compression
+
+Permission tokens: `fs.read:<source>` and `fs.write:<dest>`.
+
+```js
+await archive.unzip(source, dest)   // extracts a .zip into dest directory
+await archive.zip(source, dest)     // zips a file or directory into dest
+await archive.untar(source, dest)   // extracts a .tar.gz into dest directory
+await archive.tar(source, dest)     // creates a .tar.gz from a file or directory
+```
+
+Paths are relative to the project root. Zip-slip is detected and rejected.
+
+---
+
+### `cache` — Persistent key-value cache
+
+Permission tokens: `cache.read:<location>:<name>` and `cache.write:<location>:<name>`.
+
+```js
+const store = await cache.open(location, name?)
+// location — virtual store token (see below) or relative path
+// name     — sub-namespace within the location (default: 'default')
+
+await store.set(key, value, ttl?)   // ttl in seconds; omit for no expiry
+await store.get(key)                 // → value | null (expired entries return null)
+await store.delete(key)
+await store.clear()                  // removes all keys in this store
+```
+
+**Virtual locations:**
+
+| Token | Scope |
+|---|---|
+| `@project-cache` | Project-scoped; local runes |
+| `@project-plugin-cache` | Project + plugin scoped (plugin runes) |
+| `@plugin-cache` | Plugin-global across all projects (plugin runes) |
+
+Values must be JSON-serializable. Stored as individual `.json` files on disk.
+
+---
+
+### `sqlite` — SQLite databases
+
+Permission tokens: `sqlite.read:<location>:<name>` and `sqlite.write:<location>:<name>`.
+
+```js
+const db = await sqlite.open(location, name?)
+// location — virtual store token or relative path
+// name     — database filename without extension (default: 'default' → 'default.sqlite')
+
+db.query(sql, params?)       // → any[]        — all matching rows
+db.get(sql, params?)         // → any | null   — first matching row or null
+db.exec(sql, params?)        // → { changes, lastInsertRowid }
+await db.transaction(async () => { ... })  // auto-commits; rolls back on throw
+db.close()                   // closes the connection (auto-closed at rune exit)
+```
+
+**Virtual locations:**
+
+| Token | Scope |
+|---|---|
+| `@project-sqlite` | Project-scoped; local runes |
+| `@project-plugin-sqlite` | Project + plugin scoped (plugin runes) |
+| `@plugin-sqlite` | Plugin-global across all projects (plugin runes) |
+
+WAL mode is enabled automatically.
+
+---
+
+### `crypto` — Cryptographic utilities
+
+No permission gate. Synchronous.
+
+```js
+crypto.hash.hex(algorithm, data)    // → hex string  (e.g. algorithm: 'sha256')
+crypto.hash.base64(algorithm, data) // → base64 string
+
+crypto.uuid()          // → v4 UUID string
+crypto.hex(size)       // → hex-encoded random bytes (size = byte count)
+crypto.base64(size)    // → base64-encoded random bytes
+```
+
+---
+
+### `rune` — Call other runes
+
+Inherits the target rune's permissions. Circular calls throw `CircularRuneError`.
+
+```js
+const sections = await rune(key, args?)
+// key  — same token syntax as crunes use: bare key, plugin:key, key=arg1,arg2
+// args — string[] of positional arguments (alternative to embedding them in the token)
+// → Section[]
+```
 
 ## Plugins
 

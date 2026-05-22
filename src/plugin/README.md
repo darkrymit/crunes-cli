@@ -1,6 +1,6 @@
 # plugin
 
-Plugin lifecycle management: discover, install, uninstall, enable, disable, update, and scaffold new plugins. Full docs: `docs/knowledge-base/modules/plugin.md` (pending)
+Plugin lifecycle management: discover, install, uninstall, enable, disable, update, and scaffold new plugins. Full docs: `docs/knowledge-base/modules/plugin.md`
 
 ## Key Files
 

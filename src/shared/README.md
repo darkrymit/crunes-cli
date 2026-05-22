@@ -1,6 +1,6 @@
 # shared
 
-General-purpose utilities with no domain coupling. Consumed by multiple feature modules. Full docs: `docs/knowledge-base/modules/shared.md` (pending)
+General-purpose utilities with no domain coupling. Consumed by multiple feature modules. Full docs: `docs/knowledge-base/modules/shared.md`
 
 ## Key Files
 

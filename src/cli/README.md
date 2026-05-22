@@ -1,6 +1,6 @@
 # cli
 
-Entry point and program assembly for the crunes CLI. Full docs: `docs/knowledge-base/modules/cli.md` (pending)
+Entry point and program assembly for the crunes CLI. Full docs: `docs/knowledge-base/modules/cli.md`
 
 ## Key Files
 

@@ -14,6 +14,11 @@ The plugin system has two storage layers: a **global registry** (`~/.crunes/plug
 
 Plugin sources can be: local path, `github:owner/repo`, `https://...` git URL, or npm package name. All non-local sources are downloaded to a temp dir, validated, then copied to `~/.crunes/plugins/<marketplace>/<name>@<version>/`.
 
+## Flows
+
+- [[flows/plugin-install]] — full install + update path: marketplace resolution, download, consent, registry write
+- [[flows/plugin-create]] — scaffold generation: dual manifests, example rune/template, self-serving marketplace entry
+
 ## Key Decisions
 
 - **Consent snapshotting at install time:** The set of permissions a user approves is frozen as `consentedPermissions` in the registry entry. On update, `diffPermissions` computes only the delta (new or escalated permissions). The user is re-prompted only for the delta — not the full list again. This prevents prompt fatigue for minor updates while maintaining security for new capabilities.

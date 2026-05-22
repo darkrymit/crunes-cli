@@ -1,6 +1,6 @@
 # marketplace
 
-Plugin marketplace source management: add, remove, list, and search marketplace source URLs; browse and refresh cached plugin indexes. Full docs: `docs/knowledge-base/modules/marketplace.md` (pending)
+Plugin marketplace source management: add, remove, list, and search marketplace source URLs; browse and refresh cached plugin indexes. Full docs: `docs/knowledge-base/modules/marketplace.md`
 
 ## Key Files
 

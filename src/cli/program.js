@@ -82,7 +82,10 @@ export function buildProgram() {
 
   program
     .command('check <rune>')
-    .description('Run a rune and validate its output shape')
+    .description(
+      'Run a rune and validate its output shape.\n' +
+      '  Key supports the same token syntax as crunes use: key=arg1,arg2 and plugin:key.'
+    )
     .action(async (key) => {
       const { handler } = await import('../rune/commands/check.js')
       await handler({ key, projectRoot: projectRoot(), configRoot: configRoot() })
