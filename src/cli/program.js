@@ -109,7 +109,7 @@ export function buildProgram() {
     .command('init')
     .description('Create .crunes/config.json in the current project')
     .action(async () => {
-      const { handler } = await import('../rune/commands/init.js')
+      const { handler } = await import('../core/commands/init.js')
       await handler({ yes: !!program.opts().yes, projectRoot: projectRoot() })
     })
 
