@@ -18,7 +18,8 @@
     "better-sqlite3": "^9.0.0",
     "fast-xml-parser": "^5.8.0",
     "isolated-vm": "^5.0.1",
-    "yaml": "^2.9.0"
+    "yaml": "^2.9.0",
+    "yargs-parser": "^22.0.0"
   },
   "devDependencies": {
     "@clack/prompts": "^0.10.0",

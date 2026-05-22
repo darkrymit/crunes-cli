@@ -51,6 +51,14 @@ export function buildProgram() {
     })
 
   program
+    .command('help <rune>')
+    .description('Show usage and argument schema for a rune')
+    .action(async (key) => {
+      const { handler } = await import('../rune/commands/help.js')
+      await handler({ key, projectRoot: projectRoot(), configRoot: configRoot() })
+    })
+
+  program
     .command('version')
     .description('Print the installed version and check for updates')
     .option('--no-check', 'skip the npm update check')

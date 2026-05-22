@@ -10,6 +10,7 @@ import { computeEffectivePermissions, makePermissionChecker } from '../permissio
 import { isVerbose } from '../../shared/output.js'
 import { createModuleResolver } from './resolver.js'
 import * as EMBEDDED from './embedded.js'
+import { parseArgs } from '../api/args-parser.js'
 
 const hostRequire = createRequire(import.meta.url)
 const __isolationDir = path.dirname(fileURLToPath(import.meta.url))
@@ -296,7 +297,7 @@ export async function runRuneInIsolate(runeFile, effective, args, projectDir, {
     // so context.eval() can call it. The typeof guard prevents ReferenceError when the
     // rune does not export it — the missing-export check below handles that case.
     const runeSrc    = await fs.readFile(runeFile, 'utf8')
-    const exportBinding = `\nif (typeof ${lifecycle} !== "undefined") globalThis.__crunes_target = ${lifecycle};\n`
+    const exportBinding = `\nif (typeof ${lifecycle} !== "undefined") globalThis.__crunes_target = ${lifecycle};\nif (typeof args !== "undefined") globalThis.__crunes_args = args;\n`
     const patchedSrc = runeSrc + exportBinding
     if (isVerbose) console.error(`[crunes:debug] compiling Module...`)
     const runeMod    = await isolate.compileModule(patchedSrc, { filename: runeFile })
@@ -322,6 +323,30 @@ export async function runRuneInIsolate(runeFile, effective, args, projectDir, {
     if (isVerbose) console.error(`[crunes:debug] cleaning up $__hostRequire...`)
     await context.eval('delete globalThis.$__hostRequire')
 
+    // Extract args schema from rune if it exports args(), then parse on host.
+    // use(args) always receives a yargs-parser object; args.$raw holds the original array.
+    let parsedArgs
+    if (await context.eval('typeof __crunes_args !== "undefined"')) {
+      const schemaJson = await context.eval(
+        `(async () => {
+          const b = (() => {
+            const opts = [], pos = [], exs = []
+            return {
+              option(flags, description, def) { opts.push({ flags, description, def }); return this },
+              positional(spec, description)   { pos.push({ spec, description }); return this },
+              example(usage, description)     { exs.push({ usage, description }); return this },
+              build() { return { options: opts, positionals: pos, examples: exs } }
+            }
+          })()
+          return JSON.stringify(await __crunes_args(b))
+        })()`,
+        { promise: true, timeout: isolateTimeoutMs }
+      )
+      parsedArgs = parseArgs(args, JSON.parse(schemaJson))
+    } else {
+      parsedArgs = parseArgs(args, null)
+    }
+
     if (!await runeMod.namespace.get(lifecycle, { reference: true })) {
       throw new Error(`Rune "${runeFile}" does not export a ${lifecycle}() function.`)
     }
@@ -332,7 +357,7 @@ export async function runRuneInIsolate(runeFile, effective, args, projectDir, {
     if (isVerbose) console.error(`[crunes:debug] extracting ${lifecycle}() result...`)
     const resultJson = await context.eval(
       `(async () => {
-        const r = await __crunes_target(${JSON.stringify(args)});
+        const r = await __crunes_target(${JSON.stringify(parsedArgs)});
         return JSON.stringify(r);
       })()`,
       { promise: true, timeout: isolateTimeoutMs }
@@ -367,6 +392,75 @@ export async function runPluginRune(pluginDir, runeKey, pluginJson, effective, a
     vars:             opts.vars ?? {},
     lifecycle:        opts.lifecycle ?? 'use',
   })
+}
+
+/**
+ * Boot a rune in a minimal isolate, call its args() export with an inline builder,
+ * and return the JSON schema. Returns null if the rune has no args export.
+ */
+export async function getArgsSchema(runeFile, effective, projectDir, {
+  nodeModulesDir = null,
+  pluginDeps = {},
+  pluginDir = null,
+  isolateMemoryMb = 128,
+  isolateTimeoutMs = 30_000,
+  vars = {},
+} = {}) {
+  const augmented = {
+    allow: [...effective.allow, ...getAutoPermits({ pluginId: null, pluginDir })],
+    deny: effective.deny,
+  }
+  const checkPermission = makePermissionChecker(augmented)
+  const { utils, dispose } = createUtils(projectDir, checkPermission, pluginDir ?? null, augmented, vars, null, null)
+  const isolate = new ivm.Isolate({ memoryLimit: isolateMemoryMb })
+  try {
+    const context = await isolate.createContext()
+    await context.global.set('$__hostRequire', new ivm.Reference((spec) => hostRequire(spec)))
+    const utilsMod = await injectUtils(isolate, context, utils, null, vars, projectDir)
+    await injectConsole(isolate, context)
+    if (pluginDir != null) await context.global.set('CRUNES_PLUGIN_ROOT', pluginDir)
+
+    const runeSrc = await fs.readFile(runeFile, 'utf8')
+    const patchedSrc = runeSrc + '\nif (typeof args !== "undefined") globalThis.__crunes_args = args;\n'
+    const runeMod = await isolate.compileModule(patchedSrc, { filename: runeFile })
+    const resolver = createModuleResolver(
+      isolate,
+      path.dirname(runeFile),
+      nodeModulesDir ?? path.join(path.dirname(runeFile), 'node_modules'),
+      pluginDeps,
+      effective.allow,
+      effective.deny,
+      projectDir,
+      pluginDir ?? null,
+      new Map([['@utils', utilsMod]])
+    )
+    await runeMod.instantiate(context, resolver)
+    await runeMod.evaluate({ timeout: isolateTimeoutMs })
+    await context.eval('delete globalThis.$__hostRequire')
+
+    const hasArgsExport = await context.eval('typeof __crunes_args !== "undefined"')
+    if (!hasArgsExport) return null
+
+    const schemaJson = await context.eval(
+      `(async () => {
+        const b = (() => {
+          const opts = [], pos = [], exs = []
+          return {
+            option(flags, description, def) { opts.push({ flags, description, def }); return this },
+            positional(spec, description)   { pos.push({ spec, description }); return this },
+            example(usage, description)     { exs.push({ usage, description }); return this },
+            build() { return { options: opts, positionals: pos, examples: exs } }
+          }
+        })()
+        return JSON.stringify(await __crunes_args(b))
+      })()`,
+      { promise: true, timeout: isolateTimeoutMs }
+    )
+    return JSON.parse(schemaJson)
+  } finally {
+    dispose()
+    isolate.dispose()
+  }
 }
 
 /**
