@@ -66,6 +66,15 @@ export function buildProgram() {
       await handler({ keys, format: opts.format, projectRoot: projectRoot(), configRoot: configRoot() })
     })
 
+  helpGroup
+    .command('utils [namespaces...]')
+    .description('Show function signatures and parameter docs for utils.* namespaces')
+    .addOption(new Option('--format <format>', 'output format').choices(['md', 'json']).default('md'))
+    .action(async (namespaces, opts) => {
+      const { handler } = await import('../help/commands/utils.js')
+      await handler({ namespaces, format: opts.format })
+    })
+
   program
     .command('version')
     .description('Print the installed version and check for updates')

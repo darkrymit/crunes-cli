@@ -1,0 +1,20 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`formatUtilsNamespace > snapshot 1`] = `
+"Namespace: utils.ws
+WebSocket client
+
+  client(url, opts?)
+    Creates a WS handle.
+
+    Parameters:
+      url    string    WS URL
+      opts   object?   Options
+
+    Returns: WsHandle
+
+    WsHandle methods:
+      open()               Connect.
+      send(msg)            Send a message.
+      close()              Close."
+`;

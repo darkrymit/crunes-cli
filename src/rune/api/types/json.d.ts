@@ -1,0 +1,41 @@
+/** Read, write, and query JSON files with JSONPath support */
+declare namespace json {
+  /**
+   * Reads and parses a JSON file.
+   * @param path Relative file path
+   * @param opts Options
+   */
+  function read(path: string, opts?: { throw?: boolean }): Promise<unknown>
+
+  /**
+   * Returns the first value matching a JSONPath query.
+   * @param path Relative file path
+   * @param jsonPath JSONPath expression (e.g. $.name)
+   * @param defaultValue Returned if path not found
+   */
+  function get(path: string, jsonPath: string, defaultValue?: unknown): Promise<unknown>
+
+  /**
+   * Returns all values matching a JSONPath query.
+   * @param path Relative file path
+   * @param jsonPath JSONPath expression
+   * @param defaultValue Returned if no matches
+   */
+  function getAll(path: string, jsonPath: string, defaultValue?: unknown): Promise<unknown[]>
+
+  /**
+   * Serializes and writes a value to a JSON file.
+   * @param path Relative file path
+   * @param data Value to serialize
+   * @param opts Options
+   */
+  function write(path: string, data: unknown, opts?: { spaces?: number }): Promise<void>
+
+  /**
+   * Reads a JSON file, passes parsed data to callback, writes the result back.
+   * @param path Relative file path
+   * @param callback Receives (data, { exists }) and returns modified data
+   * @param opts Options
+   */
+  function modify(path: string, callback: (data: unknown, meta: { exists: boolean }) => unknown, opts?: { initial?: unknown; spaces?: number }): Promise<void>
+}

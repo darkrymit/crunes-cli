@@ -7,3 +7,4 @@ dist/
 .history/
 coverage/
 scratch/
+src/help/utils-api.json
