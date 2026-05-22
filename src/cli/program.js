@@ -50,12 +50,17 @@ export function buildProgram() {
       await handler({ keys, format: opts.format, failFast: !!opts.failFast, projectRoot: projectRoot(), configRoot: configRoot() })
     })
 
-  program
-    .command('help <rune>')
-    .description('Show usage and argument schema for a rune')
-    .action(async (key) => {
-      const { handler } = await import('../rune/commands/help.js')
-      await handler({ key, projectRoot: projectRoot(), configRoot: configRoot() })
+  const helpGroup = program.command('help').description('Show documentation for runes and other resources')
+
+  helpGroup
+    .command('rune <rune>')
+    .description('Show usage, argument schema, and examples for one or more runes')
+    .addOption(new Option('--format <format>', 'output format').choices(['md', 'json']).default('md'))
+    .option('-a, --and <rune>', 'add another rune key (repeatable)', (val, acc) => [...acc, val], [])
+    .action(async (key, opts) => {
+      const { handler } = await import('../help/commands/rune.js')
+      const keys = [key, ...opts.and]
+      await handler({ keys, format: opts.format, projectRoot: projectRoot(), configRoot: configRoot() })
     })
 
   program
