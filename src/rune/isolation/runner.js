@@ -201,6 +201,25 @@ async function injectUtils(isolate, context, utils, runeCallback, vars, projectD
     sqliteHandles.delete(id)
   }))
 
+  await jail.set('$__utils_ws_client', new ivm.Reference((url, optionsJson) => {
+    const options = optionsJson !== undefined ? JSON.parse(optionsJson) : undefined
+    return utils.ws.createSession(url, options)
+  }))
+  await jail.set('$__utils_ws_on', new ivm.Reference((sessionIdRef, eventRef, callbackRef) => {
+    const sessionId = sessionIdRef.copySync()
+    const event = eventRef.copySync()
+    utils.ws.getSession(sessionId).setHandler(event, callbackRef)
+  }))
+  await jail.set('$__utils_ws_open', new ivm.Reference(async (sessionId) => {
+    await utils.ws.getSession(sessionId).open()
+  }))
+  await jail.set('$__utils_ws_send', new ivm.Reference(async (sessionId, message) => {
+    await utils.ws.getSession(sessionId).send(message)
+  }))
+  await jail.set('$__utils_ws_close', new ivm.Reference(async (sessionId) => {
+    await utils.ws.getSession(sessionId).close()
+  }))
+
   await jail.set('$__crypto_hash_hex',    new ivm.Reference(hashHex))
   await jail.set('$__crypto_hash_base64', new ivm.Reference(hashBase64))
   await jail.set('$__crypto_uuid',        new ivm.Reference(cryptoUuid))

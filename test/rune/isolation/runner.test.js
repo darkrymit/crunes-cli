@@ -2,7 +2,29 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { join } from 'node:path'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
+import { createServer } from 'node:http'
+import { WebSocketServer } from 'ws'
 import { getPluginRunePath, runRuneInIsolate, getArgsSchema } from '../../../src/rune/isolation/runner.js'
+
+function startEchoServer() {
+  return new Promise((resolve) => {
+    const httpServer = createServer()
+    const wss = new WebSocketServer({ server: httpServer })
+    wss.on('connection', (ws) => {
+      ws.on('message', (data) => ws.send(String(data)))
+    })
+    httpServer.listen(0, () => {
+      const { port } = httpServer.address()
+      resolve({ wss, httpServer, port, url: `ws://localhost:${port}` })
+    })
+  })
+}
+
+function stopServer({ wss, httpServer }) {
+  return new Promise((resolve) => {
+    wss.close(() => httpServer.close(resolve))
+  })
+}
 
 describe('getPluginRunePath', () => {
   it('uses convention runes/<key>.js when plugin.json has no path', () => {
@@ -177,5 +199,110 @@ describe('runRuneInIsolate — declarative args parsing', () => {
     ].join('\n'))
     const result = await runRuneInIsolate(runeFile, { allow: [], deny: [] }, [], tmp)
     expect(result[0].data.content).toBe('false')
+  })
+})
+
+describe('runRuneInIsolate — ws integration', () => {
+  let tmp
+  let echoServer
+
+  beforeEach(async () => {
+    tmp = await mkdtemp(join(tmpdir(), 'crunes-runner-ws-'))
+    echoServer = await startEchoServer()
+  })
+
+  afterEach(async () => {
+    await rm(tmp, { recursive: true, force: true })
+    await stopServer(echoServer)
+  })
+
+  it('rune can open a ws connection, send a message, and receive the echo', async () => {
+    const runeFile = join(tmp, 'rune.js')
+    await writeFile(runeFile, `
+import { ws, section } from '@utils'
+export async function use() {
+  const socket = ws.client('${echoServer.url}')
+  let received = ''
+  socket.on('message', async (msg) => {
+    received = msg
+    socket.close()
+  })
+  await socket.open()
+  await socket.send('hello-ws')
+  await socket.close()
+  return [section.create('result', { type: 'markdown', content: received })]
+}
+`)
+    const result = await runRuneInIsolate(
+      runeFile,
+      { allow: [`ws:${echoServer.url}/**`, `ws:${echoServer.url}`], deny: [] },
+      [],
+      tmp,
+    )
+    expect(result[0].data.content).toBe('hello-ws')
+  })
+
+  it('rune throws PermissionError when ws URL is not permitted', async () => {
+    const runeFile = join(tmp, 'rune.js')
+    await writeFile(runeFile, `
+import { ws, section } from '@utils'
+export async function use() {
+  const socket = ws.client('${echoServer.url}')
+  await socket.open()
+  return [section.create('r', { type: 'markdown', content: 'ok' })]
+}
+`)
+    await expect(
+      runRuneInIsolate(runeFile, { allow: [], deny: [] }, [], tmp)
+    ).rejects.toThrow()
+  })
+
+  it('rune can exchange multiple messages in sequence', async () => {
+    const runeFile = join(tmp, 'rune.js')
+    await writeFile(runeFile, `
+import { ws, section } from '@utils'
+export async function use() {
+  const socket = ws.client('${echoServer.url}')
+  const msgs = []
+  let count = 0
+  socket.on('message', async (msg) => {
+    msgs.push(msg)
+    count++
+    if (count >= 3) socket.close()
+  })
+  await socket.open()
+  await socket.send('a')
+  await socket.send('b')
+  await socket.send('c')
+  await socket.close()
+  return [section.create('r', { type: 'markdown', content: msgs.join(',') })]
+}
+`)
+    const result = await runRuneInIsolate(
+      runeFile,
+      { allow: [`ws:${echoServer.url}/**`, `ws:${echoServer.url}`], deny: [] },
+      [],
+      tmp,
+    )
+    expect(result[0].data.content).toBe('a,b,c')
+  })
+
+  it('dispose cleans up open ws sessions when rune exits without closing', async () => {
+    const runeFile = join(tmp, 'rune.js')
+    await writeFile(runeFile, `
+import { ws, section } from '@utils'
+export async function use() {
+  const socket = ws.client('${echoServer.url}')
+  await socket.open()
+  return [section.create('r', { type: 'markdown', content: 'done' })]
+}
+`)
+    const result = await runRuneInIsolate(
+      runeFile,
+      { allow: [`ws:${echoServer.url}/**`, `ws:${echoServer.url}`], deny: [] },
+      [],
+      tmp,
+    )
+    expect(result[0].data.content).toBe('done')
   })
 })

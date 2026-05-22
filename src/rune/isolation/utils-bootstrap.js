@@ -157,9 +157,31 @@ globalThis.utils = {
     hex:    (size) => $__crypto_hex.applySync(undefined,    [size]),
     base64: (size) => $__crypto_base64.applySync(undefined, [size]),
   },
+  ws: {
+    client(url, opts) {
+      const id = $__utils_ws_client.applySync(
+        undefined,
+        [url, opts !== undefined ? JSON.stringify(opts) : undefined],
+        {},
+      )
+      return {
+        on(event, handler) {
+          const isolateHandler = event === 'error'
+            ? async (errJson) => handler(JSON.parse(errJson))
+            : handler
+          $__utils_ws_on.applySync(undefined, [id, event, isolateHandler], {
+            arguments: { reference: true },
+          })
+        },
+        open:  ()    => $__utils_ws_open.apply(undefined,  [id],      { result: { promise: true } }),
+        send:  (msg) => $__utils_ws_send.apply(undefined,  [id, msg], { result: { promise: true } }),
+        close: ()    => $__utils_ws_close.apply(undefined, [id],      { result: { promise: true } }),
+      }
+    },
+  },
   md,
   tree,
 }
 
-export const { fs, shell, section, rune, json, yaml, xml, fetch, env, vars, archive, cache, sqlite, crypto } = globalThis.utils
+export const { fs, shell, section, rune, json, yaml, xml, fetch, env, vars, archive, cache, sqlite, crypto, ws } = globalThis.utils
 export { md, tree }

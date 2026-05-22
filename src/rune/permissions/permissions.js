@@ -2,6 +2,7 @@ import micromatch from 'micromatch'
 import { matchFetchPermission } from './permissions-http.js'
 import { matchEnvPermission } from './permissions-env.js'
 import { matchStorePermission } from './permissions-store.js'
+import { matchWsPermission } from './permissions-ws.js'
 
 export class PermissionError extends Error {
   constructor(capability, value) {
@@ -75,6 +76,12 @@ export function computeEffectivePermissions(pluginPerms, projectPerms, lifecycle
  */
 export function makePermissionChecker(effective) {
   return function checkPermission(capability, value) {
+    if (capability === 'ws') {
+      const allowed = effective.allow.some(p => matchWsPermission(value, p))
+      const denied  = effective.deny.length > 0 && effective.deny.some(p => matchWsPermission(value, p))
+      if (!allowed || denied) throw new PermissionError(capability, value)
+      return
+    }
     if (capability === 'fetch') {
       const allowed = effective.allow.some(p => matchFetchPermission(value, p))
       const denied  = effective.deny.length > 0 && effective.deny.some(p => matchFetchPermission(value, p))

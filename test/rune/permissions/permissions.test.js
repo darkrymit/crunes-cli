@@ -188,3 +188,37 @@ describe('makePermissionChecker — dotfile paths', () => {
     expect(() => check('fs.write', '../outside/file.txt')).toThrow(PermissionError)
   })
 })
+
+describe('makePermissionChecker — ws capability', () => {
+  it('allows a matching ws permission', () => {
+    const check = makePermissionChecker({ allow: ['ws:ws://localhost:3000/**'], deny: [] })
+    expect(() => check('ws', 'ws://localhost:3000/chat')).not.toThrow()
+  })
+
+  it('throws PermissionError for unlisted ws URL', () => {
+    const check = makePermissionChecker({ allow: ['ws:ws://localhost:3000/**'], deny: [] })
+    expect(() => check('ws', 'ws://evil.com/data')).toThrow(PermissionError)
+  })
+
+  it('throws PermissionError when ws URL is in deny list', () => {
+    const check = makePermissionChecker({
+      allow: ['ws:ws://localhost:3000/**'],
+      deny:  ['ws:ws://localhost:3000/admin/**'],
+    })
+    expect(() => check('ws', 'ws://localhost:3000/admin/control')).toThrow(PermissionError)
+  })
+
+  it('PermissionError carries ws capability and URL value', () => {
+    const check = makePermissionChecker({ allow: [], deny: [] })
+    let err
+    try { check('ws', 'ws://localhost:3000/chat') } catch (e) { err = e }
+    expect(err).toBeInstanceOf(PermissionError)
+    expect(err.capability).toBe('ws')
+    expect(err.value).toBe('ws://localhost:3000/chat')
+  })
+
+  it('wildcard ws:** allows any URL', () => {
+    const check = makePermissionChecker({ allow: ['ws:**'], deny: [] })
+    expect(() => check('ws', 'wss://api.example.com/stream')).not.toThrow()
+  })
+})
