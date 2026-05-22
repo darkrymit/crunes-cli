@@ -89,16 +89,16 @@ export function buildProgram() {
     })
 
   program
-    .command('bench [rune]')
+    .command('bench <rune>')
     .description(
-      'Time rune execution and report which runes are fast, ok, or slow.\n' +
-      '  Benchmarks all registered runes when no key is given.\n' +
-      '  Key supports project:name, plugin:name, or bare name (same as crunes use).'
+      'Time rune execution and report fast, ok, or slow.\n' +
+      '  Key supports the same token syntax as crunes use: key=arg1,arg2 and plugin:key.'
     )
     .option('--runs <n>', 'number of runs to average (default: 1)', v => parseInt(v, 10), 1)
+    .option('--warmup', 'run one discarded warmup iteration before timing (default: off)')
     .action(async (key, opts) => {
       const { handler } = await import('../rune/commands/benchmark.js')
-      await handler({ key, runs: opts.runs, plain: !!program.opts().plain, projectRoot: projectRoot(), configRoot: configRoot() })
+      await handler({ key, runs: opts.runs, warmup: !!opts.warmup, plain: !!program.opts().plain, projectRoot: projectRoot(), configRoot: configRoot() })
     })
 
   program

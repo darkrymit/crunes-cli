@@ -1,7 +1,8 @@
 import { performance } from 'node:perf_hooks'
 import chalk from 'chalk'
 import { loadConfig } from '../../core/config.js'
-import { runRune, getRune } from '../resolver.js'
+import { runRune } from '../resolver.js'
+import { parseKeyToken } from './use.js'
 import { output } from '../../shared/output.js'
 
 const FAST_MS  = 200
@@ -35,10 +36,16 @@ function labelColour(l, plain) {
 export async function handler({
   key,
   runs = 1,
+  warmup = false,
   plain = false,
   projectRoot = process.cwd(),
   configRoot = projectRoot,
 } = {}) {
+  if (!key) {
+    output.error('Missing required argument: <rune>')
+    process.exit(1)
+  }
+
   let config
   try {
     config = loadConfig(configRoot)
@@ -48,17 +55,7 @@ export async function handler({
     process.exit(1)
   }
 
-  // Build list of keys to benchmark
-  let keys
-  if (key) {
-    keys = [key]
-  } else {
-    keys = Object.keys(config.runes ?? {})
-    if (keys.length === 0) {
-      output.info('No runes configured. Run `crunes create <key>` to add one.')
-      return
-    }
-  }
+  const { key: parsedKey, args } = parseKeyToken(key)
 
   if (!plain) {
     console.log(chalk.dim('─'.repeat(40)))
@@ -66,61 +63,47 @@ export async function handler({
     console.log()
   }
 
-  const results = []
+  const times = []
+  let err = null
 
-  for (const k of keys) {
-    const times = []
-    let err = null
-
-    // Warmup run — discarded, avoids cold-start skewing first measurement
-    try { await runRune(projectRoot, config, k, [], { configDir: configRoot }) } catch {}
-
-    for (let i = 0; i < runs; i++) {
-      const t0 = performance.now()
-      try {
-        await runRune(projectRoot, config, k, [], { configDir: configRoot })
-      } catch (e) {
-        err = e
-        break
-      }
-      times.push(performance.now() - t0)
-    }
-
-    if (err) {
-      results.push({ key: k, ms: null, err })
-    } else {
-      const avg = Math.round(times.reduce((a, b) => a + b, 0) / times.length)
-      results.push({ key: k, ms: avg, err: null })
-    }
+  if (warmup) {
+    try { await runRune(projectRoot, config, parsedKey, args, { configDir: configRoot }) } catch {}
   }
 
-  // Determine column width for alignment
-  const maxKeyLen = Math.max(...results.map(r => r.key.length))
+  for (let i = 0; i < runs; i++) {
+    const t0 = performance.now()
+    try {
+      await runRune(projectRoot, config, parsedKey, args, { configDir: configRoot })
+    } catch (e) {
+      err = e
+      break
+    }
+    times.push(performance.now() - t0)
+  }
+
+  const maxKeyLen = parsedKey.length
 
   let total = 0
   let slowCount = 0
 
-  for (const r of results) {
-    const k = r.key.padEnd(maxKeyLen)
-
-    if (r.err) {
-      if (plain) {
-        process.stdout.write(`${r.key}\terror\t${r.err.message}\n`)
-      } else {
-        console.log(`  ${chalk.dim(k)}  ${chalk.red('error')}  ${chalk.dim(r.err.message)}`)
-      }
-      continue
+  if (err) {
+    if (plain) {
+      process.stdout.write(`${parsedKey}\terror\t${err.message}\n`)
+    } else {
+      console.log(`  ${chalk.dim(parsedKey.padEnd(maxKeyLen))}  ${chalk.red('error')}  ${chalk.dim(err.message)}`)
     }
-
-    const l = label(r.ms)
+  } else {
+    const avg = Math.round(times.reduce((a, b) => a + b, 0) / times.length)
+    const l = label(avg)
     if (l === 'slow') slowCount++
-    total += r.ms
+    total += avg
 
     if (plain) {
-      process.stdout.write(`${r.key}\t${r.ms}\t${l}\n`)
+      process.stdout.write(`${parsedKey}\t${avg}\t${l}\n`)
     } else {
+      const k = parsedKey.padEnd(maxKeyLen)
       const warn = l === 'slow' ? `  ${chalk.yellow('⚠')}` : ''
-      console.log(`  ${chalk.cyan(k)}  ${String(r.ms).padStart(6)}ms  ${bar(r.ms, plain)}  ${labelColour(l, plain)}${warn}`)
+      console.log(`  ${chalk.cyan(k)}  ${String(avg).padStart(6)}ms  ${bar(avg, plain)}  ${labelColour(l, plain)}${warn}`)
     }
   }
 

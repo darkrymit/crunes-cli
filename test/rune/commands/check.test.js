@@ -1,9 +1,11 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 vi.mock('../../../src/core/config.js', () => ({ loadConfig: vi.fn() }))
 vi.mock('../../../src/rune/resolver.js', () => ({ runRune: vi.fn() }))
 
-import { scanPermissionWarnings } from '../../../src/rune/commands/check.js'
+import { loadConfig } from '../../../src/core/config.js'
+import { runRune } from '../../../src/rune/resolver.js'
+import { scanPermissionWarnings, handler } from '../../../src/rune/commands/check.js'
 
 describe('scanPermissionWarnings', () => {
   it('returns empty array for rune with no gated utils', () => {
@@ -36,5 +38,33 @@ describe('scanPermissionWarnings', () => {
 
   it('returns empty array for empty source', () => {
     expect(scanPermissionWarnings('')).toEqual([])
+  })
+})
+
+describe('handler — token parsing', () => {
+  const VALID_SECTIONS = [{ name: 'out', data: { type: 'markdown', content: 'x' } }]
+
+  beforeEach(() => {
+    loadConfig.mockReturnValue({ runes: { myrune: { path: 'runes/myrune.js' } } })
+    runRune.mockResolvedValue(VALID_SECTIONS)
+    vi.spyOn(process, 'exit').mockImplementation((code) => { throw new Error(`exit(${code})`) })
+  })
+
+  afterEach(() => { vi.clearAllMocks(); vi.restoreAllMocks() })
+
+  it('passes parsed args from token to runRune', async () => {
+    await handler({ key: 'myrune=foo,bar', projectRoot: '/p', configRoot: '/p' })
+    expect(runRune).toHaveBeenCalledWith('/p', expect.anything(), 'myrune', ['foo', 'bar'], expect.anything())
+  })
+
+  it('passes empty args for bare key', async () => {
+    await handler({ key: 'myrune', projectRoot: '/p', configRoot: '/p' })
+    expect(runRune).toHaveBeenCalledWith('/p', expect.anything(), 'myrune', [], expect.anything())
+  })
+
+  it('uses parsed key (not raw token) for runRune lookup', async () => {
+    await handler({ key: 'myrune=somearg', projectRoot: '/p', configRoot: '/p' })
+    const [, , calledKey] = runRune.mock.calls[0]
+    expect(calledKey).toBe('myrune')
   })
 })
