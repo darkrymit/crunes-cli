@@ -5,34 +5,73 @@ import { output, isVerbose } from '../../shared/output.js'
 
 import micromatch from 'micromatch'
 
-export function parseKeyToken(token) {
-  let rest = token
+export function parseSegment(argv) {
   let sections = null
+  let i = 0
 
-  const dblColonIdx = rest.indexOf('::')
-  if (dblColonIdx !== -1) {
-    const sectionStr = rest.slice(dblColonIdx + 2)
-    const parsed = sectionStr.split(',').map(s => s.trim()).filter(Boolean)
-    sections = parsed.length > 0 ? parsed : null
-    rest = rest.slice(0, dblColonIdx)
+  while (i < argv.length) {
+    const tok = argv[i]
+    if ((tok === '--section' || tok === '-s') && i + 1 < argv.length) {
+      sections = argv[i + 1].split(',').map(s => s.trim()).filter(Boolean)
+      i += 2
+    } else if (tok.startsWith('--section=')) {
+      sections = tok.slice(10).split(',').map(s => s.trim()).filter(Boolean)
+      i++
+    } else if (tok.startsWith('-s=')) {
+      sections = tok.slice(3).split(',').map(s => s.trim()).filter(Boolean)
+      i++
+    } else {
+      break
+    }
   }
 
-  let key
-  let args = []
-  const eqIdx = rest.indexOf('=')
-  if (eqIdx !== -1) {
-    key = rest.slice(0, eqIdx)
-    const argStr = rest.slice(eqIdx + 1)
-    args = argStr.split(',').map(a => a.trim()).filter(Boolean)
-  } else {
-    key = rest
-  }
-
-  return { key, args, sections }
+  const key = argv[i] ?? null
+  const runeArgs = key !== null ? argv.slice(i + 1) : []
+  return { key, sections, runeArgs }
 }
 
+export function parseUseArgs(argv) {
+  let format = 'md'
+  let failFast = false
+  const remaining = []
+
+  let i = 0
+  while (i < argv.length) {
+    const tok = argv[i]
+    if (tok === '--format' && i + 1 < argv.length) {
+      format = argv[i + 1]
+      i += 2
+    } else if (tok.startsWith('--format=')) {
+      format = tok.slice(9)
+      i++
+    } else if (tok === '--fail-fast') {
+      failFast = true
+      i++
+    } else {
+      remaining.push(tok)
+      i++
+    }
+  }
+
+  const rawSegments = []
+  let current = []
+  for (const tok of remaining) {
+    if (tok === '+') {
+      rawSegments.push(current)
+      current = []
+    } else {
+      current.push(tok)
+    }
+  }
+  rawSegments.push(current)
+
+  const segments = rawSegments.map(parseSegment)
+  return { segments, format, failFast }
+}
+
+
 export async function handler({
-  keys,
+  segments,
   format = 'md',
   failFast = false,
   projectRoot = process.cwd(),
@@ -50,13 +89,11 @@ export async function handler({
   const allSections = []
   let anyFailed = false
 
-  for (const token of keys) {
-    const { key, args, sections: sectionFilter } = parseKeyToken(token)
-
+  for (const { key, sections: sectionFilter, runeArgs } of segments) {
     let sections
     try {
       if (isVerbose) console.error(`[crunes:debug] Loading rune "${key}"`)
-      sections = await runRune(projectRoot, config, key, args, { sections: sectionFilter, configDir: configRoot })
+      sections = await runRune(projectRoot, config, key, runeArgs, { sections: sectionFilter, configDir: configRoot })
       if (isVerbose) console.error(`[crunes:debug] Rune "${key}" completed with ${sections?.length ?? 0} sections`)
     } catch (err) {
       const msg = isVerbose ? (err.stack || err.message) : err.message

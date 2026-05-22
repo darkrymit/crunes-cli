@@ -2,7 +2,7 @@ import { performance } from 'node:perf_hooks'
 import chalk from 'chalk'
 import { loadConfig } from '../../core/config.js'
 import { runRune } from '../resolver.js'
-import { parseKeyToken } from './use.js'
+import { parseSegment } from './use.js'
 import { output } from '../../shared/output.js'
 
 const FAST_MS  = 200
@@ -33,8 +33,36 @@ function labelColour(l, plain) {
   return chalk.green(l)
 }
 
+export function parseBenchArgs(argv) {
+  let runs = 1
+  let warmup = false
+  const remaining = []
+
+  let i = 0
+  while (i < argv.length) {
+    const tok = argv[i]
+    if (tok === '--runs' && i + 1 < argv.length) {
+      runs = parseInt(argv[i + 1], 10)
+      i += 2
+    } else if (tok.startsWith('--runs=')) {
+      runs = parseInt(tok.slice(7), 10)
+      i++
+    } else if (tok === '--warmup') {
+      warmup = true
+      i++
+    } else {
+      remaining.push(tok)
+      i++
+    }
+  }
+
+  const { key, sections, runeArgs } = parseSegment(remaining)
+  return { key, sections, runeArgs, runs, warmup }
+}
+
 export async function handler({
   key,
+  runeArgs = [],
   runs = 1,
   warmup = false,
   plain = false,
@@ -55,8 +83,6 @@ export async function handler({
     process.exit(1)
   }
 
-  const { key: parsedKey, args } = parseKeyToken(key)
-
   if (!plain) {
     console.log(chalk.dim('─'.repeat(40)))
     console.log(chalk.bold('crunes benchmark'))
@@ -67,13 +93,13 @@ export async function handler({
   let err = null
 
   if (warmup) {
-    try { await runRune(projectRoot, config, parsedKey, args, { configDir: configRoot }) } catch {}
+    try { await runRune(projectRoot, config, key, runeArgs, { configDir: configRoot }) } catch {}
   }
 
   for (let i = 0; i < runs; i++) {
     const t0 = performance.now()
     try {
-      await runRune(projectRoot, config, parsedKey, args, { configDir: configRoot })
+      await runRune(projectRoot, config, key, runeArgs, { configDir: configRoot })
     } catch (e) {
       err = e
       break
@@ -81,16 +107,16 @@ export async function handler({
     times.push(performance.now() - t0)
   }
 
-  const maxKeyLen = parsedKey.length
+  const maxKeyLen = key.length
 
   let total = 0
   let slowCount = 0
 
   if (err) {
     if (plain) {
-      process.stdout.write(`${parsedKey}\terror\t${err.message}\n`)
+      process.stdout.write(`${key}\terror\t${err.message}\n`)
     } else {
-      console.log(`  ${chalk.dim(parsedKey.padEnd(maxKeyLen))}  ${chalk.red('error')}  ${chalk.dim(err.message)}`)
+      console.log(`  ${chalk.dim(key.padEnd(maxKeyLen))}  ${chalk.red('error')}  ${chalk.dim(err.message)}`)
     }
   } else {
     const avg = Math.round(times.reduce((a, b) => a + b, 0) / times.length)
@@ -99,9 +125,9 @@ export async function handler({
     total += avg
 
     if (plain) {
-      process.stdout.write(`${parsedKey}\t${avg}\t${l}\n`)
+      process.stdout.write(`${key}\t${avg}\t${l}\n`)
     } else {
-      const k = parsedKey.padEnd(maxKeyLen)
+      const k = key.padEnd(maxKeyLen)
       const warn = l === 'slow' ? `  ${chalk.yellow('⚠')}` : ''
       console.log(`  ${chalk.cyan(k)}  ${String(avg).padStart(6)}ms  ${bar(avg, plain)}  ${labelColour(l, plain)}${warn}`)
     }

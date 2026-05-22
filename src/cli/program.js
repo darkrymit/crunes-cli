@@ -9,6 +9,7 @@ export function buildProgram() {
     .name('crunes')
     .description('CLI tool for managing context runes')
     .version('0.4.6', '-v, --version')
+    .enablePositionalOptions()
     .option('-y, --yes', 'assume yes to all prompts and skip interactive mode (also auto-detected in non-TTY environments)')
     .option('-p, --plain', 'plain output: no colors, no box-drawing, plain symbols — optimised for AI/pipe use')
     .option('--cwd <path>', 'project root to use instead of the current working directory')
@@ -33,21 +34,23 @@ export function buildProgram() {
   }
 
   program
-    .command('use <rune>')
+    .command('use [args...]')
     .description(
       'Use one or more runes and output the result.\n' +
-      '  Key format: [source:]name[=arg1,arg2][::section1,section2]\n' +
-      '  project:name  — resolve from project config only\n' +
-      '  plugin:name   — resolve directly from an enabled plugin\n' +
-      '  name        — auto-resolve: project config first, then enabled plugins'
+      '  Syntax: [--section s1,s2] <key> [rune-args...] [+ [--section s] <key> [rune-args...]]...\n' +
+      '  --section s1,s2  filter output sections (per rune, before the key)\n' +
+      '  --format md|json  output format (default: md)\n' +
+      '  --fail-fast       stop on first error\n' +
+      '  project:name      resolve from project config only\n' +
+      '  plugin:name       resolve directly from an enabled plugin\n' +
+      '  name              auto-resolve: project config first, then plugins'
     )
-    .addOption(new Option('--format <format>', 'output format').choices(['md', 'json']).default('md'))
-    .option('-a, --and <rune>', 'add another rune key to the batch (repeatable)', (val, acc) => [...acc, val], [])
-    .option('--fail-fast', 'stop on first rune error (default: run all, exit 1 if any failed)')
-    .action(async (key, opts) => {
-      const { handler } = await import('../rune/commands/use.js')
-      const keys = [key, ...opts.and]
-      await handler({ keys, format: opts.format, failFast: !!opts.failFast, projectRoot: projectRoot(), configRoot: configRoot() })
+    .allowUnknownOption()
+    .passThroughOptions()
+    .action(async (args) => {
+      const { handler, parseUseArgs } = await import('../rune/commands/use.js')
+      const { segments, format, failFast } = parseUseArgs(args)
+      await handler({ segments, format, failFast, projectRoot: projectRoot(), configRoot: configRoot() })
     })
 
   const helpGroup = program.command('help').description('Show documentation for runes and other resources')
@@ -81,27 +84,42 @@ export function buildProgram() {
     })
 
   program
-    .command('check <rune>')
+    .command('check [args...]')
     .description(
       'Run a rune and validate its output shape.\n' +
-      '  Key supports the same token syntax as crunes use: key=arg1,arg2 and plugin:key.'
+      '  Syntax: [--section s1,s2] <key> [rune-args...]'
     )
-    .action(async (key) => {
+    .allowUnknownOption()
+    .passThroughOptions()
+    .action(async (args) => {
+      const { parseSegment } = await import('../rune/commands/use.js')
       const { handler } = await import('../rune/commands/check.js')
-      await handler({ key, projectRoot: projectRoot(), configRoot: configRoot() })
+      const { key, sections, runeArgs } = parseSegment(args)
+      if (!key) {
+        const { output } = await import('../shared/output.js')
+        output.error('Missing required argument: <rune>')
+        process.exit(1)
+      }
+      await handler({ key, sections, runeArgs, projectRoot: projectRoot(), configRoot: configRoot() })
     })
 
   program
-    .command('bench <rune>')
+    .command('bench [args...]')
     .description(
       'Time rune execution and report fast, ok, or slow.\n' +
-      '  Key supports the same token syntax as crunes use: key=arg1,arg2 and plugin:key.'
+      '  Syntax: [--runs <n>] [--warmup] [--section s1,s2] <key> [rune-args...]'
     )
-    .option('--runs <n>', 'number of runs to average (default: 1)', v => parseInt(v, 10), 1)
-    .option('--warmup', 'run one discarded warmup iteration before timing (default: off)')
-    .action(async (key, opts) => {
-      const { handler } = await import('../rune/commands/benchmark.js')
-      await handler({ key, runs: opts.runs, warmup: !!opts.warmup, plain: !!program.opts().plain, projectRoot: projectRoot(), configRoot: configRoot() })
+    .allowUnknownOption()
+    .passThroughOptions()
+    .action(async (args) => {
+      const { handler, parseBenchArgs } = await import('../rune/commands/benchmark.js')
+      const parsed = parseBenchArgs(args)
+      if (!parsed.key) {
+        const { output } = await import('../shared/output.js')
+        output.error('Missing required argument: <rune>')
+        process.exit(1)
+      }
+      await handler({ ...parsed, plain: !!program.opts().plain, projectRoot: projectRoot(), configRoot: configRoot() })
     })
 
   program

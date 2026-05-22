@@ -41,7 +41,7 @@ describe('scanPermissionWarnings', () => {
   })
 })
 
-describe('handler — token parsing', () => {
+describe('handler — runeArgs', () => {
   const VALID_SECTIONS = [{ name: 'out', data: { type: 'markdown', content: 'x' } }]
 
   beforeEach(() => {
@@ -52,18 +52,18 @@ describe('handler — token parsing', () => {
 
   afterEach(() => { vi.clearAllMocks(); vi.restoreAllMocks() })
 
-  it('passes parsed args from token to runRune', async () => {
-    await handler({ key: 'myrune=foo,bar', projectRoot: '/p', configRoot: '/p' })
-    expect(runRune).toHaveBeenCalledWith('/p', expect.anything(), 'myrune', ['foo', 'bar'], expect.anything())
+  it('passes runeArgs to runRune', async () => {
+    await handler({ key: 'myrune', runeArgs: ['--foo', 'bar'], projectRoot: '/p', configRoot: '/p' })
+    expect(runRune).toHaveBeenCalledWith('/p', expect.anything(), 'myrune', ['--foo', 'bar'], expect.anything())
   })
 
-  it('passes empty args for bare key', async () => {
-    await handler({ key: 'myrune', projectRoot: '/p', configRoot: '/p' })
+  it('passes empty array when no runeArgs given', async () => {
+    await handler({ key: 'myrune', runeArgs: [], projectRoot: '/p', configRoot: '/p' })
     expect(runRune).toHaveBeenCalledWith('/p', expect.anything(), 'myrune', [], expect.anything())
   })
 
-  it('uses parsed key (not raw token) for runRune lookup', async () => {
-    await handler({ key: 'myrune=somearg', projectRoot: '/p', configRoot: '/p' })
+  it('uses key directly for runRune lookup', async () => {
+    await handler({ key: 'myrune', runeArgs: [], projectRoot: '/p', configRoot: '/p' })
     const [, , calledKey] = runRune.mock.calls[0]
     expect(calledKey).toBe('myrune')
   })
