@@ -1,6 +1,6 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
-import { getPluginsJsonPath } from './store.js'
+import { getPluginsJsonPath } from '../store/index.js'
 
 const EMPTY_REGISTRY = { format: '1', plugins: {} }
 

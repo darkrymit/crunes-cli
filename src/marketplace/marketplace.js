@@ -3,7 +3,7 @@ import path from 'node:path'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import os from 'node:os'
-import { getMarketplacesJsonPath, getMarketplaceCacheDir, ensureStoreDirs } from '../plugin/store.js'
+import { getMarketplacesJsonPath, getMarketplaceCacheDir, ensureStoreDirs } from '../store/index.js'
 
 const execFileAsync = promisify(execFile)
 

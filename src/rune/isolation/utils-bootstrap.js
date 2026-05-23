@@ -34,9 +34,18 @@ globalThis.utils = {
       return s ? JSON.parse(s) : null
     },
   },
-  rune: (key, args) => $__utils_rune
-    .apply(undefined, [key, args ? JSON.stringify(args) : undefined], { result: { promise: true } })
-    .then(JSON.parse),
+  rune: {
+    use: (key, args) => $__utils_rune
+      .apply(undefined, [key, args ? JSON.stringify(args) : undefined], { result: { promise: true } })
+      .then(JSON.parse),
+    spawn: (key, args) => $__utils_rune_spawn
+      .apply(undefined, [key, args ? JSON.stringify(args) : undefined], { result: { promise: true } })
+      .then(JSON.parse),
+    kill: (id, signal) => $__utils_rune_kill
+      .apply(undefined, [id, signal ?? null], { result: { promise: true } }),
+    exists: (id) => $__utils_rune_exists
+      .apply(undefined, [id], { result: { promise: true } }),
+  },
   json: {
     read:   (p, o) => $__utils_json_read.apply(undefined, [p, o ? JSON.stringify(o) : undefined], { result: { promise: true } }).then(JSON.parse),
     get:    (p, q, d) => $__utils_json_get.apply(undefined, [p, q, d !== undefined ? JSON.stringify(d) : undefined], { result: { promise: true } }).then(JSON.parse),
@@ -179,9 +188,12 @@ globalThis.utils = {
       }
     },
   },
+  time: {
+    after: (ms) => $__utils_time_after.apply(undefined, [ms], { result: { promise: true } }),
+  },
   md,
   tree,
 }
 
-export const { fs, shell, section, rune, json, yaml, xml, fetch, env, vars, archive, cache, sqlite, crypto, ws } = globalThis.utils
+export const { fs, shell, section, rune, json, yaml, xml, fetch, env, vars, archive, cache, sqlite, crypto, ws, time } = globalThis.utils
 export { md, tree }

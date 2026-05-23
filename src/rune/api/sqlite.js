@@ -2,7 +2,7 @@ import { mkdirSync } from 'node:fs'
 import path from 'node:path'
 import Database from 'better-sqlite3'
 import { resolvePath, canonicalizeLocation } from './utils.js'
-import { getStorePath } from '../../plugin/store.js'
+import { getStorePath } from '../../store/index.js'
 
 function resolveFileName(name) {
   return /\.\w+$/.test(name) ? name : `${name}.sqlite`

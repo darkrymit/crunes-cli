@@ -18,8 +18,9 @@ export function createShellUtils(dir, checkPermission) {
 
     const result = await new Promise((resolve, reject) => {
       const proc = spawn(cmd, [], {
-        shell: true,
-        cwd: dir,
+        shell:              true,
+        cwd:                dir,
+        windowsHideConsole: true,
         env: env ? { ...process.env, ...env } : process.env,
       })
 

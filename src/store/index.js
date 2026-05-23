@@ -3,7 +3,15 @@ import os from 'node:os'
 import path from 'node:path'
 
 export function getStorePath() {
-  return path.join(os.homedir(), '.crunes')
+  return process.env.CRUNES_STORE ?? path.join(os.homedir(), '.crunes')
+}
+
+export function getProjectsJsonPath() {
+  return path.join(getStorePath(), 'projects.json')
+}
+
+export function getPluginsJsonPath() {
+  return path.join(getStorePath(), 'plugins.json')
 }
 
 export function getPluginCacheDir(name, version, marketplace = '_local') {
@@ -12,10 +20,6 @@ export function getPluginCacheDir(name, version, marketplace = '_local') {
 
 export function getPnpmStorePath() {
   return path.join(getStorePath(), 'store')
-}
-
-export function getPluginsJsonPath() {
-  return path.join(getStorePath(), 'plugins.json')
 }
 
 export function getMarketplacesJsonPath() {

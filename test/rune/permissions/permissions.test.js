@@ -222,3 +222,65 @@ describe('makePermissionChecker — ws capability', () => {
     expect(() => check('ws', 'wss://api.example.com/stream')).not.toThrow()
   })
 })
+
+describe('rune.spawn / rune.kill / rune.exists permissions', () => {
+  it('bare rune.spawn (no rune name) is not normalized to rune.spawn:*', () => {
+    const result = computeEffectivePermissions({ use: { allow: ['rune.spawn'] } }, undefined, 'use')
+    expect(result.allow).not.toContain('rune.spawn:*')
+    expect(result.allow).toContain('rune.spawn')
+  })
+
+  it('bare rune.kill (no rune name) does not grant wildcard kill', () => {
+    const result = computeEffectivePermissions({ use: { allow: ['rune.kill'] } }, undefined, 'use')
+    expect(result.allow).not.toContain('rune.kill:*')
+    const check = makePermissionChecker(result)
+    expect(() => check('rune.kill', 'worker')).toThrow(PermissionError)
+  })
+
+  it('bare rune.exists (no rune name) does not grant wildcard exists', () => {
+    const result = computeEffectivePermissions({ use: { allow: ['rune.exists'] } }, undefined, 'use')
+    expect(result.allow).not.toContain('rune.exists:*')
+    const check = makePermissionChecker(result)
+    expect(() => check('rune.exists', 'worker')).toThrow(PermissionError)
+  })
+
+  it('rune.spawn:* in allow permits spawn of any rune key', () => {
+    const check = makePermissionChecker({ allow: ['rune.spawn:*'], deny: [] })
+    expect(() => check('rune.spawn', 'server-worker')).not.toThrow()
+    expect(() => check('rune.spawn', 'any-other-rune')).not.toThrow()
+  })
+
+  it('rune.spawn:<key> permits only the named rune', () => {
+    const check = makePermissionChecker({ allow: ['rune.spawn:worker'], deny: [] })
+    expect(() => check('rune.spawn', 'worker')).not.toThrow()
+    expect(() => check('rune.spawn', 'server')).toThrow(PermissionError)
+  })
+
+  it('no rune.spawn in allow throws PermissionError', () => {
+    const check = makePermissionChecker({ allow: [], deny: [] })
+    expect(() => check('rune.spawn', 'server-worker')).toThrow(PermissionError)
+  })
+
+  it('rune.kill:* in allow permits kill of jobs from any rune key', () => {
+    const check = makePermissionChecker({ allow: ['rune.kill:*'], deny: [] })
+    expect(() => check('rune.kill', 'worker')).not.toThrow()
+    expect(() => check('rune.kill', 'server')).not.toThrow()
+  })
+
+  it('rune.kill:<key> permits only jobs started by the named rune', () => {
+    const check = makePermissionChecker({ allow: ['rune.kill:worker'], deny: [] })
+    expect(() => check('rune.kill', 'worker')).not.toThrow()
+    expect(() => check('rune.kill', 'server')).toThrow(PermissionError)
+  })
+
+  it('rune.exists:* in allow permits exists check on jobs from any rune key', () => {
+    const check = makePermissionChecker({ allow: ['rune.exists:*'], deny: [] })
+    expect(() => check('rune.exists', 'worker')).not.toThrow()
+  })
+
+  it('rune.exists:<key> permits only jobs started by the named rune', () => {
+    const check = makePermissionChecker({ allow: ['rune.exists:worker'], deny: [] })
+    expect(() => check('rune.exists', 'worker')).not.toThrow()
+    expect(() => check('rune.exists', 'server')).toThrow(PermissionError)
+  })
+})

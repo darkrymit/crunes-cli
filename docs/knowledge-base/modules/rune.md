@@ -35,7 +35,7 @@ The key token format parsed by `parseKeyToken` in `commands/use.js` is `[prefix:
 
 **Result normalisation:** `normaliseResult` ensures `runRune` always returns an array. `null` → `[]`, a single object → `[obj]`, an array → pass-through.
 
-**Circular call detection:** `_callStack` is an array of keys in the current call chain. If `_callStack.includes(key)`, `CircularRuneError` is thrown with the full chain. Child rune calls (via `utils.rune`) pass `nextStack` recursively but reset `sections` to `null`.
+**Circular call detection:** `_callStack` is an array of keys in the current call chain. If `_callStack.includes(key)`, `CircularRuneError` is thrown with the full chain. Child rune calls (via `rune.use`) pass `nextStack` recursively but reset `sections` to `null`.
 
 **Reference bridge:** `utils` methods are async — they call back into the host via `isolated-vm` References (`$__utils_fs_read`, `$__utils_shell`, etc.). `ExternalCopy` cannot carry promises or callbacks, so References are the only option. Adding a new `utils` capability requires three changes: (1) implement in `src/rune/api/<module>.js`, (2) inject as a `$__utils_<name>` Reference in `injectUtils()` in `runner.js`, (3) expose it in `utils-bootstrap.js` inside the isolate. Missing any side silently fails.
 
@@ -59,7 +59,7 @@ The key token format parsed by `parseKeyToken` in `commands/use.js` is `[prefix:
 
 All namespaces are available as named exports from `@utils` inside the isolate. The full export list from `utils-bootstrap.js` line 164:
 ```js
-export const { fs, shell, section, rune, json, yaml, xml, fetch, env, vars, archive, cache, sqlite, crypto } = globalThis.utils
+export const { fs, shell, section, rune, json, yaml, xml, fetch, env, vars, archive, cache, sqlite, crypto, ws, time } = globalThis.utils
 export { md, tree }
 ```
 
@@ -76,7 +76,11 @@ export { md, tree }
 | `md` | Pure markdown builders | — |
 | `tree` | Pure tree builders | — |
 | `section` | `create`, `match`, `selected` | — |
-| `rune` | `(key, args)` | inherits target rune's permissions |
+| `rune.use` | `(key, args?)` | inherits target rune's permissions |
+| `rune.spawn` | `(key, args?)` → `{ id }` | `rune.spawn` |
+| `rune.kill` | `(id, signal?)` | `rune.kill` |
+| `rune.exists` | `(id)` → `boolean` | `rune.exists` |
+| `time` | `time.after(ms)` — resolve after ms milliseconds | — |
 | `archive` | `unzip`, `zip`, `untar`, `tar` | `fs.read:`, `fs.write:` |
 | `cache` | `open(location, name?)` → handle | `cache.read:`, `cache.write:` |
 | `sqlite` | `open(location, name?)` → db | `sqlite.read:`, `sqlite.write:` |

@@ -3,7 +3,7 @@ import { promisify } from 'node:util'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import os from 'node:os'
-import { getPnpmStorePath } from './store.js'
+import { getPnpmStorePath } from '../store/index.js'
 
 const execFileAsync = promisify(execFile)
 

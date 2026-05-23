@@ -144,6 +144,7 @@ export async function runRune(dir, config, key, args, opts = {}, _callStack = []
     sections: opts.sections ?? null,
     vars: entry.vars ?? {},
     lifecycle: 'use',
+    runeKey: key,
   })
   return normaliseResult(result)
 }

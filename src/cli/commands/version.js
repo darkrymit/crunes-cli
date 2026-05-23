@@ -2,7 +2,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import chalk from 'chalk'
 import pkg from '../../../package.json' with { type: 'json' }
-import { getStorePath } from '../../plugin/store.js'
+import { getStorePath } from '../../store/index.js'
 
 const PKG_VERSION = pkg.version
 const CACHE_PATH = path.join(getStorePath(), 'update-check.json')

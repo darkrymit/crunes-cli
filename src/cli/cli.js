@@ -7,6 +7,13 @@ if (majorVersion >= 20 && !process.execArgv.includes('--no-node-snapshot')) {
   const result = spawnSync(process.execPath, ['--no-node-snapshot', ...process.argv.slice(1)], { stdio: 'inherit' })
   process.exit(result.status ?? 1)
 }
+
+if (process.env.CRUNES_NO_TIMEOUT === '1') {
+  const useIdx = process.argv.indexOf('use')
+  if (useIdx !== -1 && process.argv[useIdx + 1]) {
+    process.title = `crunes: ${process.argv[useIdx + 1]}`
+  }
+}
 import { buildProgram } from './program.js'
 
 const program = buildProgram()

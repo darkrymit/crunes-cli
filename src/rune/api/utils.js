@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { createHash } from 'node:crypto'
-import { getStorePath } from '../../plugin/store.js'
+import { getStorePath } from '../../store/index.js'
 
 export function shortHash(str) {
   return createHash('sha1').update(str).digest('hex').slice(0, 8)
@@ -98,7 +98,7 @@ export function canonicalizeLocation(location, { dir } = {}) {
 export function getAutoPermits({ pluginId = null, pluginDir = null } = {}) {
   const permits = []
   if (!pluginDir) {
-    permits.push('fs.read:.crunes/**')
+    permits.push('fs.read:./.crunes/**')
   }
   if (pluginDir) {
     permits.push('fs.read:@plugin/**', 'fs.write:@plugin/**')

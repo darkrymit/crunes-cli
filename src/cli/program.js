@@ -140,6 +140,27 @@ export function buildProgram() {
       await handler({ format: opts.format, plain: !!program.opts().plain, projectRoot: projectRoot(), configRoot: configRoot() })
     })
 
+  // Jobs management commands
+  const jobs = program.command('jobs').description('Manage background jobs')
+
+  jobs
+    .command('list')
+    .description('List background jobs for the current project')
+    .option('-g, --global', 'list jobs across all projects')
+    .action(async (opts) => {
+      const { listHandler } = await import('./commands/jobs.js')
+      await listHandler({ projectDir: projectRoot(), global: !!opts.global })
+    })
+
+  jobs
+    .command('kill <id>')
+    .description('Send SIGTERM to a background job and remove its record')
+    .option('-g, --global', 'search for the job across all projects')
+    .action(async (id, opts) => {
+      const { killHandler } = await import('./commands/jobs.js')
+      await killHandler({ id, projectDir: projectRoot(), global: !!opts.global })
+    })
+
   program
     .command('init')
     .description('Create .crunes/config.json in the current project')

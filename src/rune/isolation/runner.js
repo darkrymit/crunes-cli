@@ -3,7 +3,9 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createRequire } from 'node:module'
+import { spawn as spawnProcess } from 'node:child_process'
 import { createUtils } from '../api/index.js'
+import { createJob, getJob, projectKey as getProjectKey } from '../../job/registry.js'
 import { getAutoPermits } from '../api/utils.js'
 import { hashHex, hashBase64, uuid as cryptoUuid, hex as cryptoHex, base64 as cryptoBase64 } from '../api/crypto.js'
 import { computeEffectivePermissions, makePermissionChecker } from '../permissions/permissions.js'
@@ -40,7 +42,9 @@ async function compileStaticModule(isolate, key) {
  * utils-bootstrap.js imports them and wires globalThis.utils.
  * All modules come from real files on disk — no eval, no embedded code strings.
  */
-async function injectUtils(isolate, context, utils, runeCallback, vars, projectDir) {
+const VALID_SIGNALS = new Set(['SIGTERM', 'SIGKILL', 'SIGINT', 'SIGHUP', 'SIGUSR1', 'SIGUSR2'])
+
+async function injectUtils(isolate, context, utils, runeCallback, vars, projectDir, checkPermission, currentRuneKey) {
   const jail = context.global
 
   await jail.set('$__utils_fs_read', new ivm.Reference(async (relPath, opts) => {
@@ -78,6 +82,42 @@ async function injectUtils(isolate, context, utils, runeCallback, vars, projectD
   await jail.set('$__utils_rune', new ivm.Reference(async (key, argsJson) => {
     const sections = await runeCallback(key, argsJson ? JSON.parse(argsJson) : [])
     return JSON.stringify(sections)
+  }))
+  await jail.set('$__utils_rune_spawn', new ivm.Reference((key, argsJson) => {
+    checkPermission('rune.spawn', key)
+    const args = argsJson ? JSON.parse(argsJson) : []
+    const cliPath = process.argv[1]
+    const spawnArgs = ['use', key, '--cwd', projectDir, ...args]
+    // Pass --no-node-snapshot directly so cli.js skips its spawnSync re-exec,
+    // avoiding a second child process that would create a console window on Windows.
+    const child = spawnProcess(process.execPath, ['--no-node-snapshot', cliPath, ...spawnArgs], {
+      detached:           true,
+      stdio:              'ignore',
+      windowsHideConsole: true,
+      env:                { ...process.env, CRUNES_NO_TIMEOUT: '1' },
+    })
+    child.unref()
+    return createJob(child.pid, { spawnedBy: currentRuneKey, runeKey: key, projectDir, args }).then(({ id, projectKey }) => JSON.stringify({ id, projectKey }))
+  }))
+  const pKey = getProjectKey(projectDir)
+  await jail.set('$__utils_rune_kill', new ivm.Reference((id, signal) => {
+    const sig = signal ?? 'SIGTERM'
+    if (!VALID_SIGNALS.has(sig)) throw new Error(`Invalid signal: ${sig}`)
+    return getJob(pKey, id).then(record => {
+      if (!record) return
+      checkPermission('rune.kill', record.runeKey)
+      try { process.kill(record.pid, sig) } catch { /* already gone */ }
+    })
+  }))
+  await jail.set('$__utils_rune_exists', new ivm.Reference((id) => {
+    return getJob(pKey, id).then(record => {
+      if (!record) return false
+      checkPermission('rune.exists', record.runeKey)
+      try { process.kill(record.pid, 0); return true } catch { return false }
+    })
+  }))
+  await jail.set('$__utils_time_after', new ivm.Reference((ms) => {
+    return new Promise(resolve => setTimeout(resolve, ms))
   }))
   await jail.set('$__utils_json_read', new ivm.Reference(async (relPath, optsJson) => {
     const result = await utils.json.read(relPath, optsJson ? JSON.parse(optsJson) : undefined)
@@ -277,11 +317,12 @@ export async function runRuneInIsolate(runeFile, effective, args, projectDir, {
   pluginDir = null,
   runeCallback = null,
   isolateMemoryMb = 128,
-  isolateTimeoutMs = 30_000,
+  isolateTimeoutMs = process.env.CRUNES_NO_TIMEOUT ? undefined : 30_000,
   sections = null,
   vars = {},
   lifecycle = 'use',
   pluginId = null,
+  runeKey = null,
 } = {}) {
   const augmented = {
     allow: [...effective.allow, ...getAutoPermits({ pluginId, pluginDir })],
@@ -300,7 +341,7 @@ export async function runRuneInIsolate(runeFile, effective, args, projectDir, {
     await context.global.set('$__hostRequire', new ivm.Reference((spec) => hostRequire(spec)))
 
     if (isVerbose) console.error(`[crunes:debug] injecting utils and console...`)
-    const utilsMod = await injectUtils(isolate, context, utils, runeCallback, vars, projectDir)
+    const utilsMod = await injectUtils(isolate, context, utils, runeCallback, vars, projectDir, checkPermission, runeKey)
     await injectConsole(isolate, context)
 
     if (pluginDir != null) {
@@ -336,7 +377,7 @@ export async function runRuneInIsolate(runeFile, effective, args, projectDir, {
     await runeMod.instantiate(context, resolver)
     
     if (isVerbose) console.error(`[crunes:debug] evaluating Module...`)
-    await runeMod.evaluate({ timeout: isolateTimeoutMs })
+    await runeMod.evaluate(isolateTimeoutMs !== undefined ? { timeout: isolateTimeoutMs } : {})
 
     // Builtin proxy modules have now been evaluated — remove the host require bridge.
     if (isVerbose) console.error(`[crunes:debug] cleaning up $__hostRequire...`)
@@ -359,7 +400,7 @@ export async function runRuneInIsolate(runeFile, effective, args, projectDir, {
           })()
           return JSON.stringify(await __crunes_args(b))
         })()`,
-        { promise: true, timeout: isolateTimeoutMs }
+        isolateTimeoutMs !== undefined ? { promise: true, timeout: isolateTimeoutMs } : { promise: true }
       )
       parsedArgs = parseArgs(args, JSON.parse(schemaJson))
     } else {
@@ -410,6 +451,7 @@ export async function runPluginRune(pluginDir, runeKey, pluginJson, effective, a
     sections:         opts.sections ?? null,
     vars:             opts.vars ?? {},
     lifecycle:        opts.lifecycle ?? 'use',
+    runeKey,
   })
 }
 
@@ -435,7 +477,7 @@ export async function getArgsSchema(runeFile, effective, projectDir, {
   try {
     const context = await isolate.createContext()
     await context.global.set('$__hostRequire', new ivm.Reference((spec) => hostRequire(spec)))
-    const utilsMod = await injectUtils(isolate, context, utils, null, vars, projectDir)
+    const utilsMod = await injectUtils(isolate, context, utils, null, vars, projectDir, checkPermission, null)
     await injectConsole(isolate, context)
     if (pluginDir != null) await context.global.set('CRUNES_PLUGIN_ROOT', pluginDir)
 
@@ -485,7 +527,7 @@ export async function getArgsSchema(runeFile, effective, projectDir, {
 /**
  * Compute effective permissions and run a plugin rune. Convenience wrapper for core.js.
  */
-export async function executePluginRune({ pluginDir, runeKey, pluginJson, projectPerms, projectVars = {}, args, projectDir, opts, runeCallback, sections, lifecycle = 'use' }) {
+export async function executePluginRune({ pluginDir, runeKey, pluginJson, projectPerms, projectVars = {}, args, projectDir, opts, runeCallback, sections, lifecycle = 'use', }) {
   const runePerms     = pluginJson.runes[runeKey]?.permissions ?? {}
   const effective     = computeEffectivePermissions(runePerms, projectPerms, lifecycle)
   const runeVars      = pluginJson.runes[runeKey]?.vars ?? {}
@@ -496,5 +538,6 @@ export async function executePluginRune({ pluginDir, runeKey, pluginJson, projec
     sections,
     vars: effectiveVars,
     lifecycle,
+    runeKey,
   })
 }

@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { resolvePath, canonicalizeLocation } from './utils.js'
-import { getStorePath } from '../../plugin/store.js'
+import { getStorePath } from '../../store/index.js'
 
 function assertSerializable(value) {
   try {

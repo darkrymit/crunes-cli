@@ -1,10 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { join } from 'node:path'
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, rm, writeFile, mkdir } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { createServer } from 'node:http'
 import { WebSocketServer } from 'ws'
 import { getPluginRunePath, runRuneInIsolate, getArgsSchema } from '../../../src/rune/isolation/runner.js'
+import { createJob, projectKey } from '../../../src/job/registry.js'
 
 function startEchoServer() {
   return new Promise((resolve) => {
@@ -75,6 +76,127 @@ describe('@utils virtual module', () => {
     ].join('\n'))
     const result = await runRuneInIsolate(runeFile, { allow: [], deny: [] }, [], tmp)
     expect(result[0]).toMatchObject({ name: 'cwd', data: { content: tmp } })
+  })
+
+  it('auto-grant allows fs.read of .crunes/** without explicit permission', async () => {
+    const crunesDir = join(tmp, '.crunes')
+    const stateFile = join(crunesDir, 'state.json')
+    await mkdir(crunesDir, { recursive: true })
+    await writeFile(stateFile, JSON.stringify({ ok: true }), 'utf8')
+
+    const runeFile = join(tmp, 'rune.js')
+    await writeFile(runeFile, [
+      'import { json, section } from "@utils"',
+      'export async function use() {',
+      '  const data = await json.read(".crunes/state.json")',
+      '  return [section.create("r", { type: "markdown", content: String(data.ok) })]',
+      '}',
+    ].join('\n'))
+    const result = await runRuneInIsolate(runeFile, { allow: [], deny: [] }, [], tmp)
+    expect(result[0].data.content).toBe('true')
+  })
+})
+
+describe('rune.spawn / rune.kill / rune.exists permission enforcement', () => {
+  let tmp
+
+  beforeEach(async () => {
+    tmp = await mkdtemp(join(tmpdir(), 'crunes-runner-spawn-'))
+    process.env.CRUNES_STORE = tmp
+  })
+  afterEach(async () => {
+    delete process.env.CRUNES_STORE
+    await rm(tmp, { recursive: true, force: true })
+  })
+
+  it('rune.spawn throws PermissionError when rune.spawn:<key> not in allow', async () => {
+    const runeFile = join(tmp, 'rune.js')
+    await writeFile(runeFile, [
+      'import { rune, section } from "@utils"',
+      'export async function use(args) {',
+      '  await rune.spawn("worker", [])',
+      '  return section.create("x", { type: "markdown", content: "ok" })',
+      '}',
+    ].join('\n'))
+    await expect(
+      runRuneInIsolate(runeFile, { allow: [], deny: [] }, [], tmp)
+    ).rejects.toThrow("'rune.spawn:worker' is not permitted.")
+  })
+
+  it('rune.kill throws PermissionError when job exists but rune.kill:<runeKey> not in allow', async () => {
+    const { id } = await createJob(process.pid, { spawnedBy: 'server', runeKey: 'worker', projectDir: tmp, args: [] })
+    const runeFile = join(tmp, 'rune.js')
+    await writeFile(runeFile, [
+      'import { rune, section } from "@utils"',
+      `export async function use(args) {`,
+      `  await rune.kill(${JSON.stringify(id)})`,
+      '  return section.create("x", { type: "markdown", content: "ok" })',
+      '}',
+    ].join('\n'))
+    await expect(
+      runRuneInIsolate(runeFile, { allow: [], deny: [] }, [], tmp)
+    ).rejects.toThrow("'rune.kill:worker' is not permitted.")
+  })
+
+  it('rune.exists throws PermissionError when job exists but rune.exists:<runeKey> not in allow', async () => {
+    const { id } = await createJob(process.pid, { spawnedBy: 'server', runeKey: 'worker', projectDir: tmp, args: [] })
+    const runeFile = join(tmp, 'rune.js')
+    await writeFile(runeFile, [
+      'import { rune, section } from "@utils"',
+      `export async function use(args) {`,
+      `  await rune.exists(${JSON.stringify(id)})`,
+      '  return section.create("x", { type: "markdown", content: "ok" })',
+      '}',
+    ].join('\n'))
+    await expect(
+      runRuneInIsolate(runeFile, { allow: [], deny: [] }, [], tmp)
+    ).rejects.toThrow("'rune.exists:worker' is not permitted.")
+  })
+
+  it('rune.exists returns false for a nonexistent job id without checking permissions', async () => {
+    const runeFile = join(tmp, 'rune.js')
+    await writeFile(runeFile, [
+      'import { rune, section } from "@utils"',
+      'export async function use(args) {',
+      '  const alive = await rune.exists("no-such-job")',
+      '  return [section.create("x", { type: "markdown", content: String(alive) })]',
+      '}',
+    ].join('\n'))
+    const result = await runRuneInIsolate(
+      runeFile,
+      { allow: [], deny: [] },
+      [],
+      tmp
+    )
+    expect(result[0].data.content).toBe('false')
+  })
+
+  it('rune.kill is a no-op for a nonexistent job id', async () => {
+    const runeFile = join(tmp, 'rune.js')
+    await writeFile(runeFile, [
+      'import { rune, section } from "@utils"',
+      'export async function use(args) {',
+      '  await rune.kill("no-such-job")',
+      '  return [section.create("x", { type: "markdown", content: "ok" })]',
+      '}',
+    ].join('\n'))
+    const result = await runRuneInIsolate(runeFile, { allow: [], deny: [] }, [], tmp)
+    expect(result[0].data.content).toBe('ok')
+  })
+
+  it('rune.kill is a no-op for a job from a different project (structural isolation)', async () => {
+    const otherProject = join(tmp, 'other')
+    const { id } = await createJob(process.pid, { spawnedBy: 'server', runeKey: 'worker', projectDir: otherProject, args: [] })
+    const runeFile = join(tmp, 'rune.js')
+    await writeFile(runeFile, [
+      'import { rune, section } from "@utils"',
+      `export async function use(args) {`,
+      `  await rune.kill(${JSON.stringify(id)})`,
+      '  return [section.create("x", { type: "markdown", content: "ok" })]',
+      '}',
+    ].join('\n'))
+    const result = await runRuneInIsolate(runeFile, { allow: ['rune.kill:*'], deny: [] }, [], tmp)
+    expect(result[0].data.content).toBe('ok')
   })
 })
 
