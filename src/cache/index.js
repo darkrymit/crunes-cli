@@ -1,4 +1,4 @@
-import { readFile, writeFile, mkdir } from 'node:fs/promises'
+import { readFile, readdir, writeFile, mkdir, rm } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import { createHash } from 'node:crypto'
 import path from 'node:path'
@@ -49,4 +49,65 @@ export async function upsertCacheBucket(resolvedPath, { scope, projectKey, plugi
 export async function listCacheBuckets() {
   const data = await loadCacheBuckets()
   return Object.entries(data.buckets).map(([key, entry]) => ({ key, ...entry }))
+}
+
+export function resolveKey(id, buckets) {
+  if (id in buckets) return id
+  const matches = Object.keys(buckets).filter(k => k.startsWith(id))
+  if (matches.length === 1) return matches[0]
+  if (matches.length === 0) throw new Error(`No cache bucket matching "${id}".`)
+  throw new Error(`Ambiguous id "${id}" — matches: ${matches.join(', ')}.`)
+}
+
+export async function clearCacheBucket(id) {
+  const data = await loadCacheBuckets()
+  const key = resolveKey(id, data.buckets)
+  const { path: bucketPath, name } = data.buckets[key]
+  let removed = 0
+  try {
+    const files = await readdir(bucketPath)
+    const now = Date.now()
+    const results = await Promise.all(
+      files.filter(f => f.endsWith('.json')).map(async f => {
+        const fp = path.join(bucketPath, f)
+        try {
+          const entry = JSON.parse(await readFile(fp, 'utf8'))
+          if (entry.expiresAt !== null && now > entry.expiresAt) {
+            await rm(fp)
+            return true
+          }
+        } catch { /* skip unreadable */ }
+        return false
+      })
+    )
+    removed = results.filter(Boolean).length
+  } catch (e) {
+    if (e.code !== 'ENOENT') throw e
+  }
+  return { removed, name }
+}
+
+export async function deleteCacheKey(id, keyName) {
+  const data = await loadCacheBuckets()
+  const key = resolveKey(id, data.buckets)
+  const { path: bucketPath, name } = data.buckets[key]
+  try {
+    await rm(path.join(bucketPath, `${keyName}.json`))
+  } catch (e) {
+    if (e.code === 'ENOENT') throw new Error(`Key "${keyName}" not found in cache bucket "${name}".`)
+    throw e
+  }
+  return { name }
+}
+
+export async function deleteCacheBucket(id) {
+  const data = await loadCacheBuckets()
+  const key = resolveKey(id, data.buckets)
+  const { path: bucketPath, name } = data.buckets[key]
+  await rm(bucketPath, { recursive: true, force: true })
+  delete data.buckets[key]
+  const p = getCacheJsonPath()
+  await mkdir(dirname(p), { recursive: true })
+  await writeFile(p, JSON.stringify(data, null, 2), 'utf8')
+  return { name }
 }

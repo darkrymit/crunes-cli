@@ -161,6 +161,68 @@ export function buildProgram() {
       await killHandler({ id, projectDir: projectRoot(), global: !!opts.global })
     })
 
+  // Cache management commands
+  const cache = program.command('cache').description('Manage cache buckets')
+
+  cache
+    .command('list')
+    .description('List all registered cache buckets')
+    .action(async () => {
+      const { handler } = await import('../cache/commands/list.js')
+      await handler()
+    })
+
+  cache
+    .command('clear <id>')
+    .description('Remove expired keys from a cache bucket')
+    .action(async (id) => {
+      const { handler } = await import('../cache/commands/clear.js')
+      await handler({ id })
+    })
+
+  cache
+    .command('delete <id>')
+    .description('Delete a cache bucket directory and deregister it')
+    .action(async (id) => {
+      const { handler } = await import('../cache/commands/delete.js')
+      await handler({ id, yes: !!program.opts().yes })
+    })
+
+  cache
+    .command('unset <id> <key>')
+    .description('Remove a single key from a cache bucket')
+    .action(async (id, key) => {
+      const { handler } = await import('../cache/commands/unset.js')
+      await handler({ id, key })
+    })
+
+  // SQLite management commands
+  const sqlite = program.command('sqlite').description('Manage SQLite databases')
+
+  sqlite
+    .command('list')
+    .description('List all registered SQLite databases')
+    .action(async () => {
+      const { handler } = await import('../sqlite/commands/list.js')
+      await handler()
+    })
+
+  sqlite
+    .command('delete <id>')
+    .description('Delete a SQLite database file and deregister it')
+    .action(async (id) => {
+      const { handler } = await import('../sqlite/commands/delete.js')
+      await handler({ id, yes: !!program.opts().yes })
+    })
+
+  sqlite
+    .command('query <id> <sql>')
+    .description('Run a SQL query against a registered SQLite database (readonly)')
+    .action(async (id, sql) => {
+      const { handler } = await import('../sqlite/commands/query.js')
+      await handler({ id, sql })
+    })
+
   program
     .command('init')
     .description('Create .crunes/config.json in the current project')
