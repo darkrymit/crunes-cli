@@ -1,7 +1,20 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
-import { resolvePath, canonicalizeLocation } from './utils.js'
-import { getStorePath } from '../../store/index.js'
+import { resolvePath, canonicalizeLocation, getProjectKey } from './utils.js'
+import { upsertCacheBucket } from '../../cache/index.js'
+
+const CACHE_SCOPES = {
+  '@plugin-cache':         'plugin',
+  '@project-cache':        'project',
+  '@project-plugin-cache': 'project-plugin',
+}
+
+function detectCacheScope(location) {
+  for (const [prefix, scope] of Object.entries(CACHE_SCOPES)) {
+    if (location === prefix || location.startsWith(prefix + '/')) return scope
+  }
+  return null
+}
 
 function assertSerializable(value) {
   try {
@@ -63,15 +76,25 @@ function makeHandle(cacheDir, checkRead, checkWrite) {
   }
 }
 
-export function createCacheUtils(dir, checkPermission, { pluginId = null, storeDir = getStorePath(), projectName = undefined } = {}) {
+export function createCacheUtils(dir, checkPermission, { pluginId = null, storeDir = null, projectName = undefined } = {}) {
   return {
-    openHandle(location, name = 'default') {
-      const ctx = { dir, pluginId, storeDir, projectName }
+    async openHandle(location, name = 'default') {
+      const scope = detectCacheScope(location)
+      if (scope !== null && (name.includes('/') || name.includes('\\'))) {
+        throw new TypeError('cache name must not contain path separators — use a flat name like "branch-main" instead of "branch/main"')
+      }
+      const ctx      = { dir, pluginId, storeDir, projectName }
       const cacheDir = path.join(resolvePath(location, ctx), name)
-      const canon = canonicalizeLocation(location, { dir })
+      const canon    = canonicalizeLocation(location, { dir })
       const tokenValue = `${canon}:${name}`
       const checkRead  = checkPermission ? () => checkPermission('cache.read',  tokenValue) : null
       const checkWrite = checkPermission ? () => checkPermission('cache.write', tokenValue) : null
+      if (scope !== null) {
+        const projectKey = (scope === 'project' || scope === 'project-plugin')
+          ? getProjectKey(dir, projectName)
+          : null
+        await upsertCacheBucket(cacheDir, { scope, projectKey, pluginId: pluginId ?? null, location, name })
+      }
       return makeHandle(cacheDir, checkRead, checkWrite)
     },
   }

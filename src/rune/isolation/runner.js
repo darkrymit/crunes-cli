@@ -182,7 +182,7 @@ async function injectUtils(isolate, context, utils, runeCallback, vars, projectD
   let   nextCacheHandle = 0
 
   await jail.set('$__utils_cache_open', new ivm.Reference(async (location, name) => {
-    const handle = utils.cache.openHandle(location, name ?? 'default')
+    const handle = await utils.cache.openHandle(location, name ?? 'default')
     const id = String(nextCacheHandle++)
     cacheHandles.set(id, handle)
     return id
@@ -213,7 +213,7 @@ async function injectUtils(isolate, context, utils, runeCallback, vars, projectD
   let   nextSqliteHandle = 0
 
   await jail.set('$__utils_sqlite_open', new ivm.Reference(async (location, name) => {
-    const handle = utils.sqlite.openHandle(location, name ?? 'default')
+    const handle = await utils.sqlite.openHandle(location, name ?? 'default')
     const id = String(nextSqliteHandle++)
     sqliteHandles.set(id, handle)
     return id

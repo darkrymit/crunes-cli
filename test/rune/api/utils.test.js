@@ -48,16 +48,18 @@ describe('getProjectKey', () => {
 })
 
 describe('resolvePath', () => {
-  let tmp, pluginDir, storeDir
+  let tmp, pluginDir
   beforeEach(async () => {
     tmp       = await makeTmp()
     pluginDir = await makeTmp()
-    storeDir  = await makeTmp()
+    process.env.CRUNES_STORE = await makeTmp()
   })
   afterEach(async () => {
+    const store = process.env.CRUNES_STORE
+    delete process.env.CRUNES_STORE
     await rm(tmp,       { recursive: true, force: true })
     await rm(pluginDir, { recursive: true, force: true })
-    await rm(storeDir,  { recursive: true, force: true })
+    await rm(store,     { recursive: true, force: true })
   })
 
   it('@plugin/sub resolves into pluginDir', () => {
@@ -73,39 +75,45 @@ describe('resolvePath', () => {
       .toBe(join(tmp, 'data', 'mydb'))
   })
   it('@plugin-sqlite resolves to store sqlite plugins dir', () => {
-    expect(resolvePath('@plugin-sqlite', { dir: tmp, pluginId: 'plug@1.0', storeDir }))
-      .toBe(join(storeDir, 'sqlite', 'plugins', 'plug@1.0'))
+    const store = process.env.CRUNES_STORE
+    expect(resolvePath('@plugin-sqlite', { dir: tmp, pluginId: 'plug@1.0' }))
+      .toBe(join(store, 'sqlite', 'plugins', 'plug@1.0'))
   })
   it('@project-sqlite resolves to store sqlite projects dir', () => {
+    const store = process.env.CRUNES_STORE
     const key = getProjectKey(tmp)
-    expect(resolvePath('@project-sqlite', { dir: tmp, storeDir }))
-      .toBe(join(storeDir, 'sqlite', 'projects', key))
+    expect(resolvePath('@project-sqlite', { dir: tmp }))
+      .toBe(join(store, 'sqlite', 'projects', key))
   })
   it('@project-sqlite/subdir appended to project sqlite base', () => {
+    const store = process.env.CRUNES_STORE
     const key = getProjectKey(tmp)
-    expect(resolvePath('@project-sqlite/data/archive', { dir: tmp, storeDir }))
-      .toBe(join(storeDir, 'sqlite', 'projects', key, 'data', 'archive'))
+    expect(resolvePath('@project-sqlite/data/archive', { dir: tmp }))
+      .toBe(join(store, 'sqlite', 'projects', key, 'data', 'archive'))
   })
-  it('@plugin-cache resolves to store cache plugins dir', () => {
-    expect(resolvePath('@plugin-cache', { dir: tmp, pluginId: 'plug@1.0', storeDir }))
-      .toBe(join(storeDir, 'cache', 'plugins', 'plug@1.0'))
+  it('@plugin-cache resolves to store caches plugins dir', () => {
+    const store = process.env.CRUNES_STORE
+    expect(resolvePath('@plugin-cache', { dir: tmp, pluginId: 'plug@1.0' }))
+      .toBe(join(store, 'caches', 'plugins', 'plug@1.0'))
   })
-  it('@project-cache/subdir appended to project cache base', () => {
+  it('@project-cache/subdir appended to project caches base', () => {
+    const store = process.env.CRUNES_STORE
     const key = getProjectKey(tmp)
-    expect(resolvePath('@project-cache/ns', { dir: tmp, storeDir }))
-      .toBe(join(storeDir, 'cache', 'projects', key, 'ns'))
+    expect(resolvePath('@project-cache/ns', { dir: tmp }))
+      .toBe(join(store, 'caches', 'projects', key, 'ns'))
   })
   it('subpath escaping virtual root throws RangeError', () => {
-    expect(() => resolvePath('@project-sqlite/../etc', { dir: tmp, storeDir }))
+    expect(() => resolvePath('@project-sqlite/../etc', { dir: tmp }))
       .toThrow(RangeError)
   })
   it('@plugin-sqlite without pluginId throws', () => {
-    expect(() => resolvePath('@plugin-sqlite', { dir: tmp, storeDir }))
+    expect(() => resolvePath('@plugin-sqlite', { dir: tmp }))
       .toThrow('@plugin-sqlite requires a plugin context')
   })
   it('@project-sqlite uses projectName to avoid disk read', () => {
-    expect(resolvePath('@project-sqlite', { dir: tmp, storeDir, projectName: 'myproj' }))
-      .toBe(join(storeDir, 'sqlite', 'projects', `myproj-${shortHash(tmp)}`))
+    const store = process.env.CRUNES_STORE
+    expect(resolvePath('@project-sqlite', { dir: tmp, projectName: 'myproj' }))
+      .toBe(join(store, 'sqlite', 'projects', `myproj-${shortHash(tmp)}`))
   })
   it('~/path resolves to homedir', () => {
     expect(resolvePath('~/foo/bar', { dir: tmp })).toBe(join(homedir(), 'foo', 'bar'))

@@ -30,6 +30,11 @@ export function getMarketplaceCacheDir(name) {
   return path.join(getStorePath(), 'marketplaces', name)
 }
 
+export function getCachesBasePath() { return path.join(getStorePath(), 'caches') }
+export function getSqliteBasePath() { return path.join(getStorePath(), 'sqlite') }
+export function getCacheJsonPath()  { return path.join(getStorePath(), 'cache.json') }
+export function getSqliteJsonPath() { return path.join(getStorePath(), 'sqlite.json') }
+
 export async function ensureStoreDirs() {
   const base = getStorePath()
   await fs.mkdir(path.join(base, 'plugins'), { recursive: true })

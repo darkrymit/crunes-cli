@@ -2,7 +2,8 @@ import { readFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { createHash } from 'node:crypto'
-import { getStorePath } from '../../store/index.js'
+import { getCachePluginDir, getCacheProjectDir, getCacheProjectPluginDir } from '../../cache/index.js'
+import { getSqlitePluginDir, getSqliteProjectDir, getSqliteProjectPluginDir } from '../../sqlite/index.js'
 
 export function shortHash(str) {
   return createHash('sha1').update(str).digest('hex').slice(0, 8)
@@ -41,26 +42,25 @@ function parseVirtualStore(location) {
   return null
 }
 
-function virtualStoreBase(prefix, { dir, pluginId, storeDir, projectName }) {
-  const store = storeDir ?? getStorePath()
+function virtualStoreBase(prefix, { dir, pluginId, projectName }) {
   const key = () => getProjectKey(dir, projectName)
   switch (prefix) {
     case '@plugin-cache':
       if (!pluginId) throw new Error('@plugin-cache requires a plugin context')
-      return path.join(store, 'cache', 'plugins', pluginId)
+      return getCachePluginDir(pluginId)
     case '@project-plugin-cache':
       if (!pluginId) throw new Error('@project-plugin-cache requires a plugin context')
-      return path.join(store, 'cache', 'projects', key(), 'plugins', pluginId)
+      return getCacheProjectPluginDir(key(), pluginId)
     case '@project-cache':
-      return path.join(store, 'cache', 'projects', key())
+      return getCacheProjectDir(key())
     case '@plugin-sqlite':
       if (!pluginId) throw new Error('@plugin-sqlite requires a plugin context')
-      return path.join(store, 'sqlite', 'plugins', pluginId)
+      return getSqlitePluginDir(pluginId)
     case '@project-plugin-sqlite':
       if (!pluginId) throw new Error('@project-plugin-sqlite requires a plugin context')
-      return path.join(store, 'sqlite', 'projects', key(), 'plugins', pluginId)
+      return getSqliteProjectPluginDir(key(), pluginId)
     case '@project-sqlite':
-      return path.join(store, 'sqlite', 'projects', key())
+      return getSqliteProjectDir(key())
   }
 }
 
@@ -74,7 +74,7 @@ export function resolvePath(location, { dir, pluginDir = null, pluginId = null, 
   }
   const virtual = parseVirtualStore(location)
   if (virtual) {
-    const base = virtualStoreBase(virtual.prefix, { dir, pluginId, storeDir, projectName })
+    const base = virtualStoreBase(virtual.prefix, { dir, pluginId, projectName })
     return virtual.subpath ? path.join(base, virtual.subpath) : base
   }
   if (location === '~' || location.startsWith('~/') || location.startsWith('~\\')) {
