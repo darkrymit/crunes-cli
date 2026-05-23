@@ -7,7 +7,7 @@ tags: [module]
 
 **Source:** `src/cli/`
 **Submodules:** `commands/` (version, doctor, completions)
-**Related:** [[modules/shared]], [[modules/rune]], [[modules/plugin]], [[modules/marketplace]], [[modules/template]], `src/help/`
+**Related:** [[modules/shared]], [[modules/rune]], [[modules/plugin]], [[modules/marketplace]], [[modules/template]], [[modules/cache]], [[modules/sqlite]], `src/help/`
 
 ## Overview
 

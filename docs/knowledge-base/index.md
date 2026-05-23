@@ -9,10 +9,15 @@ AI-first documentation vault. Start here for context before working on any modul
 | CLI | [[modules/cli]] | `src/cli/` |
 | Help | [[modules/help]] | `src/help/` |
 | Core | [[modules/core]] | `src/core/` |
+| Job | [[modules/job]] | `src/job/` |
 | Marketplace | [[modules/marketplace]] | `src/marketplace/` |
 | Plugin | [[modules/plugin]] | `src/plugin/` |
+| Project | [[modules/project]] | `src/project/` |
 | Rune | [[modules/rune]] | `src/rune/` |
 | Shared | [[modules/shared]] | `src/shared/` |
+| Store | [[modules/store]] | `src/store/` |
+| Cache | [[modules/cache]] | `src/cache/` |
+| SQLite | [[modules/sqlite]] | `src/sqlite/` |
 | Template | [[modules/template]] | `src/template/` |
 
 ## Flows

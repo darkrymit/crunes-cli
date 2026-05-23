@@ -18,3 +18,5 @@ Entry point and program assembly for the crunes CLI. Full docs: `docs/knowledge-
 - `marketplace` — Provides `crunes marketplace *` command handlers.
 - `template` — Provides `crunes template *` command handlers.
 - `shared` — `configure()` is called in the `preAction` hook to apply `--plain` / `--verbose`.
+- `cache` — Provides `crunes cache *` command handlers.
+- `sqlite` — Provides `crunes sqlite *` command handlers.

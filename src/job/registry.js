@@ -71,6 +71,15 @@ export async function cleanJobs(key) {
   }
 }
 
-function isAlive(pid) {
+export function resolveJobId(id, jobs) {
+  const exact = jobs.find(j => j.id === id)
+  if (exact) return exact.id
+  const matches = jobs.filter(j => j.id.startsWith(id))
+  if (matches.length === 1) return matches[0].id
+  if (matches.length === 0) throw new Error(`No job matching "${id}".`)
+  throw new Error(`Ambiguous id "${id}" — matches: ${matches.map(j => j.id).join(', ')}.`)
+}
+
+export function isAlive(pid) {
   try { process.kill(pid, 0); return true } catch { return false }
 }

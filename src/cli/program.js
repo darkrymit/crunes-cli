@@ -148,8 +148,8 @@ export function buildProgram() {
     .description('List background jobs for the current project')
     .option('-g, --global', 'list jobs across all projects')
     .action(async (opts) => {
-      const { listHandler } = await import('./commands/jobs.js')
-      await listHandler({ projectDir: projectRoot(), global: !!opts.global })
+      const { handler } = await import('../job/commands/list.js')
+      await handler({ projectDir: projectRoot(), global: !!opts.global })
     })
 
   jobs
@@ -157,8 +157,8 @@ export function buildProgram() {
     .description('Send SIGTERM to a background job and remove its record')
     .option('-g, --global', 'search for the job across all projects')
     .action(async (id, opts) => {
-      const { killHandler } = await import('./commands/jobs.js')
-      await killHandler({ id, projectDir: projectRoot(), global: !!opts.global })
+      const { handler } = await import('../job/commands/kill.js')
+      await handler({ id, projectDir: projectRoot(), global: !!opts.global })
     })
 
   // Cache management commands

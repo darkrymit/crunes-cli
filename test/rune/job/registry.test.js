@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { mkdtemp, rm, readFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { createJob, getJob, cleanJobs, listJobs, deleteJob, projectKey } from '../../../src/job/registry.js'
+import { createJob, getJob, cleanJobs, listJobs, deleteJob, projectKey, resolveJobId } from '../../../src/job/registry.js'
 import { loadProjects } from '../../../src/project/index.js'
 
 const PROJ = '/proj'
@@ -90,5 +90,42 @@ describe('job registry', () => {
 
   it('deleteJob is a no-op for unknown id', async () => {
     await expect(deleteJob(PKEY, 'no-such-id')).resolves.toBeUndefined()
+  })
+})
+
+describe('resolveJobId', () => {
+  let tmp
+
+  beforeEach(async () => {
+    tmp = await mkdtemp(join(tmpdir(), 'crunes-jobs-resolve-'))
+    process.env.CRUNES_STORE = tmp
+  })
+  afterEach(async () => {
+    delete process.env.CRUNES_STORE
+    await rm(tmp, { recursive: true, force: true })
+  })
+
+  it('returns exact id when full UUID matches', async () => {
+    const { id } = await createJob(process.pid, { spawnedBy: 's', runeKey: 'r', projectDir: '/p', args: [] })
+    const jobs = await listJobs()
+    expect(resolveJobId(id, jobs)).toBe(id)
+  })
+
+  it('resolves by 8-char prefix when unambiguous', async () => {
+    const { id } = await createJob(process.pid, { spawnedBy: 's', runeKey: 'r', projectDir: '/p', args: [] })
+    const jobs = await listJobs()
+    expect(resolveJobId(id.slice(0, 8), jobs)).toBe(id)
+  })
+
+  it('throws on no match', () => {
+    expect(() => resolveJobId('xxxxxxxx', [])).toThrow(/No job matching/)
+  })
+
+  it('throws on ambiguous prefix', () => {
+    const fakeJobs = [
+      { id: 'aabbcc11-0000-0000-0000-000000000000' },
+      { id: 'aabbcc22-0000-0000-0000-000000000000' },
+    ]
+    expect(() => resolveJobId('aabbcc', fakeJobs)).toThrow(/Ambiguous id/)
   })
 })
