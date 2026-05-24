@@ -10,7 +10,7 @@ tags: [module]
 
 ## Overview
 
-Runes call `utils.sqlite(name)` to open a named SQLite database. Each database is a `.sqlite` file under `~/.crunes/sqlite/`. The registry (`sqlite.json`) tracks all known databases with their metadata.
+Runes call `utils.sqlite.open(location, name)` to open a named SQLite database handle. Each database is a `.sqlite` file under `~/.crunes/sqlite/`. The registry (`sqlite.json`) tracks all known databases with their metadata.
 
 ## Concepts
 

@@ -10,7 +10,7 @@ tags: [module]
 
 ## Overview
 
-Runes call `utils.cache(name)` to get a typed bucket. Each bucket is a directory under `~/.crunes/caches/`. Individual cache entries are JSON files named `<key>.json`. The registry (`cache.json`) tracks all known buckets with their metadata.
+Runes call `utils.cache.open(location, name)` to get a typed bucket handle. Each bucket is a directory under `~/.crunes/caches/`. Individual cache entries are JSON files named `<key>.json`. The registry (`cache.json`) tracks all known buckets with their metadata.
 
 ## Concepts
 
