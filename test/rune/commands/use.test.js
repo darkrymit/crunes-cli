@@ -71,20 +71,27 @@ describe('parseUseArgs', () => {
     expect(result.segments[0].runeArgs).toEqual(['--verbose', '--flag', 'val'])
   })
 
-  it('splits on bare + into multiple segments', () => {
-    const result = parseUseArgs(['api', '+', 'git', '+', 'env'])
+  it('requires -b to split on bare + into multiple segments', () => {
+    const result = parseUseArgs(['-b', 'api', '+', 'git', '+', 'env'])
     expect(result.segments).toHaveLength(3)
     expect(result.segments.map(s => s.key)).toEqual(['api', 'git', 'env'])
   })
 
+  it('treats + as literal argument when -b is missing', () => {
+    const result = parseUseArgs(['api', '+', 'git'])
+    expect(result.segments).toHaveLength(1)
+    expect(result.segments[0].key).toBe('api')
+    expect(result.segments[0].runeArgs).toEqual(['+', 'git'])
+  })
+
   it('per-segment --section is isolated to its segment', () => {
-    const result = parseUseArgs(['--section', 'endpoints', 'api', '+', 'git'])
+    const result = parseUseArgs(['-b', '--section', 'endpoints', 'api', '+', 'git'])
     expect(result.segments[0].sections).toEqual(['endpoints'])
     expect(result.segments[1].sections).toBeNull()
   })
 
   it('rune args in first segment do not bleed into second', () => {
-    const result = parseUseArgs(['api', '--rune-flag', '+', 'git'])
+    const result = parseUseArgs(['-b', 'api', '--rune-flag', '+', 'git'])
     expect(result.segments[0].runeArgs).toEqual(['--rune-flag'])
     expect(result.segments[1].runeArgs).toEqual([])
   })

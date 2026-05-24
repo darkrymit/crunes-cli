@@ -33,6 +33,7 @@ export function parseSegment(argv) {
 export function parseUseArgs(argv) {
   let format = 'md'
   let failFast = false
+  let allowBatch = false
   let i = 0
 
   // Consume command-level flags from the prefix only — stops at the first non-flag token.
@@ -48,6 +49,9 @@ export function parseUseArgs(argv) {
     } else if (tok === '--fail-fast') {
       failFast = true
       i++
+    } else if (tok === '-b' || tok === '--batch') {
+      allowBatch = true
+      i++
     } else {
       break
     }
@@ -56,7 +60,7 @@ export function parseUseArgs(argv) {
   const rawSegments = []
   let current = []
   for (const tok of argv.slice(i)) {
-    if (tok === '+') {
+    if (allowBatch && tok === '+') {
       rawSegments.push(current)
       current = []
     } else {
