@@ -37,9 +37,11 @@ export function buildProgram() {
     .command('use [args...]')
     .description('Use one or more runes and output the result.')
     .addHelpText('after',
-      '\nSyntax:\n' +
-      '  [--section s1,s2] <key> [rune-args...] [+ [--section s] <key> [rune-args...]]...\n\n' +
-      'Rune flags:\n' +
+      '\nImportant: Global flags (e.g. --cwd) MUST appear before the "use" command.\n\n' +
+      'Syntax:\n' +
+      '  [-b] [--section s1,s2] <key> [rune-args...] [+ [--section s] <key> [rune-args...]]...\n\n' +
+      'Command flags:\n' +
+      '  -b, --batch       enable batching multiple runes with +\n' +
       '  --section s1,s2  filter output sections (per rune, before the key)\n' +
       '  --format md|json  output format (default: md)\n' +
       '  --fail-fast       stop on first error\n\n' +
@@ -96,7 +98,7 @@ export function buildProgram() {
   program
     .command('check [args...]')
     .description('Run a rune and validate its output shape.')
-    .addHelpText('after', '\nSyntax:\n  [--section s1,s2] <key> [rune-args...]')
+    .addHelpText('after', '\nImportant: Global flags (e.g. --cwd) MUST appear before the "check" command.\n\nSyntax:\n  [--section s1,s2] <key> [rune-args...]')
     .allowUnknownOption()
     .passThroughOptions()
     .action(async (args) => {
@@ -114,7 +116,7 @@ export function buildProgram() {
   program
     .command('bench [args...]')
     .description('Time rune execution and report fast, ok, or slow.')
-    .addHelpText('after', '\nSyntax:\n  [--runs <n>] [--warmup] [--section s1,s2] <key> [rune-args...]')
+    .addHelpText('after', '\nImportant: Global flags (e.g. --cwd) MUST appear before the "bench" command.\n\nSyntax:\n  [--runs <n>] [--warmup] [--section s1,s2] <key> [rune-args...]')
     .allowUnknownOption()
     .passThroughOptions()
     .action(async (args) => {

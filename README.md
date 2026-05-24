@@ -96,16 +96,31 @@ crunes sqlite query <id> <sql> Run a readonly SQL query against a registered dat
 cd your-project
 crunes init               # creates .crunes/config.json
 crunes create docs        # scaffolds .crunes/runes/docs.js
-crunes use docs           # runs the rune and prints output
-crunes use docs + api v2  # runs multiple runes in batch
+crunes use docs              # runs the rune and prints output
+crunes use -b docs + api v2  # runs multiple runes in batch
 ```
+
+### The 3-Tier Parsing Boundary
+
+`crunes` parses arguments strictly from left to right in three tiers:
+
+1. **Global Flags** (e.g. `--cwd`, `--verbose`, `-p`) MUST precede the command.
+2. **Command Flags** (e.g. `-b`, `--format`) MUST immediately follow the command.
+3. **Rune Arguments** (e.g. `--strict`, `src/`) MUST follow the rune key.
+
+```bash
+# Correct: Global -> Command -> Command Flags -> Rune Key -> Rune Args
+crunes --cwd ./my-project use -b --format json myrune --strict
+```
+
+If you misplace a global flag *after* the command (e.g. `crunes use --cwd ./dir myrune`), the CLI will intercept it and throw a strict validation error to prevent confusing behaviors.
 
 ## Key Syntax
 
 Commands that accept a `<key>` (like `crunes use`, `crunes bench`, and `crunes check`) use this syntax:
 
 ```
-[--section s1,s2] [source:]name [rune-arg ...]
+[-b] [--section s1,s2] [source:]name [rune-arg ...]
 ```
 
 - `name`: The name of the rune (auto-resolved from project config first, then plugins).
@@ -115,18 +130,18 @@ Commands that accept a `<key>` (like `crunes use`, `crunes bench`, and `crunes c
 - `rune-arg ...`: Everything after the key is passed verbatim to the rune as `args._` (or parsed against the rune's `args()` schema if it exports one). This includes flags — `--verbose`, `--format`, etc.
 - `--section s1,s2`: Filters the output to only include the named sections (must appear before the key).
 
-`crunes use` accepts multiple rune segments separated by `+`:
+`crunes use` accepts multiple rune segments separated by `+` if you pass the `-b` (batch) flag. Without `-b`, the `+` character is treated as a literal argument passed to the rune!
 
 ```bash
-crunes use structure + api v2
-crunes use --section layout structure + --section files api
+crunes use -b structure + api v2
+crunes use -b --section layout structure + --section files api
 ```
 
-**Command-level flags must come before the first key.** The `use` command's own flags (`--format`, `--fail-fast`) and `bench`'s flags (`--runs`, `--warmup`) are only recognised at the start of the argument list. Once the parser hits the first key, all remaining tokens (including flags) belong to the rune:
+**Command-level flags must come before the first key.** The `use` command's own flags (`-b`, `--format`, `--fail-fast`) and `bench`'s flags (`--runs`, `--warmup`) are only recognised at the start of the argument list. Once the parser hits the first key, all remaining tokens (including flags) belong to the rune:
 
 ```bash
 # correct — command flags before the key
-crunes use --format json mykey --rune-flag val
+crunes use -b --format json mykey --rune-flag val
 
 # rune receives --format as its own arg (command format stays 'md')
 crunes use mykey --format custom
