@@ -16,6 +16,6 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
-      - run: npm test
       - run: npm run build
+      - run: npm test
       - run: node dist/cli.js --help
