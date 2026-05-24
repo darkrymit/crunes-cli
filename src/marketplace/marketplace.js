@@ -243,7 +243,15 @@ export async function resolveFromMarketplace(marketplaceName, pluginName) {
   }
 
   const resolvedSource = resolvePluginSource(plugin.source, resolvedPath)
-  return { resolvedSource, marketplaceName, pluginName }
+  return {
+    resolvedSource,
+    marketplaceName,
+    pluginName,
+    version: plugin.version,
+    description: plugin.description,
+    author: plugin.author,
+    license: plugin.license
+  }
 }
 
 function resolvePluginSource(source, marketplaceResolvedPath) {

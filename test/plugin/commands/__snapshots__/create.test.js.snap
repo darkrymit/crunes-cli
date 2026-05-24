@@ -86,7 +86,8 @@ exports[`marketplaceJson > matches snapshot 1`] = `
         "name": "Alice"
       },
       "source": "./",
-      "category": "runes"
+      "category": "runes",
+      "license": "MIT"
     }
   ]
 }
@@ -96,14 +97,6 @@ exports[`marketplaceJson > matches snapshot 1`] = `
 exports[`pluginJson > matches snapshot 1`] = `
 "{
   "format": "1",
-  "name": "my-plugin",
-  "version": "1.0.0",
-  "description": "A test plugin",
-  "author": {
-    "name": "Alice"
-  },
-  "license": "MIT",
-  "keywords": [],
   "runes": {
     "example": {
       "name": "Example Rune",

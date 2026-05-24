@@ -20,19 +20,7 @@ describe('validatePluginJson', () => {
       .toThrow('unsupported format')
   })
 
-  it('throws when name is missing', () => {
-    const { name: _, ...rest } = VALID
-    expect(() => validatePluginJson(rest)).toThrow('"name" is required')
-  })
 
-  it('throws when name is not a string', () => {
-    expect(() => validatePluginJson({ ...VALID, name: 42 })).toThrow('"name" is required')
-  })
-
-  it('throws when version is missing', () => {
-    const { version: _, ...rest } = VALID
-    expect(() => validatePluginJson(rest)).toThrow('"version" is required')
-  })
 
   it('throws when runes is missing', () => {
     const { runes: _, ...rest } = VALID

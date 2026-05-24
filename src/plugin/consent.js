@@ -10,8 +10,8 @@ function collectAllow(permissions) {
   return all
 }
 
-export function formatConsentScreen(pluginJson) {
-  const lines = [`${pluginJson.name} requests the following permissions:\n`]
+export function formatConsentScreen(pluginName, pluginJson) {
+  const lines = [`${pluginName} requests the following permissions:\n`]
 
   for (const [runeKey, rune] of Object.entries(pluginJson.runes)) {
     const allow = collectAllow(rune.permissions)
@@ -26,8 +26,8 @@ export function formatConsentScreen(pluginJson) {
   return lines.join('\n')
 }
 
-export async function promptConsent(pluginJson) {
-  p.note(formatConsentScreen(pluginJson), 'Permissions requested')
+export async function promptConsent(pluginName, pluginJson) {
+  p.note(formatConsentScreen(pluginName, pluginJson), 'Permissions requested')
 
   const answer = await p.confirm({ message: 'Allow these permissions?' })
 

@@ -146,11 +146,13 @@ describe('handler (non-interactive)', () => {
       }
     })
 
-    it('writes valid plugin.json with correct name', async () => {
+    it('writes valid plugin.json and marketplace.json with correct name', async () => {
       await handler({ ...BASE_OPTS, out, yes: true })
       const pj = JSON.parse(readFileSync(join(out, '.crunes-plugin', 'plugin.json'), 'utf8'))
-      expect(pj.name).toBe('my-plugin')
+      const mj = JSON.parse(readFileSync(join(out, '.crunes-plugin', 'marketplace.json'), 'utf8'))
+      expect(pj.name).toBeUndefined()
       expect(pj.format).toBe('1')
+      expect(mj.plugins[0].name).toBe('my-plugin')
     })
 
     it('generates plugin.json with namespaced permissions schema', async () => {
@@ -161,10 +163,10 @@ describe('handler (non-interactive)', () => {
       })
     })
 
-    it('defaults license to MIT when not provided', async () => {
+    it('defaults license to MIT when not provided in marketplace.json', async () => {
       await handler({ ...BASE_OPTS, license: undefined, out, yes: true })
-      const pj = JSON.parse(readFileSync(join(out, '.crunes-plugin', 'plugin.json'), 'utf8'))
-      expect(pj.license).toBe('MIT')
+      const mj = JSON.parse(readFileSync(join(out, '.crunes-plugin', 'marketplace.json'), 'utf8'))
+      expect(mj.plugins[0].license).toBe('MIT')
     })
 
     it('resolves out directory relative to projectRoot', async () => {

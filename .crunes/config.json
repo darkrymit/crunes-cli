@@ -25,7 +25,11 @@
       "description": "Live structural context (README and file tree) for modules.",
       "permissions": {
         "use": {
-          "allow": ["fs.read:src/**", "fs.glob:src/**", "fs.exists:src/**"]
+          "allow": [
+            "fs.read:src/**",
+            "fs.glob:src/**",
+            "fs.exists:src/**"
+          ]
         }
       }
     },

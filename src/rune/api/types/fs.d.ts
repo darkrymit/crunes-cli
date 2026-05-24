@@ -24,7 +24,7 @@ declare namespace fs {
 
   /**
    * Returns file paths matching a glob pattern. Relative patterns only.
-   * @param pattern Glob pattern (e.g., `src/**/*.js`)
+   * @param pattern Glob pattern (e.g., 'src/**\/*.js')
    * @param opts.ignore Array of patterns to ignore
    * @param opts.onlyDirectories Return directories instead of files
    * @param opts.dot Include dotfiles and dot-directories in the results

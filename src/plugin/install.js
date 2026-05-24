@@ -101,7 +101,11 @@ export async function installPlugin(source, projectDir, provenance = {}) {
     // local: stagingDir already points to the plugin
 
     const pluginJson = await loadPluginJson(stagingDir)
-    const { name, version } = pluginJson
+    const name = provenance.pluginName
+    const version = provenance.version
+    if (!name || !version) {
+      throw new Error(`Provenance missing plugin identity: name="${name}", version="${version}"`)
+    }
     const pluginKey = `${provenance.marketplaceName}@${name}`
 
     // Check if already installed — if so, handle as update
@@ -124,7 +128,7 @@ export async function installPlugin(source, projectDir, provenance = {}) {
     await installDeps(cacheDir, pluginJson.dependencies)
 
     // Consent
-    const consented = await promptConsent(pluginJson)
+    const consented = await promptConsent(name, pluginJson)
     if (!consented) {
       await fs.rm(cacheDir, { recursive: true, force: true })
       return { installed: false, name }
@@ -158,7 +162,11 @@ async function updatePlugin(pluginKey, newPluginDir, newPluginJson, projectDir, 
     if (!consented) return { installed: false, name: pluginKey }
   }
 
-  const { name, version } = newPluginJson
+  const name = provenance.pluginName
+  const version = provenance.version
+  if (!name || !version) {
+    throw new Error(`Provenance missing plugin identity during update: name="${name}", version="${version}"`)
+  }
   const cacheDir = getPluginCacheDir(name, version, provenance.marketplaceName)
 
   if (!isLocal) {

@@ -7,12 +7,6 @@ import { output } from '../../shared/output.js'
 export function pluginJson({ name, description, author, license }) {
   return JSON.stringify({
     format: '1',
-    name,
-    version: '1.0.0',
-    description,
-    author: { name: author },
-    license,
-    keywords: [],
     runes: {
       example: {
         name: 'Example Rune',
@@ -34,7 +28,7 @@ export function pluginJson({ name, description, author, license }) {
   }, null, 2) + '\n'
 }
 
-export function marketplaceJson({ name, description, author }) {
+export function marketplaceJson({ name, description, author, license }) {
   return JSON.stringify({
     format: '1',
     name,
@@ -47,6 +41,7 @@ export function marketplaceJson({ name, description, author }) {
       author: { name: author },
       source: './',
       category: 'runes',
+      license,
     }],
   }, null, 2) + '\n'
 }
