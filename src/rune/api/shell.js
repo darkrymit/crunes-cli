@@ -12,8 +12,89 @@ export class ShellError extends Error {
   }
 }
 
+class ShellSession {
+  constructor(cmd, { dir, env }) {
+    this.buffer = ''
+    this.waiters = new Set()
+    
+    this.proc = spawn(cmd, [], {
+      shell:              true,
+      cwd:                dir,
+      windowsHideConsole: true,
+      env: env ? { ...process.env, ...env } : process.env,
+    })
+
+    this.exitPromise = new Promise((resolve) => {
+      this.proc.on('close', (code) => resolve(code ?? 1))
+      this.proc.on('error', () => resolve(1))
+    })
+
+    const handleData = (chunk) => {
+      const text = chunk.toString().replace(/\r\n/g, '\n').replace(ANSI_RE, '')
+      this.buffer += text
+      
+      for (const waiter of this.waiters) {
+        let match = false
+        if (typeof waiter.pattern === 'string' && this.buffer.includes(waiter.pattern)) {
+          match = true
+        } else if (waiter.pattern instanceof RegExp && waiter.pattern.test(this.buffer)) {
+          match = true
+        }
+
+        if (match) {
+          clearTimeout(waiter.timer)
+          this.waiters.delete(waiter)
+          waiter.resolve(this.buffer)
+        }
+      }
+    }
+
+    this.proc.stdout.on('data', handleData)
+    this.proc.stderr.on('data', handleData)
+  }
+
+  write(text) {
+    this.proc.stdin.write(text)
+  }
+
+  expect(pattern, timeoutMs = 30000) {
+    return new Promise((resolve, reject) => {
+      let match = false
+      if (typeof pattern === 'string' && this.buffer.includes(pattern)) {
+        match = true
+      } else if (pattern instanceof RegExp && pattern.test(this.buffer)) {
+        match = true
+      }
+
+      if (match) {
+        return resolve(this.buffer)
+      }
+
+      const waiter = { pattern, resolve, reject }
+      waiter.timer = setTimeout(() => {
+        this.waiters.delete(waiter)
+        reject(new Error(`Timeout waiting for ${pattern}`))
+      }, timeoutMs)
+      
+      this.waiters.add(waiter)
+    })
+  }
+
+  output() {
+    return this.buffer
+  }
+
+  waitForExit() {
+    return this.exitPromise
+  }
+
+  kill() {
+    this.proc.kill()
+  }
+}
+
 export function createShellUtils(dir, checkPermission) {
-  return async function shell(cmd, { throw: shouldThrow = true, trim = true, timeout = 30000, env } = {}) {
+  async function run(cmd, { throw: shouldThrow = true, trim = true, timeout = 30000, env } = {}) {
     if (checkPermission) checkPermission('shell', cmd)
 
     const result = await new Promise((resolve, reject) => {
@@ -45,7 +126,6 @@ export function createShellUtils(dir, checkPermission) {
       proc.on('close', exitCode => {
         clearTimeout(timer)
         if (timedOut) return
-        // normalise line endings + strip ANSI
         stdout = stdout.replace(/\r\n/g, '\n').replace(ANSI_RE, '')
         stderr = stderr.replace(/\r\n/g, '\n').replace(ANSI_RE, '')
         resolve({ stdout, stderr, exitCode })
@@ -69,4 +149,11 @@ export function createShellUtils(dir, checkPermission) {
     if (trim) return result.stdout.trim()
     return result
   }
+
+  function session(cmd, { env } = {}) {
+    if (checkPermission) checkPermission('shell', cmd)
+    return new ShellSession(cmd, { dir, env })
+  }
+
+  return { run, session }
 }

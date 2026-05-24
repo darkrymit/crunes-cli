@@ -22,7 +22,22 @@ globalThis.utils = {
       await globalThis.utils.fs.write(p, newContent);
     },
   },
-  shell: (cmd, o) => $__utils_shell.apply(undefined, [cmd, o], { arguments: { copy: true }, result: { promise: true, copy: true } }),
+  shell: {
+    run: (cmd, o) => $__utils_shell_run.apply(undefined, [cmd, o], { arguments: { copy: true }, result: { promise: true, copy: true } }),
+    session: (cmd, o) => {
+      const id = $__utils_shell_session_open.applySync(undefined, [cmd, o], { arguments: { copy: true } })
+      return {
+        write: (text) => $__utils_shell_session_write.applySync(undefined, [id, text]),
+        expect: (pattern, timeoutMs) => {
+          const pat = pattern instanceof RegExp ? { type: 'regex', source: pattern.source, flags: pattern.flags } : pattern
+          return $__utils_shell_session_expect.apply(undefined, [id, pat, timeoutMs], { arguments: { copy: true }, result: { promise: true, copy: true } })
+        },
+        output: () => $__utils_shell_session_output.applySync(undefined, [id]),
+        waitForExit: () => $__utils_shell_session_waitForExit.apply(undefined, [id], { result: { promise: true } }),
+        kill: () => $__utils_shell_session_kill.applySync(undefined, [id])
+      }
+    }
+  },
   section: {
     create: (name, data, o) => $__utils_section_create.applySync(undefined, [name, data, o], { arguments: { copy: true }, result: { copy: true } }),
     match: (sectionName, patterns) => $__utils_section_match.applySync(undefined, [sectionName, patterns], { arguments: { copy: true }, result: { copy: true } }),
