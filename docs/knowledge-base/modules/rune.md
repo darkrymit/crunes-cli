@@ -85,6 +85,8 @@ export { md, tree }
 | `cache` | `open(location, name?)` → handle | `cache.read:`, `cache.write:` |
 | `sqlite` | `open(location, name?)` → db | `sqlite.read:`, `sqlite.write:` |
 | `crypto` | `hash.hex`, `hash.base64`, `uuid`, `hex`, `base64` | — |
+| `ws` | `client(url, opts?) → session` | `ws:<url>` |
+| `time` | `after(ms)` | — |
 
 **`fs.replace`** is implemented in `utils-bootstrap.js`, not `api/fs.js` — it's a read+write composite: reads the file, runs `String.replace(regex, replacement)`, writes back.
 

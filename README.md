@@ -19,11 +19,12 @@ crunes use [--section s] <key> [args...] [+ ...]   Use one or more runes and out
 crunes check <key>             Run a rune and validate its output shape
 crunes bench <key>             Time rune execution and report fast/ok/slow (use --runs <n> to average, --warmup to add a discarded warm-up run)
 crunes list                    List all registered runes
-crunes jobs list               List background jobs for the current project
-crunes jobs kill <id>          Send SIGTERM to a job and remove its record (prefix match on id)
+crunes job list                List background jobs for the current project
+crunes job kill <id>           Send SIGTERM to a job and remove its record (prefix match on id)
 crunes doctor                  Verify environment and project setup
 crunes version                 Print the installed version and check for updates
-crunes help rune <key...>      Show usage, argument schema, and examples for one or more runes
+crunes docs rune <key...>      Show usage, argument schema, and examples for one or more runes
+crunes docs utils [namespaces...] Show function signatures and parameter docs for utils
 crunes completions install <shell>  Install shell tab-completion hook (bash, zsh, fish, powershell)
 ```
 
@@ -31,7 +32,7 @@ crunes completions install <shell>  Install shell tab-completion hook (bash, zsh
 
 ```
 crunes template list [source]  List available templates
-crunes template use <key>      Copy a template into the project as a new rune
+crunes template use [options] <template> Copy a template into the project as a new rune
 crunes template create [name]  Scaffold a new template file
 ```
 
@@ -152,7 +153,7 @@ Every namespace is a named export from `@utils`:
 
 ```js
 import { md, tree, section, fs, shell, json, yaml, xml,
-         fetch, env, vars, archive, cache, sqlite, crypto, rune } from '@utils'
+         fetch, env, vars, archive, cache, sqlite, crypto, ws, time, rune } from '@utils'
 ```
 
 **Typed arguments** — export an `args` function using the builder API:
@@ -482,6 +483,30 @@ crypto.base64(size)    // → base64-encoded random bytes
 
 ---
 
+### `ws` — WebSocket Client
+
+Permission token: `ws:<url>`.
+
+```js
+const session = utils.ws.client(url, opts?)
+// session.on(event, handler)
+// await session.open()
+// await session.send(msg)
+// await session.close()
+```
+
+---
+
+### `time` — Time Utilities
+
+No permission gate.
+
+```js
+await time.after(ms) // → Promise that resolves after ms milliseconds
+```
+
+---
+
 ### `rune` — Call other runes
 
 Inherits the target rune's permissions. Circular calls throw `CircularRuneError`.
@@ -491,6 +516,15 @@ const sections = await rune.use(key, args?)
 // key  — bare key or plugin:key
 // args — string[] of positional arguments
 // → Section[]
+
+const job = await rune.spawn(key, args?)
+// → { id, projectKey } — spawns rune in the background
+
+await rune.kill(id, signal?)
+// → void — sends signal (default: SIGTERM) to the job
+
+const exists = await rune.exists(id)
+// → boolean — true if job process is still running
 ```
 
 ## Plugins
