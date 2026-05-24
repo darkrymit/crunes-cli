@@ -23,18 +23,18 @@ globalThis.utils = {
     },
   },
   shell: {
-    run: (cmd, o) => $__utils_shell_run.apply(undefined, [cmd, o], { arguments: { copy: true }, result: { promise: true, copy: true } }),
-    session: (cmd, o) => {
-      const id = $__utils_shell_session_open.applySync(undefined, [cmd, o], { arguments: { copy: true } })
+    exec: (cmd, o) => $__utils_shell_exec.apply(undefined, [cmd, o], { arguments: { copy: true }, result: { promise: true, copy: true } }),
+    execInSession: (cmd, o) => {
+      const id = $__utils_shell_execInSession_open.applySync(undefined, [cmd, o], { arguments: { copy: true } })
       return {
-        write: (text) => $__utils_shell_session_write.applySync(undefined, [id, text]),
+        write: (text) => $__utils_shell_execInSession_write.applySync(undefined, [id, text]),
         expect: (pattern, timeoutMs) => {
           const pat = pattern instanceof RegExp ? { type: 'regex', source: pattern.source, flags: pattern.flags } : pattern
-          return $__utils_shell_session_expect.apply(undefined, [id, pat, timeoutMs], { arguments: { copy: true }, result: { promise: true, copy: true } })
+          return $__utils_shell_execInSession_expect.apply(undefined, [id, pat, timeoutMs], { arguments: { copy: true }, result: { promise: true, copy: true } })
         },
-        output: () => $__utils_shell_session_output.applySync(undefined, [id]),
-        waitForExit: () => $__utils_shell_session_waitForExit.apply(undefined, [id], { result: { promise: true } }),
-        kill: () => $__utils_shell_session_kill.applySync(undefined, [id])
+        output: () => $__utils_shell_execInSession_output.applySync(undefined, [id]),
+        waitForExit: () => $__utils_shell_execInSession_waitForExit.apply(undefined, [id], { result: { promise: true } }),
+        kill: () => $__utils_shell_execInSession_kill.applySync(undefined, [id])
       }
     }
   },

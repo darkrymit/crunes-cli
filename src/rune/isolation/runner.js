@@ -70,32 +70,32 @@ async function injectUtils(isolate, context, utils, runeCallback, vars, projectD
   const shellHandles = new Map()
   let nextShellHandle = 0
 
-  await jail.set('$__utils_shell_run', new ivm.Reference(async (cmd, opts) => {
-    return utils.shell.run(cmd, opts)
+  await jail.set('$__utils_shell_exec', new ivm.Reference(async (cmd, opts) => {
+    return utils.shell.exec(cmd, opts)
   }))
-  await jail.set('$__utils_shell_session_open', new ivm.Reference((cmd, opts) => {
-    const session = utils.shell.session(cmd, opts)
+  await jail.set('$__utils_shell_execInSession_open', new ivm.Reference((cmd, opts) => {
+    const session = utils.shell.execInSession(cmd, opts)
     const id = String(nextShellHandle++)
     shellHandles.set(id, session)
     return id
   }))
-  await jail.set('$__utils_shell_session_write', new ivm.Reference((id, text) => {
+  await jail.set('$__utils_shell_execInSession_write', new ivm.Reference((id, text) => {
     shellHandles.get(id).write(text)
   }))
-  await jail.set('$__utils_shell_session_expect', new ivm.Reference(async (id, pattern, timeoutMs) => {
+  await jail.set('$__utils_shell_execInSession_expect', new ivm.Reference(async (id, pattern, timeoutMs) => {
     let pat = pattern
     if (pattern && typeof pattern === 'object' && pattern.type === 'regex') {
       pat = new RegExp(pattern.source, pattern.flags)
     }
     return shellHandles.get(id).expect(pat, timeoutMs)
   }))
-  await jail.set('$__utils_shell_session_output', new ivm.Reference((id) => {
+  await jail.set('$__utils_shell_execInSession_output', new ivm.Reference((id) => {
     return shellHandles.get(id).output()
   }))
-  await jail.set('$__utils_shell_session_waitForExit', new ivm.Reference(async (id) => {
+  await jail.set('$__utils_shell_execInSession_waitForExit', new ivm.Reference(async (id) => {
     return shellHandles.get(id).waitForExit()
   }))
-  await jail.set('$__utils_shell_session_kill', new ivm.Reference((id) => {
+  await jail.set('$__utils_shell_execInSession_kill', new ivm.Reference((id) => {
     const handle = shellHandles.get(id)
     if (handle) {
       handle.kill()

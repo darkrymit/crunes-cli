@@ -94,8 +94,8 @@ class ShellSession {
 }
 
 export function createShellUtils(dir, checkPermission) {
-  async function run(cmd, { throw: shouldThrow = true, trim = true, timeout = 30000, env } = {}) {
-    if (checkPermission) checkPermission('shell.run', cmd)
+  async function exec(cmd, { throw: shouldThrow = true, trim = true, timeout = 30000, env } = {}) {
+    if (checkPermission) checkPermission('shell.exec', cmd)
 
     const result = await new Promise((resolve, reject) => {
       const proc = spawn(cmd, [], {
@@ -150,10 +150,10 @@ export function createShellUtils(dir, checkPermission) {
     return result
   }
 
-  function session(cmd, { env } = {}) {
-    if (checkPermission) checkPermission('shell.run', cmd)
+  function execInSession(cmd, { env } = {}) {
+    if (checkPermission) checkPermission('shell.exec', cmd)
     return new ShellSession(cmd, { dir, env })
   }
 
-  return { run, session }
+  return { exec, execInSession }
 }

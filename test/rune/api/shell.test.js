@@ -4,7 +4,7 @@ import { createShellUtils } from '../../../src/rune/api/shell.js';
 describe('shell utils', () => {
   it('runs a simple command', async () => {
     const shellUtils = createShellUtils(process.cwd());
-    const result = await shellUtils.run('node -e "console.log(\'hello\')"');
+    const result = await shellUtils.exec('node -e "console.log(\'hello\')"');
     expect(result).toBe('hello');
   });
 
@@ -29,7 +29,7 @@ describe('shell utils', () => {
     await fs.writeFile(scriptPath, script);
 
     try {
-      const session = shellUtils.session(`node ${scriptPath}`);
+      const session = shellUtils.execInSession(`node ${scriptPath}`);
       await session.expect('Question:');
       session.write('42\n');
       const exitCode = await session.waitForExit();
