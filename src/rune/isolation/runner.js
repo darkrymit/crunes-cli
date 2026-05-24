@@ -5,13 +5,14 @@ import { fileURLToPath } from 'node:url'
 import { createRequire } from 'node:module'
 import { spawn as spawnProcess } from 'node:child_process'
 import { createUtils } from '../api/index.js'
+import { getAutoPermits } from '../api/utils.js'
+import { createModuleResolver } from './resolver.js'
+import { ALLOW_BUILTINS } from './builtins.js'
 import { createJob, getJob } from '../../job/index.js'
 import { getProjectKey } from '../../project/index.js'
-import { getAutoPermits } from '../api/utils.js'
 import { hashHex, hashBase64, uuid as cryptoUuid, hex as cryptoHex, base64 as cryptoBase64 } from '../api/crypto.js'
 import { computeEffectivePermissions, makePermissionChecker } from '../permissions/permissions.js'
 import { isVerbose } from '../../shared/output.js'
-import { createModuleResolver } from './resolver.js'
 import * as EMBEDDED from './embedded.js'
 import { parseArgs } from '../api/args-parser.js'
 
@@ -81,7 +82,7 @@ async function injectUtils(isolate, context, utils, runeCallback, vars, projectD
   await jail.set('$__utils_rune_spawn', new ivm.Reference((key, args) => {
     checkPermission('rune.spawn', key)
     const cliPath = process.argv[1]
-    const spawnArgs = ['use', key, '--cwd', projectDir, ...(args || [])]
+    const spawnArgs = ['--cwd', projectDir, 'use', key, ...(args || [])]
     // Pass --no-node-snapshot directly so cli.js skips its spawnSync re-exec,
     // avoiding a second child process that would create a console window on Windows.
     const child = spawnProcess(process.execPath, ['--no-node-snapshot', cliPath, ...spawnArgs], {
@@ -326,7 +327,10 @@ export async function runRuneInIsolate(runeFile, effective, args, projectDir, {
     const context = await isolate.createContext()
 
     if (isVerbose) console.error(`[crunes:debug] injecting $__hostRequire...`)
-    await context.global.set('$__hostRequire', new ivm.Reference((spec) => hostRequire(spec)))
+    await context.global.set('$__hostRequire', new ivm.Reference((spec) => {
+      if (!ALLOW_BUILTINS.has(spec)) throw new Error(`PermissionError: Sandbox escape blocked. Cannot require '${spec}' on host.`);
+      return hostRequire(spec)
+    }))
 
     if (isVerbose) console.error(`[crunes:debug] injecting utils and console...`)
     const utilsMod = await injectUtils(isolate, context, utils, runeCallback, vars, projectDir, checkPermission, runeKey)
@@ -465,7 +469,10 @@ export async function getArgsSchema(runeFile, effective, projectDir, {
   const isolate = new ivm.Isolate({ memoryLimit: isolateMemoryMb })
   try {
     const context = await isolate.createContext()
-    await context.global.set('$__hostRequire', new ivm.Reference((spec) => hostRequire(spec)))
+    await context.global.set('$__hostRequire', new ivm.Reference((spec) => {
+      if (!ALLOW_BUILTINS.has(spec)) throw new Error(`PermissionError: Sandbox escape blocked. Cannot require '${spec}' on host.`);
+      return hostRequire(spec)
+    }))
     const utilsMod = await injectUtils(isolate, context, utils, null, vars, projectDir, checkPermission, null)
     await injectConsole(isolate, context)
     if (pluginDir != null) await context.global.set('CRUNES_PLUGIN_ROOT', pluginDir)
