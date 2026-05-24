@@ -100,6 +100,18 @@ describe('parseUseArgs', () => {
     expect(result.format).toBe('md')
     expect(result.failFast).toBe(false)
   })
+
+  it('does not intercept --format after the key — passes it to runeArgs', () => {
+    const result = parseUseArgs(['api', '--format', 'json'])
+    expect(result.format).toBe('md')
+    expect(result.segments[0].runeArgs).toEqual(['--format', 'json'])
+  })
+
+  it('does not intercept --fail-fast after the key — passes it to runeArgs', () => {
+    const result = parseUseArgs(['api', '--fail-fast'])
+    expect(result.failFast).toBe(false)
+    expect(result.segments[0].runeArgs).toEqual(['--fail-fast'])
+  })
 })
 
 describe('handler — configRoot', () => {

@@ -15,12 +15,16 @@ Requires Node.js ≥ 20.
 ```
 crunes init                    Create .crunes/config.json in the current project
 crunes create [key]            Scaffold a new rune and register it in config
-crunes use <key> [-a <key>...] Use one or more runes and output the result (use --fail-fast to stop on error)
+crunes use [--section s] <key> [args...] [+ ...]   Use one or more runes and output the result (use --fail-fast to stop on error)
 crunes check <key>             Run a rune and validate its output shape
 crunes bench <key>             Time rune execution and report fast/ok/slow (use --runs <n> to average, --warmup to add a discarded warm-up run)
 crunes list                    List all registered runes
+crunes jobs list               List background jobs for the current project
+crunes jobs kill <id>          Send SIGTERM to a job and remove its record (prefix match on id)
+crunes doctor                  Verify environment and project setup
 crunes version                 Print the installed version and check for updates
-crunes help rune <key>         Show usage, argument schema, and examples for a rune
+crunes help rune <key...>      Show usage, argument schema, and examples for one or more runes
+crunes completions install <shell>  Install shell tab-completion hook (bash, zsh, fish, powershell)
 ```
 
 **Template management:**
@@ -51,6 +55,23 @@ crunes marketplace list            List configured sources
 crunes marketplace search <query>  Search for plugins across all sources
 ```
 
+**Cache management:**
+
+```
+crunes cache list              List all registered cache buckets
+crunes cache clear <id>        Remove expired keys from a cache bucket
+crunes cache delete <id>       Delete a cache bucket and deregister it
+crunes cache unset <id> <key>  Remove a single key from a cache bucket
+```
+
+**SQLite management:**
+
+```
+crunes sqlite list             List all registered SQLite databases
+crunes sqlite delete <id>      Delete a SQLite database and deregister it
+crunes sqlite query <id> <sql> Run a readonly SQL query against a registered database
+```
+
 **Global flags:**
 
 ```
@@ -75,21 +96,40 @@ cd your-project
 crunes init               # creates .crunes/config.json
 crunes create docs        # scaffolds .crunes/runes/docs.js
 crunes use docs           # runs the rune and prints output
-crunes use docs -a api=v2 # runs multiple runes in batch
+crunes use docs + api v2  # runs multiple runes in batch
 ```
 
 ## Key Syntax
 
-Commands that accept a `<key>` (like `crunes use`, `crunes bench`, and `crunes check`) support the following syntax:
+Commands that accept a `<key>` (like `crunes use`, `crunes bench`, and `crunes check`) use this syntax:
 
-`[source:]name[=arg1,arg2][::section1,section2]`
+```
+[--section s1,s2] [source:]name [rune-arg ...]
+```
 
 - `name`: The name of the rune (auto-resolved from project config first, then plugins).
 - `source:`: Forces resolution from a specific source.
   - `local:name` resolves strictly from `.crunes/config.json`.
   - `my-plugin:name` resolves strictly from an installed plugin.
-- `=arg1,arg2`: Passes arguments to the rune (available as `args` in the API).
-- `::section1,section2`: Filters the output to only return specific sections.
+- `rune-arg ...`: Everything after the key is passed verbatim to the rune as `args._` (or parsed against the rune's `args()` schema if it exports one). This includes flags — `--verbose`, `--format`, etc.
+- `--section s1,s2`: Filters the output to only include the named sections (must appear before the key).
+
+`crunes use` accepts multiple rune segments separated by `+`:
+
+```bash
+crunes use structure + api v2
+crunes use --section layout structure + --section files api
+```
+
+**Command-level flags must come before the first key.** The `use` command's own flags (`--format`, `--fail-fast`) and `bench`'s flags (`--runs`, `--warmup`) are only recognised at the start of the argument list. Once the parser hits the first key, all remaining tokens (including flags) belong to the rune:
+
+```bash
+# correct — command flags before the key
+crunes use --format json mykey --rune-flag val
+
+# rune receives --format as its own arg (command format stays 'md')
+crunes use mykey --format custom
+```
 
 ## Rune API
 
@@ -192,7 +232,7 @@ section.create(name, data, { title?, attrs? }?)
 // name must be kebab-case; data must be { type: 'markdown', content } or { type: 'tree', root }
 
 section.match(name)
-// → boolean — true if name matches the active ::sections filter (use for early-exit optimisation)
+// → boolean — true if name matches the active --section filter (use for early-exit optimisation)
 
 section.selected()
 // → string[] | null — the active section filter list, or null if no filter is active
@@ -447,9 +487,9 @@ crypto.base64(size)    // → base64-encoded random bytes
 Inherits the target rune's permissions. Circular calls throw `CircularRuneError`.
 
 ```js
-const sections = await rune(key, args?)
-// key  — same token syntax as crunes use: bare key, plugin:key, key=arg1,arg2
-// args — string[] of positional arguments (alternative to embedding them in the token)
+const sections = await rune.use(key, args?)
+// key  — bare key or plugin:key
+// args — string[] of positional arguments
 // → Section[]
 ```
 
@@ -490,7 +530,9 @@ Plugins declare their runes and permissions in `.crunes-plugin/plugin.json`:
   "runes": {
     "some-rune": {
       "permissions": {
-        "allow": ["fs.read:**", "shell:git log *"]
+        "use": {
+          "allow": ["fs.read:**", "shell:git log *"]
+        }
       }
     }
   }

@@ -36,9 +36,10 @@ function labelColour(l, plain) {
 export function parseBenchArgs(argv) {
   let runs = 1
   let warmup = false
-  const remaining = []
-
   let i = 0
+
+  // Consume command-level flags from the prefix only — stops at the first non-flag token.
+  // This ensures rune flags with the same name (e.g. --runs) are never intercepted.
   while (i < argv.length) {
     const tok = argv[i]
     if (tok === '--runs' && i + 1 < argv.length) {
@@ -51,12 +52,11 @@ export function parseBenchArgs(argv) {
       warmup = true
       i++
     } else {
-      remaining.push(tok)
-      i++
+      break
     }
   }
 
-  const { key, sections, runeArgs } = parseSegment(remaining)
+  const { key, sections, runeArgs } = parseSegment(argv.slice(i))
   return { key, sections, runeArgs, runs, warmup }
 }
 

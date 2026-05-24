@@ -9,16 +9,17 @@ tags: [flow]
 
 ## Overview
 
-The `use` command parses one or more `key=args::sections` tokens (via `-a` for additional tokens). For each token, it calls `runRune()` which resolves the key (local or plugin), computes permissions, and dispatches to `runRuneInIsolate`. If the rune exports an `args()` function, that schema is used to parse typed arguments before `use(parsedArgs)` is called. Returned sections are filtered by the `::sections` pattern (if any) and rendered to stdout.
+The `use` command first strips its own flags (`--format`, `--fail-fast`) from the prefix of argv, then splits the remainder on `+` into segments. Each segment is `[--section s1,s2] <key> [rune-args...]`. Everything after the key is passed verbatim to the rune — including any flags. Returned sections are filtered by `--section` patterns (if any) and rendered to stdout.
 
 ## Walkthrough
 
 ```
-crunes use <token> [-a <token>...]
+crunes use [--format md|json] [--fail-fast] [--section s1,s2] <key> [rune-args...] [+ ...]
           │
+          │  parseUseArgs: consume --format/--fail-fast from prefix only (stops at first key)
+          │  then split remainder on `+` → parseSegment per segment
           ▼
-  commands/use.js: parseKeyToken → { key, args, sections }
-  (strips ::sections filter, splits =arg1,arg2, returns bare key)
+  → { format, failFast, segments: [{ key, sections, runeArgs }] }
           │
           ▼
   rune/resolver.js: runRune(dir, config, key, args, { sections, configDir })
@@ -59,7 +60,7 @@ crunes use <token> [-a <token>...]
            13. normaliseResult → always returns Section[]
                     │
                     ▼
-  commands/use.js: micromatch filter by ::sections (if filter present)
+  commands/use.js: micromatch filter by --section patterns (if present)
                     │
                     ▼
   --format md  → shared/render.js: renderSection(section) → stdout
@@ -77,7 +78,7 @@ crunes use <token> [-a <token>...]
 
 ## Key Decisions
 
-- **Section filter applied post-execution, not pre:** The `::sections` glob filter is applied in `use.js` after the rune returns, not passed as a skip hint to the isolate. The rune still executes fully. This is intentional — `section.match(name)` lets rune authors opt into early skipping if they want efficiency; it's not enforced by the framework.
+- **Section filter applied post-execution, not pre:** The `--section` glob filter is applied in `use.js` after the rune returns, not passed as a skip hint to the isolate. The rune still executes fully. This is intentional — `section.match(name)` lets rune authors opt into early skipping if they want efficiency; it's not enforced by the framework.
 
 - **`args()` schema is optional:** If a rune does not export `args`, rawArgs are passed through `yargs-parser` with no schema — all positionals land in `parsedArgs._` as strings. This keeps simple runes simple.
 

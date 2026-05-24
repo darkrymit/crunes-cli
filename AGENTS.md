@@ -66,10 +66,15 @@ Prefer `crunes use m` — this is a static fallback only.
 
 - `cli` — Entry point (`cli.js`), Commander setup (`program.js`), `-v` disambiguation, general CLI commands.
 - `core` — `loadConfig()`, `CircularRuneError`, shared config types.
+- `job` — Background job tracking: create, list, kill, GC, prefix-match resolution.
 - `marketplace` — Marketplace source URL management, plugin index browsing and caching.
 - `plugin` — Plugin registry, install, consent, dep resolution, store paths.
+- `project` — Reverse-lookup index: hashed project key → project directory path.
 - `rune` — Key resolution, sandboxed VM execution, utils API, permissions.
 - `shared` — `render.js`, `output.js` — cross-cutting utilities with no domain coupling.
+- `store` — Centralised path helpers for `~/.crunes/` (or `$CRUNES_STORE`).
+- `cache` — Rune-visible cache store: named key/value buckets backed by JSON files.
+- `sqlite` — Rune-visible SQLite store: named databases in a central index.
 - `template` — Rune template listing and scaffolding.
 
 ### Module Documentation
@@ -78,18 +83,18 @@ Every module has a `README.md` stub at `src/<module>/README.md` (file index, sub
 
 KB vault: `docs/knowledge-base/` — module notes at `modules/<module>.md`, flows at `flows/<flow>.md`, system at `system/`.
 
-- **Single module:** `crunes use m=<module> -a kb=m,<module>`
-- **Submodule:** `crunes use m=<module>.<submodule>` (dot = submodule path separator, e.g. `m=rune.isolation`)
-- **Multiple modules:** `crunes use m=<mod1>,<mod2> -a kb=m,<mod1>,<mod2>`
-- **Priority order:** chain `-a` groups so the most task-relevant module comes first — e.g. `crunes use m=rune.isolation -a kb=m,rune.isolation -a m=plugin -a kb=m,plugin`
+- **Single module:** `crunes -p use m <module> + kb -m <module>`
+- **Submodule:** `crunes -p use m <module>.<submodule>` (dot = submodule path separator, e.g. `m rune.isolation`)
+- **Multiple modules:** `crunes -p use m <mod1> <mod2> + kb -m <mod1> <mod2>`
+- **Priority order:** chain `+` groups so the most task-relevant module comes first — e.g. `crunes -p use m rune.isolation + kb -m rune.isolation + m plugin + kb -m plugin`
 
 Include `kb` alongside `m` when design decisions or subtle gotchas are likely to matter — new features, cross-module contracts, anything non-obvious from source. Skip for purely structural reads.
 
 ### Context Runes
 
 - `release` — Current version, lockfile sync status, branch/tag, last 10 commits, recent changelog, release process steps.
-- `m` — Module structure tree + file tree. No args: all modules. `m=rune` → rune module. `m=rune.isolation` → submodule (dot = path separator). `m=plugin,rune` → multiple modules. Sections: `layout` (submodule tree), `files` (JS file tree), `readme`.
-- `kb` — Knowledge base notes. No args: index of all entries. `kb=m,rune,plugin` → specific module entries. `kb=f,use` → flow doc. Sections: one per entry name.
+- `m` — Module structure tree + file tree. No args: all modules. `m rune` → rune module. `m rune.isolation` → submodule (dot = path separator). `m rune plugin` → multiple modules (space-separated). Sections: `layout` (submodule tree), `files` (JS file tree), `readme`.
+- `kb` — Knowledge base notes. No args/flags: full index. `-m <name...>` → module entries (default when names given). `-f <name...>` → flow entries. `-s <name...>` → system entries. Sections: one per entry name.
 
 **Fallback** (crunes unavailable): Module Map above for `m`; `docs/knowledge-base/index.md` for `kb`.
 

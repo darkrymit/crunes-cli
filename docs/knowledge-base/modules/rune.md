@@ -15,14 +15,14 @@ tags: [module]
 
 Every rune runs in a fresh V8 isolate. The isolate cannot access Node builtins directly — all I/O goes through the `utils` bridge: host-side async functions injected as `$__utils_fs_read`, `$__utils_shell`, etc. The `createUtils` function in `api/index.js` assembles the full `utils` object from its constituent modules. Each I/O namespace calls `permChecker` before any operation.
 
-The key token format parsed by `parseKeyToken` in `commands/use.js` is `[prefix:]name[=arg1,arg2][::section1,section2]`. The `::sections` filter is NOT applied inside the isolate — it is applied in `use.js` by micromatch after `runRune` returns.
+Each segment parsed by `parseSegment` in `commands/use.js` has the form `[--section s1,s2] [prefix:]key [rune-args...]`. The `--section` filter is NOT applied inside the isolate — it is applied in `use.js` by micromatch after `runRune` returns. Multiple segments are separated by `+` on the command line.
 
 ## Submodules
 
 - **`isolation/`** — Sandboxed VM lifecycle: create isolate → compile static modules → inject `$__` bridges → compile rune ESM → evaluate → collect sections.
 - **`api/`** — The `utils` object rune authors interact with: `fs`, `shell`, `json`, `fetch`, `env`, `vars`, `md`, `tree`, `section`.
 - **`permissions/`** — `computeEffectivePermissions` and per-operation checkers (`fs`, `http`, `env`, `shell`).
-- **`commands/`** — CLI handlers: `use`, `list`, `create`, `check`, `bench`. All key-accepting commands (`use`, `check`, `bench`) share the same `parseKeyToken` parser from `use.js` — they all support the `[prefix:]name[=arg1,arg2][::section1,section2]` token syntax. `bench` requires a key (no fallback to "run all"), supports `--runs <n>` to average multiple timed runs, and `--warmup` to execute one discarded run before timing starts.
+- **`commands/`** — CLI handlers: `use`, `list`, `create`, `check`, `bench`. All key-accepting commands share `parseSegment` from `use.js` — syntax is `[--section s1,s2] [prefix:]key [rune-args...]`. `use` supports multiple `+`-separated segments. `bench` requires a key, supports `--runs <n>` to average multiple timed runs, and `--warmup` for a discarded warm-up run.
 
 ## Concepts
 
@@ -143,6 +143,8 @@ The runner calls `args(builder)` before `use(parsedArgs)` and passes the schema 
 - [[flows/use]] — owns the full execution path from CLI input to section output
 
 ## Gotchas & Debugging
+
+- **Command-level flags must precede the key:** `use`'s `--format`/`--fail-fast` and `bench`'s `--runs`/`--warmup` are consumed from the prefix of argv only — the parser stops at the first non-flag token. A rune can safely use `--format`, `--runs`, etc. as its own flags without conflict, as long as the command-level flags are placed before the key. `crunes use --format json mykey` → command gets json; `crunes use mykey --format json` → rune gets `--format json`.
 
 - **`section()` vs `section.create()`:** `section` is an object (`{ create, match, selected }`), not a function. Runes still calling `section(name, data)` or `utils.section(name, data)` will throw `TypeError: section is not a function` at runtime with no further context.
 

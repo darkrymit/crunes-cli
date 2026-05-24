@@ -33,9 +33,10 @@ export function parseSegment(argv) {
 export function parseUseArgs(argv) {
   let format = 'md'
   let failFast = false
-  const remaining = []
-
   let i = 0
+
+  // Consume command-level flags from the prefix only — stops at the first non-flag token.
+  // This ensures rune flags with the same name (e.g. --format) are never intercepted.
   while (i < argv.length) {
     const tok = argv[i]
     if (tok === '--format' && i + 1 < argv.length) {
@@ -48,14 +49,13 @@ export function parseUseArgs(argv) {
       failFast = true
       i++
     } else {
-      remaining.push(tok)
-      i++
+      break
     }
   }
 
   const rawSegments = []
   let current = []
-  for (const tok of remaining) {
+  for (const tok of argv.slice(i)) {
     if (tok === '+') {
       rawSegments.push(current)
       current = []

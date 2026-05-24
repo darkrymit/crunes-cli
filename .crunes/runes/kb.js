@@ -1,32 +1,28 @@
 import { fs, section, md } from '@utils'
 
 const TYPE_DIRS   = { m: 'modules', f: 'flows', s: 'system' }
-const TYPE_LABELS = { m: 'Modules', f: 'Flows', s: 'System' }
+const TYPE_LABELS   = { m: 'Modules', f: 'Flows', s: 'System' }
+const TYPE_SINGULAR = { m: 'Module',  f: 'Flow',  s: 'System' }
 const KB_ROOT = 'docs/knowledge-base'
 
 export async function args(b) {
   return b
-    .positional('[type]', 'KB type: m (modules), f (flows), s (system). Omit for full index.')
-    .positional('[name]', 'Entry name(s) to fetch in full (content mode). Multiple names are space-separated.')
+    .option('-m, --modules', 'Show module KB entries (default when names given)')
+    .option('-f, --flows', 'Show flow KB entries')
+    .option('-s, --system', 'Show system KB entries')
+    .positional('[name]', 'Entry name(s) to fetch in full. Multiple names are space-separated.')
     .build()
 }
 
 export async function use(args) {
   if (!await fs.exists(KB_ROOT)) return null
 
-  if (args._.length === 0) {
-    return buildRoot()
-  }
+  const hasNames = args._.length > 0
+  const type = args.flows ? 'f' : args.system ? 's' : (args.modules || hasNames) ? 'm' : null
 
-  const [type, ...allowedNames] = args._
-  if (!TYPE_DIRS[type]) {
-    return [section.create('knowledge-base',
-      { type: 'markdown', content: md.ul([`unknown kb type: \`${type}\`. Supported: m (modules), f (flows), s (system)`]) },
-      { title: 'Knowledge Base' }
-    )]
-  }
+  if (!type) return buildRoot()
 
-  return buildTypeSection(type, allowedNames)
+  return buildTypeSection(type, args._)
 }
 
 async function buildRoot() {
@@ -74,7 +70,7 @@ async function buildTypeSection(type, allowedNames) {
     const content = raw ? raw.trim() : `_No content found for \`${name}\`._`
     return section.create(name,
       { type: 'markdown', content },
-      { title: `Knowledge Base ${TYPE_LABELS[type].slice(0, -1)}: ${name}`, attrs: { ...baseAttrs, entry: name } }
+      { title: `Knowledge Base ${TYPE_SINGULAR[type]}: ${name}`, attrs: { ...baseAttrs, entry: name } }
     )
   }))
 

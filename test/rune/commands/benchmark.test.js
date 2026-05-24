@@ -33,6 +33,18 @@ describe('parseBenchArgs', () => {
   it('handles --runs=N inline form', () => {
     expect(parseBenchArgs(['--runs=3', 'api']).runs).toBe(3)
   })
+
+  it('does not intercept --runs after the key — passes it to runeArgs', () => {
+    const result = parseBenchArgs(['api', '--runs', '5'])
+    expect(result.runs).toBe(1)
+    expect(result.runeArgs).toEqual(['--runs', '5'])
+  })
+
+  it('does not intercept --warmup after the key — passes it to runeArgs', () => {
+    const result = parseBenchArgs(['api', '--warmup'])
+    expect(result.warmup).toBe(false)
+    expect(result.runeArgs).toEqual(['--warmup'])
+  })
 })
 
 describe('handler — key required', () => {
