@@ -198,10 +198,10 @@ export async function handler({
   }
 
   const successMsg = `Created ${outDir}`
-  const hintMsg = `Run: crunes plugin install ./${name} to test locally`
+  const hintMsg = `Run the following to test locally:\n1. crunes marketplace add ./${name}\n2. crunes plugin install ${name}@${name}`
   if (isNonInteractive) {
     output.success(successMsg)
-    output.info(hintMsg)
+    output.info(`Run: crunes marketplace add ./${name} && crunes plugin install ${name}@${name}`)
   } else {
     outro(`${successMsg}\n${hintMsg}`)
   }

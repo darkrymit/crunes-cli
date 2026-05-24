@@ -112,11 +112,12 @@ export async function installPlugin(source, projectDir, provenance = {}) {
     }
 
     const isLocal = type === 'local'
-    const cacheDir = isLocal ? stagingDir : getPluginCacheDir(name, version, provenance.marketplaceName)
+    const cacheDir = getPluginCacheDir(name, version, provenance.marketplaceName)
 
-    // Copy to cache dir (local installs use the source dir directly)
     if (!isLocal) {
       await fs.cp(stagingDir, cacheDir, { recursive: true })
+    } else {
+      await fs.mkdir(cacheDir, { recursive: true })
     }
 
     // Install declared dependencies
@@ -125,7 +126,7 @@ export async function installPlugin(source, projectDir, provenance = {}) {
     // Consent
     const consented = await promptConsent(pluginJson)
     if (!consented) {
-      if (!isLocal) await fs.rm(cacheDir, { recursive: true, force: true })
+      await fs.rm(cacheDir, { recursive: true, force: true })
       return { installed: false, name }
     }
 
@@ -135,7 +136,7 @@ export async function installPlugin(source, projectDir, provenance = {}) {
       consentedPermissions[key] = collectAllowFromRune(rune)
     }
 
-    await registerPlugin({ name, version, path: cacheDir, local: isLocal, consentedPermissions, ...provenance })
+    await registerPlugin({ name, version, path: isLocal ? stagingDir : cacheDir, cacheDir, local: isLocal, consentedPermissions, ...provenance })
     await addPluginToProjectConfig(projectDir, pluginKey)
 
     return { installed: true, name: pluginKey, version }
@@ -162,6 +163,8 @@ async function updatePlugin(pluginKey, newPluginDir, newPluginJson, projectDir, 
 
   if (!isLocal) {
     await fs.cp(newPluginDir, cacheDir, { recursive: true })
+  } else {
+    await fs.mkdir(cacheDir, { recursive: true })
   }
 
   await installDeps(cacheDir, newPluginJson.dependencies)
@@ -171,7 +174,7 @@ async function updatePlugin(pluginKey, newPluginDir, newPluginJson, projectDir, 
     consentedPermissions[key] = collectAllowFromRune(rune)
   }
 
-  await registerPlugin({ name, version, path: isLocal ? newPluginDir : cacheDir, consentedPermissions, ...provenance })
+  await registerPlugin({ name, version, path: isLocal ? newPluginDir : cacheDir, cacheDir, local: isLocal, consentedPermissions, ...provenance })
   await addPluginToProjectConfig(projectDir, pluginKey)
   return { installed: true, name: pluginKey, version, updated: true }
 }
@@ -185,7 +188,7 @@ async function addPluginToProjectConfig(projectDir, pluginName) {
     const plugins = config.plugins ?? []
     if (!plugins.includes(pluginName)) {
       config.plugins = [...plugins, pluginName]
-      const tmp = configPath + '.tmp'
+      const tmp = configPath + '.' + Date.now() + Math.random().toString(36).slice(2) + '.tmp'
       await fs.writeFile(tmp, JSON.stringify(config, null, 2), 'utf8')
       await fs.rename(tmp, configPath)
     }
@@ -199,16 +202,17 @@ export async function uninstallPlugin(pluginKey, projectDir) {
   const entry = registry.plugins?.[pluginKey]
   if (!entry) throw new Error(`Plugin "${pluginKey}" is not installed.`)
 
-  if (!entry.local) {
-    try {
-      const stat = await fs.lstat(entry.path)
+  try {
+    const dirToRemove = entry.cacheDir ?? (entry.local ? null : entry.path)
+    if (dirToRemove) {
+      const stat = await fs.lstat(dirToRemove)
       if (stat.isSymbolicLink()) {
-        await fs.unlink(entry.path)
+        await fs.unlink(dirToRemove)
       } else {
-        await fs.rm(entry.path, { recursive: true, force: true })
+        await fs.rm(dirToRemove, { recursive: true, force: true })
       }
-    } catch { /* already gone */ }
-  }
+    }
+  } catch { /* already gone */ }
 
   await removePlugin(pluginKey)
   await removePluginFromProjectConfig(projectDir, pluginKey)
@@ -221,7 +225,7 @@ async function removePluginFromProjectConfig(projectDir, pluginName) {
     const raw = await fs.readFile(configPath, 'utf8')
     const config = JSON.parse(raw)
     config.plugins = (config.plugins ?? []).filter(p => p !== pluginName)
-    const tmp = configPath + '.tmp'
+    const tmp = configPath + '.' + Date.now() + Math.random().toString(36).slice(2) + '.tmp'
     await fs.writeFile(tmp, JSON.stringify(config, null, 2), 'utf8')
     await fs.rename(tmp, configPath)
   } catch { /* no config */ }

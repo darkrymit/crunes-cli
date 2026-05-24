@@ -436,9 +436,9 @@ export async function runRuneInIsolate(runeFile, effective, args, projectDir, {
 /**
  * Run a plugin rune in isolation. Resolves the rune file from pluginDir/runes/<runeKey>.js.
  */
-export async function runPluginRune(pluginDir, runeKey, pluginJson, effective, args, projectDir, opts = {}) {
+export async function runPluginRune(pluginDir, pluginCacheDir, runeKey, pluginJson, effective, args, projectDir, opts = {}) {
   const runeFile       = getPluginRunePath(pluginDir, runeKey, pluginJson)
-  const nodeModulesDir = path.join(pluginDir, 'node_modules')
+  const nodeModulesDir = path.join(pluginCacheDir ?? pluginDir, 'node_modules')
   return runRuneInIsolate(runeFile, effective, args, projectDir, {
     nodeModulesDir,
     pluginDeps:       pluginJson.dependencies ?? {},
@@ -528,12 +528,12 @@ export async function getArgsSchema(runeFile, effective, projectDir, {
 /**
  * Compute effective permissions and run a plugin rune. Convenience wrapper for core.js.
  */
-export async function executePluginRune({ pluginDir, runeKey, pluginJson, projectPerms, projectVars = {}, args, projectDir, opts, runeCallback, sections, lifecycle = 'use', }) {
+export async function executePluginRune({ pluginDir, pluginCacheDir, runeKey, pluginJson, projectPerms, projectVars = {}, args, projectDir, opts, runeCallback, sections, lifecycle = 'use', }) {
   const runePerms     = pluginJson.runes[runeKey]?.permissions ?? {}
   const effective     = computeEffectivePermissions(runePerms, projectPerms, lifecycle)
   const runeVars      = pluginJson.runes[runeKey]?.vars ?? {}
   const effectiveVars = { ...runeVars, ...projectVars }
-  return runPluginRune(pluginDir, runeKey, pluginJson, effective, args, projectDir, {
+  return runPluginRune(pluginDir, pluginCacheDir, runeKey, pluginJson, effective, args, projectDir, {
     ...opts,
     runeCallback,
     sections,

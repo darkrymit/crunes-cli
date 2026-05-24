@@ -40,7 +40,7 @@ async function resolvePluginRune(config, key) {
   const entry = registry.plugins?.[pluginKey]
   if (!entry) return null
 
-  return { pluginKey, runeKey, pluginDir: entry.path }
+  return { pluginKey, runeKey, pluginDir: entry.path, pluginCacheDir: entry.cacheDir ?? entry.path }
 }
 
 async function resolveRuneFromPlugins(config, runeKey) {
@@ -57,7 +57,7 @@ async function resolveRuneFromPlugins(config, runeKey) {
     let pluginJson
     try { pluginJson = await loadPluginJson(entry.path) } catch { continue }
     if ((pluginJson.runes ?? {})[runeKey]) {
-      matches.push({ pluginKey, runeKey, pluginDir: entry.path, pluginJson })
+      matches.push({ pluginKey, runeKey, pluginDir: entry.path, pluginCacheDir: entry.cacheDir ?? entry.path, pluginJson })
     }
   }
 
@@ -86,12 +86,12 @@ export async function runRune(dir, config, key, args, opts = {}, _callStack = []
 
   const pluginMatch = localOnly ? null : await resolvePluginRune(config, key)
   if (pluginMatch) {
-    const { pluginKey, runeKey, pluginDir } = pluginMatch
+    const { pluginKey, runeKey, pluginDir, pluginCacheDir } = pluginMatch
     const pluginJson   = await loadPluginJson(pluginDir)
     const projectPerms = config.permissions?.[`${pluginKey}:${runeKey}`]
     const projectVars  = config.vars?.[`${pluginKey}:${runeKey}`] ?? {}
     const result = await executePluginRune({
-      pluginDir, runeKey, pluginJson, projectPerms, projectVars, args,
+      pluginDir, pluginCacheDir, runeKey, pluginJson, projectPerms, projectVars, args,
       projectDir: dir, opts: config, runeCallback,
       sections: opts.sections ?? null,
       lifecycle: 'use',
@@ -104,11 +104,11 @@ export async function runRune(dir, config, key, args, opts = {}, _callStack = []
   if (!entry && !localOnly) {
     const autoMatch = await resolveRuneFromPlugins(config, key)
     if (autoMatch) {
-      const { pluginKey, runeKey, pluginDir, pluginJson } = autoMatch
+      const { pluginKey, runeKey, pluginDir, pluginCacheDir, pluginJson } = autoMatch
       const projectPerms = config.permissions?.[`${pluginKey}:${runeKey}`]
       const projectVars  = config.vars?.[`${pluginKey}:${runeKey}`] ?? {}
       const result = await executePluginRune({
-        pluginDir, runeKey, pluginJson, projectPerms, projectVars, args,
+        pluginDir, pluginCacheDir, runeKey, pluginJson, projectPerms, projectVars, args,
         projectDir: dir, opts: config, runeCallback,
         sections: opts.sections ?? null,
         lifecycle: 'use',
@@ -123,12 +123,12 @@ export async function runRune(dir, config, key, args, opts = {}, _callStack = []
   if (entry.plugin) {
     const aliasMatch = await resolvePluginRune(config, entry.plugin)
     if (!aliasMatch) throw new Error(`Plugin alias "${key}" → "${entry.plugin}" is not enabled or installed.`)
-    const { pluginKey, runeKey, pluginDir } = aliasMatch
+    const { pluginKey, runeKey, pluginDir, pluginCacheDir } = aliasMatch
     const pluginJson   = await loadPluginJson(pluginDir)
     const projectPerms = entry.permissions ?? config.permissions?.[`${pluginKey}:${runeKey}`]
     const projectVars  = entry.vars ?? config.vars?.[`${pluginKey}:${runeKey}`] ?? {}
     const result = await executePluginRune({
-      pluginDir, runeKey, pluginJson, projectPerms, projectVars, args,
+      pluginDir, pluginCacheDir, runeKey, pluginJson, projectPerms, projectVars, args,
       projectDir: dir, opts: config, runeCallback,
       sections: opts.sections ?? null,
       lifecycle: 'use',

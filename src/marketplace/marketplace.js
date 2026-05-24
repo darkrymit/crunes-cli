@@ -97,7 +97,7 @@ async function downloadMarketplaceJson(classified) {
  */
 async function readLocalMarketplace(resolvedPath) {
   const stat = await fs.stat(resolvedPath)
-  const jsonPath = stat.isDirectory() ? path.join(resolvedPath, 'marketplace.json') : resolvedPath
+  const jsonPath = stat.isDirectory() ? path.join(resolvedPath, '.crunes-plugin', 'marketplace.json') : resolvedPath
   const data = JSON.parse(await fs.readFile(jsonPath, 'utf8'))
   const resolvedDir = path.dirname(jsonPath)
   const resolutionBase = path.basename(resolvedDir) === '.crunes-plugin'

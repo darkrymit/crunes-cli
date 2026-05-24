@@ -27,6 +27,7 @@ export async function registerPlugin(entry) {
   registry.plugins[key] = {
     version:              entry.version,
     path:                 entry.path,
+    cacheDir:             entry.cacheDir ?? entry.path,
     local:                entry.local ?? false,
     installedAt:          new Date().toISOString(),
     consentedPermissions: entry.consentedPermissions ?? {},
