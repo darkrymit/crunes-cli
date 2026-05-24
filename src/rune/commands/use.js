@@ -26,6 +26,22 @@ export function parseSegment(argv) {
   }
 
   const key = argv[i] ?? null
+
+  if (key && key.startsWith('-')) {
+    output.error(`Unknown option or misplaced flag: "${key}"`)
+    output.info(`
+Arguments must follow this strict structure:
+  1. Global Flags    (e.g., --cwd, --verbose)
+  2. Command         (e.g., use, check, bench)
+  3. Command Flags   (e.g., --format, -b)
+  4. Rune Key        (e.g., myrune)
+  5. Rune Arguments  (e.g., --strict, pos-arg)
+
+Example: crunes --cwd ./dir use --format json myrune --strict
+`.trimEnd())
+    process.exit(1)
+  }
+
   const runeArgs = key !== null ? argv.slice(i + 1) : []
   return { key, sections, runeArgs }
 }

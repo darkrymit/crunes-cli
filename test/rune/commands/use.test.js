@@ -45,6 +45,22 @@ describe('parseSegment', () => {
     expect(parseSegment(['--section', 'layout', 'api', '--flag', 'val']))
       .toEqual({ key: 'api', sections: ['layout'], runeArgs: ['--flag', 'val'] })
   })
+
+  it('throws an error and exits if the resolved key starts with a hyphen', async () => {
+    const { output } = await import('../../../src/shared/output.js')
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {})
+    const errorSpy = vi.spyOn(output, 'error').mockImplementation(() => {})
+    const infoSpy = vi.spyOn(output, 'info').mockImplementation(() => {})
+    
+    parseSegment(['--cwd', 'foo'])
+    
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('Unknown option or misplaced flag: "--cwd"'))
+    expect(exitSpy).toHaveBeenCalledWith(1)
+    
+    exitSpy.mockRestore()
+    errorSpy.mockRestore()
+    infoSpy.mockRestore()
+  })
 })
 
 describe('parseUseArgs', () => {
