@@ -2,11 +2,12 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { mkdtemp, rm, readFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { createJob, getJob, cleanJobs, listJobs, deleteJob, projectKey, resolveJobId } from '../../../src/job/registry.js'
+import { createJob, getJob, cleanJobs, listJobs, deleteJob, resolveJobId } from '../../../src/job/registry.js'
+import { getProjectKey } from '../../../src/project/index.js'
 import { loadProjects } from '../../../src/project/index.js'
 
 const PROJ = '/proj'
-const PKEY = projectKey(PROJ)
+const PKEY = getProjectKey(PROJ)
 const META = { spawnedBy: 'server', runeKey: 'worker', projectDir: PROJ, args: ['--port', '3000'] }
 
 describe('job registry', () => {

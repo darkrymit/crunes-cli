@@ -2,6 +2,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { resolvePath, canonicalizeLocation, getProjectKey } from './utils.js'
 import { upsertCacheBucket } from '../../cache/index.js'
+import { upsertProject } from '../../project/index.js'
 
 const CACHE_SCOPES = {
   '@plugin-cache':         'plugin',
@@ -94,6 +95,7 @@ export function createCacheUtils(dir, checkPermission, { pluginId = null, storeD
           ? getProjectKey(dir, projectName)
           : null
         await upsertCacheBucket(cacheDir, { scope, projectKey, pluginId: pluginId ?? null, location, name })
+        if (projectKey !== null) await upsertProject(projectKey, dir)
       }
       return makeHandle(cacheDir, checkRead, checkWrite)
     },

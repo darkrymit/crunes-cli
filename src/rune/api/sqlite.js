@@ -3,6 +3,7 @@ import path from 'node:path'
 import Database from 'better-sqlite3'
 import { resolvePath, canonicalizeLocation, getProjectKey } from './utils.js'
 import { upsertSqliteDb } from '../../sqlite/index.js'
+import { upsertProject } from '../../project/index.js'
 
 const SQLITE_SCOPES = {
   '@plugin-sqlite':         'plugin',
@@ -71,6 +72,7 @@ export function createSqliteUtils(dir, checkPermission, { pluginId = null, store
           ? getProjectKey(dir, projectName)
           : null
         await upsertSqliteDb(dbPath, { scope, projectKey, pluginId: pluginId ?? null, location, name })
+        if (projectKey !== null) await upsertProject(projectKey, dir)
       }
       return makeHandle(dbPath, checkRead, checkWrite, connections)
     },

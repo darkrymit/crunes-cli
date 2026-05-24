@@ -1,24 +1,9 @@
-import { readFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { createHash } from 'node:crypto'
 import { getCachePluginDir, getCacheProjectDir, getCacheProjectPluginDir } from '../../cache/index.js'
 import { getSqlitePluginDir, getSqliteProjectDir, getSqliteProjectPluginDir } from '../../sqlite/index.js'
-
-export function shortHash(str) {
-  return createHash('sha1').update(str).digest('hex').slice(0, 8)
-}
-
-export function getProjectKey(dir, name = undefined) {
-  const hash = shortHash(dir)
-  if (typeof name === 'string' && name.length > 0) return `${name}-${hash}`
-  try {
-    const config = JSON.parse(readFileSync(path.join(dir, '.crunes', 'config.json'), 'utf8'))
-    const n = config.name
-    if (typeof n === 'string' && n.length > 0) return `${n}-${hash}`
-  } catch {}
-  return hash
-}
+import { shortHash, getProjectKey } from '../../project/index.js'
+export { shortHash, getProjectKey }
 
 const VIRTUAL_STORE_PREFIXES = [
   '@plugin-cache',

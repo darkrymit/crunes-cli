@@ -1,7 +1,8 @@
-import { listJobs, deleteJob, projectKey, resolveJobId } from '../registry.js'
+import { listJobs, deleteJob, resolveJobId } from '../registry.js'
+import { getProjectKey } from '../../project/index.js'
 
 export async function handler({ id, projectDir, global: isGlobal }) {
-  const key = isGlobal ? undefined : projectKey(projectDir)
+  const key = isGlobal ? undefined : getProjectKey(projectDir)
   const jobs = await listJobs(key)
 
   let resolvedId

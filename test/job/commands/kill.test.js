@@ -2,7 +2,8 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { join } from 'node:path'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { createJob, getJob, projectKey } from '../../../src/job/registry.js'
+import { createJob, getJob } from '../../../src/job/registry.js'
+import { getProjectKey } from '../../../src/project/index.js'
 import { handler } from '../../../src/job/commands/kill.js'
 
 const META = { spawnedBy: 'server', runeKey: 'worker', projectDir: null, args: [] }
@@ -26,7 +27,7 @@ describe('jobs kill handler', () => {
     vi.spyOn(process, 'kill').mockImplementation(() => {})
     await handler({ id, projectDir: '/proj', global: false })
     vi.restoreAllMocks()
-    expect(await getJob(projectKey('/proj'), id)).toBeNull()
+    expect(await getJob(getProjectKey('/proj'), id)).toBeNull()
     expect(logs.join('\n')).toMatch(/worker/)
   })
 
@@ -36,7 +37,7 @@ describe('jobs kill handler', () => {
     vi.spyOn(console, 'log').mockImplementation(() => {})
     await handler({ id: id.slice(0, 8), projectDir: '/proj', global: false })
     vi.restoreAllMocks()
-    expect(await getJob(projectKey('/proj'), id)).toBeNull()
+    expect(await getJob(getProjectKey('/proj'), id)).toBeNull()
   })
 
   it('exits 1 when job not found', async () => {

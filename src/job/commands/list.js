@@ -1,11 +1,12 @@
-import { listJobs, cleanJobs, projectKey, isAlive } from '../registry.js'
+import { listJobs, cleanJobs, isAlive } from '../registry.js'
+import { getProjectKey } from '../../project/index.js'
 
 function pad(str, len) {
   return String(str ?? '-').padEnd(len)
 }
 
 export async function handler({ projectDir, global: isGlobal }) {
-  const key = isGlobal ? undefined : projectKey(projectDir)
+  const key = isGlobal ? undefined : getProjectKey(projectDir)
   await cleanJobs(key)
   const jobs = await listJobs(key)
 

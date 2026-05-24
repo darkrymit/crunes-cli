@@ -1,19 +1,15 @@
 import { readFile, writeFile, mkdir, readdir, rm } from 'node:fs/promises'
 import { join } from 'node:path'
-import { randomUUID, createHash } from 'node:crypto'
+import { randomUUID } from 'node:crypto'
 import { getStorePath } from '../store/index.js'
-import { upsertProject } from '../project/index.js'
-
-export function projectKey(projectDir) {
-  return createHash('sha256').update(projectDir).digest('hex').slice(0, 12)
-}
+import { upsertProject, getProjectKey } from '../project/index.js'
 
 function jobsBase()          { return join(getStorePath(), 'jobs') }
 function projectJobsDir(key) { return join(jobsBase(), 'project', key) }
 function jobPath(key, id)    { return join(projectJobsDir(key), `${id}.json`) }
 
 export async function createJob(pid, { type = 'rune', spawnedBy, runeKey, projectDir, args = [] } = {}) {
-  const key = projectKey(projectDir)
+  const key = getProjectKey(projectDir)
   const id  = randomUUID()
   const record = { id, type, pid, startedAt: new Date().toISOString(), projectKey: key, projectDir, spawnedBy, runeKey, args }
   await mkdir(projectJobsDir(key), { recursive: true })
