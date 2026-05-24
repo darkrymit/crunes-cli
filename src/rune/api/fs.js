@@ -23,6 +23,10 @@ export function createFsUtils(dir, checkPermission, pluginDir = null, pluginId =
       }
     },
 
+    async resolve(relPath = '.') {
+      return resolvePath(relPath, ctx())
+    },
+
     async exists(relPath) {
       const token = canonicalizeLocation(relPath, { dir })
       const abs   = resolvePath(relPath, ctx())
@@ -35,7 +39,7 @@ export function createFsUtils(dir, checkPermission, pluginDir = null, pluginId =
       }
     },
 
-    async glob(pattern, { ignore = [], onlyDirectories = false } = {}) {
+    async glob(pattern, { ignore = [], onlyDirectories = false, dot = false, expandDirectories = false } = {}) {
       if (path.isAbsolute(pattern)) {
         throw new Error('utils.fs.glob does not support absolute patterns — use a relative pattern.')
       }
@@ -44,6 +48,8 @@ export function createFsUtils(dir, checkPermission, pluginDir = null, pluginId =
       const results = await glob(pattern, {
         cwd: dir,
         ignore,
+        dot,
+        expandDirectories,
         onlyFiles: !onlyDirectories,
         onlyDirectories,
       })

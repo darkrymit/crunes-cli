@@ -270,7 +270,7 @@ await fs.read(relPath, { throw: true }?)
 await fs.exists(relPath)
 // → boolean
 
-await fs.glob(pattern, { ignore?: string[], onlyDirectories?: boolean }?)
+await fs.glob(pattern, { ignore?: string[], onlyDirectories?: boolean, dot?: boolean, expandDirectories?: boolean }?)
 // → string[]   (forward-slash paths, relative to project root)
 
 await fs.write(relPath, content)

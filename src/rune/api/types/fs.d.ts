@@ -4,6 +4,12 @@ declare namespace fs {
   function cwd(): string
 
   /**
+   * Resolves a relative path to its absolute path on the host filesystem.
+   * @param relPath Relative path (default: '.')
+   */
+  function resolve(relPath?: string): Promise<string>
+
+  /**
    * Reads a file as a UTF-8 string. Returns null if not found and throw is false.
    * @param path Relative file path
    * @param opts Options
@@ -18,10 +24,13 @@ declare namespace fs {
 
   /**
    * Returns file paths matching a glob pattern. Relative patterns only.
-   * @param pattern Glob pattern (no absolute paths)
-   * @param opts Glob options
+   * @param pattern Glob pattern (e.g., `src/**/*.js`)
+   * @param opts.ignore Array of patterns to ignore
+   * @param opts.onlyDirectories Return directories instead of files
+   * @param opts.dot Include dotfiles and dot-directories in the results
+   * @param opts.expandDirectories Expand directories to include their contents (defaults to false)
    */
-  function glob(pattern: string, opts?: { ignore?: string[]; onlyDirectories?: boolean }): Promise<string[]>
+  function glob(pattern: string, opts?: { ignore?: string[]; onlyDirectories?: boolean; dot?: boolean; expandDirectories?: boolean }): Promise<string[]>
 
   /**
    * Writes content to a file, creating parent directories as needed.

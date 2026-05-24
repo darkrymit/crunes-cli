@@ -65,7 +65,7 @@ export { md, tree }
 
 | Namespace | Methods | Permission token |
 |---|---|---|
-| `fs` | `cwd()`, `read`, `exists`, `glob`, `write`, `copy`, `replace` | `fs.read:`, `fs.write:`, `fs.glob:` |
+| `fs` | `cwd()`, `resolve`, `read`, `exists`, `glob`, `write`, `copy`, `replace` | `fs.read:`, `fs.write:`, `fs.glob:` |
 | `shell` | `(cmd, opts)` | `shell:<cmd-prefix>` |
 | `json` | `read`, `get`, `getAll`, `write`, `modify` | inherits `fs.read:` / `fs.write:` |
 | `yaml` | `read`, `write`, `modify` | inherits `fs.read:` / `fs.write:` |
@@ -155,6 +155,8 @@ The runner calls `args(builder)` before `use(parsedArgs)` and passes the schema 
 - **`isolateTimeoutMs` is per-`eval` call, not total wall-clock:** A rune making many sequential `fs.read` calls can exceed real elapsed time while staying under the per-call limit. If a rune hangs, check for loops over large globs.
 
 - **`fs.glob` `onlyDirectories: true`:** Returns only directories. `onlyFiles: true` (default) returns only files. Both options are passed through to `tinyglobby`. Absolute patterns throw immediately.
+- **`fs.glob` `dot: true`:** Enables matching of hidden dotfiles and dot-directories (e.g. `.git`). Defaults to `false`.
+- **`fs.glob` `expandDirectories: true`:** If a directory matches, automatically search inside it. Defaults to `false` in `crunes-cli` to protect isolate memory limits, unlike standard `tinyglobby` or `fast-glob`.
 
 - **`json.get` returns the first JSONPath match.** Use `json.getAll` for expressions that may match multiple nodes.
 

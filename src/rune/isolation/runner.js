@@ -52,6 +52,9 @@ async function injectUtils(isolate, context, utils, runeCallback, vars, projectD
   await jail.set('$__utils_fs_read', new ivm.Reference(async (relPath, opts) => {
     return utils.fs.read(relPath, opts)
   }))
+  await jail.set('$__utils_fs_resolve', new ivm.Reference(async (relPath) => {
+    return utils.fs.resolve(relPath)
+  }))
   await jail.set('$__utils_fs_exists', new ivm.Reference(async (relPath) => {
     return utils.fs.exists(relPath)
   }))

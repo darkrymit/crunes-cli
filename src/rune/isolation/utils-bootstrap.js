@@ -10,6 +10,7 @@ const __vars = JSON.parse($__vars)
 globalThis.utils = {
   fs: {
     cwd:    ()           => $__projectDir,
+    resolve:(p)          => $__utils_fs_resolve.apply(undefined, [p], { result: { promise: true, copy: true } }),
     read:   (p, o) => $__utils_fs_read.apply(undefined, [p, o], { arguments: { copy: true }, result: { promise: true, copy: true } }),
     exists: (p)    => $__utils_fs_exists.apply(undefined, [p], { result: { promise: true } }),
     glob:   (p, o) => $__utils_fs_glob.apply(undefined, [p, o], { arguments: { copy: true }, result: { promise: true, copy: true } }),
