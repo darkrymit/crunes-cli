@@ -7,7 +7,7 @@ tags: [module]
 
 **Source:** `src/cli/`
 **Submodules:** `commands/` (version, doctor, completions)
-**Related:** [[modules/shared]], [[modules/rune]], [[modules/plugin]], [[modules/marketplace]], [[modules/template]], [[modules/cache]], [[modules/sqlite]], `src/help/`
+**Related:** [[modules/shared]], [[modules/rune]], [[modules/plugin]], [[modules/marketplace]], [[modules/template]], [[modules/cache]], [[modules/sqlite]], `src/docs/`
 
 ## Overview
 
@@ -29,7 +29,7 @@ tags: [module]
 
 - **All command handlers are lazy imports:** Every `.action()` in `program.js` uses `const { handler } = await import('...')`. This keeps the startup parse cycle fast — only the module for the invoked command is actually loaded. Side effect: parse errors in handler modules do not surface until the command fires.
 
-- **`help` is a command group, not a top-level command:** `crunes help rune <key>` is registered as a sub-command of the `help` group (`program.command('help')`). The handler lives in `src/help/commands/rune.js`, not `src/cli/commands/`. `crunes help --help` shows the group; `crunes help rune --help` shows the sub-command options.
+- **`docs` is a command group, not a top-level command:** `crunes docs rune <key>` is registered as a sub-command of the `docs` group (`program.command('docs')`). The handler lives in `src/docs/commands/rune.js`, not `src/cli/commands/`. `crunes docs --help` shows the group; `crunes docs rune --help` shows the sub-command options.
 
 - **`spawnSync` result status fallback to `1`:** `process.exit(result.status ?? 1)` handles the edge case where `spawnSync` returns `null` for the status (signal-killed child). The parent exits non-zero rather than hanging.
 
