@@ -168,7 +168,7 @@ async function updatePlugin(pluginKey, newPluginDir, newPluginJson, projectDir, 
 
   const consentedPermissions = {}
   for (const [key, rune] of Object.entries(newPluginJson.runes)) {
-    consentedPermissions[key] = rune.permissions?.allow ?? []
+    consentedPermissions[key] = collectAllowFromRune(rune)
   }
 
   await registerPlugin({ name, version, path: isLocal ? newPluginDir : cacheDir, consentedPermissions, ...provenance })
