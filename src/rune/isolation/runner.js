@@ -49,14 +49,13 @@ async function injectUtils(isolate, context, utils, runeCallback, vars, projectD
   const jail = context.global
 
   await jail.set('$__utils_fs_read', new ivm.Reference(async (relPath, opts) => {
-    return utils.fs.read(relPath, opts ? JSON.parse(opts) : undefined)
+    return utils.fs.read(relPath, opts)
   }))
   await jail.set('$__utils_fs_exists', new ivm.Reference(async (relPath) => {
     return utils.fs.exists(relPath)
   }))
   await jail.set('$__utils_fs_glob', new ivm.Reference(async (pattern, opts) => {
-    const results = await utils.fs.glob(pattern, opts ? JSON.parse(opts) : undefined)
-    return JSON.stringify(results)
+    return utils.fs.glob(pattern, opts)
   }))
   await jail.set('$__utils_fs_write', new ivm.Reference(async (relPath, content) => {
     return utils.fs.write(relPath, content)
@@ -65,30 +64,24 @@ async function injectUtils(isolate, context, utils, runeCallback, vars, projectD
     await utils.fs.copy(src, dest)
   }))
   await jail.set('$__utils_shell', new ivm.Reference(async (cmd, opts) => {
-    const result = await utils.shell(cmd, opts ? JSON.parse(opts) : undefined)
-    if (typeof result === 'string') return result
-    return JSON.stringify(result)
+    return utils.shell(cmd, opts)
   }))
   await jail.set('$__utils_section_create', new ivm.Reference((name, data, opts) => {
-    return JSON.stringify(utils.section.create(name, JSON.parse(data), opts ? JSON.parse(opts) : undefined))
+    return utils.section.create(name, data, opts)
   }))
-  await jail.set('$__utils_section_match', new ivm.Reference((sectionName, patternsJson) => {
-    const p = patternsJson !== undefined ? JSON.parse(patternsJson) : undefined
-    return utils.section.match(sectionName, p)
+  await jail.set('$__utils_section_match', new ivm.Reference((sectionName, patterns) => {
+    return utils.section.match(sectionName, patterns)
   }))
   await jail.set('$__utils_section_selected', new ivm.Reference(() => {
-    const s = utils.section.selected()
-    return s ? JSON.stringify(s) : undefined
+    return utils.section.selected() ?? undefined
   }))
-  await jail.set('$__utils_rune', new ivm.Reference(async (key, argsJson) => {
-    const sections = await runeCallback(key, argsJson ? JSON.parse(argsJson) : [])
-    return JSON.stringify(sections)
+  await jail.set('$__utils_rune', new ivm.Reference(async (key, args) => {
+    return runeCallback(key, args || [])
   }))
-  await jail.set('$__utils_rune_spawn', new ivm.Reference((key, argsJson) => {
+  await jail.set('$__utils_rune_spawn', new ivm.Reference((key, args) => {
     checkPermission('rune.spawn', key)
-    const args = argsJson ? JSON.parse(argsJson) : []
     const cliPath = process.argv[1]
-    const spawnArgs = ['use', key, '--cwd', projectDir, ...args]
+    const spawnArgs = ['use', key, '--cwd', projectDir, ...(args || [])]
     // Pass --no-node-snapshot directly so cli.js skips its spawnSync re-exec,
     // avoiding a second child process that would create a console window on Windows.
     const child = spawnProcess(process.execPath, ['--no-node-snapshot', cliPath, ...spawnArgs], {
@@ -98,7 +91,7 @@ async function injectUtils(isolate, context, utils, runeCallback, vars, projectD
       env:                { ...process.env, CRUNES_NO_TIMEOUT: '1' },
     })
     child.unref()
-    return createJob(child.pid, { spawnedBy: currentRuneKey, runeKey: key, projectDir, args }).then(({ id, projectKey }) => JSON.stringify({ id, projectKey }))
+    return createJob(child.pid, { spawnedBy: currentRuneKey, runeKey: key, projectDir, args: args || [] }).then(({ id, projectKey }) => ({ id, projectKey }))
   }))
   const pKey = getProjectKey(projectDir)
   await jail.set('$__utils_rune_kill', new ivm.Reference((id, signal) => {
@@ -120,47 +113,42 @@ async function injectUtils(isolate, context, utils, runeCallback, vars, projectD
   await jail.set('$__utils_time_after', new ivm.Reference((ms) => {
     return new Promise(resolve => setTimeout(resolve, ms))
   }))
-  await jail.set('$__utils_json_read', new ivm.Reference(async (relPath, optsJson) => {
-    const result = await utils.json.read(relPath, optsJson ? JSON.parse(optsJson) : undefined)
-    return JSON.stringify(result)
+  await jail.set('$__utils_json_read', new ivm.Reference(async (relPath, opts) => {
+    return utils.json.read(relPath, opts)
   }))
-  await jail.set('$__utils_json_get', new ivm.Reference(async (relPath, jsonPath, defaultJson) => {
-    const result = await utils.json.get(relPath, jsonPath, defaultJson !== undefined ? JSON.parse(defaultJson) : undefined)
-    return JSON.stringify(result)
+  await jail.set('$__utils_json_get', new ivm.Reference(async (relPath, jsonPath, defaultVal) => {
+    return utils.json.get(relPath, jsonPath, defaultVal)
   }))
-  await jail.set('$__utils_json_getAll', new ivm.Reference(async (relPath, jsonPath, defaultJson) => {
-    const result = await utils.json.getAll(relPath, jsonPath, defaultJson !== undefined ? JSON.parse(defaultJson) : undefined)
-    return JSON.stringify(result)
+  await jail.set('$__utils_json_getAll', new ivm.Reference(async (relPath, jsonPath, defaultVal) => {
+    return utils.json.getAll(relPath, jsonPath, defaultVal)
   }))
-  await jail.set('$__utils_json_write', new ivm.Reference(async (relPath, dataJson, optsJson) => {
-    await utils.json.write(relPath, JSON.parse(dataJson), optsJson ? JSON.parse(optsJson) : undefined)
+  await jail.set('$__utils_json_write', new ivm.Reference(async (relPath, data, opts) => {
+    await utils.json.write(relPath, data, opts)
   }))
-  await jail.set('$__utils_yaml_read', new ivm.Reference(async (relPath, optsJson) => {
-    const result = await utils.yaml.read(relPath, optsJson ? JSON.parse(optsJson) : undefined)
-    return JSON.stringify(result)
+  await jail.set('$__utils_yaml_read', new ivm.Reference(async (relPath, opts) => {
+    return utils.yaml.read(relPath, opts)
   }))
-  await jail.set('$__utils_yaml_write', new ivm.Reference(async (relPath, dataJson, optsJson) => {
-    await utils.yaml.write(relPath, JSON.parse(dataJson), optsJson ? JSON.parse(optsJson) : undefined)
+  await jail.set('$__utils_yaml_write', new ivm.Reference(async (relPath, data, opts) => {
+    await utils.yaml.write(relPath, data, opts)
   }))
-  await jail.set('$__utils_xml_read', new ivm.Reference(async (relPath, optsJson) => {
-    const result = await utils.xml.read(relPath, optsJson ? JSON.parse(optsJson) : undefined)
-    return JSON.stringify(result)
+  await jail.set('$__utils_xml_read', new ivm.Reference(async (relPath, opts) => {
+    return utils.xml.read(relPath, opts)
   }))
-  await jail.set('$__utils_xml_write', new ivm.Reference(async (relPath, dataJson, optsJson) => {
-    await utils.xml.write(relPath, JSON.parse(dataJson), optsJson ? JSON.parse(optsJson) : undefined)
+  await jail.set('$__utils_xml_write', new ivm.Reference(async (relPath, data, opts) => {
+    await utils.xml.write(relPath, data, opts)
   }))
-  await jail.set('$__utils_fetch', new ivm.Reference(async (url, optsJson) => {
-    const res = await utils.fetch(url, optsJson ? JSON.parse(optsJson) : undefined)
-    return JSON.stringify({
+  await jail.set('$__utils_fetch', new ivm.Reference(async (url, opts) => {
+    const res = await utils.fetch(url, opts)
+    return {
       ok:         res.ok,
       status:     res.status,
       statusText: res.statusText,
-      headers:    res.headers,
+      headers:    Object.fromEntries(res.headers.entries()),
       _text:      await res.text(),
-    })
+    }
   }))
-  await jail.set('$__utils_env_get', new ivm.Reference(async (key, fallbackJson) => {
-    const result = utils.env.get(key, fallbackJson !== undefined ? JSON.parse(fallbackJson) : undefined)
+  await jail.set('$__utils_env_get', new ivm.Reference(async (key, fallback) => {
+    const result = utils.env.get(key, fallback)
     return result !== undefined ? result : null
   }))
   await jail.set('$__utils_env_has', new ivm.Reference(async (key) => {
@@ -188,16 +176,16 @@ async function injectUtils(isolate, context, utils, runeCallback, vars, projectD
     cacheHandles.set(id, handle)
     return id
   }))
-  await jail.set('$__utils_cache_set', new ivm.Reference(async (id, key, valueJson, ttl) => {
+  await jail.set('$__utils_cache_set', new ivm.Reference(async (id, key, value, ttl) => {
     const handle = cacheHandles.get(id)
     if (!handle) throw new Error(`Invalid cache handle: ${id}`)
-    await handle.set(key, JSON.parse(valueJson), ttl !== null ? Number(ttl) : null)
+    await handle.set(key, value, ttl !== null ? Number(ttl) : null)
   }))
   await jail.set('$__utils_cache_get', new ivm.Reference(async (id, key) => {
     const handle = cacheHandles.get(id)
     if (!handle) throw new Error(`Invalid cache handle: ${id}`)
     const value = await handle.get(key)
-    return value !== null ? JSON.stringify(value) : null
+    return value !== null ? value : null
   }))
   await jail.set('$__utils_cache_delete', new ivm.Reference(async (id, key) => {
     const handle = cacheHandles.get(id)
@@ -219,21 +207,21 @@ async function injectUtils(isolate, context, utils, runeCallback, vars, projectD
     sqliteHandles.set(id, handle)
     return id
   }))
-  await jail.set('$__utils_sqlite_query', new ivm.Reference(async (id, sql, paramsJson) => {
+  await jail.set('$__utils_sqlite_query', new ivm.Reference(async (id, sql, params) => {
     const handle = sqliteHandles.get(id)
     if (!handle) throw new Error(`Invalid sqlite handle: ${id}`)
-    return JSON.stringify(handle.query(sql, paramsJson ? JSON.parse(paramsJson) : []))
+    return handle.query(sql, params || [])
   }))
-  await jail.set('$__utils_sqlite_get', new ivm.Reference(async (id, sql, paramsJson) => {
+  await jail.set('$__utils_sqlite_get', new ivm.Reference(async (id, sql, params) => {
     const handle = sqliteHandles.get(id)
     if (!handle) throw new Error(`Invalid sqlite handle: ${id}`)
-    const row = handle.get(sql, paramsJson ? JSON.parse(paramsJson) : [])
-    return row !== null ? JSON.stringify(row) : null
+    const row = handle.get(sql, params || [])
+    return row !== null ? row : null
   }))
-  await jail.set('$__utils_sqlite_exec', new ivm.Reference(async (id, sql, paramsJson) => {
+  await jail.set('$__utils_sqlite_exec', new ivm.Reference(async (id, sql, params) => {
     const handle = sqliteHandles.get(id)
     if (!handle) throw new Error(`Invalid sqlite handle: ${id}`)
-    return JSON.stringify(handle.exec(sql, paramsJson ? JSON.parse(paramsJson) : []))
+    return handle.exec(sql, params || [])
   }))
   await jail.set('$__utils_sqlite_close', new ivm.Reference(async (id) => {
     const handle = sqliteHandles.get(id)
@@ -242,8 +230,7 @@ async function injectUtils(isolate, context, utils, runeCallback, vars, projectD
     sqliteHandles.delete(id)
   }))
 
-  await jail.set('$__utils_ws_client', new ivm.Reference((url, optionsJson) => {
-    const options = optionsJson !== undefined ? JSON.parse(optionsJson) : undefined
+  await jail.set('$__utils_ws_client', new ivm.Reference((url, options) => {
     return utils.ws.createSession(url, options)
   }))
   await jail.set('$__utils_ws_on', new ivm.Reference((sessionIdRef, eventRef, callbackRef) => {
@@ -388,8 +375,8 @@ export async function runRuneInIsolate(runeFile, effective, args, projectDir, {
     // use(args) always receives a yargs-parser object; args.$raw holds the original array.
     let parsedArgs
     if (await context.eval('typeof __crunes_args !== "undefined"')) {
-      const schemaJson = await context.eval(
-        `(async () => {
+      const schema = await context.evalClosure(
+        `return (async () => {
           const b = (() => {
             const opts = [], pos = [], exs = []
             return {
@@ -399,11 +386,12 @@ export async function runRuneInIsolate(runeFile, effective, args, projectDir, {
               build() { return { options: opts, positionals: pos, examples: exs } }
             }
           })()
-          return JSON.stringify(await __crunes_args(b))
+          return await __crunes_args(b)
         })()`,
-        isolateTimeoutMs !== undefined ? { promise: true, timeout: isolateTimeoutMs } : { promise: true }
+        [],
+        isolateTimeoutMs !== undefined ? { timeout: isolateTimeoutMs, result: { promise: true, copy: true } } : { result: { promise: true, copy: true } }
       )
-      parsedArgs = parseArgs(args, JSON.parse(schemaJson))
+      parsedArgs = parseArgs(args, schema)
     } else {
       parsedArgs = parseArgs(args, null)
     }
@@ -416,16 +404,16 @@ export async function runRuneInIsolate(runeFile, effective, args, projectDir, {
     // __crunes_target and utils are globals set above.
     // context.eval with { promise: true } correctly awaits the async result.
     if (isVerbose) console.error(`[crunes:debug] extracting ${lifecycle}() result...`)
-    const resultJson = await context.eval(
-      `(async () => {
-        const r = await __crunes_target(${JSON.stringify(parsedArgs)});
-        return JSON.stringify(r);
+    const result = await context.evalClosure(
+      `return (async () => {
+        return await __crunes_target($0);
       })()`,
-      { promise: true, timeout: isolateTimeoutMs }
+      [parsedArgs],
+      { arguments: { copy: true }, result: { promise: true, copy: true }, timeout: isolateTimeoutMs }
     )
 
     if (isVerbose) console.error(`[crunes:debug] parsing isolate result...`)
-    return JSON.parse(resultJson)
+    return result
   } finally {
     if (isVerbose) console.error(`[crunes:debug] disposing Isolate...`)
     dispose()
@@ -503,8 +491,8 @@ export async function getArgsSchema(runeFile, effective, projectDir, {
     const hasArgsExport = await context.eval('typeof __crunes_args !== "undefined"')
     if (!hasArgsExport) return null
 
-    const schemaJson = await context.eval(
-      `(async () => {
+    const schema = await context.evalClosure(
+      `return (async () => {
         const b = (() => {
           const opts = [], pos = [], exs = []
           return {
@@ -514,11 +502,12 @@ export async function getArgsSchema(runeFile, effective, projectDir, {
             build() { return { options: opts, positionals: pos, examples: exs } }
           }
         })()
-        return JSON.stringify(await __crunes_args(b))
+        return await __crunes_args(b)
       })()`,
-      { promise: true, timeout: isolateTimeoutMs }
+      [],
+      { timeout: isolateTimeoutMs, result: { promise: true, copy: true } }
     )
-    return JSON.parse(schemaJson)
+    return schema
   } finally {
     dispose()
     isolate.dispose()
