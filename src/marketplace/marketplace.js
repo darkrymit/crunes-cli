@@ -59,7 +59,7 @@ function isLocalPath(source) {
  */
 async function downloadMarketplaceJson(classified) {
   if (classified.type === 'github') {
-    const url = `https://raw.githubusercontent.com/${classified.resolved}/HEAD/marketplace.json`
+    const url = `https://raw.githubusercontent.com/${classified.resolved}/HEAD/.crunes-plugin/marketplace.json`
     const res = await fetch(url, { headers: { 'User-Agent': 'crunes-cli' } })
     if (!res.ok) throw new Error(`Failed to fetch marketplace from GitHub (${classified.resolved}): HTTP ${res.status}`)
     return res.json()
@@ -82,7 +82,7 @@ async function downloadMarketplaceJson(classified) {
       const extractDir = path.join(tmp, 'extracted')
       await fs.mkdir(extractDir, { recursive: true })
       await execFileAsync('tar', ['-xzf', path.join(tmp, tarball), '-C', extractDir, '--strip-components=1'], { shell: process.platform === 'win32' })
-      const raw = await fs.readFile(path.join(extractDir, 'marketplace.json'), 'utf8')
+      const raw = await fs.readFile(path.join(extractDir, '.crunes-plugin', 'marketplace.json'), 'utf8')
       return JSON.parse(raw)
     } finally {
       await fs.rm(tmp, { recursive: true, force: true }).catch(() => {})
