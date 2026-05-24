@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { formatUtilsIndex, formatUtilsNamespace } from '../../src/help/utils-formatter.js'
+import { formatUtilsIndex, formatUtilsNamespace } from '../../src/docs/utils-formatter.js'
 
 const WS_NS = {
   namespace: 'ws',

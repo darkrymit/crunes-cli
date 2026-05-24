@@ -75,6 +75,7 @@ Prefer `crunes use m` — this is a static fallback only.
 - `store` — Centralised path helpers for `~/.crunes/` (or `$CRUNES_STORE`).
 - `cache` — Rune-visible cache store: named key/value buckets backed by JSON files.
 - `sqlite` — Rune-visible SQLite store: named databases in a central index.
+- `docs` — `crunes docs rune` / `crunes docs utils` — rune arg-schema formatting and utils API docs walker.
 - `template` — Rune template listing and scaffolding.
 
 ### Module Documentation

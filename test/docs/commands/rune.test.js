@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { join } from 'node:path'
 import { mkdtemp, rm, mkdir, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { handler } from '../../../src/help/commands/rune.js'
+import { handler } from '../../../src/docs/commands/rune.js'
 
 describe('help rune handler', () => {
   let tmp

@@ -46,9 +46,22 @@ export async function upsertCacheBucket(resolvedPath, { scope, projectKey, plugi
   await writeFile(p, JSON.stringify(data, null, 2), 'utf8')
 }
 
-export async function listCacheBuckets() {
+function scopedBuckets(data, projectKey) {
+  if (projectKey === undefined) return data.buckets
+  return Object.fromEntries(
+    Object.entries(data.buckets).filter(([, e]) =>
+      (e.scope === 'project' || e.scope === 'project-plugin') && e.projectKey === projectKey
+    )
+  )
+}
+
+export async function listCacheBuckets(projectKey = undefined) {
   const data = await loadCacheBuckets()
-  return Object.entries(data.buckets).map(([key, entry]) => ({ key, ...entry }))
+  const entries = Object.entries(data.buckets).map(([key, entry]) => ({ key, ...entry }))
+  if (projectKey === undefined) return entries
+  return entries.filter(e =>
+    (e.scope === 'project' || e.scope === 'project-plugin') && e.projectKey === projectKey
+  )
 }
 
 export function resolveKey(id, buckets) {
@@ -59,9 +72,9 @@ export function resolveKey(id, buckets) {
   throw new Error(`Ambiguous id "${id}" — matches: ${matches.join(', ')}.`)
 }
 
-export async function clearCacheBucket(id) {
+export async function clearCacheBucket(id, projectKey = undefined) {
   const data = await loadCacheBuckets()
-  const key = resolveKey(id, data.buckets)
+  const key = resolveKey(id, scopedBuckets(data, projectKey))
   const { path: bucketPath, name } = data.buckets[key]
   let removed = 0
   try {
@@ -87,9 +100,9 @@ export async function clearCacheBucket(id) {
   return { removed, name }
 }
 
-export async function deleteCacheKey(id, keyName) {
+export async function deleteCacheKey(id, keyName, projectKey = undefined) {
   const data = await loadCacheBuckets()
-  const key = resolveKey(id, data.buckets)
+  const key = resolveKey(id, scopedBuckets(data, projectKey))
   const { path: bucketPath, name } = data.buckets[key]
   try {
     await rm(path.join(bucketPath, `${keyName}.json`))
@@ -100,9 +113,9 @@ export async function deleteCacheKey(id, keyName) {
   return { name }
 }
 
-export async function deleteCacheBucket(id) {
+export async function deleteCacheBucket(id, projectKey = undefined) {
   const data = await loadCacheBuckets()
-  const key = resolveKey(id, data.buckets)
+  const key = resolveKey(id, scopedBuckets(data, projectKey))
   const { path: bucketPath, name } = data.buckets[key]
   await rm(bucketPath, { recursive: true, force: true })
   delete data.buckets[key]

@@ -1,11 +1,13 @@
 import { querySqliteDb } from '../index.js'
+import { getProjectKey } from '../../project/index.js'
 
 function pad(s, n) { return String(s ?? '').padEnd(n) }
 
-export async function handler({ id, sql }) {
+export async function handler({ id, sql, projectDir, global: isGlobal }) {
+  const key = isGlobal ? undefined : getProjectKey(projectDir)
   let rows
   try {
-    rows = await querySqliteDb(id, sql)
+    rows = await querySqliteDb(id, sql, key)
   } catch (err) {
     console.error(`Error: ${err.message}`)
     process.exit(1)

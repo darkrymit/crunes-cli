@@ -53,14 +53,14 @@ export function buildProgram() {
       await handler({ segments, format, failFast, projectRoot: projectRoot(), configRoot: configRoot() })
     })
 
-  const helpGroup = program.command('help').description('Show documentation for runes and other resources')
+  const helpGroup = program.command('docs').description('Show documentation for runes and other resources')
 
   helpGroup
     .command('rune <rune...>')
     .description('Show usage, argument schema, and examples for one or more runes')
     .addOption(new Option('--format <format>', 'output format').choices(['md', 'json']).default('md'))
     .action(async (keys, opts) => {
-      const { handler } = await import('../help/commands/rune.js')
+      const { handler } = await import('../docs/commands/rune.js')
       await handler({ keys, format: opts.format, projectRoot: projectRoot(), configRoot: configRoot() })
     })
 
@@ -69,7 +69,7 @@ export function buildProgram() {
     .description('Show function signatures and parameter docs for utils.* namespaces')
     .addOption(new Option('--format <format>', 'output format').choices(['md', 'json']).default('md'))
     .action(async (namespaces, opts) => {
-      const { handler } = await import('../help/commands/utils.js')
+      const { handler } = await import('../docs/commands/utils.js')
       await handler({ namespaces, format: opts.format })
     })
 
@@ -138,8 +138,8 @@ export function buildProgram() {
       await handler({ format: opts.format, plain: !!program.opts().plain, projectRoot: projectRoot(), configRoot: configRoot() })
     })
 
-  // Jobs management commands
-  const jobs = program.command('jobs').description('Manage background jobs')
+  // Job management commands
+  const jobs = program.command('job').description('Manage background jobs')
 
   jobs
     .command('list')
@@ -164,34 +164,38 @@ export function buildProgram() {
 
   cache
     .command('list')
-    .description('List all registered cache buckets')
-    .action(async () => {
+    .description('List cache buckets for the current project')
+    .option('-g, --global', 'list all cache buckets across all projects and plugins')
+    .action(async (opts) => {
       const { handler } = await import('../cache/commands/list.js')
-      await handler()
+      await handler({ projectDir: projectRoot(), global: !!opts.global })
     })
 
   cache
     .command('clear <id>')
     .description('Remove expired keys from a cache bucket')
-    .action(async (id) => {
+    .option('-g, --global', 'resolve the id across all projects')
+    .action(async (id, opts) => {
       const { handler } = await import('../cache/commands/clear.js')
-      await handler({ id })
+      await handler({ id, projectDir: projectRoot(), global: !!opts.global })
     })
 
   cache
     .command('delete <id>')
     .description('Delete a cache bucket directory and deregister it')
-    .action(async (id) => {
+    .option('-g, --global', 'resolve the id across all projects')
+    .action(async (id, opts) => {
       const { handler } = await import('../cache/commands/delete.js')
-      await handler({ id, yes: !!program.opts().yes })
+      await handler({ id, projectDir: projectRoot(), yes: !!program.opts().yes, global: !!opts.global })
     })
 
   cache
     .command('unset <id> <key>')
     .description('Remove a single key from a cache bucket')
-    .action(async (id, key) => {
+    .option('-g, --global', 'resolve the id across all projects')
+    .action(async (id, key, opts) => {
       const { handler } = await import('../cache/commands/unset.js')
-      await handler({ id, key })
+      await handler({ id, key, projectDir: projectRoot(), global: !!opts.global })
     })
 
   // SQLite management commands
@@ -200,25 +204,28 @@ export function buildProgram() {
   sqlite
     .command('list')
     .description('List all registered SQLite databases')
-    .action(async () => {
+    .option('-g, --global', 'List databases from all projects (default: current project only)')
+    .action(async (opts) => {
       const { handler } = await import('../sqlite/commands/list.js')
-      await handler()
+      await handler({ projectDir: projectRoot(), global: !!opts.global })
     })
 
   sqlite
     .command('delete <id>')
     .description('Delete a SQLite database file and deregister it')
-    .action(async (id) => {
+    .option('-g, --global', 'Match databases from all projects (default: current project only)')
+    .action(async (id, opts) => {
       const { handler } = await import('../sqlite/commands/delete.js')
-      await handler({ id, yes: !!program.opts().yes })
+      await handler({ id, yes: !!program.opts().yes, projectDir: projectRoot(), global: !!opts.global })
     })
 
   sqlite
     .command('query <id> <sql>')
     .description('Run a SQL query against a registered SQLite database (readonly)')
-    .action(async (id, sql) => {
+    .option('-g, --global', 'Match databases from all projects (default: current project only)')
+    .action(async (id, sql, opts) => {
       const { handler } = await import('../sqlite/commands/query.js')
-      await handler({ id, sql })
+      await handler({ id, sql, projectDir: projectRoot(), global: !!opts.global })
     })
 
   program

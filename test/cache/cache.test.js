@@ -92,6 +92,27 @@ describe('cache index', () => {
     expect(list[0].key).toMatch(/^default-[0-9a-f]{12}$/)
     expect(list[0].path).toBe(bucketPath)
   })
+
+  it('listCacheBuckets(projectKey) returns only matching entries', async () => {
+    const p1 = join(tmp, 'caches', 'projects', PROJ_KEY, 'a')
+    const p2 = join(tmp, 'caches', 'projects', 'other-key', 'b')
+    const p3 = join(tmp, 'caches', 'plugins', 'my-plugin', 'c')
+    await upsertCacheBucket(p1, { scope: 'project', projectKey: PROJ_KEY, pluginId: null, location: '@project-cache', name: 'a' })
+    await upsertCacheBucket(p2, { scope: 'project', projectKey: 'other-key', pluginId: null, location: '@project-cache', name: 'b' })
+    await upsertCacheBucket(p3, { scope: 'plugin', projectKey: null, pluginId: 'my-plugin', location: '@plugin-cache', name: 'c' })
+    const list = await listCacheBuckets(PROJ_KEY)
+    expect(list).toHaveLength(1)
+    expect(list[0].name).toBe('a')
+  })
+
+  it('listCacheBuckets() with no arg returns all entries', async () => {
+    const p1 = join(tmp, 'caches', 'projects', PROJ_KEY, 'a')
+    const p2 = join(tmp, 'caches', 'projects', 'other-key', 'b')
+    await upsertCacheBucket(p1, { scope: 'project', projectKey: PROJ_KEY, pluginId: null, location: '@project-cache', name: 'a' })
+    await upsertCacheBucket(p2, { scope: 'project', projectKey: 'other-key', pluginId: null, location: '@project-cache', name: 'b' })
+    const list = await listCacheBuckets()
+    expect(list).toHaveLength(2)
+  })
 })
 
 describe('cache index — management operations', () => {
@@ -194,5 +215,21 @@ describe('cache index — management operations', () => {
     expect(result.name).toBe('default')
     await expect(access(bucketPath)).rejects.toThrow()
     expect(Object.keys((await loadCacheBuckets()).buckets)).toHaveLength(0)
+  })
+
+  it('clearCacheBucket rejects an id from a different project', async () => {
+    const bucketPath = join(tmp, 'caches', 'projects', 'other-key', 'default')
+    await upsertCacheBucket(bucketPath, { scope: 'project', projectKey: 'other-key', pluginId: null, location: '@project-cache', name: 'default' })
+    const data = await loadCacheBuckets()
+    const id = Object.keys(data.buckets)[0]
+    await expect(clearCacheBucket(id, PROJ_KEY)).rejects.toThrow(/No cache bucket matching/)
+  })
+
+  it('deleteCacheBucket rejects an id from a different project', async () => {
+    const bucketPath = join(tmp, 'caches', 'projects', 'other-key', 'def')
+    await upsertCacheBucket(bucketPath, { scope: 'project', projectKey: 'other-key', pluginId: null, location: '@project-cache', name: 'def' })
+    const data = await loadCacheBuckets()
+    const id = Object.keys(data.buckets)[0]
+    await expect(deleteCacheBucket(id, PROJ_KEY)).rejects.toThrow(/No cache bucket matching/)
   })
 })

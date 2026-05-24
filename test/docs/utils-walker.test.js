@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { walkUtilsDocs } from '../../src/help/utils-walker.js'
+import { walkUtilsDocs } from '../../src/docs/utils-walker.js'
 
 // Minimal TypeDoc JSON fixture representing the ws namespace
 const FIXTURE = {

@@ -91,6 +91,26 @@ describe('sqlite index', () => {
     expect(list[0].key).toMatch(/^default-[0-9a-f]{12}$/)
     expect(list[0].path).toBe(dbPath)
   })
+
+  it('listSqliteDbs(projectKey) returns only matching entries', async () => {
+    const p1 = join(tmp, 'sqlite', 'projects', PROJ_KEY, 'a.sqlite')
+    const p2 = join(tmp, 'sqlite', 'projects', 'other-key', 'b.sqlite')
+    const p3 = join(tmp, 'sqlite', 'plugins', 'my-plugin', 'c.sqlite')
+    await upsertSqliteDb(p1, { scope: 'project', projectKey: PROJ_KEY, pluginId: null, location: '@project-sqlite', name: 'a' })
+    await upsertSqliteDb(p2, { scope: 'project', projectKey: 'other-key', pluginId: null, location: '@project-sqlite', name: 'b' })
+    await upsertSqliteDb(p3, { scope: 'plugin', projectKey: null, pluginId: 'my-plugin', location: '@plugin-sqlite', name: 'c' })
+    const list = await listSqliteDbs(PROJ_KEY)
+    expect(list).toHaveLength(1)
+    expect(list[0].name).toBe('a')
+  })
+
+  it('listSqliteDbs() with no arg returns all entries', async () => {
+    const p1 = join(tmp, 'sqlite', 'projects', PROJ_KEY, 'a.sqlite')
+    const p2 = join(tmp, 'sqlite', 'projects', 'other-key', 'b.sqlite')
+    await upsertSqliteDb(p1, { scope: 'project', projectKey: PROJ_KEY, pluginId: null, location: '@project-sqlite', name: 'a' })
+    await upsertSqliteDb(p2, { scope: 'project', projectKey: 'other-key', pluginId: null, location: '@project-sqlite', name: 'b' })
+    expect(await listSqliteDbs()).toHaveLength(2)
+  })
 })
 
 describe('sqlite index — management operations', () => {
@@ -183,5 +203,27 @@ describe('sqlite index — management operations', () => {
     const data = await loadSqliteDbs()
     const key = Object.keys(data.databases)[0]
     expect(await querySqliteDb(key, 'SELECT * FROM t')).toEqual([])
+  })
+
+  it('deleteSqliteDb rejects an id from a different project', async () => {
+    const { mkdir: mk, writeFile: wf } = await import('node:fs/promises')
+    const dbPath = join(tmp, 'sqlite', 'projects', 'other-key', 'x.sqlite')
+    await mk(join(tmp, 'sqlite', 'projects', 'other-key'), { recursive: true })
+    await wf(dbPath, '')
+    await upsertSqliteDb(dbPath, { scope: 'project', projectKey: 'other-key', pluginId: null, location: '@project-sqlite', name: 'x' })
+    const data = await loadSqliteDbs()
+    const id = Object.keys(data.databases)[0]
+    await expect(deleteSqliteDb(id, PROJ_KEY)).rejects.toThrow(/No SQLite database matching/)
+  })
+
+  it('querySqliteDb rejects an id from a different project', async () => {
+    const { mkdir: mk, writeFile: wf } = await import('node:fs/promises')
+    const dbPath = join(tmp, 'sqlite', 'projects', 'other-key', 'y.sqlite')
+    await mk(join(tmp, 'sqlite', 'projects', 'other-key'), { recursive: true })
+    await wf(dbPath, '')
+    await upsertSqliteDb(dbPath, { scope: 'project', projectKey: 'other-key', pluginId: null, location: '@project-sqlite', name: 'y' })
+    const data = await loadSqliteDbs()
+    const id = Object.keys(data.databases)[0]
+    await expect(querySqliteDb(id, 'SELECT 1', PROJ_KEY)).rejects.toThrow(/No SQLite database matching/)
   })
 })

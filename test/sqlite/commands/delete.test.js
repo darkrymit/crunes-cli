@@ -3,6 +3,7 @@ import { mkdtemp, rm, mkdir, writeFile, access } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { upsertSqliteDb, loadSqliteDbs } from '../../../src/sqlite/index.js'
+import { getProjectKey } from '../../../src/project/index.js'
 import { handler } from '../../../src/sqlite/commands/delete.js'
 
 const PROJ_KEY = 'abc123def456'
@@ -27,7 +28,7 @@ describe('sqlite delete handler', () => {
     await upsertSqliteDb(dbPath, { scope: 'project', projectKey: PROJ_KEY, pluginId: null, location: '@project-sqlite', name: 'notes' })
     const { databases } = await loadSqliteDbs()
     const id = Object.keys(databases)[0]
-    await handler({ id, yes: true })
+    await handler({ id, yes: true, projectDir: tmp, global: true })
     await expect(access(dbPath)).rejects.toThrow()
     expect(console.log).toHaveBeenCalledWith(expect.stringContaining('Deleted SQLite database'))
     expect(Object.keys((await loadSqliteDbs()).databases)).toHaveLength(0)
@@ -36,7 +37,20 @@ describe('sqlite delete handler', () => {
   it('exits 1 on unknown id', async () => {
     const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => { throw new Error('exit') })
     vi.spyOn(console, 'error').mockImplementation(() => {})
-    await expect(handler({ id: 'nope', yes: true })).rejects.toThrow('exit')
+    await expect(handler({ id: 'nope', yes: true, projectDir: tmp, global: true })).rejects.toThrow('exit')
+    exitSpy.mockRestore()
+  })
+
+  it('rejects cross-project delete when global: false', async () => {
+    const dbPath = join(tmp, 'sqlite', 'projects', 'other-key', 'x.sqlite')
+    await mkdir(join(tmp, 'sqlite', 'projects', 'other-key'), { recursive: true })
+    await writeFile(dbPath, '')
+    await upsertSqliteDb(dbPath, { scope: 'project', projectKey: 'other-key', pluginId: null, location: '@project-sqlite', name: 'x' })
+    const { databases } = await loadSqliteDbs()
+    const id = Object.keys(databases)[0]
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => { throw new Error('exit') })
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    await expect(handler({ id, yes: true, projectDir: tmp, global: false })).rejects.toThrow('exit')
     exitSpy.mockRestore()
   })
 })

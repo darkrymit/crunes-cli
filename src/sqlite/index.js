@@ -47,9 +47,18 @@ export async function upsertSqliteDb(resolvedPath, { scope, projectKey, pluginId
   await writeFile(p, JSON.stringify(data, null, 2), 'utf8')
 }
 
-export async function listSqliteDbs() {
+function scopedDatabases(data, projectKey) {
+  if (projectKey === undefined) return data.databases
+  return Object.fromEntries(
+    Object.entries(data.databases).filter(([, e]) =>
+      (e.scope === 'project' || e.scope === 'project-plugin') && e.projectKey === projectKey
+    )
+  )
+}
+
+export async function listSqliteDbs(projectKey = undefined) {
   const data = await loadSqliteDbs()
-  return Object.entries(data.databases).map(([key, entry]) => ({ key, ...entry }))
+  return Object.entries(scopedDatabases(data, projectKey)).map(([key, entry]) => ({ key, ...entry }))
 }
 
 export function resolveKey(id, databases) {
@@ -60,9 +69,9 @@ export function resolveKey(id, databases) {
   throw new Error(`Ambiguous id "${id}" — matches: ${matches.join(', ')}.`)
 }
 
-export async function deleteSqliteDb(id) {
+export async function deleteSqliteDb(id, projectKey = undefined) {
   const data = await loadSqliteDbs()
-  const key = resolveKey(id, data.databases)
+  const key = resolveKey(id, scopedDatabases(data, projectKey))
   const { path: dbPath, name } = data.databases[key]
   await rm(dbPath, { force: true })
   await rm(dbPath + '-wal', { force: true })
@@ -74,9 +83,9 @@ export async function deleteSqliteDb(id) {
   return { name }
 }
 
-export async function querySqliteDb(id, sql) {
+export async function querySqliteDb(id, sql, projectKey = undefined) {
   const data = await loadSqliteDbs()
-  const key = resolveKey(id, data.databases)
+  const key = resolveKey(id, scopedDatabases(data, projectKey))
   const { path: dbPath } = data.databases[key]
   const db = new Database(dbPath, { readonly: true })
   try {

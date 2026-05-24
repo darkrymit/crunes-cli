@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { formatHelp } from '../../src/help/formatter.js'
+import { formatHelp } from '../../src/docs/formatter.js'
 
 describe('formatHelp', () => {
   it('includes usage line with rune key', () => {

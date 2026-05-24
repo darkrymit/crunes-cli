@@ -1,20 +1,35 @@
 import { listCacheBuckets } from '../index.js'
+import { getProjectKey, loadProjects } from '../../project/index.js'
 
 function pad(s, n) { return String(s ?? '-').padEnd(n) }
 
-function projectPlugin(entry) {
-  if (entry.scope === 'project') return entry.projectKey ?? '-'
-  if (entry.scope === 'plugin') return entry.pluginId ?? '-'
-  if (entry.scope === 'project-plugin') return `${entry.projectKey}/${entry.pluginId}`
-  return '-'
-}
+export async function handler({ projectDir, global: isGlobal }) {
+  const key = isGlobal ? undefined : getProjectKey(projectDir)
+  const buckets = await listCacheBuckets(key)
 
-export async function handler() {
-  const buckets = await listCacheBuckets()
+  let projectPaths = {}
+  if (isGlobal) {
+    const { projects } = await loadProjects()
+    projectPaths = projects
+  }
+
   if (buckets.length === 0) {
     console.log('No cache buckets.')
     return
   }
+
+  function projectPlugin(entry) {
+    if (entry.scope === 'project') {
+      return projectPaths[entry.projectKey] ?? entry.projectKey ?? '-'
+    }
+    if (entry.scope === 'plugin') return entry.pluginId ?? '-'
+    if (entry.scope === 'project-plugin') {
+      const proj = projectPaths[entry.projectKey] ?? entry.projectKey
+      return `${proj}/${entry.pluginId}`
+    }
+    return '-'
+  }
+
   const cols = ['KEY', 'NAME', 'SCOPE', 'PROJECT/PLUGIN', 'FIRST SEEN']
   const rows = buckets.map(b => [
     b.key,

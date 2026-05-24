@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { handler } from '../../../src/help/commands/utils.js'
+import { handler } from '../../../src/docs/commands/utils.js'
 
 describe('help utils handler', () => {
   let written

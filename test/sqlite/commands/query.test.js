@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import Database from 'better-sqlite3'
 import { upsertSqliteDb, loadSqliteDbs } from '../../../src/sqlite/index.js'
+import { getProjectKey } from '../../../src/project/index.js'
 import { handler } from '../../../src/sqlite/commands/query.js'
 
 const PROJ_KEY = 'abc123def456'
@@ -35,7 +36,7 @@ describe('sqlite query handler', () => {
 
   it('prints column headers and data rows', async () => {
     const id = await makeDb()
-    await handler({ id, sql: 'SELECT * FROM t' })
+    await handler({ id, sql: 'SELECT * FROM t', projectDir: tmp, global: true })
     const lines = console.log.mock.calls.map(c => c[0])
     expect(lines.some(l => l.includes('id') && l.includes('val'))).toBe(true)
     expect(lines.some(l => l.includes('hello'))).toBe(true)
@@ -43,14 +44,22 @@ describe('sqlite query handler', () => {
 
   it('prints "No rows." when query returns nothing', async () => {
     const id = await makeDb()
-    await handler({ id, sql: 'SELECT * FROM t WHERE id = 999' })
+    await handler({ id, sql: 'SELECT * FROM t WHERE id = 999', projectDir: tmp, global: true })
     expect(console.log).toHaveBeenCalledWith('No rows.')
   })
 
   it('exits 1 on unknown id', async () => {
     const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => { throw new Error('exit') })
     vi.spyOn(console, 'error').mockImplementation(() => {})
-    await expect(handler({ id: 'nope', sql: 'SELECT 1' })).rejects.toThrow('exit')
+    await expect(handler({ id: 'nope', sql: 'SELECT 1', projectDir: tmp, global: true })).rejects.toThrow('exit')
+    exitSpy.mockRestore()
+  })
+
+  it('rejects cross-project query when global: false', async () => {
+    const id = await makeDb()
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => { throw new Error('exit') })
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    await expect(handler({ id, sql: 'SELECT * FROM t', projectDir: tmp, global: false })).rejects.toThrow('exit')
     exitSpy.mockRestore()
   })
 })

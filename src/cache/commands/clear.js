@@ -1,9 +1,11 @@
 import { clearCacheBucket } from '../index.js'
+import { getProjectKey } from '../../project/index.js'
 
-export async function handler({ id }) {
+export async function handler({ id, projectDir, global: isGlobal }) {
+  const key = isGlobal ? undefined : getProjectKey(projectDir)
   let result
   try {
-    result = await clearCacheBucket(id)
+    result = await clearCacheBucket(id, key)
   } catch (err) {
     console.error(`Error: ${err.message}`)
     process.exit(1)
