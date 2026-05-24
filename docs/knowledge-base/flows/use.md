@@ -46,7 +46,7 @@ crunes use [--format md|json] [--fail-fast] [--section s1,s2] <key> [rune-args..
                  shell, section (create, match, selected), rune
                  json (read, get, getAll, write)
                  yaml (read, write), xml (read, write)
-                 fetch, env (get, has)
+                 http (fetch), env (read, has), vars (read, has)
                  archive (unzip, zip, untar, tar)
                  cache (open, set, get, delete, clear)
                  sqlite (open, query, get, exec, close)

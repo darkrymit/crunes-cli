@@ -16,11 +16,11 @@ export function createEnvUtils(dir, checkPermission, permissions) {
 
   function resolve(key) {
     for (const pattern of permissions.allow) {
-      if (!pattern.startsWith('env:')) continue
+      if (!pattern.startsWith('env.read:')) continue
       const { source, keyPattern } = parseEnvPattern(pattern)
       if (!micromatch.isMatch(key, keyPattern)) continue
       try {
-        if (checkPermission) checkPermission('env', `${source}:${key}`)
+        if (checkPermission) checkPermission('env.read', `${source}:${key}`)
       } catch {
         continue
       }
@@ -31,7 +31,7 @@ export function createEnvUtils(dir, checkPermission, permissions) {
   }
 
   return {
-    get: (key, fallback = undefined) => resolve(key) ?? fallback,
+    read: (key, fallback = undefined) => resolve(key) ?? fallback,
     has: (key) => resolve(key) !== undefined,
   }
 }

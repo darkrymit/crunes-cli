@@ -76,19 +76,19 @@ export function computeEffectivePermissions(pluginPerms, projectPerms, lifecycle
  */
 export function makePermissionChecker(effective) {
   return function checkPermission(capability, value) {
-    if (capability === 'ws') {
+    if (capability === 'ws.client') {
       const allowed = effective.allow.some(p => matchWsPermission(value, p))
       const denied  = effective.deny.length > 0 && effective.deny.some(p => matchWsPermission(value, p))
       if (!allowed || denied) throw new PermissionError(capability, value)
       return
     }
-    if (capability === 'fetch') {
+    if (capability === 'http.fetch') {
       const allowed = effective.allow.some(p => matchFetchPermission(value, p))
       const denied  = effective.deny.length > 0 && effective.deny.some(p => matchFetchPermission(value, p))
       if (!allowed || denied) throw new PermissionError(capability, value)
       return
     }
-    if (capability === 'env') {
+    if (capability === 'env.read') {
       const allowed = effective.allow.some(p => matchEnvPermission(value, p))
       const denied  = effective.deny.length > 0 && effective.deny.some(p => matchEnvPermission(value, p))
       if (!allowed || denied) throw new PermissionError(capability, value)

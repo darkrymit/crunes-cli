@@ -5,7 +5,7 @@ declare namespace vars {
    * @param key Variable name
    * @param fallback Default value
    */
-  function get(key: string, fallback?: unknown): unknown
+  function read(key: string, fallback?: unknown): unknown
 
   /**
    * Returns true if the variable is defined in the rune config.

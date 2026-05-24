@@ -5,7 +5,7 @@ import { createShellUtils } from './shell.js'
 import { createJsonUtils } from './json.js'
 import { createYamlUtils } from './yaml.js'
 import { createXmlUtils } from './xml.js'
-import { createFetchUtils } from './fetch.js'
+import { createHttpUtils } from './http.js'
 import { createEnvUtils } from './env.js'
 import { createVarsUtils } from './vars.js'
 import { createArchiveUtils } from './archive.js'
@@ -43,7 +43,7 @@ export function createUtils(dir, checkPermission = null, pluginDir = null, permi
     json:    createJsonUtils(dir, fs),
     yaml:    createYamlUtils(dir, fs),
     xml:     createXmlUtils(dir, fs),
-    fetch:   createFetchUtils(checkPermission),
+    http:    createHttpUtils(checkPermission),
     env:     createEnvUtils(dir, checkPermission, permissions),
     vars:    createVarsUtils(vars),
     archive: createArchiveUtils(dir, checkPermission),

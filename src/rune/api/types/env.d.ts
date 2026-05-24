@@ -5,7 +5,7 @@ declare namespace env {
    * @param key Environment variable name
    * @param fallback Value returned if key is absent
    */
-  function get(key: string, fallback?: unknown): Promise<string | unknown>
+  function read(key: string, fallback?: unknown): Promise<string | unknown>
 
   /**
    * Returns true if the environment variable exists and is permitted.

@@ -99,25 +99,27 @@ globalThis.utils = {
       await globalThis.utils.xml.write(filepath, result !== undefined ? result : data, { indent })
     },
   },
-  fetch: (url, opts) => $__utils_fetch
-    .apply(undefined, [url, opts], { arguments: { copy: true }, result: { promise: true, copy: true } })
-    .then(res => ({
-      ok:         res.ok,
-      status:     res.status,
-      statusText: res.statusText,
-      headers:    res.headers,
-      text:       () => Promise.resolve(res._text),
-      json:       () => Promise.resolve(JSON.parse(res._text)),
-    })),
+  http: {
+    fetch: (url, opts) => $__utils_http_fetch
+      .apply(undefined, [url, opts], { arguments: { copy: true }, result: { promise: true, copy: true } })
+      .then(res => ({
+        ok:         res.ok,
+        status:     res.status,
+        statusText: res.statusText,
+        headers:    res.headers,
+        text:       () => Promise.resolve(res._text),
+        json:       () => Promise.resolve(JSON.parse(res._text)),
+      })),
+  },
   env: {
-    get: (key, fallback) => $__utils_env_get
+    read: (key, fallback) => $__utils_env_read
       .apply(undefined, [key, fallback], { arguments: { copy: true }, result: { promise: true, copy: true } })
       .then(r => r !== null ? r : fallback),
     has: (key) => $__utils_env_has
       .apply(undefined, [key], { result: { promise: true } }),
   },
   vars: {
-    get: (key, fallback = undefined) => Object.hasOwn(__vars, key) ? __vars[key] : fallback,
+    read: (key, fallback = undefined) => Object.hasOwn(__vars, key) ? __vars[key] : fallback,
     has: (key) => Object.hasOwn(__vars, key),
   },
   archive: {
@@ -196,5 +198,5 @@ globalThis.utils = {
   tree,
 }
 
-export const { fs, shell, section, rune, json, yaml, xml, fetch, env, vars, archive, cache, sqlite, crypto, ws, time } = globalThis.utils
+export const { fs, shell, section, rune, json, yaml, xml, http, env, vars, archive, cache, sqlite, crypto, ws, time } = globalThis.utils
 export { md, tree }

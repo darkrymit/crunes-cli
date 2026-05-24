@@ -82,13 +82,13 @@ export function createWsUtils(checkPermission) {
   let nextId = 0
 
   return {
-    createSession(url, options) {
-      if (checkPermission) checkPermission('ws', url)
+    client(url, options) {
+      if (checkPermission) checkPermission('ws.client', url)
       const id = nextId++
       sessions.set(id, new WsSession(url, options))
       return id
     },
-    getSession(id) {
+    _getSession(id) {
       const session = sessions.get(id)
       if (!session) throw new Error(`Invalid ws session: ${id}`)
       return session

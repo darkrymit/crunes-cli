@@ -357,7 +357,7 @@ export async function use() {
 `)
     const result = await runRuneInIsolate(
       runeFile,
-      { allow: [`ws:${echoServer.url}/**`, `ws:${echoServer.url}`], deny: [] },
+      { allow: [`ws.client:${echoServer.url}/**`, `ws.client:${echoServer.url}`], deny: [] },
       [],
       tmp,
     )
@@ -402,7 +402,7 @@ export async function use() {
 `)
     const result = await runRuneInIsolate(
       runeFile,
-      { allow: [`ws:${echoServer.url}/**`, `ws:${echoServer.url}`], deny: [] },
+      { allow: [`ws.client:${echoServer.url}/**`, `ws.client:${echoServer.url}`], deny: [] },
       [],
       tmp,
     )
@@ -421,7 +421,7 @@ export async function use() {
 `)
     const result = await runRuneInIsolate(
       runeFile,
-      { allow: [`ws:${echoServer.url}/**`, `ws:${echoServer.url}`], deny: [] },
+      { allow: [`ws.client:${echoServer.url}/**`, `ws.client:${echoServer.url}`], deny: [] },
       [],
       tmp,
     )

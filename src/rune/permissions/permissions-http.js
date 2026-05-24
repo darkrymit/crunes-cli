@@ -1,7 +1,7 @@
 import micromatch from 'micromatch'
 
 export function matchFetchPermission(value, pattern) {
-  const patternBody = pattern.startsWith('fetch:') ? pattern.slice(6) : pattern
+  const patternBody = pattern.startsWith('http.fetch:') ? pattern.slice(11) : pattern
 
   const vColon = value.indexOf(':')
   const pColon = patternBody.indexOf(':')

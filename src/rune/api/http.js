@@ -6,9 +6,9 @@ export class FetchError extends Error {
   }
 }
 
-export function createFetchUtils(checkPermission) {
-  return async function fetch(url, { method = 'GET', headers = {}, body, timeout = 30_000 } = {}) {
-    if (checkPermission) checkPermission('fetch', `${method}:${url}`)
+export function createHttpUtils(checkPermission) {
+  async function fetch(url, { method = 'GET', headers = {}, body, timeout = 30_000 } = {}) {
+    if (checkPermission) checkPermission('http.fetch', `${method}:${url}`)
 
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), timeout)
@@ -30,4 +30,6 @@ export function createFetchUtils(checkPermission) {
       clearTimeout(timer)
     }
   }
+
+  return { fetch }
 }

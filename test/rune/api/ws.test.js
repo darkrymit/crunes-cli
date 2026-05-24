@@ -39,56 +39,56 @@ describe('createWsUtils', () => {
     await stopServer(server)
   })
 
-  it('createSession returns an integer session ID', () => {
+  it('client returns an integer session ID', () => {
     const ws = createWsUtils(null)
-    const id = ws.createSession(server.url)
+    const id = ws.client(server.url)
     expect(typeof id).toBe('number')
   })
 
-  it('getSession returns the session for a valid ID', () => {
+  it('_getSession returns the session for a valid ID', () => {
     const ws = createWsUtils(null)
-    const id = ws.createSession(server.url)
-    expect(ws.getSession(id)).toBeDefined()
+    const id = ws.client(server.url)
+    expect(ws._getSession(id)).toBeDefined()
   })
 
-  it('getSession throws for an invalid ID', () => {
+  it('_getSession throws for an invalid ID', () => {
     const ws = createWsUtils(null)
-    expect(() => ws.getSession(99)).toThrow('Invalid ws session: 99')
+    expect(() => ws._getSession(99)).toThrow('Invalid ws session: 99')
   })
 
-  it('createSession calls checkPermission with ws capability and URL', () => {
+  it('client calls checkPermission with ws.client capability and URL', () => {
     const calls = []
     const check = (cap, val) => calls.push({ cap, val })
     const ws = createWsUtils(check)
-    ws.createSession(server.url)
-    expect(calls).toEqual([{ cap: 'ws', val: server.url }])
+    ws.client(server.url)
+    expect(calls).toEqual([{ cap: 'ws.client', val: server.url }])
   })
 
-  it('createSession propagates PermissionError from checkPermission', () => {
-    const check = () => { throw new PermissionError('ws', server.url) }
+  it('client propagates PermissionError from checkPermission', () => {
+    const check = () => { throw new PermissionError('ws.client', server.url) }
     const ws = createWsUtils(check)
-    expect(() => ws.createSession(server.url)).toThrow(PermissionError)
+    expect(() => ws.client(server.url)).toThrow(PermissionError)
   })
 
   it('open() connects and resolves', async () => {
     const ws = createWsUtils(null)
-    const id = ws.createSession(server.url)
-    const session = ws.getSession(id)
+    const id = ws.client(server.url)
+    const session = ws._getSession(id)
     await expect(session.open()).resolves.toBeUndefined()
     await session.close()
   })
 
   it('open() rejects on invalid URL', async () => {
     const ws = createWsUtils(null)
-    const id = ws.createSession('ws://localhost:1')
-    const session = ws.getSession(id)
+    const id = ws.client('ws://localhost:1')
+    const session = ws._getSession(id)
     await expect(session.open()).rejects.toThrow()
   })
 
   it('open() throws if called on an already-open socket', async () => {
     const ws = createWsUtils(null)
-    const id = ws.createSession(server.url)
-    const session = ws.getSession(id)
+    const id = ws.client(server.url)
+    const session = ws._getSession(id)
     await session.open()
     expect(() => session.open()).toThrow('Cannot open socket in state OPEN')
     await session.close()
@@ -96,8 +96,8 @@ describe('createWsUtils', () => {
 
   it('send() and receive via echo server', async () => {
     const ws = createWsUtils(null)
-    const id = ws.createSession(server.url)
-    const session = ws.getSession(id)
+    const id = ws.client(server.url)
+    const session = ws._getSession(id)
     const received = []
     session.setHandler('message', fakeRef((msg) => { received.push(msg) }))
     await session.open()
@@ -109,15 +109,15 @@ describe('createWsUtils', () => {
 
   it('send() throws when not OPEN', () => {
     const ws = createWsUtils(null)
-    const id = ws.createSession(server.url)
-    const session = ws.getSession(id)
+    const id = ws.client(server.url)
+    const session = ws._getSession(id)
     expect(() => session.send('msg')).toThrow('Cannot send in state CREATED')
   })
 
   it('close() is idempotent — repeated calls return the same promise', async () => {
     const ws = createWsUtils(null)
-    const id = ws.createSession(server.url)
-    const session = ws.getSession(id)
+    const id = ws.client(server.url)
+    const session = ws._getSession(id)
     await session.open()
     const p1 = session.close()
     const p2 = session.close()
@@ -127,15 +127,15 @@ describe('createWsUtils', () => {
 
   it('close() throws when called before open()', () => {
     const ws = createWsUtils(null)
-    const id = ws.createSession(server.url)
-    const session = ws.getSession(id)
+    const id = ws.client(server.url)
+    const session = ws._getSession(id)
     expect(() => session.close()).toThrow('Cannot close socket before opening')
   })
 
   it('on(open) handler is called after successful open', async () => {
     const ws = createWsUtils(null)
-    const id = ws.createSession(server.url)
-    const session = ws.getSession(id)
+    const id = ws.client(server.url)
+    const session = ws._getSession(id)
     let opened = false
     session.setHandler('open', fakeRef(() => { opened = true }))
     await session.open()
@@ -145,8 +145,8 @@ describe('createWsUtils', () => {
 
   it('on(close) handler is called after close', async () => {
     const ws = createWsUtils(null)
-    const id = ws.createSession(server.url)
-    const session = ws.getSession(id)
+    const id = ws.client(server.url)
+    const session = ws._getSession(id)
     let closed = false
     session.setHandler('close', fakeRef(() => { closed = true }))
     await session.open()
@@ -156,8 +156,8 @@ describe('createWsUtils', () => {
 
   it('dispose() terminates all open sessions', async () => {
     const ws = createWsUtils(null)
-    const id = ws.createSession(server.url)
-    const session = ws.getSession(id)
+    const id = ws.client(server.url)
+    const session = ws._getSession(id)
     await session.open()
     ws.dispose()
     expect(session.state).toBe('CLOSED')

@@ -20,7 +20,7 @@ Each segment parsed by `parseSegment` in `commands/use.js` has the form `[--sect
 ## Submodules
 
 - **`isolation/`** — Sandboxed VM lifecycle: create isolate → compile static modules → inject `$__` bridges → compile rune ESM → evaluate → collect sections.
-- **`api/`** — The `utils` object rune authors interact with: `fs`, `shell`, `json`, `fetch`, `env`, `vars`, `md`, `tree`, `section`.
+- **`api/`** — The `utils` object rune authors interact with: `fs`, `shell`, `json`, `http`, `env`, `vars`, `md`, `tree`, `section`.
 - **`permissions/`** — `computeEffectivePermissions` and per-operation checkers (`fs`, `http`, `env`, `shell`).
 - **`commands/`** — CLI handlers: `use`, `list`, `create`, `check`, `bench`. All key-accepting commands share `parseSegment` from `use.js` — syntax is `[--section s1,s2] [prefix:]key [rune-args...]`. `use` supports multiple `+`-separated segments. `bench` requires a key, supports `--runs <n>` to average multiple timed runs, and `--warmup` for a discarded warm-up run.
 
@@ -59,7 +59,7 @@ Each segment parsed by `parseSegment` in `commands/use.js` has the form `[--sect
 
 All namespaces are available as named exports from `@utils` inside the isolate. The full export list from `utils-bootstrap.js` line 164:
 ```js
-export const { fs, shell, section, rune, json, yaml, xml, fetch, env, vars, archive, cache, sqlite, crypto, ws, time } = globalThis.utils
+export const { fs, shell, section, rune, json, yaml, xml, http, env, vars, archive, cache, sqlite, crypto, ws, time } = globalThis.utils
 export { md, tree }
 ```
 
@@ -70,9 +70,9 @@ export { md, tree }
 | `json` | `read`, `get`, `getAll`, `write`, `modify` | inherits `fs.read:` / `fs.write:` |
 | `yaml` | `read`, `write`, `modify` | inherits `fs.read:` / `fs.write:` |
 | `xml` | `read`, `write`, `modify` | inherits `fs.read:` / `fs.write:` |
-| `fetch` | `(url, opts)` | `fetch:<METHOD>:<url>` |
-| `env` | `get`, `has` | `env:<source>:<key-glob>` |
-| `vars` | `get`, `has` | — |
+| `http.fetch` | `(url, opts)` | `http.fetch:<METHOD>:<url>` |
+| `env` | `read`, `has` | `env.read:<source>:<key-glob>` |
+| `vars` | `read`, `has` | — |
 | `md` | Pure markdown builders | — |
 | `tree` | Pure tree builders | — |
 | `section` | `create`, `match`, `selected` | — |
@@ -85,7 +85,7 @@ export { md, tree }
 | `cache` | `open(location, name?)` → handle | `cache.read:`, `cache.write:` |
 | `sqlite` | `open(location, name?)` → db | `sqlite.read:`, `sqlite.write:` |
 | `crypto` | `hash.hex`, `hash.base64`, `uuid`, `hex`, `base64` | — |
-| `ws` | `client(url, opts?) → session` | `ws:<url>` |
+| `ws` | `client(url, opts?) → session` | `ws.client:<url>` |
 | `time` | `after(ms)` | — |
 
 **`fs.replace`** is implemented in `utils-bootstrap.js`, not `api/fs.js` — it's a read+write composite: reads the file, runs `String.replace(regex, replacement)`, writes back.
@@ -166,15 +166,14 @@ The runner calls `args(builder)` before `use(parsedArgs)` and passes the schema 
 
 - **`@project-plugin-cache` / `@project-plugin-sqlite` require a plugin context:** Calling these from a local rune throws `Error: @project-plugin-cache requires a plugin context`. Use `@project-cache` / `@project-sqlite` for local runes.
 
-- **`env.get` only resolves keys that match a declared `env:` permission pattern.** A key not covered by any `allow` pattern returns `undefined` (or the fallback), even if the key exists in `process.env`. There is no "env access denied" error — it silently falls through to the fallback.
-
-- **`env:` permission source is a filename, not `process.env`:** `env:process:KEY` reads `process.env`. `env:.env:KEY` reads the project's `.env` file. Using `env:KEY` (missing the source segment) produces a pattern that never matches and silently returns undefined.
+- **`env.read` only resolves keys that match a declared `env.read:` permission pattern.** A key not covered by any `allow` pattern returns `undefined` (or the fallback), even if the key exists in `process.env`. There is no "env access denied" error — it silently falls through to the fallback.
+- **`env.read:` permission source is a filename, not `process.env`:** `env.read:process:KEY` reads `process.env`. `env.read:.env:KEY` reads the project's `.env` file. Using `env.read:KEY` (missing the source segment) produces a pattern that never matches and silently returns undefined.
 
 - **Lifecycle namespacing is mandatory in permissions:** A flat top-level `{ "allow": [...] }` in `plugin.json` is rejected at install time — `validatePluginJson` throws `plugin.json: rune "X" must have lifecycle-scoped permissions (e.g. permissions.use.allow)`. Project config overrides are not validated the same way and silently produce an empty set if a flat `allow` is used there.
 
 - **`normalizePermission` prepends `./`:** `fs.read:package.json` is normalized to `fs.read:./package.json`. A permission declared as `fs.read:./package.json` and a check for `package.json` (without `./`) will NOT match. Always use the normalized path in permission tokens.
 
-- **`fetch:` and `env:` use custom matchers, not micromatch:** Do not add fetch or env patterns to the micromatch allow array. They are checked by `matchFetchPermission` and `matchEnvPermission` before the micromatch pass.
+- **`http.fetch:` and `env.read:` use custom matchers, not micromatch:** Do not add fetch or env patterns to the micromatch allow array. They are checked by `matchFetchPermission` and `matchEnvPermission` before the micromatch pass.
 
 - **Shell permission matching is exact-prefix:** `shell:git log *` allows `git log --oneline -10` but not `git status`. The pattern is matched as a prefix against the full command string.
 

@@ -173,8 +173,8 @@ async function injectUtils(isolate, context, utils, runeCallback, vars, projectD
   await jail.set('$__utils_xml_write', new ivm.Reference(async (relPath, data, opts) => {
     await utils.xml.write(relPath, data, opts)
   }))
-  await jail.set('$__utils_fetch', new ivm.Reference(async (url, opts) => {
-    const res = await utils.fetch(url, opts)
+  await jail.set('$__utils_http_fetch', new ivm.Reference(async (url, opts) => {
+    const res = await utils.http.fetch(url, opts)
     return {
       ok:         res.ok,
       status:     res.status,
@@ -183,8 +183,8 @@ async function injectUtils(isolate, context, utils, runeCallback, vars, projectD
       _text:      await res.text(),
     }
   }))
-  await jail.set('$__utils_env_get', new ivm.Reference(async (key, fallback) => {
-    const result = utils.env.get(key, fallback)
+  await jail.set('$__utils_env_read', new ivm.Reference(async (key, fallback) => {
+    const result = utils.env.read(key, fallback)
     return result !== undefined ? result : null
   }))
   await jail.set('$__utils_env_has', new ivm.Reference(async (key) => {
@@ -267,21 +267,21 @@ async function injectUtils(isolate, context, utils, runeCallback, vars, projectD
   }))
 
   await jail.set('$__utils_ws_client', new ivm.Reference((url, options) => {
-    return utils.ws.createSession(url, options)
+    return utils.ws.client(url, options)
   }))
   await jail.set('$__utils_ws_on', new ivm.Reference((sessionIdRef, eventRef, callbackRef) => {
     const sessionId = sessionIdRef.copySync()
     const event = eventRef.copySync()
-    utils.ws.getSession(sessionId).setHandler(event, callbackRef)
+    utils.ws._getSession(sessionId).setHandler(event, callbackRef)
   }))
   await jail.set('$__utils_ws_open', new ivm.Reference(async (sessionId) => {
-    await utils.ws.getSession(sessionId).open()
+    await utils.ws._getSession(sessionId).open()
   }))
   await jail.set('$__utils_ws_send', new ivm.Reference(async (sessionId, message) => {
-    await utils.ws.getSession(sessionId).send(message)
+    await utils.ws._getSession(sessionId).send(message)
   }))
   await jail.set('$__utils_ws_close', new ivm.Reference(async (sessionId) => {
-    await utils.ws.getSession(sessionId).close()
+    await utils.ws._getSession(sessionId).close()
   }))
 
   await jail.set('$__crypto_hash_hex',    new ivm.Reference(hashHex))

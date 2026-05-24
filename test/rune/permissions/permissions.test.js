@@ -191,35 +191,35 @@ describe('makePermissionChecker — dotfile paths', () => {
 
 describe('makePermissionChecker — ws capability', () => {
   it('allows a matching ws permission', () => {
-    const check = makePermissionChecker({ allow: ['ws:ws://localhost:3000/**'], deny: [] })
-    expect(() => check('ws', 'ws://localhost:3000/chat')).not.toThrow()
+    const check = makePermissionChecker({ allow: ['ws.client:ws://localhost:3000/**'], deny: [] })
+    expect(() => check('ws.client', 'ws://localhost:3000/chat')).not.toThrow()
   })
 
   it('throws PermissionError for unlisted ws URL', () => {
-    const check = makePermissionChecker({ allow: ['ws:ws://localhost:3000/**'], deny: [] })
-    expect(() => check('ws', 'ws://evil.com/data')).toThrow(PermissionError)
+    const check = makePermissionChecker({ allow: ['ws.client:ws://localhost:3000/**'], deny: [] })
+    expect(() => check('ws.client', 'ws://evil.com/data')).toThrow(PermissionError)
   })
 
   it('throws PermissionError when ws URL is in deny list', () => {
     const check = makePermissionChecker({
-      allow: ['ws:ws://localhost:3000/**'],
-      deny:  ['ws:ws://localhost:3000/admin/**'],
+      allow: ['ws.client:ws://localhost:3000/**'],
+      deny:  ['ws.client:ws://localhost:3000/admin/**'],
     })
-    expect(() => check('ws', 'ws://localhost:3000/admin/control')).toThrow(PermissionError)
+    expect(() => check('ws.client', 'ws://localhost:3000/admin/control')).toThrow(PermissionError)
   })
 
   it('PermissionError carries ws capability and URL value', () => {
     const check = makePermissionChecker({ allow: [], deny: [] })
     let err
-    try { check('ws', 'ws://localhost:3000/chat') } catch (e) { err = e }
+    try { check('ws.client', 'ws://localhost:3000/chat') } catch (e) { err = e }
     expect(err).toBeInstanceOf(PermissionError)
-    expect(err.capability).toBe('ws')
+    expect(err.capability).toBe('ws.client')
     expect(err.value).toBe('ws://localhost:3000/chat')
   })
 
   it('wildcard ws:** allows any URL', () => {
-    const check = makePermissionChecker({ allow: ['ws:**'], deny: [] })
-    expect(() => check('ws', 'wss://api.example.com/stream')).not.toThrow()
+    const check = makePermissionChecker({ allow: ['ws.client:**'], deny: [] })
+    expect(() => check('ws.client', 'wss://api.example.com/stream')).not.toThrow()
   })
 })
 
