@@ -35,12 +35,15 @@ export function buildProgram() {
 
   program
     .command('use [args...]')
-    .description(
-      'Use one or more runes and output the result.\n' +
-      '  Syntax: [--section s1,s2] <key> [rune-args...] [+ [--section s] <key> [rune-args...]]...\n' +
+    .description('Use one or more runes and output the result.')
+    .addHelpText('after',
+      '\nSyntax:\n' +
+      '  [--section s1,s2] <key> [rune-args...] [+ [--section s] <key> [rune-args...]]...\n\n' +
+      'Rune flags:\n' +
       '  --section s1,s2  filter output sections (per rune, before the key)\n' +
       '  --format md|json  output format (default: md)\n' +
-      '  --fail-fast       stop on first error\n' +
+      '  --fail-fast       stop on first error\n\n' +
+      'Key prefixes:\n' +
       '  project:name      resolve from project config only\n' +
       '  plugin:name       resolve directly from an enabled plugin\n' +
       '  name              auto-resolve: project config first, then plugins'
@@ -92,10 +95,8 @@ export function buildProgram() {
 
   program
     .command('check [args...]')
-    .description(
-      'Run a rune and validate its output shape.\n' +
-      '  Syntax: [--section s1,s2] <key> [rune-args...]'
-    )
+    .description('Run a rune and validate its output shape.')
+    .addHelpText('after', '\nSyntax:\n  [--section s1,s2] <key> [rune-args...]')
     .allowUnknownOption()
     .passThroughOptions()
     .action(async (args) => {
@@ -112,10 +113,8 @@ export function buildProgram() {
 
   program
     .command('bench [args...]')
-    .description(
-      'Time rune execution and report fast, ok, or slow.\n' +
-      '  Syntax: [--runs <n>] [--warmup] [--section s1,s2] <key> [rune-args...]'
-    )
+    .description('Time rune execution and report fast, ok, or slow.')
+    .addHelpText('after', '\nSyntax:\n  [--runs <n>] [--warmup] [--section s1,s2] <key> [rune-args...]')
     .allowUnknownOption()
     .passThroughOptions()
     .action(async (args) => {
@@ -326,11 +325,12 @@ export function buildProgram() {
 
   template
     .command('use <template>')
-    .description(
-      'Copy a template into the project as a new rune and register it in config.\n' +
+    .description('Copy a template into the project as a new rune and register it in config.')
+    .addHelpText('after',
+      '\nKey prefixes:\n' +
       '  project:name  — use a template defined in this project\'s config\n' +
       '  plugin:name   — use a template from a specific installed plugin\n' +
-      '  name        — auto-resolve: project config first, then installed plugins'
+      '  name          — auto-resolve: project config first, then installed plugins'
     )
     .option('--as <new-rune>', 'register the rune under a different key (default: template name)')
     .option('--path <path>', 'file path for the rune (default: .crunes/runes/<key>.js)')
