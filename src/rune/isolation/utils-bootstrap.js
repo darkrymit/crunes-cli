@@ -179,7 +179,16 @@ globalThis.utils = {
       return {
         on(event, handler) {
           const isolateHandler = event === 'error'
-            ? async (err) => handler(err)
+            ? async (errJson) => {
+                let d
+                try { d = JSON.parse(errJson) }
+                catch { d = { message: errJson } }
+                const errorObj = new Error(d.message)
+                errorObj.name = 'WebSocketError'
+                if (d.code) errorObj.code = d.code
+                if (d.stack) errorObj.stack = d.stack
+                handler(errorObj)
+              }
             : handler
           $__utils_ws_on.applySync(undefined, [id, event, isolateHandler], {
             arguments: { reference: true },
@@ -187,7 +196,8 @@ globalThis.utils = {
         },
         open:  ()    => $__utils_ws_open.apply(undefined,  [id],      { result: { promise: true } }),
         send:  (msg) => $__utils_ws_send.apply(undefined,  [id, msg], { result: { promise: true } }),
-        close: ()    => $__utils_ws_close.apply(undefined, [id],      { result: { promise: true } }),
+        close: ()    => $__utils_ws_close.apply(undefined, [id],      { result: { promise: true, copy: true } }),
+        closed: ()   => $__utils_ws_closed.apply(undefined, [id],     { result: { promise: true, copy: true } }),
       }
     },
   },

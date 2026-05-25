@@ -281,7 +281,10 @@ async function injectUtils(isolate, context, utils, runeCallback, vars, projectD
     await utils.ws._getSession(sessionId).send(message)
   }))
   await jail.set('$__utils_ws_close', new ivm.Reference(async (sessionId) => {
-    await utils.ws._getSession(sessionId).close()
+    return utils.ws._getSession(sessionId).close()
+  }))
+  await jail.set('$__utils_ws_closed', new ivm.Reference(async (sessionId) => {
+    return utils.ws._getSession(sessionId).closedPromise
   }))
 
   await jail.set('$__crypto_hash_hex',    new ivm.Reference(hashHex))

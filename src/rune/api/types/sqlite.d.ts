@@ -9,14 +9,14 @@ declare namespace sqlite {
 
   interface SqliteHandle {
     /** Run a SELECT and return all rows */
-    query(sql: string, params?: unknown[]): unknown[]
+    query(sql: string, params?: unknown[]): Promise<unknown[]>
     /** Run a SELECT and return the first row, or null */
-    get(sql: string, params?: unknown[]): unknown | null
+    get(sql: string, params?: unknown[]): Promise<unknown | null>
     /** Run INSERT/UPDATE/DELETE. Returns { changes, lastInsertRowid } */
-    exec(sql: string, params?: unknown[]): { changes: number; lastInsertRowid: number }
+    exec(sql: string, params?: unknown[]): Promise<{ changes: number; lastInsertRowid: number }>
     /** Wrap multiple exec calls in a transaction. Rolls back on error. */
     transaction(fn: () => Promise<void>): Promise<void>
     /** Close the database connection */
-    close(): void
+    close(): Promise<void>
   }
 }

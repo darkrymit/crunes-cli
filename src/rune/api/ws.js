@@ -7,8 +7,9 @@ class WsSession {
     this.state = 'CREATED'
     this.socket = null
     this.handlers = new Map()
-    this.closePromise = null
-    this.closeResolve = null
+    this.closedPromise = new Promise((resolve) => {
+      this.closedResolve = resolve
+    })
   }
 
   setHandler(event, callbackRef) {
@@ -34,7 +35,14 @@ class WsSession {
       socket.on('error', (err) => {
         if (!opened) reject(err)
         const h = this.handlers.get('error')
-        if (h) h.apply(undefined, [JSON.stringify({ message: err.message })], { result: { promise: true } }).catch(() => {})
+        if (h) {
+          const errData = JSON.stringify({
+            message: err.message,
+            code: err.code ?? null,
+            stack: err.stack ?? null
+          })
+          h.apply(undefined, [errData], { result: { promise: true } }).catch(() => {})
+        }
       })
 
       socket.on('message', async (data) => {
@@ -42,11 +50,12 @@ class WsSession {
         if (h) await h.apply(undefined, [String(data)], { result: { promise: true } })
       })
 
-      socket.on('close', async () => {
+      socket.on('close', async (code, reason) => {
         this.state = 'CLOSED'
+        const reasonStr = reason ? String(reason) : ''
         const h = this.handlers.get('close')
-        if (h) await h.apply(undefined, [], { result: { promise: true } }).catch(() => {})
-        if (this.closeResolve) { this.closeResolve(); this.closeResolve = null }
+        if (h) await h.apply(undefined, [code, reasonStr], { result: { promise: true } }).catch(() => {})
+        this.closedResolve({ code, reason: reasonStr })
       })
     })
   }
@@ -59,12 +68,10 @@ class WsSession {
   }
 
   close() {
-    if (this.state === 'CLOSED') return Promise.resolve()
-    if (this.closePromise) return this.closePromise
+    if (this.state === 'CLOSED') return this.closedPromise
     if (this.state === 'CREATED') throw new Error('Cannot close socket before opening')
-    this.closePromise = new Promise((resolve) => { this.closeResolve = resolve })
     this.socket.close()
-    return this.closePromise
+    return this.closedPromise
   }
 
   terminate() {
@@ -72,7 +79,7 @@ class WsSession {
       this.handlers.clear()
       if (this.socket) this.socket.terminate()
       this.state = 'CLOSED'
-      if (this.closeResolve) { this.closeResolve(); this.closeResolve = null }
+      this.closedResolve({ code: 1006, reason: 'Abnormal closure via termination' })
     }
   }
 }
