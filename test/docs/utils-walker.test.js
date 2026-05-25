@@ -119,4 +119,72 @@ describe('walkUtilsDocs', () => {
     expect(ns.types.WsHandle.methods[0].description).toBe('Connect and wait.')
     expect(ns.types.WsHandle.methods[0].returns).toBe('Promise<void>')
   })
+
+  it('walks recursively and flattens sub-namespace functions', () => {
+    const fixture = {
+      id: 0,
+      name: 'utils',
+      kind: 1,
+      children: [
+        {
+          id: 1,
+          name: 'crypto',
+          kind: 4,
+          comment: { summary: [{ text: 'Crypto utilities' }] },
+          children: [
+            {
+              id: 2,
+              name: 'hash',
+              kind: 4,
+              comment: { summary: [{ text: 'Hash sub-namespace' }] },
+              children: [
+                {
+                  id: 3,
+                  name: 'hex',
+                  kind: 64,
+                  signatures: [
+                    {
+                      id: 4,
+                      name: 'hex',
+                      kind: 4096,
+                      comment: { summary: [{ text: 'Hex hash.' }] },
+                      parameters: [],
+                      type: { type: 'intrinsic', name: 'string' },
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              id: 5,
+              name: 'uuid',
+              kind: 64,
+              signatures: [
+                {
+                  id: 6,
+                  name: 'uuid',
+                  kind: 4096,
+                  comment: { summary: [{ text: 'UUID.' }] },
+                  parameters: [],
+                  type: { type: 'intrinsic', name: 'string' },
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+
+    const [cryptoNs] = walkUtilsDocs(fixture)
+    expect(cryptoNs.namespace).toBe('crypto')
+    expect(cryptoNs.functions).toHaveLength(2)
+    
+    const hexFn = cryptoNs.functions.find(f => f.name === 'hash.hex')
+    expect(hexFn).toBeDefined()
+    expect(hexFn.description).toBe('Hex hash.')
+    
+    const uuidFn = cryptoNs.functions.find(f => f.name === 'uuid')
+    expect(uuidFn).toBeDefined()
+    expect(uuidFn.description).toBe('UUID.')
+  })
 })

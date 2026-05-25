@@ -129,15 +129,24 @@ function walkFunction(child) {
   }
 }
 
-function walkNamespace(child) {
+function walkNamespace(child, prefix = '') {
   const functions = []
   const types = {}
   for (const c of (child.children ?? [])) {
     if (c.kind === KIND_FUNCTION) {
       const fn = walkFunction(c)
-      if (fn) functions.push(fn)
+      if (fn) {
+        if (prefix) {
+          fn.name = `${prefix}.${fn.name}`
+        }
+        functions.push(fn)
+      }
     } else if (c.kind === KIND_INTERFACE) {
       types[c.name] = walkInterface(c)
+    } else if (c.kind === KIND_NAMESPACE) {
+      const subNs = walkNamespace(c, prefix ? `${prefix}.${c.name}` : c.name)
+      functions.push(...subNs.functions)
+      Object.assign(types, subNs.types)
     }
   }
   return {
@@ -155,5 +164,5 @@ export function walkUtilsDocs(typedocJson) {
   )
   return candidates
     .filter(c => c.kind === KIND_NAMESPACE || c.kind === KIND_FUNCTION)
-    .map(walkNamespace)
+    .map(c => walkNamespace(c))
 }

@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.4] - 2026-05-25
+
+### Fixed
+- **Sub-namespace dynamic documentation**: Fixed walkUtilsDocs to recursively walk and format nested TypeScript namespaces (e.g. `crypto.hash`), ensuring `hash.hex` and `hash.base64` are accurately included in the handbook.
+- **Dynamic list index prefixing**: Corrected a mapping bug that accidentally passed loop candidate indices to the walker, removing unexpected prefix numbers (e.g. `1.open(...)` -> `open(...)`).
+
+---
+
 ## [0.5.3] - 2026-05-25
 
 ### Added
