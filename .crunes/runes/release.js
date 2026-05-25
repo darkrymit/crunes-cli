@@ -5,14 +5,14 @@ export async function use() {
   const lockVersion = await json.get('package-lock.json', '$.version', 'unknown')
   const name        = await json.get('package.json', '$.name', '')
 
-  const programSrc = await fs.read('src/program.js', { throw: false }) ?? ''
+  const programSrc = await fs.read('src/cli/program.js', { throw: false }) ?? ''
   const cliVersionMatch = programSrc.match(/\.version\(['"]([^'"]+)['"]/)
   const cliVersion = cliVersionMatch ? cliVersionMatch[1] : 'unknown'
 
-  const gitLog = await shell('git log --oneline -10 --no-decorate', { throw: false, trim: true })
-  const branch  = await shell('git rev-parse --abbrev-ref HEAD', { throw: false, trim: true })
-  const lastTag = await shell('git describe --tags --abbrev=0', { throw: false, trim: true })
-  const unpushed = await shell('git rev-list --count @{u}..HEAD', { throw: false, trim: true })
+  const gitLog = await shell.exec('git log --oneline -10 --no-decorate', { throw: false, trim: true })
+  const branch  = await shell.exec('git rev-parse --abbrev-ref HEAD', { throw: false, trim: true })
+  const lastTag = await shell.exec('git describe --tags --abbrev=0', { throw: false, trim: true })
+  const unpushed = await shell.exec('git rev-list --count @{u}..HEAD', { throw: false, trim: true })
 
   const changelog = await fs.read('CHANGELOG.md', { throw: false }) ?? ''
   const recent = changelog

@@ -9,12 +9,12 @@
           "allow": [
             "fs.read:package.json",
             "fs.read:package-lock.json",
-            "fs.read:src/program.js",
+            "fs.read:src/cli/program.js",
             "fs.read:CHANGELOG.md",
-            "shell:git log *",
-            "shell:git rev-parse *",
-            "shell:git describe *",
-            "shell:git rev-list *"
+            "shell.exec:git log *",
+            "shell.exec:git rev-parse *",
+            "shell.exec:git describe *",
+            "shell.exec:git rev-list *"
           ]
         }
       }
