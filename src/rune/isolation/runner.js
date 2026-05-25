@@ -10,7 +10,7 @@ import { createModuleResolver } from './resolver.js'
 import { ALLOW_BUILTINS } from './builtins.js'
 import { createJob, getJob } from '../../job/index.js'
 import { getProjectKey } from '../../project/index.js'
-import { hashHex, hashBase64, uuid as cryptoUuid, hex as cryptoHex, base64 as cryptoBase64 } from '../api/crypto.js'
+import { hash, hashAsHex, hashAsBase64, hmac, hmacAsHex, hmacAsBase64, encrypt, decrypt, uuid as cryptoUuid, randomHex as cryptoHex, randomBase64 as cryptoBase64 } from '../api/crypto.js'
 import { computeEffectivePermissions, makePermissionChecker } from '../permissions/permissions.js'
 import { isVerbose } from '../../shared/output.js'
 import * as EMBEDDED from './embedded.js'
@@ -66,6 +66,29 @@ async function injectUtils(isolate, context, utils, runeCallback, vars, projectD
   }))
   await jail.set('$__utils_fs_copy', new ivm.Reference(async (src, dest) => {
     await utils.fs.copy(src, dest)
+  }))
+  await jail.set('$__utils_fs_remove', new ivm.Reference(async (relPath, opts) => {
+    return utils.fs.remove(relPath, opts)
+  }))
+  await jail.set('$__utils_fs_move', new ivm.Reference(async (src, dest) => {
+    return utils.fs.move(src, dest)
+  }))
+  await jail.set('$__utils_fs_stat', new ivm.Reference(async (relPath) => {
+    return utils.fs.stat(relPath)
+  }))
+  await jail.set('$__utils_fs_mkdir', new ivm.Reference(async (relPath) => {
+    return utils.fs.mkdir(relPath)
+  }))
+  await jail.set('$__utils_fs_read_bytes', new ivm.Reference(async (relPath, opts) => {
+    const bytes = await utils.fs.readAsBytes(relPath, opts)
+    if (!bytes) return null
+    const copy = new Uint8Array(bytes.length)
+    copy.set(bytes)
+    return copy.buffer
+  }))
+  await jail.set('$__utils_fs_write_bytes', new ivm.Reference(async (relPath, arrayBuffer) => {
+    const bytes = new Uint8Array(arrayBuffer)
+    return utils.fs.writeAsBytes(relPath, bytes)
   }))
   const shellHandles = new Map()
   let nextShellHandle = 0
@@ -152,11 +175,11 @@ async function injectUtils(isolate, context, utils, runeCallback, vars, projectD
   await jail.set('$__utils_json_read', new ivm.Reference(async (relPath, opts) => {
     return utils.json.read(relPath, opts)
   }))
-  await jail.set('$__utils_json_get', new ivm.Reference(async (relPath, jsonPath, defaultVal) => {
-    return utils.json.get(relPath, jsonPath, defaultVal)
+  await jail.set('$__utils_json_readPath', new ivm.Reference(async (relPath, jsonPath, defaultVal) => {
+    return utils.json.readPath(relPath, jsonPath, defaultVal)
   }))
-  await jail.set('$__utils_json_getAll', new ivm.Reference(async (relPath, jsonPath, defaultVal) => {
-    return utils.json.getAll(relPath, jsonPath, defaultVal)
+  await jail.set('$__utils_json_readPathAll', new ivm.Reference(async (relPath, jsonPath, defaultVal) => {
+    return utils.json.readPathAll(relPath, jsonPath, defaultVal)
   }))
   await jail.set('$__utils_json_write', new ivm.Reference(async (relPath, data, opts) => {
     await utils.json.write(relPath, data, opts)
@@ -174,12 +197,23 @@ async function injectUtils(isolate, context, utils, runeCallback, vars, projectD
     await utils.xml.write(relPath, data, opts)
   }))
   await jail.set('$__utils_http_fetch', new ivm.Reference(async (url, opts) => {
-    const res = await utils.http.fetch(url, opts)
+    let body = opts.body
+    if (Array.isArray(body)) {
+      body = body.map(entry => {
+        if (entry.value && typeof entry.value === 'object' && entry.value.type === 'Buffer') {
+          return { ...entry, value: new Uint8Array(entry.value.data) }
+        }
+        return entry
+      })
+    }
+    const res = await utils.http.fetch(url, { ...opts, body })
+    // In Node 18+, res.headers is a Headers instance; use Object.fromEntries(res.headers.entries()) or Object.fromEntries(Object.entries(res.headers))
+    const headers = typeof res.headers.entries === 'function' ? Object.fromEntries(res.headers.entries()) : res.headers
     return {
       ok:         res.ok,
       status:     res.status,
       statusText: res.statusText,
-      headers:    Object.fromEntries(res.headers.entries()),
+      headers:    headers,
       _text:      await res.text(),
     }
   }))
@@ -196,11 +230,11 @@ async function injectUtils(isolate, context, utils, runeCallback, vars, projectD
   await jail.set('$__utils_archive_zip', new ivm.Reference(async (source, dest) => {
     await utils.archive.zip(source, dest)
   }))
-  await jail.set('$__utils_archive_untar', new ivm.Reference(async (source, dest) => {
-    await utils.archive.untar(source, dest)
+  await jail.set('$__utils_archive_untar', new ivm.Reference(async (source, dest, opts) => {
+    await utils.archive.untar(source, dest, opts)
   }))
-  await jail.set('$__utils_archive_tar', new ivm.Reference(async (source, dest) => {
-    await utils.archive.tar(source, dest)
+  await jail.set('$__utils_archive_tar', new ivm.Reference(async (source, dest, opts) => {
+    await utils.archive.tar(source, dest, opts)
   }))
 
   const cacheHandles    = new Map()
@@ -290,11 +324,59 @@ async function injectUtils(isolate, context, utils, runeCallback, vars, projectD
     return utils.ws._getSession(sessionId).closedPromise
   }))
 
-  await jail.set('$__crypto_hash_hex',    new ivm.Reference(hashHex))
-  await jail.set('$__crypto_hash_base64', new ivm.Reference(hashBase64))
+  await jail.set('$__crypto_hash', new ivm.Reference((algorithm, data) => {
+    const d = typeof data === 'string' ? data : new Uint8Array(data)
+    const res = hash(algorithm, d)
+    return Array.from(res)
+  }))
+  await jail.set('$__crypto_hash_hex', new ivm.Reference((algorithm, data) => {
+    const d = typeof data === 'string' ? data : new Uint8Array(data)
+    return hashAsHex(algorithm, d)
+  }))
+  await jail.set('$__crypto_hash_base64', new ivm.Reference((algorithm, data) => {
+    const d = typeof data === 'string' ? data : new Uint8Array(data)
+    return hashAsBase64(algorithm, d)
+  }))
   await jail.set('$__crypto_uuid',        new ivm.Reference(cryptoUuid))
-  await jail.set('$__crypto_hex',         new ivm.Reference(cryptoHex))
-  await jail.set('$__crypto_base64',      new ivm.Reference(cryptoBase64))
+  await jail.set('$__crypto_random_hex',  new ivm.Reference(cryptoHex))
+  await jail.set('$__crypto_random_base64', new ivm.Reference(cryptoBase64))
+  
+  await jail.set('$__crypto_hmac', new ivm.Reference((algorithm, key, data) => {
+    const k = typeof key === 'string' ? key : new Uint8Array(key)
+    const d = typeof data === 'string' ? data : new Uint8Array(data)
+    const res = hmac(algorithm, k, d)
+    return Array.from(res)
+  }))
+  await jail.set('$__crypto_hmac_hex', new ivm.Reference((algorithm, key, data) => {
+    const k = typeof key === 'string' ? key : new Uint8Array(key)
+    const d = typeof data === 'string' ? data : new Uint8Array(data)
+    return hmacAsHex(algorithm, k, d)
+  }))
+  await jail.set('$__crypto_hmac_base64', new ivm.Reference((algorithm, key, data) => {
+    const k = typeof key === 'string' ? key : new Uint8Array(key)
+    const d = typeof data === 'string' ? data : new Uint8Array(data)
+    return hmacAsBase64(algorithm, k, d)
+  }))
+
+  await jail.set('$__crypto_encrypt', new ivm.Reference((algorithm, key, iv, data) => {
+    const k = typeof key === 'string' ? key : new Uint8Array(key)
+    const i = typeof iv === 'string' ? iv : new Uint8Array(iv)
+    const d = typeof data === 'string' ? data : new Uint8Array(data)
+    const res = encrypt(algorithm, k, i, d)
+    const copy = new Uint8Array(res.length)
+    copy.set(res)
+    return copy.buffer
+  }))
+
+  await jail.set('$__crypto_decrypt', new ivm.Reference((algorithm, key, iv, ciphertext) => {
+    const k = typeof key === 'string' ? key : new Uint8Array(key)
+    const i = typeof iv === 'string' ? iv : new Uint8Array(iv)
+    const c = typeof ciphertext === 'string' ? ciphertext : new Uint8Array(ciphertext)
+    const res = decrypt(algorithm, k, i, c)
+    const copy = new Uint8Array(res.length)
+    copy.set(res)
+    return copy.buffer
+  }))
 
   await jail.set('$__vars', JSON.stringify(vars))
   await jail.set('$__projectDir', projectDir)

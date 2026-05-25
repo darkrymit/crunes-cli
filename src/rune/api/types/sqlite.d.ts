@@ -2,7 +2,7 @@
 declare namespace sqlite {
   /**
    * Opens (or creates) a SQLite database. Returns a handle with query/get/exec/transaction/close.
-   * @param location Storage scope: "project", "plugin", "global", or a relative path
+   * @param location Storage scope: "@project-cache", "@plugin-cache", "@project-plugin-cache", or a relative path
    * @param name Database filename without extension (default: "default")
    */
   function open(location: string, name?: string): Promise<SqliteHandle>

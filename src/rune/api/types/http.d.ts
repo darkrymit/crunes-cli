@@ -5,10 +5,17 @@ declare namespace http {
    * @param url Request URL
    * @param opts Request options
    */
+  interface MultipartEntry {
+    name: string
+    value: string | Uint8Array
+    filename?: string
+    contentType?: string
+  }
+
   function fetch(url: string, opts?: {
     method?: string
     headers?: Record<string, string>
-    body?: string
+    body?: string | MultipartEntry[]
     timeout?: number
   }): Promise<FetchResponse>
 

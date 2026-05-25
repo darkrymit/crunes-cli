@@ -43,7 +43,7 @@ describe('createArchiveUtils — zip + unzip roundtrip', () => {
   })
 })
 
-describe('createArchiveUtils — tar + untar roundtrip', () => {
+describe('createArchiveUtils — tar + untar uncompressed roundtrip', () => {
   let tmp
   beforeEach(async () => { tmp = await makeTmp() })
   afterEach(async () => { await rm(tmp, { recursive: true, force: true }) })
@@ -53,12 +53,36 @@ describe('createArchiveUtils — tar + untar roundtrip', () => {
     await mkdir(src)
     await writeFile(join(src, 'c.txt'), 'foo')
     const arc = createArchiveUtils(tmp, null)
+    await arc.tar('src', 'out.tar', { gzip: false })
+    await arc.untar('out.tar', 'extracted')
+    expect(await readFile(join(tmp, 'extracted', 'c.txt'), 'utf8')).toBe('foo')
+  })
+
+  it('packs a single file', async () => {
+    await writeFile(join(tmp, 'file.txt'), 'data')
+    const arc = createArchiveUtils(tmp, null)
+    await arc.tar('file.txt', 'out.tar', { gzip: false })
+    await arc.untar('out.tar', 'extracted')
+    expect(await readFile(join(tmp, 'extracted', 'file.txt'), 'utf8')).toBe('data')
+  })
+})
+
+describe('createArchiveUtils — tar + untar gzip-compressed roundtrip', () => {
+  let tmp
+  beforeEach(async () => { tmp = await makeTmp() })
+  afterEach(async () => { await rm(tmp, { recursive: true, force: true }) })
+
+  it('packs a directory and auto-detects gzip on extract', async () => {
+    const src = join(tmp, 'src')
+    await mkdir(src)
+    await writeFile(join(src, 'c.txt'), 'foo')
+    const arc = createArchiveUtils(tmp, null)
     await arc.tar('src', 'out.tar.gz')
     await arc.untar('out.tar.gz', 'extracted')
     expect(await readFile(join(tmp, 'extracted', 'c.txt'), 'utf8')).toBe('foo')
   })
 
-  it('packs a single file', async () => {
+  it('packs a single file and auto-detects gzip on extract', async () => {
     await writeFile(join(tmp, 'file.txt'), 'data')
     const arc = createArchiveUtils(tmp, null)
     await arc.tar('file.txt', 'out.tar.gz')

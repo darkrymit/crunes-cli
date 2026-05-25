@@ -67,7 +67,7 @@ export { md, tree }
 |---|---|---|
 | `fs` | `cwd()`, `resolve`, `read`, `exists`, `glob`, `write`, `copy`, `replace` | `fs.read:`, `fs.write:`, `fs.glob:` |
 | `shell` | `(cmd, opts)` | `shell:<cmd-prefix>` |
-| `json` | `read`, `get`, `getAll`, `write`, `modify` | inherits `fs.read:` / `fs.write:` |
+| `json` | `read`, `readPath`, `readPathAll`, `write`, `modify` | inherits `fs.read:` / `fs.write:` |
 | `yaml` | `read`, `write`, `modify` | inherits `fs.read:` / `fs.write:` |
 | `xml` | `read`, `write`, `modify` | inherits `fs.read:` / `fs.write:` |
 | `http.fetch` | `(url, opts)` | `http.fetch:<METHOD>:<url>` |
@@ -81,10 +81,10 @@ export { md, tree }
 | `rune.kill` | `(id, signal?)` | `rune.kill` |
 | `rune.exists` | `(id)` → `boolean` | `rune.exists` |
 | `time` | `time.after(ms)` — resolve after ms milliseconds | — |
-| `archive` | `unzip`, `zip`, `untar`, `tar` | `fs.read:`, `fs.write:` |
+| `archive` | `unzip`, `zip`, `untar(src,dest,{gzip?})`, `tar(src,dest,{gzip?})` | `fs.read:`, `fs.write:` |
 | `cache` | `open(location, name?)` → handle | `cache.read:`, `cache.write:` |
 | `sqlite` | `open(location, name?)` → db | `sqlite.read:`, `sqlite.write:` |
-| `crypto` | `hash.hex`, `hash.base64`, `uuid`, `hex`, `base64` | — |
+| `crypto` | `hash`, `hashAsHex`, `hashAsBase64`, `uuid`, `randomHex`, `randomBase64`, `hmac`, `hmacAsHex`, `hmacAsBase64`, `encrypt`, `decrypt`, converters | — |
 | `ws` | `client(url, opts?) → session` | `ws.client:<url>` |
 | `time` | `after(ms)` | — |
 
@@ -158,7 +158,7 @@ The runner calls `args(builder)` before `use(parsedArgs)` and passes the schema 
 - **`fs.glob` `dot: true`:** Enables matching of hidden dotfiles and dot-directories (e.g. `.git`). Defaults to `false`.
 - **`fs.glob` `expandDirectories: true`:** If a directory matches, automatically search inside it. Defaults to `false` in `crunes-cli` to protect isolate memory limits, unlike standard `tinyglobby` or `fast-glob`.
 
-- **`json.get` returns the first JSONPath match.** Use `json.getAll` for expressions that may match multiple nodes.
+- **`json.readPath` returns the first JSONPath match.** Use `json.readPathAll` for expressions that may match multiple nodes.
 
 - **`json.modify` / `yaml.modify` / `xml.modify` callback semantics:** The callback receives `(data, { exists })`. If the callback returns a value, that replaces the entire file content. If it returns `undefined` (implicit or explicit), the (mutated) `data` argument is used. Forgetting to `return` the new object is a common bug when building a new structure instead of mutating.
 

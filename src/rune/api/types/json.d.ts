@@ -13,7 +13,7 @@ declare namespace json {
    * @param jsonPath JSONPath expression (e.g. $.name)
    * @param defaultValue Returned if path not found
    */
-  function get(path: string, jsonPath: string, defaultValue?: unknown): Promise<unknown>
+  function readPath(path: string, jsonPath: string, defaultValue?: unknown): Promise<unknown>
 
   /**
    * Returns all values matching a JSONPath query.
@@ -21,7 +21,7 @@ declare namespace json {
    * @param jsonPath JSONPath expression
    * @param defaultValue Returned if no matches
    */
-  function getAll(path: string, jsonPath: string, defaultValue?: unknown): Promise<unknown[]>
+  function readPathAll(path: string, jsonPath: string, defaultValue?: unknown): Promise<unknown[]>
 
   /**
    * Serializes and writes a value to a JSON file.

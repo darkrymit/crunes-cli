@@ -51,47 +51,47 @@ describe('json.read', () => {
   })
 })
 
-describe('json.get', () => {
+describe('json.readPath', () => {
   const PKG = JSON.stringify({ name: 'app', scripts: { build: 'tsc' }, engines: { node: '>=20' } })
 
   it('returns first JSONPath match', async () => {
     const fs = makeFsUtils({ 'package.json': PKG })
     const json = createJsonUtils('/project', fs)
-    expect(await json.get('package.json', '$.name')).toBe('app')
+    expect(await json.readPath('package.json', '$.name')).toBe('app')
   })
 
   it('returns nested value via JSONPath', async () => {
     const fs = makeFsUtils({ 'package.json': PKG })
     const json = createJsonUtils('/project', fs)
-    expect(await json.get('package.json', '$.scripts.build')).toBe('tsc')
+    expect(await json.readPath('package.json', '$.scripts.build')).toBe('tsc')
   })
 
   it('returns defaultValue when path has no match', async () => {
     const fs = makeFsUtils({ 'package.json': PKG })
     const json = createJsonUtils('/project', fs)
-    expect(await json.get('package.json', '$.missing', 'fallback')).toBe('fallback')
+    expect(await json.readPath('package.json', '$.missing', 'fallback')).toBe('fallback')
   })
 
   it('returns undefined by default when path has no match', async () => {
     const fs = makeFsUtils({ 'package.json': PKG })
     const json = createJsonUtils('/project', fs)
-    expect(await json.get('package.json', '$.missing')).toBeUndefined()
+    expect(await json.readPath('package.json', '$.missing')).toBeUndefined()
   })
 
   it('returns defaultValue when file not found', async () => {
     const fs = makeFsUtils({})
     const json = createJsonUtils('/project', fs)
-    expect(await json.get('missing.json', '$.name', 'default')).toBe('default')
+    expect(await json.readPath('missing.json', '$.name', 'default')).toBe('default')
   })
 })
 
-describe('json.getAll', () => {
+describe('json.readPathAll', () => {
   const PKG = JSON.stringify({ dependencies: { react: '^18.0.0', lodash: '^4.17.21' } })
 
   it('returns all JSONPath matches as array', async () => {
     const fs = makeFsUtils({ 'package.json': PKG })
     const json = createJsonUtils('/project', fs)
-    const results = await json.getAll('package.json', '$.dependencies[*]')
+    const results = await json.readPathAll('package.json', '$.dependencies[*]')
     expect(results).toHaveLength(2)
     expect(results).toContain('^18.0.0')
   })
@@ -99,19 +99,19 @@ describe('json.getAll', () => {
   it('returns defaultValue when no matches', async () => {
     const fs = makeFsUtils({ 'package.json': PKG })
     const json = createJsonUtils('/project', fs)
-    expect(await json.getAll('package.json', '$.missing[*]', ['none'])).toEqual(['none'])
+    expect(await json.readPathAll('package.json', '$.missing[*]', ['none'])).toEqual(['none'])
   })
 
   it('returns [] when file not found', async () => {
     const fs = makeFsUtils({})
     const json = createJsonUtils('/project', fs)
-    expect(await json.getAll('missing.json', '$.*')).toEqual([])
+    expect(await json.readPathAll('missing.json', '$.*')).toEqual([])
   })
 
   it('returns defaultValue when file not found', async () => {
     const fs = makeFsUtils({})
     const json = createJsonUtils('/project', fs)
-    expect(await json.getAll('missing.json', '$.*', ['fallback'])).toEqual(['fallback'])
+    expect(await json.readPathAll('missing.json', '$.*', ['fallback'])).toEqual(['fallback'])
   })
 })
 

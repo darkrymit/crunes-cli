@@ -54,3 +54,13 @@ describe('table', () => {
     expect(out).toContain('| lodash | 4.17.21 |')
   })
 })
+
+describe('blockquote', () => {
+  it('formats a single line', () => {
+    expect(md.blockquote('hello')).toBe('> hello\n')
+  })
+
+  it('formats multiple lines', () => {
+    expect(md.blockquote('hello\nworld')).toBe('> hello\n> world\n')
+  })
+})

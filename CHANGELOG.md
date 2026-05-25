@@ -5,6 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.5] - 2026-05-26
+
+### Added
+- **`crypto` encoding conversions**: Added `toHex`, `fromHex`, `toBase64`, `fromBase64`, `fromUtf8`, `toUtf8` as pure in-isolate synchronous helpers on the `crypto` namespace for ergonomic byte ↔ string conversions without host round-trips.
+- **`crypto.hmac` family**: Added `hmac`, `hmacAsHex`, and `hmacAsBase64` for HMAC-based message authentication.
+- **`crypto.encrypt` / `crypto.decrypt`**: Added symmetric encryption and decryption (e.g. `aes-256-cbc`, `aes-256-gcm`) returning raw `Uint8Array`.
+- **`fs.remove`**: Deletes a file or directory; accepts an optional `{ recursive }` flag. Requires `fs.write:` permission.
+- **`fs.move`**: Moves a file or directory between paths with automatic cross-volume copy-delete fallback. Requires `fs.read:` and `fs.write:` permissions.
+- **`fs.stat`**: Returns file metadata (`size`, `mtime`, `birthtime`, `isFile`, `isDirectory`). Requires `fs.read:` permission.
+- **`fs.mkdir`**: Recursively creates empty directory structures. Requires `fs.write:` permission.
+- **`fs.readAsBytes`**: Reads a file as raw binary `Uint8Array`. Requires `fs.read:` permission.
+- **`fs.writeAsBytes`**: Writes raw binary `Uint8Array` to a file, creating parent directories as needed. Requires `fs.write:` permission.
+- **`archive.tar` / `archive.untar` `opts.gzip` option**: Both methods now accept an optional third argument `{ gzip?: boolean }`. `tar` defaults to `gzip: true` (compressed). `untar` auto-detects compression from the file's magic bytes when `gzip` is omitted, so callers rarely need to specify it.
+- **`http.fetch` multipart body**: `body` now accepts a `MultipartEntry[]` array (with `name`, `value`, optional `filename` and `contentType`) to send `multipart/form-data` requests, including binary `Uint8Array` file parts.
+- **`md.blockquote`**: Renders a Markdown blockquote block.
+- **`TextEncoder` / `TextDecoder` polyfills**: Both classes are now available globally inside rune isolates.
+- **`archive` example `tar-demo` rune**: Demonstrates `tar`, `untar`, `targz`, and `untargz` in a single runnable example.
+
+### Changed
+- **`crypto` API is now fully async across binary-boundary methods**: `hash`, `hashAsHex`, `hashAsBase64`, `hmac`, `hmacAsHex`, `hmacAsBase64`, `encrypt`, and `decrypt` now return `Promise`. This eliminates `Array.from()` overhead on large binary inputs by using `ArrayBuffer` transfer via the async `isolated-vm` bridge. `uuid`, `randomHex`, `randomBase64`, and all encoding converters remain synchronous.
+- **Updated `crypto.d.ts`**: All async methods now declare `Promise<Uint8Array>` or `Promise<string>` return types.
+- **`archive.tar` / `archive.untar`**: Replaced the separate `targz` / `untargz` methods with a unified `opts.gzip` option on `tar` and `untar`. Pass `{ gzip: true }` for compressed archives. `targz` and `untargz` are removed.
+- **`json.get` renamed to `json.readPath`** and **`json.getAll` renamed to `json.readPathAll`** for API clarity. **Breaking** — runes calling `json.get` / `json.getAll` must be updated.
+
+### Fixed
+- **`isolated-vm` binary data marshalling**: Resolved a bug where `Uint8Array` values passed from the isolate to host bridges via `applySync` arrived empty. The fix uses `ArrayBuffer` transfer via async `apply` for all binary-input host calls, and explicit `Array.from()` + `result: { copy: true }` was replaced with proper async bridging.
+- **`$__crypto_hash_hex` / `$__crypto_hash_base64` host bridges**: Wrapped bare function references in explicit handlers that normalise `ArrayBuffer` input (matching the pattern of all other binary bridges).
+- **`release` rune**: Fixed `json.get` calls (renamed to `json.readPath` in this release) so the release rune is operational again.
+- **Example `.gitignore` files**: Added `.gitignore` to all 11 examples that were missing one, including common IDE exclusions (`.vscode/`, `.idea/`, `*.iml`). The `archive` example additionally ignores its runtime-generated `backups/` and `restore/` directories. The `unified-paths` example `.gitignore` was updated with the same IDE exclusions.
+
+---
+
 ## [0.5.4] - 2026-05-25
 
 ### Fixed

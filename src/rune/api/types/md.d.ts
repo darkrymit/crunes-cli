@@ -36,4 +36,10 @@ declare namespace md {
    * @param rows Array of row arrays
    */
   function table(headers: string[], rows: string[][]): string
+
+  /**
+   * Renders a markdown blockquote.
+   * @param text Text content
+   */
+  function blockquote(text: string): string
 }

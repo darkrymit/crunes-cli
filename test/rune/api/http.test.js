@@ -122,4 +122,21 @@ describe('createHttpUtils', () => {
       expect.objectContaining({ method: 'GET' }),
     )
   })
+
+  it('supports multipart upload with ordered array', async () => {
+    globalThis.fetch.mockResolvedValue(makeResponse({ body: 'uploaded' }))
+    const { fetch } = createHttpUtils(null)
+    const arrayBody = [
+      { name: 'field1', value: 'hello' },
+      { name: 'file1', value: new Uint8Array([1, 2, 3]), filename: 'test.bin', contentType: 'application/octet-stream' }
+    ]
+    await fetch('https://example.com', { method: 'POST', body: arrayBody })
+    
+    expect(globalThis.fetch).toHaveBeenCalled()
+    const callArgs = globalThis.fetch.mock.calls[0][1]
+    expect(callArgs.body).toBeInstanceOf(globalThis.FormData)
+    expect(callArgs.body.get('field1')).toBe('hello')
+    const filePart = callArgs.body.get('file1')
+    expect(filePart).toBeInstanceOf(globalThis.Blob)
+  })
 })

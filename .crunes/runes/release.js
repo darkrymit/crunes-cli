@@ -1,9 +1,9 @@
 import { fs, json, shell, section, md } from '@utils'
 
 export async function use() {
-  const version     = await json.get('package.json', '$.version', 'unknown')
-  const lockVersion = await json.get('package-lock.json', '$.version', 'unknown')
-  const name        = await json.get('package.json', '$.name', '')
+  const version     = await json.readPath('package.json', '$.version', 'unknown')
+  const lockVersion = await json.readPath('package-lock.json', '$.version', 'unknown')
+  const name        = await json.readPath('package.json', '$.name', '')
 
   const programSrc = await fs.read('src/cli/program.js', { throw: false }) ?? ''
   const cliVersionMatch = programSrc.match(/\.version\(['"]([^'"]+)['"]/)

@@ -31,3 +31,7 @@ export function table(headers, rows) {
   ];
   return lines.join('\n') + '\n';
 }
+
+export function blockquote(text) {
+  return text.split('\n').map(line => `> ${line}`).join('\n') + '\n';
+}

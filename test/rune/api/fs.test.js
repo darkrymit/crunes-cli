@@ -361,3 +361,105 @@ describe('createFsUtils — copy', () => {
       .rejects.toThrow(PermissionError)
   })
 })
+
+describe('createFsUtils — remove, move, stat, mkdir, readAsBytes, writeAsBytes', () => {
+  let dir
+
+  beforeEach(async () => {
+    dir = await makeTempDir()
+  })
+
+  afterEach(async () => {
+    await fs.rm(dir, { recursive: true, force: true }).catch(() => {})
+  })
+
+  it('fs.remove deletes files and recursively deletes folders', async () => {
+    const fsUtils = createFsUtils(dir, null)
+    await writeFile(dir, 'a.txt', 'hello')
+    await writeFile(dir, 'nested/b.txt', 'world')
+
+    await fsUtils.remove('./a.txt')
+    expect(await fsUtils.exists('./a.txt')).toBe(false)
+
+    await fsUtils.remove('./nested', { recursive: true })
+    expect(await fsUtils.exists('./nested/b.txt')).toBe(false)
+  })
+
+  it('fs.remove checks fs.write permission', async () => {
+    const spy = vi.fn()
+    const fsUtils = createFsUtils(dir, spy)
+    await fsUtils.remove('./a.txt').catch(() => {})
+    expect(spy).toHaveBeenCalledWith('fs.write', './a.txt')
+  })
+
+  it('fs.move moves files and scaffolds parent directories', async () => {
+    const fsUtils = createFsUtils(dir, null)
+    await writeFile(dir, 'src/a.txt', 'hello')
+
+    await fsUtils.move('src/a.txt', 'dst/b.txt')
+    expect(await fsUtils.exists('src/a.txt')).toBe(false)
+    expect(await fsUtils.read('dst/b.txt')).toBe('hello')
+  })
+
+  it('fs.move checks fs.read and fs.write permissions', async () => {
+    const spy = vi.fn()
+    const fsUtils = createFsUtils(dir, spy)
+    await fsUtils.move('src/a.txt', 'dst/b.txt').catch(() => {})
+    expect(spy).toHaveBeenCalledWith('fs.read', './src/a.txt')
+    expect(spy).toHaveBeenCalledWith('fs.write', './dst/b.txt')
+  })
+
+  it('fs.stat returns accurate metadata', async () => {
+    const fsUtils = createFsUtils(dir, null)
+    await writeFile(dir, 'a.txt', 'hello')
+    
+    const info = await fsUtils.stat('a.txt')
+    expect(info.size).toBe(5)
+    expect(info.isFile).toBe(true)
+    expect(info.isDirectory).toBe(false)
+    expect(info.mtime).toBeDefined()
+    expect(info.birthtime).toBeDefined()
+  })
+
+  it('fs.stat checks fs.read permission', async () => {
+    const spy = vi.fn()
+    const fsUtils = createFsUtils(dir, spy)
+    await fsUtils.stat('a.txt').catch(() => {})
+    expect(spy).toHaveBeenCalledWith('fs.read', './a.txt')
+  })
+
+  it('fs.mkdir creates empty folder structures', async () => {
+    const fsUtils = createFsUtils(dir, null)
+    await fsUtils.mkdir('./empty/nested/dir')
+    expect(await fsUtils.exists('./empty/nested/dir')).toBe(true)
+  })
+
+  it('fs.mkdir checks fs.write permission', async () => {
+    const spy = vi.fn()
+    const fsUtils = createFsUtils(dir, spy)
+    await fsUtils.mkdir('./empty/nested/dir').catch(() => {})
+    expect(spy).toHaveBeenCalledWith('fs.write', './empty/nested/dir')
+  })
+
+  it('fs.readAsBytes and fs.writeAsBytes handle raw binary bytes', async () => {
+    const fsUtils = createFsUtils(dir, null)
+    const bytes = new Uint8Array([72, 69, 76, 76, 79])
+    
+    await fsUtils.writeAsBytes('bin.dat', bytes)
+    const readBytes = await fsUtils.readAsBytes('bin.dat')
+    expect(readBytes).toEqual(bytes)
+  })
+
+  it('fs.readAsBytes and fs.writeAsBytes check permissions', async () => {
+    const spy = vi.fn()
+    const fsUtils = createFsUtils(dir, spy)
+    const bytes = new Uint8Array([1, 2, 3])
+    
+    await fsUtils.writeAsBytes('bin.dat', bytes).catch(() => {})
+    expect(spy).toHaveBeenCalledWith('fs.write', './bin.dat')
+    
+    await fsUtils.readAsBytes('bin.dat').catch(() => {})
+    expect(spy).toHaveBeenCalledWith('fs.read', './bin.dat')
+  })
+})
+

@@ -82,10 +82,19 @@ export function createArchiveUtils(dir, checkPermission) {
       })
     },
 
-    async untar(source, dest) {
+    async untar(source, dest, { gzip } = {}) {
       checkPerms(source, dest)
       const srcAbs = resolveToAbs(dir, source)
       const dstAbs = resolveToAbs(dir, dest)
+
+      let useGzip = gzip
+      if (useGzip === undefined) {
+        const fd = await fs.open(srcAbs, 'r')
+        const buf = Buffer.alloc(2)
+        await fd.read(buf, 0, 2, 0)
+        await fd.close()
+        useGzip = buf[0] === 0x1f && buf[1] === 0x8b
+      }
 
       const entries = []
       await tarList({ file: srcAbs, onentry: (e) => entries.push(e.path) })
@@ -94,10 +103,10 @@ export function createArchiveUtils(dir, checkPermission) {
       }
 
       await fs.mkdir(dstAbs, { recursive: true })
-      await tarExtract({ file: srcAbs, cwd: dstAbs })
+      await tarExtract({ gzip: useGzip, file: srcAbs, cwd: dstAbs })
     },
 
-    async tar(source, dest) {
+    async tar(source, dest, { gzip = true } = {}) {
       checkPerms(source, dest)
       const srcAbs = resolveToAbs(dir, source)
       const dstAbs = resolveToAbs(dir, dest)
@@ -105,9 +114,9 @@ export function createArchiveUtils(dir, checkPermission) {
 
       const stat = await fs.stat(srcAbs)
       if (stat.isDirectory()) {
-        await tarCreate({ gzip: true, file: dstAbs, cwd: srcAbs }, ['.'])
+        await tarCreate({ gzip, file: dstAbs, cwd: srcAbs }, ['.'])
       } else {
-        await tarCreate({ gzip: true, file: dstAbs, cwd: path.dirname(srcAbs) }, [path.basename(srcAbs)])
+        await tarCreate({ gzip, file: dstAbs, cwd: path.dirname(srcAbs) }, [path.basename(srcAbs)])
       }
     },
   }

@@ -37,14 +37,14 @@ export function createJsonUtils(dir, fsUtils) {
       return parseJson(text, path.join(dir, relPath))
     },
 
-    async get(relPath, jsonPath, defaultValue = undefined) {
+    async readPath(relPath, jsonPath, defaultValue = undefined) {
       const obj = await this.read(relPath, { throw: false })
       if (obj === null) return defaultValue
       const results = JSONPath({ path: jsonPath, json: obj, wrap: true })
       return results.length === 0 ? defaultValue : results[0]
     },
 
-    async getAll(relPath, jsonPath, defaultValue = []) {
+    async readPathAll(relPath, jsonPath, defaultValue = []) {
       const obj = await this.read(relPath, { throw: false })
       if (obj === null) return defaultValue
       const results = JSONPath({ path: jsonPath, json: obj, wrap: true })

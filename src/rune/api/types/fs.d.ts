@@ -59,4 +59,58 @@ declare namespace fs {
    * @param replacement Replacement string
    */
   function replace(path: string, regex: RegExp | string, replacement: string): Promise<void>
+
+  /**
+   * Deletes a file or directory recursively.
+   * Requires `fs.write:<path>` permission.
+   * @param path Relative path to file or directory
+   * @param opts.recursive If true, perform a recursive deletion (default: false)
+   */
+  function remove(path: string, opts?: { recursive?: boolean }): Promise<void>
+
+  /**
+   * Moves a file or directory from src to dest.
+   * Handles cross-volume transitions automatically (copy-and-delete fallback).
+   * Automatically scaffolds parent directories of the destination recursively.
+   * Requires `fs.read:<src>` and `fs.write:<dest>` permissions.
+   * @param src Relative source path
+   * @param dest Relative destination path
+   */
+  function move(src: string, dest: string): Promise<void>
+
+  /**
+   * Returns structural metadata for a file or directory.
+   * Requires `fs.read:<path>` permission.
+   * @param path Relative path
+   */
+  function stat(path: string): Promise<{
+    size: number
+    mtime: string      // ISO timestamp
+    birthtime: string  // ISO timestamp
+    isDirectory: boolean
+    isFile: boolean
+  }>
+
+  /**
+   * Recursively creates empty directory structures.
+   * Requires `fs.write:<path>` permission.
+   * @param path Relative directory path to create
+   */
+  function mkdir(path: string): Promise<void>
+
+  /**
+   * Reads a file as raw binary bytes.
+   * Requires `fs.read:<path>` permission.
+   * @param path Relative file path
+   * @param opts Options
+   */
+  function readAsBytes(path: string, opts?: { throw?: boolean }): Promise<Uint8Array | null>
+
+  /**
+   * Writes raw binary bytes to a file, creating parent directories as needed.
+   * Requires `fs.write:<path>` permission.
+   * @param path Relative file path
+   * @param content Raw binary Uint8Array bytes
+   */
+  function writeAsBytes(path: string, content: Uint8Array): Promise<void>
 }
