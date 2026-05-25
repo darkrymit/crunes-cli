@@ -2,6 +2,7 @@
 declare namespace shell {
   /**
    * Executes a fire-and-forget shell command and returns the output.
+   * Requires `shell.exec:<command>` permission.
    *
    * @param cmd The shell command to run.
    * @param opts Execution options (timeout, trim, throw on error, env vars).
@@ -11,6 +12,7 @@ declare namespace shell {
 
   /**
    * Starts a shell session for interactive or background execution.
+   * Requires `shell.exec:<command>` permission.
    *
    * @param cmd The shell command to start the session with.
    * @param opts Session options (env vars).

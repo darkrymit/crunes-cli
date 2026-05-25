@@ -8,13 +8,25 @@ declare namespace cache {
   function open(location: string, name?: string): Promise<CacheHandle>
 
   interface CacheHandle {
-    /** Store a value. ttl is time-to-live in seconds. */
+    /**
+     * Store a value. ttl is time-to-live in seconds.
+     * Requires `cache.write:<location>:<name>` permission.
+     */
     set(key: string, value: unknown, ttl?: number): Promise<void>
-    /** Retrieve a value, or null if absent or expired */
+    /**
+     * Retrieve a value, or null if absent or expired.
+     * Requires `cache.read:<location>:<name>` permission.
+     */
     get(key: string): Promise<unknown>
-    /** Delete a single entry */
+    /**
+     * Delete a single entry.
+     * Requires `cache.write:<location>:<name>` permission.
+     */
     delete(key: string): Promise<void>
-    /** Delete all entries in this cache */
+    /**
+     * Delete all entries in this cache.
+     * Requires `cache.write:<location>:<name>` permission.
+     */
     clear(): Promise<void>
   }
 }

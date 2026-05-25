@@ -1,7 +1,7 @@
 /** HTTP fetch with permission-gated URL access. Called as utils.http.fetch(url, opts). */
 declare namespace http {
   /**
-   * Makes an HTTP request. Requires fetch:<METHOD>:<url> permission.
+   * Makes an HTTP request. Requires `http.fetch:<METHOD>:<url>` permission.
    * @param url Request URL
    * @param opts Request options
    */

@@ -9,17 +9,22 @@ import { resolve } from 'node:path'
 
 const NAMESPACE_RECIPES = {
   fs: `\`\`\`javascript
-import { fs } from '@utils'
+import { fs, section } from '@utils'
 
 export async function use() {
   // Read and write files relative to the project root
   const content = await fs.read('src/components/Button.jsx');
   await fs.write('dist/output.txt', 'Hello Sandbox!');
-  return 'File written successfully!';
+  return [
+    section.create('fs-result', {
+      type: 'markdown',
+      content: 'File written successfully!'
+    })
+  ];
 }
 \`\`\``,
   ws: `\`\`\`javascript
-import { ws, section } from '@utils'
+import { ws, time, section } from '@utils'
 
 export async function use() {
   const socket = ws.client('ws://localhost:8080');
@@ -34,6 +39,7 @@ export async function use() {
   await socket.sendText(JSON.stringify({ type: 'PING' }));
   
   // Wait a moment for replies, then close
+  await time.after(500);
   await socket.close();
 
   return [
@@ -53,6 +59,7 @@ export async function use() {
   await db.exec('CREATE TABLE IF NOT EXISTS logs (id TEXT PRIMARY KEY, msg TEXT)');
   await db.exec('INSERT INTO logs VALUES (?, ?)', [crypto.uuid(), 'Rune executed!']);
   const rows = await db.query('SELECT * FROM logs');
+  await db.close();
 
   return [
     section.create('db-logs', {
@@ -79,13 +86,18 @@ export async function use() {
 }
 \`\`\``,
   cache: `\`\`\`javascript
-import { cache } from '@utils'
+import { cache, section } from '@utils'
 
 export async function use() {
   const projectCache = await cache.open('@project-cache');
   await projectCache.set('last-run', Date.now(), 60); // 60s TTL
   const lastRun = await projectCache.get('last-run');
-  return \`Last run timestamp: \${lastRun}\`;
+  return [
+    section.create('cache-result', {
+      type: 'markdown',
+      content: \`Last run timestamp: \${lastRun}\`
+    })
+  ];
 }
 \`\`\``,
   shell: `\`\`\`javascript
@@ -199,7 +211,7 @@ export async function compileIntro({ config, format, projectRoot, configRoot, ha
   lines.push('')
 
   for (const ns of namespaces) {
-    lines.push(`### \`utils.${ns.namespace}\``)
+    lines.push(`### \`${ns.namespace}\``)
     lines.push('')
     if (ns.description) {
       lines.push(ns.description)

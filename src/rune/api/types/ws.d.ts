@@ -2,6 +2,7 @@
 declare namespace ws {
   /**
    * Creates a WebSocket client handle. Call open() before send().
+   * Requires `ws.client:<url>` permission.
    * @param url WebSocket URL to connect to
    * @param opts Connection options
    */
