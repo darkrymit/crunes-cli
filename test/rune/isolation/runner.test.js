@@ -350,7 +350,7 @@ export async function use() {
     socket.close()
   })
   await socket.open()
-  await socket.send('hello-ws')
+  await socket.sendText('hello-ws')
   await socket.close()
   return [section.create('result', { type: 'markdown', content: received })]
 }
@@ -393,9 +393,9 @@ export async function use() {
     if (count >= 3) socket.close()
   })
   await socket.open()
-  await socket.send('a')
-  await socket.send('b')
-  await socket.send('c')
+  await socket.sendText('a')
+  await socket.sendText('b')
+  await socket.sendText('c')
   await socket.close()
   return [section.create('r', { type: 'markdown', content: msgs.join(',') })]
 }

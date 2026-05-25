@@ -1,8 +1,15 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, beforeAll, afterAll } from 'vitest'
 import { createServer } from 'http'
 import { WebSocketServer } from 'ws'
 import { createWsUtils } from '../../../src/rune/api/ws.js'
 import { PermissionError } from '../../../src/rune/permissions/permissions.js'
+import { runRuneInIsolate } from '../../../src/rune/isolation/runner.js'
+import fs from 'node:fs/promises'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const testRuneFile = path.join(__dirname, 'test-ws-binary-inline.js')
 
 function fakeRef(fn) {
   return { apply: (_thisArg, args, _opts) => Promise.resolve().then(() => fn(...args)) }
@@ -13,7 +20,13 @@ function startEchoServer() {
     const httpServer = createServer()
     const wss = new WebSocketServer({ server: httpServer })
     wss.on('connection', (ws) => {
-      ws.on('message', (data) => ws.send(String(data)))
+      ws.on('message', (message, isBinary) => {
+        if (isBinary) {
+          ws.send(message, { binary: true })
+        } else {
+          ws.send(String(message))
+        }
+      })
     })
     httpServer.listen(0, () => {
       const { port } = httpServer.address()
@@ -94,24 +107,49 @@ describe('createWsUtils', () => {
     await session.close()
   })
 
-  it('send() and receive via echo server', async () => {
+  it('sendText() and receive via echo server', async () => {
     const ws = createWsUtils(null)
     const id = ws.client(server.url)
     const session = ws._getSession(id)
     const received = []
     session.setHandler('message', fakeRef((msg) => { received.push(msg) }))
     await session.open()
-    await session.send('hello')
+    await session.sendText('hello')
     await new Promise((r) => setTimeout(r, 50))
     expect(received).toEqual(['hello'])
     await session.close()
   })
 
-  it('send() throws when not OPEN', () => {
+  it('sendBinary() and receive binary via echo server', async () => {
     const ws = createWsUtils(null)
     const id = ws.client(server.url)
     const session = ws._getSession(id)
-    expect(() => session.send('msg')).toThrow('Cannot send in state CREATED')
+    const received = []
+    session.setHandler('binary', fakeRef((arrayBuffer) => {
+      received.push(new Uint8Array(arrayBuffer))
+    }))
+    await session.open()
+    const testArr = new Uint8Array([5, 10, 15])
+    await session.sendBinary(testArr.buffer, testArr.byteOffset, testArr.byteLength)
+    await new Promise((r) => setTimeout(r, 50))
+    expect(received.length).toBe(1)
+    expect(Array.from(received[0])).toEqual([5, 10, 15])
+    await session.close()
+  })
+
+  it('sendText() throws when not OPEN', () => {
+    const ws = createWsUtils(null)
+    const id = ws.client(server.url)
+    const session = ws._getSession(id)
+    expect(() => session.sendText('msg')).toThrow('Cannot send in state CREATED')
+  })
+
+  it('sendBinary() throws when not OPEN', () => {
+    const ws = createWsUtils(null)
+    const id = ws.client(server.url)
+    const session = ws._getSession(id)
+    const testArr = new Uint8Array([1, 2])
+    expect(() => session.sendBinary(testArr.buffer, 0, 2)).toThrow('Cannot send in state CREATED')
   })
 
   it('close() is idempotent — repeated calls return the same promise', async () => {
@@ -166,5 +204,57 @@ describe('createWsUtils', () => {
   it('dispose() is safe to call when no sessions exist', () => {
     const ws = createWsUtils(null)
     expect(() => ws.dispose()).not.toThrow()
+  })
+})
+
+describe('WebSocket sandboxed integration', () => {
+  let integrationServer
+
+  beforeAll(async () => {
+    integrationServer = await startEchoServer()
+  })
+
+  afterAll(async () => {
+    await fs.unlink(testRuneFile).catch(() => {})
+    await stopServer(integrationServer)
+  })
+
+  it('successfully executes sandboxed run with sendText and sendBinary in Isolate', async () => {
+    const runeSrc = `
+      import { ws } from '@utils'
+      export async function use() {
+        const client = ws.client('ws://localhost:${integrationServer.port}')
+        const textPromise = new Promise(resolve => {
+          client.on('message', (msg) => resolve(msg))
+        })
+        const binaryPromise = new Promise(resolve => {
+          client.on('binary', (data) => resolve(data))
+        })
+
+        await client.open()
+        
+        await client.sendText('hello sandboxed world')
+        const textResult = await textPromise
+
+        const sendArr = new Uint8Array([42, 84, 126])
+        await client.sendBinary(sendArr)
+        const binaryResult = await binaryPromise
+
+        await client.close()
+        
+        return {
+          textResult,
+          binaryIsUint8: binaryResult instanceof Uint8Array,
+          binaryBytes: Array.from(binaryResult)
+        }
+      }
+    `
+    await fs.writeFile(testRuneFile, runeSrc, 'utf8')
+    const res = await runRuneInIsolate(testRuneFile, { allow: ['ws.client:**'], deny: [] }, [], __dirname)
+    expect(res).toEqual({
+      textResult: 'hello sandboxed world',
+      binaryIsUint8: true,
+      binaryBytes: [42, 84, 126]
+    })
   })
 })

@@ -189,13 +189,32 @@ globalThis.utils = {
                 if (d.stack) errorObj.stack = d.stack
                 handler(errorObj)
               }
+            : event === 'binary'
+            ? async (arrayBuffer) => {
+                handler(new Uint8Array(arrayBuffer))
+              }
             : handler
           $__utils_ws_on.applySync(undefined, [id, event, isolateHandler], {
             arguments: { reference: true },
           })
         },
         open:  ()    => $__utils_ws_open.apply(undefined,  [id],      { result: { promise: true } }),
-        send:  (msg) => $__utils_ws_send.apply(undefined,  [id, msg], { result: { promise: true } }),
+        sendText: (msg) => $__utils_ws_send_text.apply(undefined,  [id, msg], { result: { promise: true } }),
+        sendBinary: (data) => {
+          if (data instanceof Uint8Array) {
+            return $__utils_ws_send_binary.apply(undefined, [id, data.buffer, data.byteOffset, data.byteLength], {
+              arguments: { copy: true },
+              result: { promise: true }
+            })
+          } else if (data instanceof ArrayBuffer) {
+            return $__utils_ws_send_binary.apply(undefined, [id, data, 0, data.byteLength], {
+              arguments: { copy: true },
+              result: { promise: true }
+            })
+          } else {
+            throw new TypeError('sendBinary requires an ArrayBuffer or Uint8Array')
+          }
+        },
         close: ()    => $__utils_ws_close.apply(undefined, [id],      { result: { promise: true, copy: true } }),
         closed: ()   => $__utils_ws_closed.apply(undefined, [id],     { result: { promise: true, copy: true } }),
       }

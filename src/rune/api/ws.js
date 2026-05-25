@@ -45,9 +45,17 @@ class WsSession {
         }
       })
 
-      socket.on('message', async (data) => {
-        const h = this.handlers.get('message')
-        if (h) await h.apply(undefined, [String(data)], { result: { promise: true } })
+      socket.on('message', async (data, isBinary) => {
+        if (isBinary) {
+          const h = this.handlers.get('binary')
+          if (h) {
+            const arrayBuffer = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength)
+            await h.apply(undefined, [arrayBuffer], { arguments: { copy: true }, result: { promise: true } }).catch(() => {})
+          }
+        } else {
+          const h = this.handlers.get('message')
+          if (h) await h.apply(undefined, [String(data)], { result: { promise: true } })
+        }
       })
 
       socket.on('close', async (code, reason) => {
@@ -60,10 +68,18 @@ class WsSession {
     })
   }
 
-  send(message) {
+  sendText(message) {
     if (this.state !== 'OPEN') throw new Error(`Cannot send in state ${this.state}`)
     return new Promise((resolve, reject) => {
       this.socket.send(message, (err) => (err ? reject(err) : resolve()))
+    })
+  }
+
+  sendBinary(arrayBuffer, byteOffset, byteLength) {
+    if (this.state !== 'OPEN') throw new Error(`Cannot send in state ${this.state}`)
+    return new Promise((resolve, reject) => {
+      const buffer = Buffer.from(arrayBuffer, byteOffset, byteLength)
+      this.socket.send(buffer, (err) => (err ? reject(err) : resolve()))
     })
   }
 

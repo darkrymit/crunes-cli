@@ -277,8 +277,11 @@ async function injectUtils(isolate, context, utils, runeCallback, vars, projectD
   await jail.set('$__utils_ws_open', new ivm.Reference(async (sessionId) => {
     await utils.ws._getSession(sessionId).open()
   }))
-  await jail.set('$__utils_ws_send', new ivm.Reference(async (sessionId, message) => {
-    await utils.ws._getSession(sessionId).send(message)
+  await jail.set('$__utils_ws_send_text', new ivm.Reference(async (sessionId, message) => {
+    await utils.ws._getSession(sessionId).sendText(message)
+  }))
+  await jail.set('$__utils_ws_send_binary', new ivm.Reference(async (sessionId, arrayBuffer, byteOffset, byteLength) => {
+    await utils.ws._getSession(sessionId).sendBinary(arrayBuffer, byteOffset, byteLength)
   }))
   await jail.set('$__utils_ws_close', new ivm.Reference(async (sessionId) => {
     return utils.ws._getSession(sessionId).close()
