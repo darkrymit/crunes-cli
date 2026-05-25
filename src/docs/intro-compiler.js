@@ -8,44 +8,99 @@ import { computeEffectivePermissions } from '../rune/permissions/permissions.js'
 import { resolve } from 'node:path'
 
 const NAMESPACE_RECIPES = {
-  fs: `\`\`\`js
-// Reading and writing files in the sandboxed workspace
-const content = await utils.fs.read('src/components/Button.jsx');
-await utils.fs.write('dist/output.txt', 'Hello Sandbox!');
+  fs: `\`\`\`javascript
+import { fs } from '@utils'
+
+export async function use() {
+  // Read and write files relative to the project root
+  const content = await fs.read('src/components/Button.jsx');
+  await fs.write('dist/output.txt', 'Hello Sandbox!');
+  return 'File written successfully!';
+}
 \`\`\``,
-  ws: `\`\`\`js
-// WebSocket streaming connection
-const socket = utils.ws.client('ws://localhost:8080');
-await socket.open();
-socket.onMessage((msg) => {
-  utils.rune.section('stream', msg.text);
-});
-await socket.sendText(JSON.stringify({ type: 'PING' }));
-await socket.close();
+  ws: `\`\`\`javascript
+import { ws, section } from '@utils'
+
+export async function use() {
+  const socket = ws.client('ws://localhost:8080');
+  const messages = [];
+
+  // Register event listeners BEFORE opening
+  socket.on('message', (msg) => {
+    messages.push(msg);
+  });
+
+  await socket.open();
+  await socket.sendText(JSON.stringify({ type: 'PING' }));
+  
+  // Wait a moment for replies, then close
+  await socket.close();
+
+  return [
+    section.create('ws-replies', {
+      type: 'markdown',
+      content: messages.map(m => \`- \${m}\`).join('\\n')
+    })
+  ];
+}
 \`\`\``,
-  sqlite: `\`\`\`js
-// Named SQLite operations
-const db = await utils.sqlite.open('my-database');
-await db.exec('CREATE TABLE IF NOT EXISTS logs (id TEXT PRIMARY KEY, msg TEXT)');
-await db.run('INSERT INTO logs VALUES (?, ?)', [utils.crypto.uuid(), 'Rune executed!']);
-const rows = await db.query('SELECT * FROM logs');
+  sqlite: `\`\`\`javascript
+import { sqlite, crypto, section } from '@utils'
+
+export async function use() {
+  // Scoped SQLite operations
+  const db = await sqlite.open('@project-sqlite', 'my-database');
+  await db.exec('CREATE TABLE IF NOT EXISTS logs (id TEXT PRIMARY KEY, msg TEXT)');
+  await db.exec('INSERT INTO logs VALUES (?, ?)', [crypto.uuid(), 'Rune executed!']);
+  const rows = await db.query('SELECT * FROM logs');
+
+  return [
+    section.create('db-logs', {
+      type: 'markdown',
+      content: rows.map(r => \`- [\${r.id}]: \${r.msg}\`).join('\\n')
+    })
+  ];
+}
 \`\`\``,
-  http: `\`\`\`js
-// Performing HTTP calls
-const response = await utils.http.fetch('https://api.github.com/repos/darkrymit/crunes');
-const repo = JSON.parse(response.body);
-utils.rune.section('repo', repo.description);
+  http: `\`\`\`javascript
+import { http, section } from '@utils'
+
+export async function use() {
+  // Fetch from permitted hosts
+  const response = await http.fetch('https://api.github.com/repos/darkrymit/crunes');
+  const repo = await response.json();
+
+  return [
+    section.create('github-repo', {
+      type: 'markdown',
+      content: \`**Repo Description**: \${repo.description}\`
+    })
+  ];
+}
 \`\`\``,
-  cache: `\`\`\`js
-// Named cache read/writes
-const projectCache = await utils.cache.open('@project-cache');
-await projectCache.set('last-run', Date.now(), { ttlMs: 60000 });
-const lastRun = await projectCache.get('last-run');
+  cache: `\`\`\`javascript
+import { cache } from '@utils'
+
+export async function use() {
+  const projectCache = await cache.open('@project-cache');
+  await projectCache.set('last-run', Date.now(), 60); // 60s TTL
+  const lastRun = await projectCache.get('last-run');
+  return \`Last run timestamp: \${lastRun}\`;
+}
 \`\`\``,
-  shell: `\`\`\`js
-// Executing safe shell commands
-const result = await utils.shell.run('git status --short');
-utils.rune.section('status', result.stdout);
+  shell: `\`\`\`javascript
+import { shell, section } from '@utils'
+
+export async function use() {
+  // Run command relative to the project directory
+  const stdout = await shell.exec('git status --short');
+  return [
+    section.create('git-status', {
+      type: 'markdown',
+      content: \`\\\`\\\`\\\`\\n\${stdout}\\n\\\`\\\`\\\`\`
+    })
+  ];
+}
 \`\`\``
 }
 

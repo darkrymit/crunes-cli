@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.5.2] - 2026-05-25
+
+### Fixed
+- **Code Recipe Accuracy in `crunes docs intro`**:
+  - Corrected all namespace recipes to use idiomatic `@utils` ESM imports (`import { ws } from '@utils'`, etc.) instead of deprecated `utils` access.
+  - Aligned the `ws` recipe with accurate `.on('message')` callbacks registered before socket `.open()`.
+  - Corrected the `sqlite` recipe to invoke `.open('@project-sqlite')` and use the proper `.exec(...)` write interface.
+  - Fixed `cache.set` recipe parameter order to use `ttl` seconds directly instead of a nested config object.
+  - Corrected the `shell` recipe to use the accurate `shell.exec` method.
+  - Refined the welcome statement and title to position Crunes as a fast sandboxed scripting environment.
+
+---
+
 ## [0.5.1] - 2026-05-25
 
 ### Added
