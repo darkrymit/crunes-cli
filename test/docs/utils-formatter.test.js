@@ -66,6 +66,42 @@ describe('formatUtilsNamespace', () => {
     expect(out).toContain('close()')
   })
 
+  it('renders WsHandle methods block when wrapped in Promise', () => {
+    const wsNsWithPromise = {
+      ...WS_NS,
+      functions: [
+        {
+          ...WS_NS.functions[0],
+          returns: 'Promise<WsHandle>',
+        }
+      ]
+    }
+    const out = formatUtilsNamespace(wsNsWithPromise)
+    expect(out).toContain('WsHandle methods')
+    expect(out).toContain('open()')
+  })
+
+  it('renders fields block when properties exist', () => {
+    const nsWithProps = {
+      ...WS_NS,
+      types: {
+        WsHandle: {
+          properties: [
+            { name: 'ok', type: 'boolean', description: 'True if ok' }
+          ],
+          methods: [
+            { name: 'close', description: 'Close connection', returns: 'void' }
+          ]
+        }
+      }
+    }
+    const out = formatUtilsNamespace(nsWithProps)
+    expect(out).toContain('WsHandle fields')
+    expect(out).toContain('ok   boolean   True if ok')
+    expect(out).toContain('WsHandle methods')
+    expect(out).toContain('close()')
+  })
+
   it('snapshot', () => {
     expect(formatUtilsNamespace(WS_NS)).toMatchSnapshot()
   })

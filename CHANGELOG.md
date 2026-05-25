@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.5.1] - 2026-05-25
+
+### Added
+- **Dynamic Crunes Intro Command (`crunes docs intro`)**:
+  - Compiles a complete, self-contained Markdown or JSON primer of the entire Crunes ecosystem.
+  - Dynamically walk and format TypeDoc signatures for the `@utils` API reference using actual `.d.ts` types.
+  - Fully unwrap and document custom return object properties and methods (e.g. `FetchResponse`, `CacheHandle`, `SqliteHandle`) even when wrapped in a `Promise<...>`.
+  - Introspect local workspace configurations, dynamic isolate-resolving and inlining argument schemas, descriptions, and rules for all active project runes (`release`, `m`, `kb`).
+  - Added `-g, --global` flag to bypass project introspection and generate a clean, pure-ecosystem manual.
+  - Added `--out <path>` flag to write the compiled handbook to a file, and `--format md|json` support.
+
+---
+
 ## [0.5.0] - 2026-05-25
 
 ### Added

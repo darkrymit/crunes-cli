@@ -2,6 +2,7 @@ const KIND_MODULE     = 2
 const KIND_NAMESPACE  = 4
 const KIND_FUNCTION   = 64
 const KIND_INTERFACE  = 256
+const KIND_PROPERTY   = 1024
 const KIND_METHOD     = 2048
 
 function commentText(comment) {
@@ -95,9 +96,21 @@ function walkMethod(child) {
   }
 }
 
+function walkProperty(child) {
+  return {
+    name: child.name,
+    type: typeStr(child.type),
+    description: commentText(child.comment),
+    ...(child.flags?.isOptional ? { optional: true } : {}),
+  }
+}
+
 function walkInterface(child) {
   return {
     description: commentText(child.comment),
+    properties: (child.children ?? [])
+      .filter(c => c.kind === KIND_PROPERTY)
+      .map(walkProperty),
     methods: (child.children ?? [])
       .filter(c => c.kind === KIND_METHOD)
       .map(walkMethod),

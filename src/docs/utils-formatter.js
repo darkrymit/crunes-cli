@@ -38,13 +38,32 @@ export function formatUtilsNamespace(ns) {
       lines.push('')
       lines.push(`    Returns: ${fn.returns}`)
 
-      const typeDef = ns.types?.[fn.returns]
-      if (typeDef?.methods?.length) {
-        lines.push('')
-        lines.push(`    ${fn.returns} methods:`)
-        for (const m of typeDef.methods) {
-          const mSig = sig(m)
-          lines.push(`      ${mSig.padEnd(20)} ${m.description ?? ''}`.trimEnd())
+      let lookupType = fn.returns
+      const promiseMatch = fn.returns.match(/^Promise<(.+)>$/)
+      if (promiseMatch) {
+        lookupType = promiseMatch[1]
+      }
+
+      const typeDef = ns.types?.[lookupType]
+      if (typeDef) {
+        if (typeDef.properties?.length) {
+          lines.push('')
+          lines.push(`    ${lookupType} fields:`)
+          const maxName = typeDef.properties.reduce((m, p) => Math.max(m, p.name.length), 0)
+          const maxType = typeDef.properties.reduce((m, p) => Math.max(m, (p.type ?? '').length + (p.optional ? 1 : 0)), 0)
+          for (const p of typeDef.properties) {
+            const t = p.optional ? `${p.type}?` : (p.type ?? '')
+            lines.push(`      ${p.name.padEnd(maxName + 2)} ${t.padEnd(maxType + 2)} ${p.description ?? ''}`.trimEnd())
+          }
+        }
+
+        if (typeDef.methods?.length) {
+          lines.push('')
+          lines.push(`    ${lookupType} methods:`)
+          for (const m of typeDef.methods) {
+            const mSig = sig(m)
+            lines.push(`      ${mSig.padEnd(20)} ${m.description ?? ''}`.trimEnd())
+          }
         }
       }
     }

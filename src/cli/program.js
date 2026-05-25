@@ -78,6 +78,23 @@ export function buildProgram() {
       await handler({ namespaces, format: opts.format })
     })
 
+  helpGroup
+    .command('intro')
+    .description('Generate a comprehensive introduction and context document for Crunes and the active project')
+    .option('-g, --global', 'generate a global, pure-ecosystem guide (skip local project context)')
+    .option('--out <path>', 'output file path (defaults to stdout)')
+    .addOption(new Option('--format <format>', 'output format').choices(['md', 'json']).default('md'))
+    .action(async (opts) => {
+      const { handler } = await import('../docs/commands/intro.js')
+      await handler({
+        global: !!opts.global,
+        out: opts.out,
+        format: opts.format,
+        projectRoot: projectRoot(),
+        configRoot: configRoot(),
+      })
+    })
+
   program
     .command('version')
     .description('Print the installed version and check for updates')
