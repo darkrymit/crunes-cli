@@ -1,6 +1,6 @@
 {
   "name": "@darkrymit/crunes-cli",
-  "version": "0.4.6",
+  "version": "0.5.0",
   "description": "CLI tool for querying crunes enrichers",
   "type": "module",
   "bin": {
