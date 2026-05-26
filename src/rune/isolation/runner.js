@@ -508,15 +508,43 @@ export async function runRuneInIsolate(runeFile, effective, args, projectDir, {
       const schema = await context.evalClosure(
         `return (async () => {
           const b = (() => {
-            const opts = [], pos = [], exs = []
-            return {
-              option(flags, description, def) { opts.push({ flags, description, def }); return this },
-              positional(spec, description)   { pos.push({ spec, description }); return this },
-              example(usage, description)     { exs.push({ usage, description }); return this },
-              build() { return { options: opts, positionals: pos, examples: exs } }
+            const opts = [], pos = [], exs = [], cmds = []
+            const createBuilder = (subName, subDesc) => {
+              const sOpts = [], sPos = [], sExs = [], sCmds = []
+              const subBuilder = {
+                option(flags, description, def) { sOpts.push({ flags, description, def }); return subBuilder },
+                positional(spec, description)   { sPos.push({ spec, description }); return subBuilder },
+                example(usage, description)     { sExs.push({ usage, description }); return subBuilder },
+                command(name, description, callback) {
+                  const nestedBuilder = createBuilder(name, description)
+                  if (typeof callback === 'function') {
+                    callback(nestedBuilder)
+                  }
+                  sCmds.push(nestedBuilder.build())
+                  return subBuilder
+                },
+                build() { return { name: subName, description: subDesc, options: sOpts, positionals: sPos, examples: sExs, commands: sCmds } }
+              }
+              return subBuilder
             }
+            const rootBuilder = {
+              option(flags, description, def) { opts.push({ flags, description, def }); return rootBuilder },
+              positional(spec, description)   { pos.push({ spec, description }); return rootBuilder },
+              example(usage, description)     { exs.push({ usage, description }); return rootBuilder },
+              command(name, description, callback) {
+                const subBuilder = createBuilder(name, description)
+                if (typeof callback === 'function') {
+                  callback(subBuilder)
+                }
+                cmds.push(subBuilder.build())
+                return rootBuilder
+              },
+              build() { return { options: opts, positionals: pos, examples: exs, commands: cmds } }
+            }
+            return rootBuilder
           })()
-          return await __crunes_args(b)
+          const res = await __crunes_args(b)
+          return (res && typeof res.build === 'function') ? res.build() : res
         })()`,
         [],
         isolateTimeoutMs !== undefined ? { timeout: isolateTimeoutMs, result: { promise: true, copy: true } } : { result: { promise: true, copy: true } }
@@ -627,15 +655,43 @@ export async function getArgsSchema(runeFile, effective, projectDir, {
     const schema = await context.evalClosure(
       `return (async () => {
         const b = (() => {
-          const opts = [], pos = [], exs = []
-          return {
-            option(flags, description, def) { opts.push({ flags, description, def }); return this },
-            positional(spec, description)   { pos.push({ spec, description }); return this },
-            example(usage, description)     { exs.push({ usage, description }); return this },
-            build() { return { options: opts, positionals: pos, examples: exs } }
+          const opts = [], pos = [], exs = [], cmds = []
+          const createBuilder = (subName, subDesc) => {
+            const sOpts = [], sPos = [], sExs = [], sCmds = []
+            const subBuilder = {
+              option(flags, description, def) { sOpts.push({ flags, description, def }); return subBuilder },
+              positional(spec, description)   { sPos.push({ spec, description }); return subBuilder },
+              example(usage, description)     { sExs.push({ usage, description }); return subBuilder },
+              command(name, description, callback) {
+                const nestedBuilder = createBuilder(name, description)
+                if (typeof callback === 'function') {
+                  callback(nestedBuilder)
+                }
+                sCmds.push(nestedBuilder.build())
+                return subBuilder
+              },
+              build() { return { name: subName, description: subDesc, options: sOpts, positionals: sPos, examples: sExs, commands: sCmds } }
+            }
+            return subBuilder
           }
+          const rootBuilder = {
+            option(flags, description, def) { opts.push({ flags, description, def }); return rootBuilder },
+            positional(spec, description)   { pos.push({ spec, description }); return rootBuilder },
+            example(usage, description)     { exs.push({ usage, description }); return rootBuilder },
+            command(name, description, callback) {
+              const subBuilder = createBuilder(name, description)
+              if (typeof callback === 'function') {
+                callback(subBuilder)
+              }
+              cmds.push(subBuilder.build())
+              return rootBuilder
+            },
+            build() { return { options: opts, positionals: pos, examples: exs, commands: cmds } }
+          }
+          return rootBuilder
         })()
-        return await __crunes_args(b)
+        const res = await __crunes_args(b)
+        return (res && typeof res.build === 'function') ? res.build() : res
       })()`,
       [],
       { timeout: isolateTimeoutMs, result: { promise: true, copy: true } }

@@ -41,3 +41,31 @@ describe('formatHelp', () => {
     expect(out).not.toContain('Examples:')
   })
 })
+
+describe('formatHelp recursive', () => {
+  it('outputs clean recursively indented commands', () => {
+    const schema = {
+      options: [{ flags: '--verbose', description: 'Verbose root' }],
+      commands: [
+        {
+          name: 'remote',
+          description: 'Git remotes',
+          commands: [
+            {
+              name: 'add',
+              description: 'Add remote',
+              positionals: [{ spec: '<name>' }, { spec: '<url>' }],
+              options: [{ flags: '--fetch', description: 'Fetch first' }]
+            }
+          ]
+        }
+      ]
+    }
+
+    const output = formatHelp(schema, { key: 'git', description: 'Git helper' })
+    expect(output).toContain('Usage: crunes use git <command> [options]')
+    expect(output).toContain('remote                         Git remotes')
+    expect(output).toContain('add <name> <url>           Add remote')
+    expect(output).toContain('--fetch                    Fetch first')
+  })
+})

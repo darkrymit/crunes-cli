@@ -41,10 +41,93 @@ export function buildYargsConfig(schema) {
   return cfg
 }
 
+export function mapPositionals(parsed, positionals, offset = 0) {
+  if (!positionals) return
+  for (let i = 0; i < positionals.length; i++) {
+    const spec = positionals[i].spec
+    const match = spec.match(/^[<\[]([a-zA-Z0-9_-]+)[>\]]$/)
+    if (match) {
+      const key = match[1]
+      const val = parsed._[i + offset]
+      if (val !== undefined) {
+        parsed[key] = val
+      }
+    }
+  }
+}
+
 export function parseArgs(rawArgs, schema) {
-  const cfg = buildYargsConfig(schema)
-  const parsed = yargsParser(rawArgs, cfg)
+  if (!schema) {
+    const parsed = yargsParser(rawArgs, {})
+    parsed.$raw = rawArgs
+    return parsed
+  }
+
+  // 1. Recursive Command Resolution
+  let currentSchema = schema
+  const commandsMatched = []
+
+  while (true) {
+    // Accumulate all options configured from the root down to the current matched path
+    const activeOptions = new Map()
+    for (const opt of schema.options ?? []) {
+      activeOptions.set(opt.flags, opt)
+    }
+    let temp = schema
+    for (const name of commandsMatched) {
+      temp = temp.commands.find(c => c.name === name)
+      for (const opt of temp.options ?? []) {
+        activeOptions.set(opt.flags, opt)
+      }
+    }
+
+    const rootCfg = buildYargsConfig({ options: Array.from(activeOptions.values()) })
+    const tempParsed = yargsParser(rawArgs, rootCfg)
+    const nextPosIndex = commandsMatched.length
+    const nextArg = tempParsed._[nextPosIndex]
+
+    if (nextArg && currentSchema.commands) {
+      const match = currentSchema.commands.find(c => c.name === nextArg)
+      if (match) {
+        commandsMatched.push(nextArg)
+        currentSchema = match
+        continue
+      }
+    }
+    break
+  }
+
+  // 2. Merge Option Hierarchies
+  const optionsMap = new Map()
+  for (const opt of schema.options ?? []) {
+    optionsMap.set(opt.flags, opt)
+  }
+
+  let temp = schema
+  for (const name of commandsMatched) {
+    temp = temp.commands.find(c => c.name === name)
+    for (const opt of temp.options ?? []) {
+      optionsMap.set(opt.flags, opt) // child options override parent conflicts
+    }
+  }
+
+  const finalSchema = { options: Array.from(optionsMap.values()) }
+  const finalCfg = buildYargsConfig(finalSchema)
+  const parsed = yargsParser(rawArgs, finalCfg)
+  
   parsed.$raw = rawArgs
+  
+  // 3. Expose Unified Command Properties
+  if (commandsMatched.length > 0) {
+    parsed.command = commandsMatched.join(' ')
+    parsed.commands = commandsMatched
+    parsed.subcommand = parsed.command
+    parsed.subcommands = parsed.commands
+  }
+
+  // 4. Map Named Positional Parameters
+  mapPositionals(parsed, currentSchema.positionals, commandsMatched.length)
+
   return parsed
 }
 

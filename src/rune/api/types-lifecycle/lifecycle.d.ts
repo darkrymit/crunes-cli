@@ -56,6 +56,15 @@ declare namespace lifecycle {
     example(usage: string, description: string): this
 
     /**
+     * Declares a nested command under the current command.
+     * 
+     * @param name Command name (e.g. 'create').
+     * @param description Command description.
+     * @param callback Callback configured with a subcommand ArgBuilder.
+     */
+    command(name: string, description: string, callback?: (sub: ArgBuilder) => void): this
+
+    /**
      * Finalizes and builds the argument schema.
      */
     build(): any
@@ -68,5 +77,11 @@ declare namespace lifecycle {
 
     /** Original raw arguments passed to the rune. */
     $raw: string[]
+
+    /** Space-separated matched command path string (e.g. 'remote add') */
+    command?: string
+
+    /** Array of matched command path levels (e.g. ['remote', 'add']) */
+    commands?: string[]
   }
 }

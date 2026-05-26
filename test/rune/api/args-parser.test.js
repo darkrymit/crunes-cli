@@ -74,3 +74,93 @@ describe('parseArgs', () => {
     expect(result.strict).toBe(false)
   })
 })
+
+describe('sandbox builder', () => {
+  it('builds recursive command schemas', () => {
+    // Mocking isolate builder structure locally
+    const opts = [], pos = [], exs = [], cmds = []
+    const createBuilder = (subName, subDesc) => {
+      const sOpts = [], sPos = [], sExs = [], sCmds = []
+      const subBuilder = {
+        option(flags, description, def) { sOpts.push({ flags, description, def }); return subBuilder },
+        positional(spec, description)   { sPos.push({ spec, description }); return subBuilder },
+        example(usage, description)     { sExs.push({ usage, description }); return subBuilder },
+        command(name, description, callback) {
+          const nestedBuilder = createBuilder(name, description)
+          if (typeof callback === 'function') callback(nestedBuilder)
+          sCmds.push(nestedBuilder.build())
+          return subBuilder
+        },
+        build() { return { name: subName, description: subDesc, options: sOpts, positionals: sPos, examples: sExs, commands: sCmds } }
+      }
+      return subBuilder
+    }
+    const b = {
+      option(flags, description, def) { opts.push({ flags, description, def }); return b },
+      positional(spec, description)   { pos.push({ spec, description }); return b },
+      example(usage, description)     { exs.push({ usage, description }); return b },
+      command(name, description, callback) {
+        const subBuilder = createBuilder(name, description)
+        if (typeof callback === 'function') callback(subBuilder)
+        cmds.push(subBuilder.build())
+        return b
+      },
+      build() { return { options: opts, positionals: pos, examples: exs, commands: cmds } }
+    }
+
+    b.command('remote', 'Git remotes', remote => {
+      remote.command('add', 'Add remote', add => {
+        add.positional('<name>', 'Name').option('--fetch', 'Fetch', false)
+      })
+    })
+
+    const schema = b.build()
+    expect(schema.commands[0].name).toBe('remote')
+    expect(schema.commands[0].commands[0].name).toBe('add')
+    expect(schema.commands[0].commands[0].positionals[0].spec).toBe('<name>')
+  })
+})
+
+describe('parseArgs nested commands', () => {
+  const schema = {
+    options: [{ flags: '--verbose', description: 'Verbose', def: false }],
+    positionals: [],
+    commands: [
+      {
+        name: 'remote',
+        description: 'Remote commands',
+        options: [{ flags: '--fetch', description: 'Fetch option', def: true }],
+        commands: [
+          {
+            name: 'add',
+            description: 'Add remote',
+            options: [{ flags: '--force', description: 'Force overwrite', def: false }],
+            positionals: [{ spec: '<name>', description: 'Remote name' }, { spec: '<url>', description: 'URL' }]
+          }
+        ]
+      }
+    ]
+  }
+
+  it('resolves intermediate command paths', () => {
+    const parsed = parseArgs(['remote'], schema)
+    expect(parsed.command).toBe('remote')
+    expect(parsed.commands).toEqual(['remote'])
+    expect(parsed.fetch).toBe(true)
+  })
+
+  it('resolves deeply nested commands and merges options', () => {
+    const parsed = parseArgs(['--verbose', 'remote', 'add', 'origin', 'https://github.com', '--force'], schema)
+    expect(parsed.command).toBe('remote add')
+    expect(parsed.commands).toEqual(['remote', 'add'])
+    expect(parsed.verbose).toBe(true)
+    expect(parsed.fetch).toBe(true)
+    expect(parsed.force).toBe(true)
+  })
+
+  it('maps positionals to named properties using correct offsets', () => {
+    const parsed = parseArgs(['remote', 'add', 'origin', 'https://github.com'], schema)
+    expect(parsed.name).toBe('origin')
+    expect(parsed.url).toBe('https://github.com')
+  })
+})

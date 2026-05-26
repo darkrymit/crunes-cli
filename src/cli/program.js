@@ -95,6 +95,22 @@ export function buildProgram() {
       })
     })
 
+  helpGroup
+    .command('args')
+    .description('Show detailed documentation, conventions, and examples for the args(builder) export')
+    .action(async () => {
+      const { handler } = await import('../docs/commands/args.js')
+      await handler()
+    })
+
+  helpGroup
+    .command('use')
+    .description('Show detailed documentation, conventions, and examples for the use(args) export')
+    .action(async () => {
+      const { handler } = await import('../docs/commands/use.js')
+      await handler()
+    })
+
   program
     .command('version')
     .description('Print the installed version and check for updates')
