@@ -2,8 +2,8 @@
   "runes": {
     "release": {
       "path": ".crunes/runes/release.js",
-      "name": "Release Info",
-      "description": "Current version, branch/tag status, recent commits, changelog, and release process",
+      "name": "Release Automator",
+      "description": "Bump package versions, update changelogs, synchronize lockfiles, compile bundles, and tag Git releases automatically.",
       "permissions": {
         "use": {
           "allow": [
@@ -11,10 +11,21 @@
             "fs.read:package-lock.json",
             "fs.read:src/cli/program.js",
             "fs.read:CHANGELOG.md",
+            "fs.write:package.json",
+            "fs.write:src/cli/program.js",
+            "fs.write:CHANGELOG.md",
             "shell.exec:git log *",
             "shell.exec:git rev-parse *",
             "shell.exec:git describe *",
-            "shell.exec:git rev-list *"
+            "shell.exec:git rev-list *",
+            "shell.exec:npm install",
+            "shell.exec:npm run build",
+            "shell.exec:git add package.json",
+            "shell.exec:git add package-lock.json",
+            "shell.exec:git add CHANGELOG.md",
+            "shell.exec:git add src/cli/program.js",
+            "shell.exec:git commit *",
+            "shell.exec:git tag *"
           ]
         }
       }

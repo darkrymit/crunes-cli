@@ -101,14 +101,35 @@ Include `kb` alongside `m` when design decisions or subtle gotchas are likely to
 
 ## Release Process
 
-1. Bump `version` in `package.json`
-2. Run `npm install` to sync `package-lock.json`
-3. Add `## [x.y.z] - YYYY-MM-DD` entry to `CHANGELOG.md`
-4. Commit: `git commit -m "chore: release vX.Y.Z"`
-5. Tag: `git tag vX.Y.Z`
-6. Push: `git push origin main --tags` — publish CI fires automatically on the tag
+The release process is fully automated via the local `release` rune. Choose the command that matches your use case:
 
-Verify before pushing: `node dist/cli.js use release --plain` should show matching versions, `✓` on lockfile, and `0 (in sync)` on unpushed.
+### Use Case: Gaining Release Context
+To view current package versions, lockfile synchronization, recent git logs, and tag histories:
+```bash
+crunes use release info
+```
+
+### Use Case: Automated Release (Quick Path)
+To bump the version and automatically prepend formatted keep-a-changelog additions to `CHANGELOG.md` in a single command:
+```bash
+crunes use release bump patch \
+  -a "**Recursively Nested Commands**: Sandboxed arguments parser supports command groups" \
+  -f "**Sandbox setTimeout routing corrected**: Fixed globalThis.setTimeout inside isolates"
+```
+
+### Use Case: Standard Release (Manual Changelog)
+If you have already hand-written custom detailed release notes under a target version header in `CHANGELOG.md` first, simply run:
+```bash
+crunes use release bump minor
+```
+
+### Use Case: Automated Git Commit & Tagging
+To automatically stage, commit, and tag the release in Git after the bump and build steps are finished and verified:
+```bash
+crunes use release git
+```
+
+*Publish CI triggers automatically on tag push: `git push origin main --tags` (only do it if user asks and confirms that all good!).*
 
 ## Testing Philosophy
 
