@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.7] - 2026-05-26
+
+### Fixed
+- **Rune process hang after completion**: Host-side `setTimeout` handles backing `time.after` are now `.unref()`'d, so a pending timeout (e.g. a race-pattern guard timer) no longer keeps the CLI process alive after the rune has already returned its result.
+
+---
+
 ## [0.5.6] - 2026-05-26
 
 ### Added

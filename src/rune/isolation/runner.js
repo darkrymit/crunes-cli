@@ -170,6 +170,9 @@ async function injectUtils(isolate, context, utils, runeCallback, vars, projectD
     })
   }))
   await jail.set('$__utils_time_after', new ivm.Reference((ms) => {
+    return new Promise(resolve => setTimeout(resolve, ms).unref())
+  }))
+  await jail.set('$__utils_time_after_ref', new ivm.Reference((ms) => {
     return new Promise(resolve => setTimeout(resolve, ms))
   }))
   await jail.set('$__utils_json_read', new ivm.Reference(async (relPath, opts) => {

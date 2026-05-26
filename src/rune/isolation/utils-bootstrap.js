@@ -391,7 +391,7 @@ globalThis.utils = {
     },
   },
   time: {
-    after: (ms) => $__utils_time_after.apply(undefined, [ms], { result: { promise: true } }),
+    after: (ms) => $__utils_time_after_ref.apply(undefined, [ms], { result: { promise: true } }),
   },
   md,
   tree,
@@ -437,7 +437,7 @@ globalThis.setInterval = function(callback, delay = 0, ...args) {
   let active = true
 
   const run = () => {
-    globalThis.utils.time.after(delay).then(() => {
+    $__utils_time_after_ref.apply(undefined, [delay], { result: { promise: true } }).then(() => {
       if (active) {
         callback(...args)
         run() // Schedule next execution
