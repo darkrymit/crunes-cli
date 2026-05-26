@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.9] - 2026-05-26
+
+### Added
+- **Recursively Nested Commands**: Sandboxed arguments parser (`ArgBuilder`) now supports recursive `.command()` groups and sub-actions (e.g., `remote add`).
+- **Positional Parameter Mapping**: Automatically maps parsed positional arguments (e.g. `<name>`, `[url]`) directly to named keys (e.g. `args.name`, `args.url`) inside the `use(args)` lifecycle.
+- **Implicit Command Helpers**: Automatically exposes space-separated `args.command` and array `args.commands` for quick sub-routing.
+- **V8 Isolate Safe Arg-Building**: Compiles argument schemas completely inside the bootstrap isolate sandbox before cloning to prevent `isolated-vm` function cloning errors.
+- **Progressive Help Subcommands**: Added dedicated `crunes docs use` and `crunes docs args` subcommands to progressively guide users through CLI actions instead of reading the entire handbook.
+- **Indented Tree Help Formatting**: Renders nested commands, options, and positionals using a structured tree layout with relative indentation offsets.
+
+### Changed
+- **Ecosystem ACI Skill Integration**: Updated `crunes-write-rune` prompt templates to document recursive nested commands and automatic positional schema mappings.
+
+---
+
 ## [0.5.8] - 2026-05-26
 
 ### Fixed
