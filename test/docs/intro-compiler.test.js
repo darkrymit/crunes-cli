@@ -12,8 +12,9 @@ describe('compileIntro compiler engine', () => {
 
     expect(output).toContain('# Crunes: Fast Sandboxed Scripting & Context Framework')
     expect(output).toContain('## 1. Anatomy of a Rune')
-    expect(output).toContain('## 2. Sandbox Security & Permissions')
-    expect(output).toContain('## 3. Dynamic `@utils` Reference')
+    expect(output).toContain('## 2. Rune Exports API Reference')
+    expect(output).toContain('## 3. Global Sandbox APIs')
+    expect(output).toContain('## 6. Dynamic `@utils` Reference')
     expect(output).toContain('### `fs`')
     expect(output).toContain('### `ws`')
     expect(output).toContain('Workspace Context')

@@ -170,6 +170,15 @@ describe('normalizePermission — virtual root tokens', () => {
     })
     expect(() => check('sqlite.read', '@plugin-sqlite:test')).not.toThrow()
   })
+
+  it('cache.read:@project-cache:chat-session matches exact token', () => {
+    const check = makePermissionChecker({
+      allow: ['cache.read:@project-cache:chat-session'],
+      deny: [],
+    })
+    expect(() => check('cache.read', '@project-cache:chat-session')).not.toThrow()
+    expect(() => check('cache.read', '@project-cache:other-session')).toThrow(PermissionError)
+  })
 })
 
 describe('makePermissionChecker — dotfile paths', () => {

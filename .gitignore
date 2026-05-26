@@ -8,3 +8,5 @@ dist/
 coverage/
 scratch/
 src/docs/utils-api.json
+src/docs/lifecycle-api.json
+src/docs/globals-api.json

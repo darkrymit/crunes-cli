@@ -1,8 +1,8 @@
 {
   "entryPointStrategy": "expand",
-  "entryPoints": ["src/rune/api/types"],
+  "entryPoints": ["src/rune/api/types-utils"],
   "json": "src/docs/utils-api.json",
-  "tsconfig": "src/rune/api/types/tsconfig.json",
+  "tsconfig": "src/rune/api/types-utils/tsconfig.json",
   "disableSources": true,
   "excludeExternals": true,
   "readme": "none"

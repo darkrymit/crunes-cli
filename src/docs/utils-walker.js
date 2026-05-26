@@ -1,6 +1,7 @@
 const KIND_MODULE     = 2
 const KIND_NAMESPACE  = 4
 const KIND_FUNCTION   = 64
+const KIND_CLASS      = 128
 const KIND_INTERFACE  = 256
 const KIND_PROPERTY   = 1024
 const KIND_METHOD     = 2048
@@ -107,6 +108,7 @@ function walkProperty(child) {
 
 function walkInterface(child) {
   return {
+    kind: child.kind,
     description: commentText(child.comment),
     properties: (child.children ?? [])
       .filter(c => c.kind === KIND_PROPERTY)
@@ -141,7 +143,7 @@ function walkNamespace(child, prefix = '') {
         }
         functions.push(fn)
       }
-    } else if (c.kind === KIND_INTERFACE) {
+    } else if (c.kind === KIND_INTERFACE || c.kind === KIND_CLASS) {
       types[c.name] = walkInterface(c)
     } else if (c.kind === KIND_NAMESPACE) {
       const subNs = walkNamespace(c, prefix ? `${prefix}.${c.name}` : c.name)

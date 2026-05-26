@@ -1,0 +1,9 @@
+{
+  "entryPointStrategy": "expand",
+  "entryPoints": ["src/rune/api/types-globals"],
+  "json": "src/docs/globals-api.json",
+  "tsconfig": "src/rune/api/types-globals/tsconfig.json",
+  "disableSources": true,
+  "excludeExternals": true,
+  "readme": "none"
+}

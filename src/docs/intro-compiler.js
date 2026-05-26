@@ -1,4 +1,6 @@
 import utilsApiData from './utils-api.json' assert { type: 'json' }
+import lifecycleApiData from './lifecycle-api.json' assert { type: 'json' }
+import globalsApiData from './globals-api.json' assert { type: 'json' }
 import { walkUtilsDocs } from './utils-walker.js'
 import { formatUtilsNamespace } from './utils-formatter.js'
 import { getRune } from '../rune/resolver.js'
@@ -116,6 +118,128 @@ export async function use() {
 \`\`\``
 }
 
+function formatLifecycleDocs(data) {
+  const lifecycleNs = walkUtilsDocs(data)[0]
+  if (!lifecycleNs) return ''
+
+  const lines = []
+  lines.push('### Core Entrypoints')
+  lines.push('')
+
+  for (const fn of lifecycleNs.functions) {
+    const isUse = fn.name === 'use'
+    const sigStr = isUse ? 'use(args)' : 'args(builder)'
+    lines.push(`#### \`export function ${sigStr}\``)
+    lines.push('')
+    if (fn.description) lines.push(fn.description)
+    lines.push('')
+    lines.push('**Parameters:**')
+    for (const p of fn.params) {
+      lines.push(`- **\`${p.name}\`** (\`${p.type}\`): ${p.description ?? ''}`)
+    }
+    lines.push('')
+    if (fn.returns && fn.returns !== 'void') {
+      lines.push(`**Returns:** \`${fn.returns}\``)
+      lines.push('')
+    }
+  }
+
+  lines.push('### Supporting Interfaces')
+  lines.push('')
+
+  for (const [typeName, typeDef] of Object.entries(lifecycleNs.types ?? {})) {
+    lines.push(`#### Interface: \`${typeName}\``)
+    lines.push('')
+    if (typeDef.description) lines.push(typeDef.description)
+    lines.push('')
+    
+    if (typeDef.properties?.length) {
+      lines.push('| Field | Type | Description |')
+      lines.push('| --- | --- | --- |')
+      for (const p of typeDef.properties) {
+        lines.push(`| \`${p.name}\` | \`${p.type}\` | ${p.description ?? ''} |`)
+      }
+      lines.push('')
+    }
+
+    if (typeDef.methods?.length) {
+      lines.push('| Method | Returns | Description |')
+      lines.push('| --- | --- | --- |')
+      for (const m of typeDef.methods) {
+        const params = (m.params ?? []).map(p => `${p.name}${p.optional ? '?' : ''}: ${p.type}`).join(', ')
+        lines.push(`| \`${m.name}(${params})\` | \`${m.returns}\` | ${m.description ?? ''} |`)
+      }
+      lines.push('')
+    }
+  }
+
+  return lines.join('\n')
+}
+
+function formatGlobalsDocs(data) {
+  const globalsNs = walkUtilsDocs(data)[0]
+  if (!globalsNs) return ''
+
+  const lines = []
+  lines.push('The sandbox environment provides standard global utility functions and classes directly on `globalThis`. These are backed by the host bridge and do not require importing from `@utils`:')
+  lines.push('')
+  lines.push('### Global Functions')
+  lines.push('')
+
+  const preferredOrder = ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval']
+  const sortedFunctions = [...globalsNs.functions].sort((a, b) => {
+    const idxA = preferredOrder.indexOf(a.name)
+    const idxB = preferredOrder.indexOf(b.name)
+    if (idxA !== -1 && idxB !== -1) return idxA - idxB
+    if (idxA !== -1) return -1
+    if (idxB !== -1) return 1
+    return a.name.localeCompare(b.name)
+  })
+
+  for (const fn of sortedFunctions) {
+    const paramsSig = fn.params.map(p => `${p.name}${p.optional ? '?' : ''}`).join(', ')
+    lines.push(`#### \`function ${fn.name}(${paramsSig})\``)
+    lines.push('')
+    if (fn.description) lines.push(fn.description)
+    lines.push('')
+    if (fn.params && fn.params.length > 0) {
+      lines.push('**Parameters:**')
+      for (const p of fn.params) {
+        lines.push(`- **\`${p.name}\`** (\`${p.type}\`): ${p.description ?? ''}`)
+      }
+      lines.push('')
+    }
+    if (fn.returns && fn.returns !== 'void') {
+      lines.push(`**Returns:** \`${fn.returns}\``)
+      lines.push('')
+    }
+  }
+
+  if (globalsNs.types && Object.keys(globalsNs.types).length > 0) {
+    lines.push('### Global Classes and Interfaces')
+    lines.push('')
+    const sortedTypes = Object.entries(globalsNs.types).sort((a, b) => a[0].localeCompare(b[0]))
+    for (const [typeName, typeDef] of sortedTypes) {
+      const label = typeDef.kind === 128 ? 'Class' : 'Interface'
+      lines.push(`#### ${label}: \`${typeName}\``)
+      lines.push('')
+      if (typeDef.description) lines.push(typeDef.description)
+      lines.push('')
+      if (typeDef.methods?.length) {
+        lines.push('| Method | Returns | Description |')
+        lines.push('| --- | --- | --- |')
+        for (const m of typeDef.methods) {
+          const params = (m.params ?? []).map(p => `${p.name}${p.optional ? '?' : ''}: ${p.type}`).join(', ')
+          lines.push(`| \`${m.name}(${params})\` | \`${m.returns}\` | ${m.description ?? ''} |`)
+        }
+        lines.push('')
+      }
+    }
+  }
+
+  return lines.join('\n')
+}
+
 export async function compileIntro({ config, format, projectRoot, configRoot, hasProjectError }) {
   const namespaces = walkUtilsDocs(utilsApiData)
 
@@ -176,36 +300,102 @@ export async function compileIntro({ config, format, projectRoot, configRoot, ha
   lines.push('Crunes is designed as a way to rapidly draft useful scripts inside a project workspace, primarily utilized by AI coding agents to perform repeatable complex tasks such as context ingestion, application interaction, orchestration, and sandboxed file/command execution.')
   lines.push('')
 
-  // Anatomy of a Rune
+  // Section 1: Anatomy of a Rune
   lines.push('## 1. Anatomy of a Rune')
   lines.push('')
-  lines.push('Crunes execute inside an isolated sandbox (`isolated-vm`). Runes are ESM modules exporting a `use` method:')
+  lines.push('Crunes execute inside an isolated sandbox (`isolated-vm`). Runes are ESM modules exporting a `use` method and an optional `args` method to declare schemas:')
   lines.push('')
   lines.push('```javascript')
   lines.push('// Example Rune: hello.js')
   lines.push('export function args(builder) {')
   lines.push('  return builder')
-  lines.push('    .positional(\'name\', { description: \'Target name\', default: \'World\' })')
+  lines.push('    .positional(\'<name>\', \'Target name to greet\')')
   lines.push('}')
   lines.push('')
   lines.push('export async function use(args) {')
-  lines.push('  const target = args.name;')
-  lines.push('  return `Hello, ${target}!`;')
+  lines.push('  const name = args._[0] ?? \'World\';')
+  lines.push('  return `Hello, ${name}!`;')
   lines.push('}')
   lines.push('```')
   lines.push('')
 
-  // Permissions
-  lines.push('## 2. Sandbox Security & Permissions')
+  // Section 2: Rune Exports API Reference
+  lines.push('## 2. Rune Exports API Reference')
   lines.push('')
-  lines.push('Runes do not have direct access to Node.js APIs. They declare specific permission scopes in `.crunes/config.json`: ')
+  lines.push('The sandboxed execution environment parses entrypoint exports to build schemas and run modules safely. Their dynamic type specification is detailed below:')
   lines.push('')
+  lines.push(formatLifecycleDocs(lifecycleApiData))
+  lines.push('')
+
+  // Section 3: Global Sandbox APIs
+  lines.push('## 3. Global Sandbox APIs')
+  lines.push('')
+  lines.push(formatGlobalsDocs(globalsApiData))
+  lines.push('')
+
+  // Section 4: CLI Calling & Argument Conventions
+  lines.push('## 4. CLI Calling & Argument Conventions')
+  lines.push('')
+  lines.push('Crunes enforces a strict 3-tier boundary when executing runes via the CLI. Misplacing flags will cause the parser to fail or misinterpret the arguments.')
+  lines.push('')
+  lines.push('### The Strict 3-Tier Parsing Boundary')
+  lines.push('All command invocations must follow this structural order exactly:')
+  lines.push('1. **Global Flags**: Options parsed by the core process (e.g. `--cwd <path>`, `-p` for plain output, `--verbose`).')
+  lines.push('2. **Command Flags**: Options parsed by the `use` command (e.g. `-b` / `--batch`, `--fail-fast`, `--format json`).')
+  lines.push('3. **Rune Arguments**: Config and positional values passed directly to the execution sandbox.')
+  lines.push('')
+  lines.push('```bash')
+  lines.push('# Correct Flag Placement')
+  lines.push('crunes --cwd ./project -p use --format json greeting "Alice"')
+  lines.push('```')
+  lines.push('')
+  lines.push('> [!WARNING]')
+  lines.push('> Placing a global flag after `use` (e.g. `crunes use --cwd ./project`) causes an instant error.')
+  lines.push('')
+  lines.push('### The Misplaced Flag Pitfall (Section Filters)')
+  lines.push('Section filtering flags (`-s` or `--section`) belong to the segment prefix *before* the rune key. If placed *after* the key, they are intercepted and treated as raw positional arguments inside the rune!')
+  lines.push('')
+  lines.push('```bash')
+  lines.push('# CORRECT: The filter is parsed successfully, outputting only the "endpoints" section')
+  lines.push('crunes use -s endpoints api v2')
+  lines.push('')
+  lines.push('# INCORRECT: Treated as positional args: args._ = ["v2", "--section", "endpoints"]')
+  lines.push('crunes use api v2 --section endpoints')
+  lines.push('```')
+  lines.push('')
+  lines.push('### Batched Executions')
+  lines.push('Multiple runes can be run sequentially in one invocation using the `+` operator (requires the `-b` / `--batch` command flag):')
+  lines.push('```bash')
+  lines.push('crunes use -b -s endpoints api + greeting "World"')
+  lines.push('```')
+  lines.push('')
+  lines.push('### Hook Token Prompt Syntax')
+  lines.push('When using the Claude Code plugin (`crunes-aci`), prompt tokens are parsed automatically before submission:')
+  lines.push('- **`$key`**: Runs `key` with all sections.')
+  lines.push('- **`$key(arg1,arg2)`**: Passes positional arguments to `key`.')
+  lines.push('- **`$key::sec1,sec2`**: Section filters applied to `key`.')
+  lines.push('- **`$key(arg1)::sec1`**: Combination of positional argument and section filter.')
+  lines.push('')
+
+  // Section 5: Configuration Reference
+  lines.push('## 5. Configuration Reference')
+  lines.push('')
+  lines.push('Configuration properties in `.crunes/config.json` control permissions, default variables, mappings, and plugin registration.')
+  lines.push('')
+  lines.push('### Sandbox Security & Permissions')
+  lines.push('Runes do not have direct access to Node.js APIs. They declare specific permission scopes in `.crunes/config.json`:')
   lines.push('- **`allow`**: Whitelist of capabilities (e.g. `["fs:read:src/**", "http:fetch:api.github.com"]`).')
   lines.push('- **`deny`**: Blacklist of capabilities (processed first).')
   lines.push('')
+  lines.push('### Config File Fields Reference')
+  lines.push('- **`permissions`**: Mappings of permission templates scoped to specific runes.')
+  lines.push('- **`runes`**: Definition of project-registered runes, containing local filesystem paths, pre-declared vars, and metadata.')
+  lines.push('- **`vars`**: Key-value settings scoped to specific runes (accessible inside the isolate via `utils.vars.read(key)`).')
+  lines.push('- **`plugins`**: Mappings of enabled third-party marketplaces or plugins.')
+  lines.push('')
 
-  // Dynamic API Reference
-  lines.push('## 3. Dynamic `@utils` Reference')
+  // Section 6: Dynamic @utils Reference
+  lines.push('## 6. Dynamic `@utils` Reference')
   lines.push('')
   lines.push('The following utility namespaces are available to runes in the execution isolate:')
   lines.push('')
@@ -230,9 +420,9 @@ export async function compileIntro({ config, format, projectRoot, configRoot, ha
     lines.push('')
   }
 
-  // Workspace Context
+  // Section 7: Workspace Context
   if (config) {
-    lines.push('## 4. Workspace Context')
+    lines.push('## 7. Workspace Context')
     lines.push('')
     lines.push(`- **Project Root**: \`${projectRoot}\``)
     lines.push(`- **Config Path**: \`${configRoot}\``)
@@ -278,13 +468,13 @@ export async function compileIntro({ config, format, projectRoot, configRoot, ha
       lines.push('')
     }
   } else if (hasProjectError) {
-    lines.push('## 4. Workspace Context')
+    lines.push('## 7. Workspace Context')
     lines.push('')
     lines.push(`> [!WARNING]`)
     lines.push(`> Failed to resolve local project context: ${hasProjectError}`)
     lines.push('')
   } else {
-    lines.push('## 4. Workspace Context')
+    lines.push('## 7. Workspace Context')
     lines.push('')
     lines.push('_No local project context loaded (global mode enabled)._')
     lines.push('')

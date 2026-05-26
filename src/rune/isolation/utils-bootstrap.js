@@ -399,3 +399,64 @@ globalThis.utils = {
 
 export const { fs, shell, section, rune, json, yaml, xml, http, env, vars, archive, cache, sqlite, crypto, ws, time } = globalThis.utils
 export { md, tree }
+
+// ─── Global Sandbox Timers ───────────────────────────────────────────────────
+const timers = new Map()
+let nextTimerId = 1
+
+globalThis.setTimeout = function(callback, delay = 0, ...args) {
+  if (typeof callback !== 'function') throw new TypeError('callback must be a function')
+  const id = nextTimerId++
+  let active = true
+
+  timers.set(id, {
+    clear() {
+      active = false
+      timers.delete(id)
+    }
+  })
+
+  globalThis.utils.time.after(delay).then(() => {
+    if (active) {
+      timers.delete(id)
+      callback(...args)
+    }
+  })
+
+  return id
+}
+
+globalThis.clearTimeout = function(id) {
+  const timer = timers.get(id)
+  if (timer) timer.clear()
+}
+
+globalThis.setInterval = function(callback, delay = 0, ...args) {
+  if (typeof callback !== 'function') throw new TypeError('callback must be a function')
+  const id = nextTimerId++
+  let active = true
+
+  const run = () => {
+    globalThis.utils.time.after(delay).then(() => {
+      if (active) {
+        callback(...args)
+        run() // Schedule next execution
+      }
+    })
+  }
+
+  timers.set(id, {
+    clear() {
+      active = false
+      timers.delete(id)
+    }
+  })
+
+  run()
+  return id
+}
+
+globalThis.clearInterval = function(id) {
+  const timer = timers.get(id)
+  if (timer) timer.clear()
+}

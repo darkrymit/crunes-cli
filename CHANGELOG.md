@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.6] - 2026-05-26
+
+### Added
+- **Global Sandbox APIs**: Standard timing functions (`setTimeout`, `clearTimeout`, `setInterval`, `clearInterval`) and encoding utility classes (`TextEncoder`, `TextDecoder`) are now exposed globally on `globalThis` inside execution isolates.
+- **Isolated Types**: Added a dedicated `src/rune/api/types-globals/` directory and `typedoc-globals.json` compilation configuration to isolate global types from standard libraries.
+- **Ignored Dynamic Files**: Added `INTRO.md` and `globals-api.json` to respective `.gitignore` files to keep on-demand files untracked.
+
+### Changed
+- **Renamed Types Directory**: Moved core type definitions folder from `types` to `types-utils` to establish structural naming consistency alongside `types-lifecycle`.
+
+### Fixed
+- **Virtual Root Named Permissions**: Resolved a bug in the permission matching store where named sub-scopes (e.g., `cache.read:@project-cache:chat-session`) containing colons were incorrectly matched, ensuring cache and SQLite exact scoping is fully recognized.
+
+---
+
 ## [0.5.5] - 2026-05-26
 
 ### Added

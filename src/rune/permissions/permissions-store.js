@@ -9,7 +9,7 @@ export function matchStorePermission(value, pattern, cap) {
   const valueLoc  = vColon >= 0 ? value.slice(0, vColon)  : value
   const valueName = vColon >= 0 ? value.slice(vColon + 1) : null
 
-  if (patBody.startsWith('@')) {
+  if (patBody.startsWith('@') && !patBody.includes(':')) {
     // Virtual root path pattern — no name component in pattern.
     // /** means "root AND all subpaths": expand to also match the bare prefix.
     if (patBody.endsWith('/**')) {

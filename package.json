@@ -1,6 +1,6 @@
 {
   "name": "@darkrymit/crunes-cli",
-  "version": "0.5.5",
+  "version": "0.5.6",
   "description": "CLI tool for querying crunes enrichers",
   "type": "module",
   "bin": {
@@ -10,7 +10,7 @@
     "dist/"
   ],
   "scripts": {
-    "build": "typedoc && node build.mjs",
+    "build": "typedoc --options typedoc.json && typedoc --options typedoc-lifecycle.json && typedoc --options typedoc-globals.json && node build.mjs",
     "prepack": "node build.mjs",
     "test": "vitest run"
   },
