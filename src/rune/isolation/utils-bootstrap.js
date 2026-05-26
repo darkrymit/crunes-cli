@@ -416,7 +416,7 @@ globalThis.setTimeout = function(callback, delay = 0, ...args) {
     }
   })
 
-  globalThis.utils.time.after(delay).then(() => {
+  $__utils_time_after.apply(undefined, [delay], { result: { promise: true } }).then(() => {
     if (active) {
       timers.delete(id)
       callback(...args)
