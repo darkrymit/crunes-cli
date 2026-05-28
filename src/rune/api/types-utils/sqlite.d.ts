@@ -24,6 +24,13 @@ declare namespace sqlite {
      */
     exec(sql: string, params?: unknown[]): Promise<{ changes: number; lastInsertRowid: number }>
     /**
+     * Runs a multi-statement SQL string. Intended for schema initialization and migrations.
+     * Accepts raw SQL only — no parameter binding. Never interpolate user-controlled values.
+     * Requires `sqlite.write:<location>:<name>` permission.
+     * @param sql Raw SQL string, may contain multiple semicolon-separated statements
+     */
+    run(sql: string): Promise<void>
+    /**
      * Wrap multiple exec calls in a transaction. Rolls back on error.
      * Requires `sqlite.write:<location>:<name>` permission.
      */

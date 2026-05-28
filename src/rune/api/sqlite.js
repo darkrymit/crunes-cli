@@ -41,6 +41,10 @@ function makeHandle(dbPath, checkRead, checkWrite, connections) {
       const info = db.prepare(sql).run(params)
       return { changes: info.changes, lastInsertRowid: Number(info.lastInsertRowid) }
     },
+    run(sql) {
+      if (checkWrite) checkWrite()
+      db.exec(sql)
+    },
     close() {
       if (db.open) {
         db.close()

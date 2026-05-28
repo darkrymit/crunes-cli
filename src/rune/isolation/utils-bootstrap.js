@@ -249,6 +249,8 @@ globalThis.utils = {
           $__utils_sqlite_get.apply(undefined, [id, sql, params], { arguments: { copy: true }, result: { promise: true, copy: true } }),
         exec: (sql, params = []) =>
           $__utils_sqlite_exec.apply(undefined, [id, sql, params], { arguments: { copy: true }, result: { promise: true, copy: true } }),
+        run: (sql) =>
+          $__utils_sqlite_run.apply(undefined, [id, sql], { arguments: { copy: true }, result: { promise: true } }),
         transaction: async (fn) => {
           await db.exec('BEGIN')
           try { await fn(); await db.exec('COMMIT') }

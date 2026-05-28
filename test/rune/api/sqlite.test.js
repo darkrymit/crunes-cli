@@ -308,3 +308,45 @@ describe('createSqliteUtils — dispose', () => {
     expect(() => sqlite.dispose()).not.toThrow()
   })
 })
+
+describe('SqliteHandle — run', () => {
+  let tmp
+  beforeEach(async () => {
+    tmp = await makeTmp()
+    process.env.CRUNES_STORE = tmp
+  })
+  afterEach(async () => {
+    delete process.env.CRUNES_STORE
+    await rm(tmp, { recursive: true, force: true })
+  })
+
+  it('executes a multi-statement SQL script', async () => {
+    const sqlite = createSqliteUtils(tmp, null, { pluginId: 'plug@1.0.0' })
+    const h = await sqlite.openHandle('@plugin-sqlite', 'test')
+    h.run(`
+      CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT);
+      CREATE TABLE posts (id INTEGER PRIMARY KEY, title TEXT);
+      INSERT INTO users (name) VALUES ('alice');
+    `)
+    expect(h.query('SELECT name FROM users')).toEqual([{ name: 'alice' }])
+    expect(h.query("SELECT name FROM sqlite_master WHERE type='table' AND name='posts'"))
+      .toEqual([{ name: 'posts' }])
+    h.close()
+  })
+
+  it('returns undefined', async () => {
+    const sqlite = createSqliteUtils(tmp, null, { pluginId: 'plug@1.0.0' })
+    const h = await sqlite.openHandle('@plugin-sqlite', 'test')
+    const result = h.run('CREATE TABLE t (id INTEGER)')
+    expect(result).toBeUndefined()
+    h.close()
+  })
+
+  it('requires sqlite.write permission', async () => {
+    const sqlite = createSqliteUtils(tmp, makePermissionChecker({ allow: [], deny: [] }), { pluginId: 'plug@1.0.0' })
+    const h = await sqlite.openHandle('@plugin-sqlite', 'test')
+    expect(() => h.run('CREATE TABLE t (id INTEGER)')).toThrow(PermissionError)
+    h.close()
+  })
+})
+

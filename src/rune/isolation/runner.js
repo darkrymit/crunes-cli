@@ -330,6 +330,11 @@ async function injectUtils(isolate, context, utils, runeCallback, vars, projectD
     if (!handle) throw new Error(`Invalid sqlite handle: ${id}`)
     return handle.exec(sql, params || [])
   }))
+  await jail.set('$__utils_sqlite_run', new ivm.Reference(async (id, sql) => {
+    const handle = sqliteHandles.get(id)
+    if (!handle) throw new Error(`Invalid sqlite handle: ${id}`)
+    handle.run(sql)
+  }))
   await jail.set('$__utils_sqlite_close', new ivm.Reference(async (id) => {
     const handle = sqliteHandles.get(id)
     if (!handle) return
