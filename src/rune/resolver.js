@@ -70,6 +70,7 @@ async function resolveRuneFromPlugins(config, runeKey) {
 
 export async function runRune(dir, config, key, args, opts = {}, _callStack = []) {
   const configDir = opts.configDir ?? dir
+  const instanceId = opts.instanceId ?? "1"
 
   let localOnly = false
   if (key.startsWith('project:')) {
@@ -82,7 +83,16 @@ export async function runRune(dir, config, key, args, opts = {}, _callStack = []
   }
 
   const nextStack = [..._callStack, key]
-  const runeCallback = (childKey, childArgs) => runRune(dir, config, childKey, childArgs, { configDir }, nextStack)
+  let childCounter = 0
+  const runeCallback = (childKey, childArgs) => {
+    childCounter++
+    const childInstanceId = `${instanceId}.${childCounter}`
+    return runRune(dir, config, childKey, childArgs, {
+      configDir,
+      onEvent: opts.onEvent,
+      instanceId: childInstanceId
+    }, nextStack)
+  }
 
   const pluginMatch = localOnly ? null : await resolvePluginRune(config, key)
   if (pluginMatch) {
@@ -95,6 +105,8 @@ export async function runRune(dir, config, key, args, opts = {}, _callStack = []
       projectDir: dir, opts: config, runeCallback,
       sections: opts.sections ?? null,
       lifecycle: 'use',
+      onEvent: opts.onEvent ?? null,
+      instanceId,
     })
     return normaliseResult(result)
   }
@@ -112,6 +124,8 @@ export async function runRune(dir, config, key, args, opts = {}, _callStack = []
         projectDir: dir, opts: config, runeCallback,
         sections: opts.sections ?? null,
         lifecycle: 'use',
+        onEvent: opts.onEvent ?? null,
+        instanceId,
       })
       return normaliseResult(result)
     }
@@ -132,6 +146,8 @@ export async function runRune(dir, config, key, args, opts = {}, _callStack = []
       projectDir: dir, opts: config, runeCallback,
       sections: opts.sections ?? null,
       lifecycle: 'use',
+      onEvent: opts.onEvent ?? null,
+      instanceId,
     })
     return normaliseResult(result)
   }
@@ -145,6 +161,8 @@ export async function runRune(dir, config, key, args, opts = {}, _callStack = []
     vars: entry.vars ?? {},
     lifecycle: 'use',
     runeKey: key,
+    onEvent: opts.onEvent ?? null,
+    instanceId,
   })
   return normaliseResult(result)
 }

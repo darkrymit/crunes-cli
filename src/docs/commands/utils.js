@@ -1,11 +1,11 @@
-import utilsApiData from '../utils-api.json' assert { type: 'json' }
+import utilsApiData from '../generated/utils-api.json' assert { type: 'json' }
 import { walkUtilsDocs } from '../utils-walker.js'
 import { formatUtilsIndex, formatUtilsNamespace } from '../utils-formatter.js'
 import { output } from '../../shared/output.js'
 
 const ALL_NAMESPACES = walkUtilsDocs(utilsApiData)
 
-export async function handler({ namespaces = [], format = 'md' } = {}) {
+export async function handler({ namespaces = [], format = 'text' } = {}) {
   let anyFailed = false
 
   const targets = namespaces.length === 0

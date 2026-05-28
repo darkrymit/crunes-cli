@@ -6,7 +6,7 @@ import { formatHelp } from '../formatter.js'
 import { computeEffectivePermissions } from '../../rune/permissions/permissions.js'
 import { output } from '../../shared/output.js'
 
-export async function handler({ keys, format = 'md', projectRoot = process.cwd(), configRoot = projectRoot }) {
+export async function handler({ keys, format = 'text', projectRoot = process.cwd(), configRoot = projectRoot }) {
   let config
   try {
     config = loadConfig(configRoot)

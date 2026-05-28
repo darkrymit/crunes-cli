@@ -46,7 +46,7 @@ async function compileStaticModule(isolate, key) {
  */
 const VALID_SIGNALS = new Set(['SIGTERM', 'SIGKILL', 'SIGINT', 'SIGHUP', 'SIGUSR1', 'SIGUSR2'])
 
-async function injectUtils(isolate, context, utils, runeCallback, vars, projectDir, checkPermission, currentRuneKey) {
+async function injectUtils(isolate, context, utils, runeCallback, vars, projectDir, checkPermission, currentRuneKey, sections, onEvent) {
   const jail = context.global
 
   await jail.set('$__utils_fs_read', new ivm.Reference(async (relPath, opts) => {
@@ -105,25 +105,44 @@ async function injectUtils(isolate, context, utils, runeCallback, vars, projectD
   await jail.set('$__utils_shell_execInSession_write', new ivm.Reference((id, text) => {
     shellHandles.get(id).write(text)
   }))
-  await jail.set('$__utils_shell_execInSession_expect', new ivm.Reference(async (id, pattern, timeoutMs) => {
-    let pat = pattern
-    if (pattern && typeof pattern === 'object' && pattern.type === 'regex') {
-      pat = new RegExp(pattern.source, pattern.flags)
-    }
-    return shellHandles.get(id).expect(pat, timeoutMs)
+  await jail.set('$__utils_shell_execInSession_end', new ivm.Reference((id) => {
+    shellHandles.get(id).proc.stdin.end()
   }))
-  await jail.set('$__utils_shell_execInSession_output', new ivm.Reference((id) => {
-    return shellHandles.get(id).output()
+  await jail.set('$__utils_shell_execInSession_on', new ivm.Reference((idRef, typeRef, eventRef, callbackRef) => {
+    const id = typeof idRef === 'object' && idRef.copySync ? idRef.copySync() : idRef
+    const type = typeof typeRef === 'object' && typeRef.copySync ? typeRef.copySync() : typeRef
+    const event = typeof eventRef === 'object' && eventRef.copySync ? eventRef.copySync() : eventRef
+    shellHandles.get(id).setHandler(type, event, callbackRef)
   }))
-  await jail.set('$__utils_shell_execInSession_waitForExit', new ivm.Reference(async (id) => {
-    return shellHandles.get(id).waitForExit()
-  }))
-  await jail.set('$__utils_shell_execInSession_kill', new ivm.Reference((id) => {
+  await jail.set('$__utils_shell_execInSession_kill', new ivm.Reference((id, signal) => {
     const handle = shellHandles.get(id)
     if (handle) {
-      handle.kill()
+      handle.kill(signal ?? undefined)
       shellHandles.delete(id)
     }
+  }))
+
+  const decoders = new Map()
+  let nextDecoderId = 1
+  const _hostEncoder = new TextEncoder()
+  await jail.set('$__utils_encode', new ivm.Reference((str) => {
+    return _hostEncoder.encode(str).buffer
+  }))
+  await jail.set('$__utils_decoder_create', new ivm.Reference((label, options) => {
+    const d = new TextDecoder(label ?? 'utf-8', options ?? undefined)
+    const id = nextDecoderId++
+    decoders.set(id, d)
+    return id
+  }))
+  await jail.set('$__utils_decoder_decode', new ivm.Reference((id, arrayBuffer, decodeOptions) => {
+    const d = decoders.get(id)
+    if (!d) throw new Error(`Invalid decoder ID: ${id}`)
+    return d.decode(new Uint8Array(arrayBuffer), decodeOptions ?? undefined)
+  }))
+
+  await jail.set('$__utils_section_emit', new ivm.Reference((section) => {
+    if (sections) sections.push(section)
+    if (onEvent) onEvent({ type: 'section', section })
   }))
   await jail.set('$__utils_section_create', new ivm.Reference((name, data, opts) => {
     return utils.section.create(name, data, opts)
@@ -405,10 +424,15 @@ async function injectUtils(isolate, context, utils, runeCallback, vars, projectD
   return utilsMod
 }
 
-async function injectConsole(isolate, context) {
+async function injectConsole(isolate, context, onEvent) {
   const jail = context.global
-  await jail.set('$__log', new ivm.Reference((...args) => process.stdout.write(args.join(' ') + '\n')))
-  await jail.set('$__err', new ivm.Reference((...args) => process.stderr.write(args.join(' ') + '\n')))
+  if (onEvent) {
+    await jail.set('$__log', new ivm.Reference((...args) => onEvent({ type: 'log', message: args.join(' ') })))
+    await jail.set('$__err', new ivm.Reference((...args) => onEvent({ type: 'error', message: args.join(' ') })))
+  } else {
+    await jail.set('$__log', new ivm.Reference((...args) => process.stdout.write(args.join(' ') + '\n')))
+    await jail.set('$__err', new ivm.Reference((...args) => process.stderr.write(args.join(' ') + '\n')))
+  }
 
   const consoleMod = await compileStaticModule(isolate, 'console')
   await consoleMod.instantiate(context, (spec) => { throw new Error(`Unexpected import in console-bootstrap: ${spec}`) })
@@ -438,7 +462,10 @@ export async function runRuneInIsolate(runeFile, effective, args, projectDir, {
   lifecycle = 'use',
   pluginId = null,
   runeKey = null,
+  onEvent = null,
+  instanceId = '1',
 } = {}) {
+  const wrappedOnEvent = onEvent ? (event) => onEvent({ ...event, instanceId, rune: runeKey }) : null
   const augmented = {
     allow: [...effective.allow, ...getAutoPermits({ pluginId, pluginDir })],
     deny: effective.deny,
@@ -459,8 +486,8 @@ export async function runRuneInIsolate(runeFile, effective, args, projectDir, {
     }))
 
     if (isVerbose) console.error(`[crunes:debug] injecting utils and console...`)
-    const utilsMod = await injectUtils(isolate, context, utils, runeCallback, vars, projectDir, checkPermission, runeKey)
-    await injectConsole(isolate, context)
+    const utilsMod = await injectUtils(isolate, context, utils, runeCallback, vars, projectDir, checkPermission, runeKey, sections, wrappedOnEvent)
+    await injectConsole(isolate, context, wrappedOnEvent)
 
     if (pluginDir != null) {
       await context.global.set('CRUNES_PLUGIN_ROOT', pluginDir)
@@ -599,6 +626,8 @@ export async function runPluginRune(pluginDir, pluginCacheDir, runeKey, pluginJs
     vars:             opts.vars ?? {},
     lifecycle:        opts.lifecycle ?? 'use',
     runeKey,
+    onEvent:          opts.onEvent ?? null,
+    instanceId:       opts.instanceId ?? '1',
   })
 }
 
@@ -627,8 +656,8 @@ export async function getArgsSchema(runeFile, effective, projectDir, {
       if (!ALLOW_BUILTINS.has(spec)) throw new Error(`PermissionError: Sandbox escape blocked. Cannot require '${spec}' on host.`);
       return hostRequire(spec)
     }))
-    const utilsMod = await injectUtils(isolate, context, utils, null, vars, projectDir, checkPermission, null)
-    await injectConsole(isolate, context)
+    const utilsMod = await injectUtils(isolate, context, utils, null, vars, projectDir, checkPermission, null, null, null)
+    await injectConsole(isolate, context, null)
     if (pluginDir != null) await context.global.set('CRUNES_PLUGIN_ROOT', pluginDir)
 
     const runeSrc = await fs.readFile(runeFile, 'utf8')
@@ -706,7 +735,7 @@ export async function getArgsSchema(runeFile, effective, projectDir, {
 /**
  * Compute effective permissions and run a plugin rune. Convenience wrapper for core.js.
  */
-export async function executePluginRune({ pluginDir, pluginCacheDir, runeKey, pluginJson, projectPerms, projectVars = {}, args, projectDir, opts, runeCallback, sections, lifecycle = 'use', }) {
+export async function executePluginRune({ pluginDir, pluginCacheDir, runeKey, pluginJson, projectPerms, projectVars = {}, args, projectDir, opts, runeCallback, sections, lifecycle = 'use', onEvent = null, instanceId = '1', }) {
   const runePerms     = pluginJson.runes[runeKey]?.permissions ?? {}
   const effective     = computeEffectivePermissions(runePerms, projectPerms, lifecycle)
   const runeVars      = pluginJson.runes[runeKey]?.vars ?? {}
@@ -718,5 +747,7 @@ export async function executePluginRune({ pluginDir, pluginCacheDir, runeKey, pl
     vars: effectiveVars,
     lifecycle,
     runeKey,
+    onEvent,
+    instanceId,
   })
 }

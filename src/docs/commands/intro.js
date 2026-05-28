@@ -4,7 +4,7 @@ import { loadConfig } from '../../core/config.js'
 import { compileIntro } from '../intro-compiler.js'
 import { output } from '../../shared/output.js'
 
-export async function handler({ global, out, format = 'md', projectRoot = process.cwd(), configRoot = projectRoot }) {
+export async function handler({ global, out, format = 'text', projectRoot = process.cwd(), configRoot = projectRoot }) {
   let config = null
   let loadError = null
 

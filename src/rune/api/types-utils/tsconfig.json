@@ -6,5 +6,5 @@
     "strict": false,
     "noEmit": true
   },
-  "include": ["./**/*.d.ts"]
+  "include": ["./**/*.d.ts", "../types-globals/globals.d.ts"]
 }

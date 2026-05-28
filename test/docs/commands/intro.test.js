@@ -22,13 +22,13 @@ describe('help intro command handler', () => {
   })
 
   it('prints compiled intro to stdout by default', async () => {
-    await handler({ global: true, format: 'md' })
+    await handler({ global: true, format: 'text' })
     const out = written.join('')
     expect(out).toContain('# Crunes: Fast Sandboxed Scripting & Context Framework')
   })
 
   it('writes output to a file if out parameter is passed', async () => {
-    await handler({ global: true, format: 'md', out: 'test-crunes-intro.md' })
+    await handler({ global: true, format: 'text', out: 'test-crunes-intro.md' })
     expect(existsSync(outFilePath)).toBe(true)
   })
 })

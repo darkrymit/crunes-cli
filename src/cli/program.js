@@ -43,7 +43,7 @@ export function buildProgram() {
       'Command flags:\n' +
       '  -b, --batch       enable batching multiple runes with +\n' +
       '  --section s1,s2  filter output sections (per rune, before the key)\n' +
-      '  --format md|json  output format (default: md)\n' +
+      '  --format text|jsonl  output format (default: text)\n' +
       '  --fail-fast       stop on first error\n\n' +
       'Key prefixes:\n' +
       '  project:name      resolve from project config only\n' +
@@ -63,7 +63,7 @@ export function buildProgram() {
   helpGroup
     .command('rune <rune...>')
     .description('Show usage, argument schema, and examples for one or more runes')
-    .addOption(new Option('--format <format>', 'output format').choices(['md', 'json']).default('md'))
+    .addOption(new Option('--format <format>', 'output format').choices(['text', 'json']).default('text'))
     .action(async (keys, opts) => {
       const { handler } = await import('../docs/commands/rune.js')
       await handler({ keys, format: opts.format, projectRoot: projectRoot(), configRoot: configRoot() })
@@ -72,7 +72,7 @@ export function buildProgram() {
   helpGroup
     .command('utils [namespaces...]')
     .description('Show function signatures and parameter docs for utils.* namespaces')
-    .addOption(new Option('--format <format>', 'output format').choices(['md', 'json']).default('md'))
+    .addOption(new Option('--format <format>', 'output format').choices(['text', 'json']).default('text'))
     .action(async (namespaces, opts) => {
       const { handler } = await import('../docs/commands/utils.js')
       await handler({ namespaces, format: opts.format })
@@ -83,7 +83,7 @@ export function buildProgram() {
     .description('Generate a comprehensive introduction and context document for Crunes and the active project')
     .option('-g, --global', 'generate a global, pure-ecosystem guide (skip local project context)')
     .option('--out <path>', 'output file path (defaults to stdout)')
-    .addOption(new Option('--format <format>', 'output format').choices(['md', 'json']).default('md'))
+    .addOption(new Option('--format <format>', 'output format').choices(['text', 'json']).default('text'))
     .action(async (opts) => {
       const { handler } = await import('../docs/commands/intro.js')
       await handler({
@@ -166,7 +166,7 @@ export function buildProgram() {
   program
     .command('list')
     .description('List all registered runes')
-    .addOption(new Option('--format <format>', 'output format').choices(['md', 'json']).default('md'))
+    .addOption(new Option('--format <format>', 'output format').choices(['text', 'json']).default('text'))
     .action(async (opts) => {
       const { handler } = await import('../rune/commands/list.js')
       await handler({ format: opts.format, plain: !!program.opts().plain, projectRoot: projectRoot(), configRoot: configRoot() })
@@ -304,7 +304,7 @@ export function buildProgram() {
   plugin
     .command('list')
     .description('List installed plugins')
-    .addOption(new Option('--format <format>', 'output format').choices(['md', 'json']).default('md'))
+    .addOption(new Option('--format <format>', 'output format').choices(['text', 'json']).default('text'))
     .action(async (opts) => {
       const { handler } = await import('../plugin/commands/list.js')
       await handler({ format: opts.format })
@@ -352,7 +352,7 @@ export function buildProgram() {
   template
     .command('list [template-source]')
     .description('List available templates. [template-source] can be "project" (project config only) or a plugin name; omit to list all.')
-    .addOption(new Option('--format <format>', 'output format').choices(['md', 'json']).default('md'))
+    .addOption(new Option('--format <format>', 'output format').choices(['text', 'json']).default('text'))
     .action(async (source, opts) => {
       const { handler } = await import('../template/commands/list.js')
       await handler({ source, format: opts.format, plain: !!program.opts().plain, projectRoot: projectRoot() })
@@ -433,7 +433,7 @@ export function buildProgram() {
   marketplace
     .command('browse')
     .description('List all plugins from all configured marketplace sources')
-    .addOption(new Option('--format <format>', 'output format').choices(['md', 'json']).default('md'))
+    .addOption(new Option('--format <format>', 'output format').choices(['text', 'json']).default('text'))
     .action(async (opts) => {
       const { handler } = await import('../marketplace/commands/browse.js')
       await handler({ format: opts.format })

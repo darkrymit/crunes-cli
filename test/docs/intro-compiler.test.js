@@ -5,7 +5,7 @@ describe('compileIntro compiler engine', () => {
   it('compiles pure ecosystem guide when global flag is enabled (null config)', async () => {
     const output = await compileIntro({
       config: null,
-      format: 'md',
+      format: 'text',
       projectRoot: '/test',
       configRoot: '/test',
     })
@@ -49,7 +49,7 @@ describe('compileIntro compiler engine', () => {
 
     const output = await compileIntro({
       config: mockConfig,
-      format: 'md',
+      format: 'text',
       projectRoot: '/test',
       configRoot: '/test',
     })

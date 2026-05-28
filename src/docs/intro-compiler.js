@@ -1,6 +1,6 @@
-import utilsApiData from './utils-api.json' assert { type: 'json' }
-import lifecycleApiData from './lifecycle-api.json' assert { type: 'json' }
-import globalsApiData from './globals-api.json' assert { type: 'json' }
+import utilsApiData from './generated/utils-api.json' assert { type: 'json' }
+import lifecycleApiData from './generated/lifecycle-api.json' assert { type: 'json' }
+import globalsApiData from './generated/globals-api.json' assert { type: 'json' }
 import { walkUtilsDocs } from './utils-walker.js'
 import { formatUtilsNamespace } from './utils-formatter.js'
 import { getRune } from '../rune/resolver.js'

@@ -47,7 +47,7 @@ Example: crunes --cwd ./dir use --format json myrune --strict
 }
 
 export function parseUseArgs(argv) {
-  let format = 'md'
+  let format = 'text'
   let failFast = false
   let allowBatch = false
   let i = 0
@@ -92,7 +92,7 @@ export function parseUseArgs(argv) {
 
 export async function handler({
   segments,
-  format = 'md',
+  format = 'text',
   failFast = false,
   projectRoot = process.cwd(),
   configRoot = projectRoot,
@@ -106,14 +106,57 @@ export async function handler({
     process.exit(1)
   }
 
-  const allSections = []
   let anyFailed = false
+  const printedSections = new Set()
 
-  for (const { key, sections: sectionFilter, runeArgs } of segments) {
+  for (let i = 0; i < segments.length; i++) {
+    const { key, sections: sectionFilter, runeArgs } = segments[i]
     let sections
     try {
       if (isVerbose) console.error(`[crunes:debug] Loading rune "${key}"`)
-      sections = await runRune(projectRoot, config, key, runeArgs, { sections: sectionFilter, configDir: configRoot })
+      
+      sections = await runRune(projectRoot, config, key, runeArgs, {
+        sections: sectionFilter,
+        configDir: configRoot,
+        instanceId: String(i + 1),
+        onEvent(event) {
+          const { type, message, section, instanceId, rune } = event
+          const prefix = `[${instanceId}:${rune}:${type}]`
+          if (format === 'jsonl') {
+            process.stdout.write(JSON.stringify({
+              type,
+              rune,
+              instance: instanceId,
+              ...(message != null ? { message } : {}),
+              ...(section != null ? { section } : {}),
+            }) + '\n')
+            if (type === 'section') printedSections.add(section)
+          } else {
+            if (type === 'section') {
+              if (!sectionFilter || micromatch.isMatch(section.name, sectionFilter)) {
+                const rendered = renderSection(section)
+                const lines = rendered ? rendered.split('\n') : []
+                let contentStartIndex = 1
+                let attrs = ''
+                if (lines[1] && lines[1].startsWith('[')) {
+                  attrs = ' ' + lines[1]
+                  contentStartIndex = 2
+                }
+                const content = lines.slice(contentStartIndex).join('\n')
+                process.stdout.write(`${prefix} ${section.name}${attrs}\n${content}\n\n`)
+                printedSections.add(section)
+              }
+            } else {
+              if (message && message.includes('\n')) {
+                process.stdout.write(`${prefix}\n${message}\n\n`)
+              } else {
+                process.stdout.write(`${prefix} ${message ?? ''}\n`)
+              }
+            }
+          }
+        }
+      })
+      
       if (isVerbose) console.error(`[crunes:debug] Rune "${key}" completed with ${sections?.length ?? 0} sections`)
     } catch (err) {
       const msg = isVerbose ? (err.stack || err.message) : err.message
@@ -135,17 +178,19 @@ export async function handler({
       ? sections.filter(s => micromatch.isMatch(s.name, sectionFilter))
       : sections
 
-    allSections.push(...filtered)
-  }
-
-  if (format === 'json') {
-    process.stdout.write(JSON.stringify(allSections, null, 2) + '\n')
-  } else {
-    const rendered = allSections
-      .map(s => renderSection(s))
-      .filter(Boolean)
-      .join('\n\n')
-    if (rendered) process.stdout.write(rendered + '\n')
+    // Print any sections returned by the rune that were not progressively emitted
+    for (const sect of filtered) {
+      const alreadyPrinted = Array.from(printedSections).some(p => p.name === sect.name)
+      if (!alreadyPrinted) {
+        if (format === 'jsonl') {
+          process.stdout.write(JSON.stringify({ type: 'section', section: sect }) + '\n')
+        } else {
+          const rendered = renderSection(sect)
+          if (rendered) process.stdout.write(rendered + '\n')
+        }
+        printedSections.add(sect)
+      }
+    }
   }
 
   if (anyFailed) process.exit(1)

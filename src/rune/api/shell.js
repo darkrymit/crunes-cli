@@ -12,11 +12,9 @@ export class ShellError extends Error {
   }
 }
 
-class ShellSession {
+export class ShellSession {
   constructor(cmd, { dir, env }) {
-    this.buffer = ''
-    this.waiters = new Set()
-    
+    this.handlers = new Map()
     this.proc = spawn(cmd, [], {
       shell:              true,
       cwd:                dir,
@@ -24,72 +22,64 @@ class ShellSession {
       env: env ? { ...process.env, ...env } : process.env,
     })
 
-    this.exitPromise = new Promise((resolve) => {
-      this.proc.on('close', (code) => resolve(code ?? 1))
-      this.proc.on('error', () => resolve(1))
-    })
+    this.proc.stdout.on('data', chunk => this.emit('stdout', 'data', chunk))
+    this.proc.stderr.on('data', chunk => this.emit('stderr', 'data', chunk))
+    this.proc.stdout.on('end', () => this.emit('stdout', 'end'))
+    this.proc.stderr.on('end', () => this.emit('stderr', 'end'))
+    
+    this.proc.on('exit', code => this.emit('session', 'exit', code ?? 0))
+    this.proc.on('error', err => this.emit('session', 'error', err))
+  }
 
-    const handleData = (chunk) => {
-      const text = chunk.toString().replace(/\r\n/g, '\n').replace(ANSI_RE, '')
-      this.buffer += text
-      
-      for (const waiter of this.waiters) {
-        let match = false
-        if (typeof waiter.pattern === 'string' && this.buffer.includes(waiter.pattern)) {
-          match = true
-        } else if (waiter.pattern instanceof RegExp && waiter.pattern.test(this.buffer)) {
-          match = true
-        }
+  setHandler(type, event, callbackRef) {
+    const key = `${type}:${event}`
+    this.handlers.set(key, callbackRef)
+  }
 
-        if (match) {
-          clearTimeout(waiter.timer)
-          this.waiters.delete(waiter)
-          waiter.resolve(this.buffer)
-        }
+  emit(type, event, arg) {
+    const key = `${type}:${event}`
+    const h = this.handlers.get(key)
+    if (!h) return
+
+    if (typeof h === 'object' && h.apply) {
+      if (event === 'data') {
+        const arrayBuffer = arg.buffer.slice(arg.byteOffset, arg.byteOffset + arg.byteLength)
+        h.apply(undefined, [arrayBuffer], { arguments: { copy: true } }).catch(err => {
+          console.error('[crunes:debug] shell callback error:', err)
+        })
+      } else if (event === 'error') {
+        const errStr = arg instanceof Error ? arg.message : String(arg)
+        h.apply(undefined, [errStr], { arguments: { copy: true } }).catch(err => {
+          console.error('[crunes:debug] shell callback error:', err)
+        })
+      } else if (event === 'exit') {
+        h.apply(undefined, [arg], { arguments: { copy: true } }).catch(err => {
+          console.error('[crunes:debug] shell callback error:', err)
+        })
+      } else {
+        h.apply(undefined, [], { arguments: { copy: true } }).catch(err => {
+          console.error('[crunes:debug] shell callback error:', err)
+        })
       }
+    } else {
+      h(arg)
     }
-
-    this.proc.stdout.on('data', handleData)
-    this.proc.stderr.on('data', handleData)
   }
 
   write(text) {
     this.proc.stdin.write(text)
   }
 
-  expect(pattern, timeoutMs = 30000) {
-    return new Promise((resolve, reject) => {
-      let match = false
-      if (typeof pattern === 'string' && this.buffer.includes(pattern)) {
-        match = true
-      } else if (pattern instanceof RegExp && pattern.test(this.buffer)) {
-        match = true
+  kill(signal) {
+    if (process.platform === 'win32') {
+      try {
+        spawn('taskkill', ['/pid', String(this.proc.pid), '/t', '/f'], { windowsHideConsole: true })
+      } catch (e) {
+        this.proc.kill()
       }
-
-      if (match) {
-        return resolve(this.buffer)
-      }
-
-      const waiter = { pattern, resolve, reject }
-      waiter.timer = setTimeout(() => {
-        this.waiters.delete(waiter)
-        reject(new Error(`Timeout waiting for ${pattern}`))
-      }, timeoutMs)
-      
-      this.waiters.add(waiter)
-    })
-  }
-
-  output() {
-    return this.buffer
-  }
-
-  waitForExit() {
-    return this.exitPromise
-  }
-
-  kill() {
-    this.proc.kill()
+    } else {
+      this.proc.kill(signal ?? 'SIGTERM')
+    }
   }
 }
 

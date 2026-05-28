@@ -102,9 +102,28 @@ export function makePermissionChecker(effective) {
       if (!allowed || denied) throw new PermissionError(capability, value)
       return
     }
-    const token   = `${capability}:${value}`
-    const allowed = micromatch.isMatch(token, effective.allow, { dot: true })
-    const denied  = effective.deny.length > 0 && micromatch.isMatch(token, effective.deny, { dot: true })
+    const token   = `${capability}:${value}`.replace(/\\/g, '/')
+    const normalizedAllow = effective.allow.map(p => p.replace(/\\/g, '/'))
+    const normalizedDeny = effective.deny.map(p => p.replace(/\\/g, '/'))
+    const matchToken = (tok, patterns) => {
+      return patterns.some(pattern => {
+        if (pattern.endsWith('/**')) {
+          const prefix = pattern.slice(0, -2)
+          if (tok.startsWith(prefix)) return true
+        }
+        if (pattern.endsWith(':**')) {
+          const prefix = pattern.slice(0, -2)
+          if (tok.startsWith(prefix)) return true
+        }
+        if (pattern.endsWith(':*')) {
+          const prefix = pattern.slice(0, -1)
+          if (tok.startsWith(prefix)) return true
+        }
+        return micromatch.isMatch(tok, pattern, { dot: true })
+      })
+    }
+    const allowed = matchToken(token, normalizedAllow)
+    const denied  = effective.deny.length > 0 && matchToken(token, normalizedDeny)
     if (!allowed || denied) throw new PermissionError(capability, value)
   }
 }

@@ -96,7 +96,7 @@ export function resolveCompletions(tokens, program, { cwd } = {}) {
 
   // 3a. Special-case: --format on rune passthrough commands (no longer registered as Commander option)
   if (!activeOpt && prevWord === '--format' && ['use', 'check', 'bench'].includes(currentCmd.name())) {
-    return ['md', 'json'].filter(c => c.startsWith(matchTarget))
+    return ['text', 'jsonl'].filter(c => c.startsWith(matchTarget))
   }
 
   // 3. Explicit Flag Value Mapping

@@ -9,49 +9,57 @@ const __vars = JSON.parse($__vars)
 
 class TextEncoder {
   encode(str) {
-    const bytes = []
-    for (let i = 0; i < str.length; i++) {
-      let code = str.charCodeAt(i)
-      if (code < 0x80) {
-        bytes.push(code)
-      } else if (code < 0x800) {
-        bytes.push(0xc0 | (code >> 6), 0x80 | (code & 0x3f))
-      } else if (code < 0xd800 || code >= 0xe000) {
-        bytes.push(0xe0 | (code >> 12), 0x80 | ((code >> 6) & 0x3f), 0x80 | (code & 0x3f))
-      } else {
-        i++
-        code = 0x10000 + (((code & 0x3ff) << 10) | (str.charCodeAt(i) & 0x3ff))
-        bytes.push(0xf0 | (code >> 18), 0x80 | ((code >> 12) & 0x3f), 0x80 | ((code >> 6) & 0x3f), 0x80 | (code & 0x3f))
-      }
-    }
-    return new Uint8Array(bytes)
+    const ab = $__utils_encode.applySync(undefined, [str], { result: { copy: true } })
+    return new Uint8Array(ab)
   }
 }
 
 class TextDecoder {
-  decode(bytes) {
-    let str = ''
-    let i = 0
-    while (i < bytes.length) {
-      const b = bytes[i++]
-      if (b < 0x80) {
-        str += String.fromCharCode(b)
-      } else if (b < 0xe0) {
-        str += String.fromCharCode(((b & 0x1f) << 6) | (bytes[i++] & 0x3f))
-      } else if (b < 0xf0) {
-        str += String.fromCharCode(((b & 0x0f) << 12) | ((bytes[i++] & 0x3f) << 6) | (bytes[i++] & 0x3f))
-      } else {
-        let code = ((b & 0x07) << 18) | ((bytes[i++] & 0x3f) << 12) | ((bytes[i++] & 0x3f) << 6) | (bytes[i++] & 0x3f)
-        code -= 0x10000
-        str += String.fromCharCode(0xd800 | (code >> 10), 0xdc00 | (code & 0x3ff))
+  constructor(label, options) {
+    this._id = $__utils_decoder_create.applySync(undefined, [label ?? null, options ?? null], { arguments: { copy: true } })
+  }
+  decode(bytes, decodeOptions) {
+    const ab = bytes instanceof Uint8Array ? bytes.buffer : bytes
+    return $__utils_decoder_decode.applySync(undefined, [this._id, ab, decodeOptions ?? null], { arguments: { copy: true } })
+  }
+}
+
+class AbortSignal {
+  constructor() {
+    this.aborted = false
+    this._listeners = []
+  }
+  addEventListener(type, listener) {
+    if (type === 'abort') this._listeners.push(listener)
+  }
+  removeEventListener(type, listener) {
+    if (type === 'abort') this._listeners = this._listeners.filter(l => l !== listener)
+  }
+  dispatchEvent(event) {
+    if (event.type === 'abort') {
+      this.aborted = true
+      for (const listener of this._listeners) {
+        try { listener(event) } catch (e) {}
       }
     }
-    return str
+  }
+}
+
+class AbortController {
+  constructor() {
+    this.signal = new AbortSignal()
+  }
+  abort() {
+    if (!this.signal.aborted) {
+      this.signal.dispatchEvent({ type: 'abort' })
+    }
   }
 }
 
 globalThis.TextEncoder = TextEncoder
 globalThis.TextDecoder = TextDecoder
+globalThis.AbortController = AbortController
+globalThis.AbortSignal = AbortSignal
 
 globalThis.utils = {
   fs: {
@@ -84,20 +92,37 @@ globalThis.utils = {
     exec: (cmd, o) => $__utils_shell_exec.apply(undefined, [cmd, o], { arguments: { copy: true }, result: { promise: true, copy: true } }),
     execInSession: (cmd, o) => {
       const id = $__utils_shell_execInSession_open.applySync(undefined, [cmd, o], { arguments: { copy: true } })
-      return {
-        write: (text) => $__utils_shell_execInSession_write.applySync(undefined, [id, text]),
-        expect: (pattern, timeoutMs) => {
-          const pat = pattern instanceof RegExp ? { type: 'regex', source: pattern.source, flags: pattern.flags } : pattern
-          return $__utils_shell_execInSession_expect.apply(undefined, [id, pat, timeoutMs], { arguments: { copy: true }, result: { promise: true, copy: true } })
+      const session = {
+        stdin: {
+          write: (text) => $__utils_shell_execInSession_write.applySync(undefined, [id, text]),
+          end: () => $__utils_shell_execInSession_end.applySync(undefined, [id])
         },
-        output: () => $__utils_shell_execInSession_output.applySync(undefined, [id]),
-        waitForExit: () => $__utils_shell_execInSession_waitForExit.apply(undefined, [id], { result: { promise: true } }),
-        kill: () => $__utils_shell_execInSession_kill.applySync(undefined, [id])
+        stdout: {
+          on(event, callback) {
+            const wrappedCallback = event === 'data' ? (ab) => callback(new Uint8Array(ab)) : callback;
+            $__utils_shell_execInSession_on.applySync(undefined, [id, 'stdout', event, wrappedCallback], { arguments: { reference: true } })
+          }
+        },
+        stderr: {
+          on(event, callback) {
+            const wrappedCallback = event === 'data' ? (ab) => callback(new Uint8Array(ab)) : callback;
+            $__utils_shell_execInSession_on.applySync(undefined, [id, 'stderr', event, wrappedCallback], { arguments: { reference: true } })
+          }
+        },
+        on(event, callback) {
+          $__utils_shell_execInSession_on.applySync(undefined, [id, 'session', event, callback], { arguments: { reference: true } })
+        },
+        kill: (signal) => $__utils_shell_execInSession_kill.applySync(undefined, [id, signal ?? null])
       }
+      if (o && o.signal) {
+        o.signal.addEventListener('abort', () => session.kill('SIGTERM'))
+      }
+      return session
     }
   },
   section: {
     create: (name, data, o) => $__utils_section_create.applySync(undefined, [name, data, o], { arguments: { copy: true }, result: { copy: true } }),
+    emit: (sect) => $__utils_section_emit.applySync(undefined, [sect], { arguments: { copy: true } }),
     match: (sectionName, patterns) => $__utils_section_match.applySync(undefined, [sectionName, patterns], { arguments: { copy: true }, result: { copy: true } }),
     selected: () => $__utils_section_selected.applySync(undefined, [], { result: { copy: true } }),
   },

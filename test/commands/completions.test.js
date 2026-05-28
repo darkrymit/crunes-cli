@@ -109,8 +109,8 @@ describe('resolveCompletions — other subcommands', () => {
     )
   })
 
-  it('completes --format value for use (md, json)', () => {
-    expect(resolveCompletions(['crunes', 'use', 'release', '--format', ''], program)).toEqual(['md', 'json'])
+  it('completes --format value for use (text, jsonl)', () => {
+    expect(resolveCompletions(['crunes', 'use', 'release', '--format', ''], program)).toEqual(['text', 'jsonl'])
   })
 
   it('completes --format value for create (tree, markdown)', () => {

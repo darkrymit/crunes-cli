@@ -67,14 +67,14 @@ describe('parseUseArgs', () => {
   it('parses single bare key', () => {
     expect(parseUseArgs(['api'])).toEqual({
       segments: [{ key: 'api', sections: null, runeArgs: [] }],
-      format: 'md',
+      format: 'text',
       failFast: false,
     })
   })
 
   it('extracts --format before key', () => {
-    const result = parseUseArgs(['--format', 'json', 'api'])
-    expect(result.format).toBe('json')
+    const result = parseUseArgs(['--format', 'jsonl', 'api'])
+    expect(result.format).toBe('jsonl')
     expect(result.segments[0]).toEqual({ key: 'api', sections: null, runeArgs: [] })
   })
 
@@ -118,16 +118,16 @@ describe('parseUseArgs', () => {
     expect(result.segments[0].runeArgs).toEqual(['--tag=a+b'])
   })
 
-  it('defaults format to md and failFast to false', () => {
+  it('defaults format to text and failFast to false', () => {
     const result = parseUseArgs(['api'])
-    expect(result.format).toBe('md')
+    expect(result.format).toBe('text')
     expect(result.failFast).toBe(false)
   })
 
   it('does not intercept --format after the key — passes it to runeArgs', () => {
-    const result = parseUseArgs(['api', '--format', 'json'])
-    expect(result.format).toBe('md')
-    expect(result.segments[0].runeArgs).toEqual(['--format', 'json'])
+    const result = parseUseArgs(['api', '--format', 'jsonl'])
+    expect(result.format).toBe('text')
+    expect(result.segments[0].runeArgs).toEqual(['--format', 'jsonl'])
   })
 
   it('does not intercept --fail-fast after the key — passes it to runeArgs', () => {
@@ -185,27 +185,29 @@ describe('handler — section filtering', () => {
     runRune.mockResolvedValue(makeSections('intro', 'detail'))
     let written = ''
     vi.spyOn(process.stdout, 'write').mockImplementation(s => { written += s })
-    await handler({ segments: [{ key: 'docs', sections: null, runeArgs: [] }], format: 'json' })
-    expect(JSON.parse(written)).toHaveLength(2)
+    await handler({ segments: [{ key: 'docs', sections: null, runeArgs: [] }], format: 'jsonl' })
+    const events = written.split('\n').filter(Boolean).map(JSON.parse)
+    expect(events).toHaveLength(2)
+    expect(events.map(e => e.section.name)).toEqual(['intro', 'detail'])
   })
 
   it('exact name filter keeps matching section', async () => {
     runRune.mockResolvedValue(makeSections('endpoints', 'errors'))
     let written = ''
     vi.spyOn(process.stdout, 'write').mockImplementation(s => { written += s })
-    await handler({ segments: [{ key: 'docs', sections: ['endpoints'], runeArgs: [] }], format: 'json' })
-    const sections = JSON.parse(written)
-    expect(sections).toHaveLength(1)
-    expect(sections[0].name).toBe('endpoints')
+    await handler({ segments: [{ key: 'docs', sections: ['endpoints'], runeArgs: [] }], format: 'jsonl' })
+    const events = written.split('\n').filter(Boolean).map(JSON.parse)
+    expect(events).toHaveLength(1)
+    expect(events[0].section.name).toBe('endpoints')
   })
 
   it('glob filter matches prefix', async () => {
     runRune.mockResolvedValue(makeSections('api-auth', 'api-users', 'errors'))
     let written = ''
     vi.spyOn(process.stdout, 'write').mockImplementation(s => { written += s })
-    await handler({ segments: [{ key: 'docs', sections: ['api-*'], runeArgs: [] }], format: 'json' })
-    const sections = JSON.parse(written)
-    expect(sections.map(s => s.name)).toEqual(['api-auth', 'api-users'])
+    await handler({ segments: [{ key: 'docs', sections: ['api-*'], runeArgs: [] }], format: 'jsonl' })
+    const events = written.split('\n').filter(Boolean).map(JSON.parse)
+    expect(events.map(e => e.section.name)).toEqual(['api-auth', 'api-users'])
   })
 
   it('passes rune args to runRune verbatim', async () => {
@@ -227,8 +229,41 @@ describe('handler — section filtering', () => {
         { key: 'docs', sections: null, runeArgs: [] },
         { key: 'git', sections: null, runeArgs: [] },
       ],
-      format: 'json',
+      format: 'jsonl',
     })
-    expect(JSON.parse(written).map(s => s.name)).toEqual(['a', 'b'])
+    const events = written.split('\n').filter(Boolean).map(JSON.parse)
+    expect(events.map(e => e.section.name)).toEqual(['a', 'b'])
+  })
+})
+
+describe('handler — progressive streaming and console logs', () => {
+  beforeEach(() => {
+    loadConfig.mockReturnValue({ runes: { docs: { path: 'runes/docs.js' } } })
+    vi.spyOn(process.stdout, 'write').mockImplementation(() => {})
+    vi.spyOn(process.stderr, 'write').mockImplementation(() => {})
+    vi.spyOn(process, 'exit').mockImplementation(() => {})
+  })
+
+  afterEach(() => { vi.clearAllMocks(); vi.restoreAllMocks() })
+
+  it('outputs console logs progressively and formats as JSON Lines', async () => {
+    runRune.mockImplementation(async (dir, config, key, args, opts) => {
+      opts.onEvent({ type: 'log', message: 'started' })
+      opts.onEvent({ type: 'error', message: 'warning' })
+      opts.onEvent({ type: 'section', section: { name: 'sec1', data: { type: 'markdown', content: 'c1' } } })
+      return [{ name: 'sec2', data: { type: 'markdown', content: 'c2' } }]
+    })
+
+    let stdoutWritten = ''
+    vi.spyOn(process.stdout, 'write').mockImplementation(s => { stdoutWritten += s })
+
+    await handler({ segments: [{ key: 'docs', sections: null, runeArgs: [] }], format: 'jsonl' })
+    
+    const lines = stdoutWritten.split('\n').filter(Boolean).map(JSON.parse)
+    expect(lines).toHaveLength(4)
+    expect(lines[0]).toEqual({ type: 'log', message: 'started' })
+    expect(lines[1]).toEqual({ type: 'error', message: 'warning' })
+    expect(lines[2]).toEqual({ type: 'section', section: { name: 'sec1', data: { type: 'markdown', content: 'c1' } } })
+    expect(lines[3]).toEqual({ type: 'section', section: { name: 'sec2', data: { type: 'markdown', content: 'c2' } } })
   })
 })

@@ -428,3 +428,172 @@ export async function use() {
     expect(result[0].data.content).toBe('done')
   })
 })
+
+describe('TextEncoder, TextDecoder, AbortController, and AbortSignal sandbox integration', () => {
+  let tmp
+
+  beforeEach(async () => { tmp = await mkdtemp(join(tmpdir(), 'crunes-runner-enc-')) })
+  afterEach(async () => { await rm(tmp, { recursive: true, force: true }) })
+
+  it('provides working TextEncoder and TextDecoder with custom options', async () => {
+    const runeFile = join(tmp, 'rune.js')
+    await writeFile(runeFile, `
+import { section } from '@utils'
+export async function use() {
+    const encoder = new TextEncoder()
+    const decoder = new TextDecoder('utf-8', { fatal: true })
+    const encoded = encoder.encode('héllo 🚀')
+    const decoded = decoder.decode(encoded)
+    return [section.create('r', { type: 'markdown', content: decoded })]
+}
+`)
+    const result = await runRuneInIsolate(runeFile, { allow: [], deny: [] }, [], tmp)
+    expect(result[0].data.content).toBe('héllo 🚀')
+  })
+
+  it('provides AbortController and AbortSignal globally', async () => {
+    const runeFile = join(tmp, 'rune.js')
+    await writeFile(runeFile, `
+import { section } from '@utils'
+export async function use() {
+    const controller = new AbortController()
+    let aborted = false
+    controller.signal.addEventListener('abort', () => {
+      aborted = true
+    })
+    controller.abort()
+    const content = controller.signal.aborted && aborted ? 'aborted' : 'active'
+    return [section.create('r', { type: 'markdown', content })]
+}
+`)
+    const result = await runRuneInIsolate(runeFile, { allow: [], deny: [] }, [], tmp)
+    expect(result[0].data.content).toBe('aborted')
+  })
+})
+
+describe('progressive section emission', () => {
+  let tmp
+
+  beforeEach(async () => { tmp = await mkdtemp(join(tmpdir(), 'crunes-runner-sec-')) })
+  afterEach(async () => { await rm(tmp, { recursive: true, force: true }) })
+
+  it('allows section.emit to progressively emit sections in real-time', async () => {
+    const runeFile = join(tmp, 'rune.js')
+    await writeFile(runeFile, `
+import { section } from '@utils'
+export async function use() {
+  section.emit(section.create('progressive-1', { type: 'markdown', content: 'hello from step 1' }))
+  section.emit(section.create('progressive-2', { type: 'markdown', content: 'hello from step 2' }))
+  return []
+}
+`)
+    const events = []
+    const result = await runRuneInIsolate(runeFile, { allow: [], deny: [] }, [], tmp, {
+      onEvent(event) {
+        events.push(event)
+      }
+    })
+    expect(result).toEqual([])
+    expect(events).toHaveLength(2)
+    expect(events[0]).toMatchObject({
+      type: 'section',
+      section: { name: 'progressive-1', data: { type: 'markdown', content: 'hello from step 1' } }
+    })
+    expect(events[1]).toMatchObject({
+      type: 'section',
+      section: { name: 'progressive-2', data: { type: 'markdown', content: 'hello from step 2' } }
+    })
+  })
+})
+
+describe('spawn-like ShellSession sandbox integration', () => {
+  let tmp
+
+  beforeEach(async () => { tmp = await mkdtemp(join(tmpdir(), 'crunes-runner-shell-')) })
+  afterEach(async () => { await rm(tmp, { recursive: true, force: true }) })
+
+  it('provides spawn-like streams and AbortSignal support', async () => {
+    const scriptPath = join(tmp, 'echo.js')
+    await writeFile(scriptPath, `
+      process.stdout.write('Question:');
+      process.stdin.on('data', (d) => {
+        if (d.toString().trim() === '42') {
+          process.stdout.write('Correct\\n');
+          process.exit(0);
+        } else {
+          process.stdout.write('Wrong\\n');
+          process.exit(1);
+        }
+      });
+    `)
+
+    const runeFile = join(tmp, 'rune.js')
+    await writeFile(runeFile, `
+import { shell, section } from '@utils'
+export async function use() {
+  const session = shell.execInSession('node ${scriptPath.replace(/\\/g, '\\\\')}')
+  let stdoutStr = ''
+  
+  await new Promise((resolve, reject) => {
+    session.stdout.on('data', (bytes) => {
+      const text = new TextDecoder().decode(bytes)
+      stdoutStr += text
+      if (stdoutStr.includes('Question:')) {
+        session.stdin.write('42\\n')
+      }
+    })
+    session.on('exit', (code) => {
+      if (code === 0) resolve()
+      else reject(new Error('exit ' + code))
+    })
+    session.on('error', reject)
+  })
+
+  return [section.create('r', { type: 'markdown', content: stdoutStr })]
+}
+`)
+
+    const result = await runRuneInIsolate(runeFile, { allow: ['shell.exec:**'], deny: [] }, [], tmp)
+    expect(result[0].data.content).toContain('Correct')
+  })
+
+  it('terminates process when AbortSignal is aborted', async () => {
+    const scriptPath = join(tmp, 'sleep.js')
+    await writeFile(scriptPath, `
+      setTimeout(() => {}, 10000);
+    `)
+
+    const runeFile = join(tmp, 'rune.js')
+    await writeFile(runeFile, `
+import { shell, section } from '@utils'
+export async function use() {
+  const controller = new AbortController()
+  const session = shell.execInSession('node ${scriptPath.replace(/\\/g, '\\\\')}', {
+    signal: controller.signal
+  })
+  
+  let exitCode = null
+  let exitedPromise = new Promise((resolve) => {
+    session.on('exit', (code) => {
+      exitCode = code
+      resolve()
+    })
+  })
+  
+  setTimeout(() => {
+    controller.abort()
+  }, 100)
+  
+  await exitedPromise
+  
+  await new Promise(r => setTimeout(r, 200))
+  
+  return [section.create('r', { type: 'markdown', content: 'exited' })]
+}
+`)
+
+    const result = await runRuneInIsolate(runeFile, { allow: ['shell.exec:**'], deny: [] }, [], tmp)
+    expect(result[0].data.content).toBe('exited')
+  })
+})
+

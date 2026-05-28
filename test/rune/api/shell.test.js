@@ -30,12 +30,23 @@ describe('shell utils', () => {
 
     try {
       const session = shellUtils.execInSession(`node ${scriptPath}`);
-      await session.expect('Question:');
-      session.write('42\n');
-      const exitCode = await session.waitForExit();
+      let stdout = '';
+      
+      session.setHandler('stdout', 'data', (chunk) => {
+        stdout += chunk.toString();
+        if (stdout.includes('Question:')) {
+          session.write('42\n');
+        }
+      });
+
+      const exitPromise = new Promise((resolve) => {
+        session.setHandler('session', 'exit', resolve);
+      });
+
+      const exitCode = await exitPromise;
       
       expect(exitCode).toBe(0);
-      expect(session.output()).toContain('Correct');
+      expect(stdout).toContain('Correct');
     } finally {
       await fs.unlink(scriptPath);
     }

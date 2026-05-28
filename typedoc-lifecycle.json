@@ -1,7 +1,7 @@
 {
   "entryPointStrategy": "expand",
   "entryPoints": ["src/rune/api/types-lifecycle"],
-  "json": "src/docs/lifecycle-api.json",
+  "json": "src/docs/generated/lifecycle-api.json",
   "tsconfig": "src/rune/api/types-lifecycle/tsconfig.json",
   "disableSources": true,
   "excludeExternals": true,

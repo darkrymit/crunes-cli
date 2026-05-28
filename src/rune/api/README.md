@@ -8,7 +8,7 @@ The `utils` object injected into every rune at runtime. `index.js` assembles the
 - **md.js** — Markdown string builders: `h1`–`h3`, `p`, `bold`, `italic`, `code`, `codeBlock`, `ul`, `ol`, `link`, `table`. Embedded at build time as a source string; runs entirely inside the isolate.
 - **tree.js** — Tree node builders and formatters (`node`, `format`). Embedded at build time as a source string; runs entirely inside the isolate.
 - **fs.js** — Permission-gated filesystem access: `read`, `exists`, `glob`, `write`, `copy`. (`replace` is a composite implemented in `utils-bootstrap.js`.)
-- **shell.js** — Permission-gated shell execution + `ShellError`.
+- **shell.js** — Permission-gated shell execution + `ShellError`. `exec(cmd, opts?)` runs fire-and-forget commands. `execInSession(cmd, opts?)` returns a `ShellSession` with Node-like spawn streams: `stdin.write/end`, `stdout/stderr.on('data'/'end')`, `on('exit'/'error')`, `kill(signal?)`, and optional `signal: AbortSignal` for programmatic termination.
 - **json.js** — JSON file access with JSONPath: `read`, `get`, `getAll`, `write`, `modify`. (`modify` is implemented in `utils-bootstrap.js`.)
 - **yaml.js** — YAML file access with comment-preserving round-trips: `read`, `write`, `modify`. (`modify` is implemented in `utils-bootstrap.js`.)
 - **xml.js** — XML file access (`@_` attribute prefix, `#comment` comments): `read`, `write`, `modify`. (`modify` is implemented in `utils-bootstrap.js`.)
@@ -21,6 +21,8 @@ The `utils` object injected into every rune at runtime. `index.js` assembles the
 - **crypto.js** — Cryptographic utilities: `hashHex`, `hashBase64`, `uuid`, `hex`, `base64`.
 - **utils.js** — Internal helpers: `resolvePath`, `canonicalizeLocation`, `getAutoPermits`, `getProjectKey`. Handles virtual location tokens (`@project/`, `@plugin/`, `@project-cache`, `@project-sqlite`, etc.).
 - **args-parser.js** — `parseArgs(rawArgs, schema)`, `buildYargsConfig(schema)`, `parseFlags(flagStr)` — converts the schema produced by a rune's `args()` export into a yargs-parser config and runs the parser. Called by `isolation/runner.js` before invoking `use(parsedArgs)`.
+
+**Sandbox globals:** `setTimeout`, `clearTimeout`, `setInterval`, `clearInterval`, `TextEncoder`, `TextDecoder`, `AbortController`, and `AbortSignal` are available on `globalThis` inside every rune without any import.
 
 ## Related Modules
 

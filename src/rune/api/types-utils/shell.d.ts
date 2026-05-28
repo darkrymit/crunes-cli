@@ -18,18 +18,23 @@ declare namespace shell {
    * @param opts Session options (env vars).
    * @returns A ShellSession object to interact with the running process.
    */
-  export function execInSession(cmd: string, opts?: { env?: Record<string, string> }): ShellSession
+  export function execInSession(cmd: string, opts?: { env?: Record<string, string>, signal?: AbortSignal }): ShellSession
 
   interface ShellSession {
-    /** Writes text to the child process's standard input */
-    write(text: string): void
-    /** Waits for the output to match the pattern and returns the match */
-    expect(pattern: string | RegExp, timeoutMs?: number): Promise<string>
-    /** Returns all accumulated output as a string */
-    output(): string
-    /** Resolves with the exit code when the process terminates */
-    waitForExit(): Promise<number>
-    /** Forcefully terminates the process */
-    kill(): void
+    readonly stdin: {
+      write(text: string): void
+      end(): void
+    }
+    readonly stdout: {
+      on(event: 'data', callback: (chunk: Uint8Array) => void): void
+      on(event: 'end', callback: () => void): void
+    }
+    readonly stderr: {
+      on(event: 'data', callback: (chunk: Uint8Array) => void): void
+      on(event: 'end', callback: () => void): void
+    }
+    on(event: 'exit', callback: (code: number) => void): void
+    on(event: 'error', callback: (err: string) => void): void
+    kill(signal?: string): void
   }
 }

@@ -56,9 +56,34 @@ declare namespace globals {
   class TextDecoder {
     /**
      * Decodes raw UTF-8 binary bytes into a string.
-     * 
+     *
      * @param bytes The raw binary bytes.
      */
     decode(bytes: Uint8Array): string
   }
+
+  /**
+   * Represents the signal object of an AbortController.
+   */
+  class AbortSignal {
+    /** Whether the signal has been aborted. */
+    readonly aborted: boolean
+    addEventListener(type: 'abort', listener: (event: { type: string }) => void): void
+    removeEventListener(type: 'abort', listener: (event: { type: string }) => void): void
+    dispatchEvent(event: { type: string }): void
+  }
+
+  /**
+   * Provides an AbortSignal that can be used to abort one or more operations.
+   */
+  class AbortController {
+    readonly signal: AbortSignal
+    abort(): void
+  }
 }
+
+// Top-level type aliases so rune API .d.ts files can reference these types
+// without namespace qualification. walkUtilsDocs ignores type aliases (kind 4194304),
+// so TypeDoc documentation output is unaffected.
+type AbortSignal = globals.AbortSignal
+type AbortController = globals.AbortController
