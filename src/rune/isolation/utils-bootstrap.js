@@ -313,7 +313,8 @@ globalThis.utils = {
         .then(ab => new Uint8Array(ab))
     },
 
-    // Encoding Conversions
+  },
+  codec: {
     toHex: (data) => {
       const bytes = typeof data === 'string' ? new TextEncoder().encode(data) : data
       let hex = ''
@@ -366,12 +367,8 @@ globalThis.utils = {
       }
       return bytes
     },
-    fromUtf8: (utf8) => {
-      return new TextEncoder().encode(utf8)
-    },
-    toUtf8: (data) => {
-      return new TextDecoder().decode(data)
-    }
+    fromUtf8: (utf8) => new TextEncoder().encode(utf8),
+    toUtf8: (data) => new TextDecoder().decode(data),
   },
   ws: {
     client(url, opts) {
@@ -431,7 +428,7 @@ globalThis.utils = {
   tree,
 }
 
-export const { fs, shell, section, rune, json, yaml, xml, http, env, vars, archive, cache, sqlite, crypto, ws, time } = globalThis.utils
+export const { fs, shell, section, rune, json, yaml, xml, http, env, vars, archive, cache, sqlite, crypto, codec, ws, time } = globalThis.utils
 export { md, tree }
 
 // ─── Global Sandbox Timers ───────────────────────────────────────────────────

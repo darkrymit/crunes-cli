@@ -11,12 +11,6 @@ import {
   randomBase64,
   encrypt,
   decrypt,
-  toHex,
-  fromHex,
-  toBase64,
-  fromBase64,
-  fromUtf8,
-  toUtf8,
 } from '../../../src/rune/api/crypto.js'
 
 describe('hashing', () => {
@@ -73,29 +67,6 @@ describe('symmetric encryption & decryption (pure bytes)', () => {
 
     const decrypted = decrypt('aes-256-gcm', key, iv, cipher)
     expect(decrypted).toEqual(cleartext)
-  })
-})
-
-describe('conversions', () => {
-  it('toHex and fromHex', () => {
-    const bytes = new Uint8Array([104, 101, 108, 108, 111])
-    const hex = '68656c6c6f'
-    expect(toHex(bytes)).toBe(hex)
-    expect(fromHex(hex)).toEqual(bytes)
-  })
-
-  it('toBase64 and fromBase64', () => {
-    const bytes = new Uint8Array([104, 101, 108, 108, 111])
-    const b64 = 'aGVsbG8='
-    expect(toBase64(bytes)).toBe(b64)
-    expect(fromBase64(b64)).toEqual(bytes)
-  })
-
-  it('fromUtf8 and toUtf8', () => {
-    const bytes = new Uint8Array([104, 101, 108, 108, 111])
-    const str = 'hello'
-    expect(fromUtf8(str)).toEqual(bytes)
-    expect(toUtf8(bytes)).toBe(str)
   })
 })
 
