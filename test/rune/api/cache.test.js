@@ -227,3 +227,41 @@ describe('createCacheUtils', () => {
     expect(await h.get('k')).toBe('v')
   })
 })
+
+describe('CacheHandle — has', () => {
+  let tmp
+  beforeEach(async () => {
+    tmp = await makeTmp()
+    process.env.CRUNES_STORE = tmp
+  })
+  afterEach(async () => {
+    delete process.env.CRUNES_STORE
+    await rm(tmp, { recursive: true, force: true })
+  })
+
+  it('returns true for an existing key', async () => {
+    const cache = createCacheUtils(tmp, null, { pluginId: 'plug@1.0.0' })
+    const h = await cache.openHandle('@plugin-cache', 'test')
+    await h.set('k', { x: 1 })
+    expect(await h.has('k')).toBe(true)
+  })
+
+  it('returns false for a missing key', async () => {
+    const cache = createCacheUtils(tmp, null, { pluginId: 'plug@1.0.0' })
+    const h = await cache.openHandle('@plugin-cache', 'test')
+    expect(await h.has('missing')).toBe(false)
+  })
+
+  it('returns false for an expired key', async () => {
+    const cache = createCacheUtils(tmp, null, { pluginId: 'plug@1.0.0' })
+    const h = await cache.openHandle('@plugin-cache', 'test')
+    await h.set('k', 'val', -1)
+    expect(await h.has('k')).toBe(false)
+  })
+
+  it('requires cache.read permission', async () => {
+    const cache = createCacheUtils(tmp, makePermissionChecker({ allow: [], deny: [] }), { pluginId: 'plug@1.0.0' })
+    const h = await cache.openHandle('@plugin-cache', 'test')
+    await expect(h.has('k')).rejects.toThrow(PermissionError)
+  })
+})

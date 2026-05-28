@@ -233,6 +233,7 @@ globalThis.utils = {
       return {
         set:    (k, v, ttl) => $__utils_cache_set.apply(undefined, [id, k, v, ttl ?? null], { arguments: { copy: true }, result: { promise: true } }),
         get:    (k)          => $__utils_cache_get.apply(undefined, [id, k], { result: { promise: true, copy: true } }),
+        has:    (k)          => $__utils_cache_has.apply(undefined, [id, k], { result: { promise: true } }),
         delete: (k)          => $__utils_cache_delete.apply(undefined, [id, k], { result: { promise: true } }),
         clear:  ()           => $__utils_cache_clear.apply(undefined, [id], { result: { promise: true } }),
       }

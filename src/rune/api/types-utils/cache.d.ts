@@ -28,5 +28,10 @@ declare namespace cache {
      * Requires `cache.write:<location>:<name>` permission.
      */
     clear(): Promise<void>
+    /**
+     * Returns true if the key exists and has not expired. Does not return the value.
+     * Requires `cache.read:<location>:<name>` permission.
+     */
+    has(key: string): Promise<boolean>
   }
 }

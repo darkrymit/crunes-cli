@@ -299,6 +299,11 @@ async function injectUtils(isolate, context, utils, runeCallback, vars, projectD
     if (!handle) throw new Error(`Invalid cache handle: ${id}`)
     await handle.clear()
   }))
+  await jail.set('$__utils_cache_has', new ivm.Reference(async (id, key) => {
+    const handle = cacheHandles.get(id)
+    if (!handle) throw new Error(`Invalid cache handle: ${id}`)
+    return handle.has(key)
+  }))
 
   const sqliteHandles    = new Map()
   let   nextSqliteHandle = 0

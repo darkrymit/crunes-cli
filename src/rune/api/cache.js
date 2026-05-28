@@ -57,6 +57,22 @@ function makeHandle(cacheDir, checkRead, checkWrite) {
       }
     },
 
+    async has(key) {
+      if (checkRead) checkRead()
+      const file = path.join(cacheDir, `${key}.json`)
+      try {
+        const entry = JSON.parse(await fs.readFile(file, 'utf8'))
+        if (entry.expiresAt !== null && Date.now() > entry.expiresAt) {
+          await fs.rm(file, { force: true })
+          return false
+        }
+        return true
+      } catch (e) {
+        if (e.code === 'ENOENT') return false
+        throw e
+      }
+    },
+
     async delete(key) {
       if (checkWrite) checkWrite()
       await fs.rm(path.join(cacheDir, `${key}.json`), { force: true })
