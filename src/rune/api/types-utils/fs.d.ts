@@ -113,4 +113,29 @@ declare namespace fs {
    * @param content Raw binary Uint8Array bytes
    */
   function writeAsBytes(path: string, content: Uint8Array): Promise<void>
+
+  /**
+   * Appends UTF-8 text to a file, creating parent directories if needed.
+   * Requires `fs.write:<path>` permission.
+   * @param path Relative file path
+   * @param content UTF-8 string content to append
+   */
+  function append(path: string, content: string): Promise<void>
+
+  /**
+   * Appends raw binary bytes to a file, creating parent directories if needed.
+   * Requires `fs.write:<path>` permission.
+   * @param path Relative file path
+   * @param content Raw binary Uint8Array bytes to append
+   */
+  function appendAsBytes(path: string, content: Uint8Array): Promise<void>
+
+  /**
+   * Changes file permissions.
+   * On Windows this call succeeds silently — the execute bit is not meaningful on Windows.
+   * Requires `fs.write:<path>` permission.
+   * @param path Relative file path
+   * @param mode Octal permission number (e.g. 0o755) or string (e.g. '755')
+   */
+  function chmod(path: string, mode: number | string): Promise<void>
 }

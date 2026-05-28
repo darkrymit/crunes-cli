@@ -143,5 +143,28 @@ export function createFsUtils(dir, checkPermission, pluginDir = null, pluginId =
       await fs.mkdir(path.dirname(abs), { recursive: true })
       await fs.writeFile(abs, content)
     },
+
+    async append(relPath, content) {
+      const token = canonicalizeLocation(relPath, { dir })
+      const abs   = resolvePath(relPath, ctx())
+      if (checkPermission) checkPermission('fs.write', token)
+      await fs.mkdir(path.dirname(abs), { recursive: true })
+      await fs.appendFile(abs, content, 'utf8')
+    },
+
+    async appendAsBytes(relPath, content) {
+      const token = canonicalizeLocation(relPath, { dir })
+      const abs   = resolvePath(relPath, ctx())
+      if (checkPermission) checkPermission('fs.write', token)
+      await fs.mkdir(path.dirname(abs), { recursive: true })
+      await fs.appendFile(abs, content)
+    },
+
+    async chmod(relPath, mode) {
+      const token = canonicalizeLocation(relPath, { dir })
+      const abs   = resolvePath(relPath, ctx())
+      if (checkPermission) checkPermission('fs.write', token)
+      await fs.chmod(abs, mode)
+    },
   }
 }

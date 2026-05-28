@@ -82,6 +82,12 @@ globalThis.utils = {
       if (!(content instanceof Uint8Array)) throw new TypeError('writeAsBytes requires a Uint8Array')
       return $__utils_fs_write_bytes.apply(undefined, [path, content.buffer], { arguments: { copy: true }, result: { promise: true } })
     },
+    append: (p, c) => $__utils_fs_append.apply(undefined, [p, c], { arguments: { copy: true }, result: { promise: true } }),
+    appendAsBytes: async (p, content) => {
+      if (!(content instanceof Uint8Array)) throw new TypeError('appendAsBytes requires a Uint8Array')
+      return $__utils_fs_append_bytes.apply(undefined, [p, content.buffer], { arguments: { copy: true }, result: { promise: true } })
+    },
+    chmod: (p, mode) => $__utils_fs_chmod.apply(undefined, [p, mode], { arguments: { copy: true }, result: { promise: true } }),
     replace: async (p, regex, replacement) => {
       const content = await globalThis.utils.fs.read(p);
       const newContent = content.replace(regex, replacement);

@@ -362,6 +362,70 @@ describe('createFsUtils — copy', () => {
   })
 })
 
+describe('createFsUtils — append', () => {
+  let dir
+
+  beforeEach(async () => { dir = await makeTempDir() })
+  afterEach(async () => { await fs.rm(dir, { recursive: true, force: true }) })
+
+  it('appends text to an existing file', async () => {
+    await writeFile(dir, 'log.txt', 'line1\n')
+    const fsUtils = createFsUtils(dir, null)
+    await fsUtils.append('log.txt', 'line2\n')
+    expect(await fs.readFile(path.join(dir, 'log.txt'), 'utf8')).toBe('line1\nline2\n')
+  })
+
+  it('creates file and parent dirs when missing', async () => {
+    const fsUtils = createFsUtils(dir, null)
+    await fsUtils.append('deep/dir/log.txt', 'hello')
+    expect(await fs.readFile(path.join(dir, 'deep/dir/log.txt'), 'utf8')).toBe('hello')
+  })
+
+  it('requires fs.write permission', async () => {
+    const fsUtils = createFsUtils(dir, checkerFor([]))
+    await expect(fsUtils.append('log.txt', 'x')).rejects.toThrow(PermissionError)
+  })
+})
+
+describe('createFsUtils — appendAsBytes', () => {
+  let dir
+
+  beforeEach(async () => { dir = await makeTempDir() })
+  afterEach(async () => { await fs.rm(dir, { recursive: true, force: true }) })
+
+  it('appends binary bytes to an existing file', async () => {
+    await fs.writeFile(path.join(dir, 'data.bin'), Buffer.from([1, 2]))
+    const fsUtils = createFsUtils(dir, null)
+    await fsUtils.appendAsBytes('data.bin', new Uint8Array([3, 4]))
+    const result = await fs.readFile(path.join(dir, 'data.bin'))
+    expect(Array.from(result)).toEqual([1, 2, 3, 4])
+  })
+
+  it('requires fs.write permission', async () => {
+    const fsUtils = createFsUtils(dir, checkerFor([]))
+    await expect(fsUtils.appendAsBytes('data.bin', new Uint8Array([1]))).rejects.toThrow(PermissionError)
+  })
+})
+
+describe('createFsUtils — chmod', () => {
+  let dir
+
+  beforeEach(async () => { dir = await makeTempDir() })
+  afterEach(async () => { await fs.rm(dir, { recursive: true, force: true }) })
+
+  it('changes file permissions without throwing', async () => {
+    await writeFile(dir, 'script.sh', '#!/bin/sh')
+    const fsUtils = createFsUtils(dir, null)
+    await expect(fsUtils.chmod('script.sh', 0o755)).resolves.toBeUndefined()
+  })
+
+  it('requires fs.write permission', async () => {
+    await writeFile(dir, 'script.sh', '#!/bin/sh')
+    const fsUtils = createFsUtils(dir, checkerFor([]))
+    await expect(fsUtils.chmod('script.sh', 0o755)).rejects.toThrow(PermissionError)
+  })
+})
+
 describe('createFsUtils — remove, move, stat, mkdir, readAsBytes, writeAsBytes', () => {
   let dir
 

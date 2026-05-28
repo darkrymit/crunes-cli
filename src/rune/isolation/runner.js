@@ -90,6 +90,16 @@ async function injectUtils(isolate, context, utils, runeCallback, vars, projectD
     const bytes = new Uint8Array(arrayBuffer)
     return utils.fs.writeAsBytes(relPath, bytes)
   }))
+  await jail.set('$__utils_fs_append', new ivm.Reference(async (relPath, content) => {
+    return utils.fs.append(relPath, content)
+  }))
+  await jail.set('$__utils_fs_append_bytes', new ivm.Reference(async (relPath, arrayBuffer) => {
+    const bytes = new Uint8Array(arrayBuffer)
+    return utils.fs.appendAsBytes(relPath, bytes)
+  }))
+  await jail.set('$__utils_fs_chmod', new ivm.Reference(async (relPath, mode) => {
+    return utils.fs.chmod(relPath, mode)
+  }))
   const shellHandles = new Map()
   let nextShellHandle = 0
 
