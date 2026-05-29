@@ -249,7 +249,7 @@ export async function compileIntro({ config, format, projectRoot, configRoot, ha
     for (const [key, entry] of runesList) {
       const runeFile = resolve(configRoot, entry.path ?? `.crunes/runes/${key}.js`)
       const basePerms = entry.permissions ?? { allow: [], deny: [] }
-      const effective = computeEffectivePermissions(basePerms, config.permissions?.[key], 'use')
+      const effective = computeEffectivePermissions(basePerms, config.permissions?.[key], 'args')
 
       let schema = null
       let schemaError = null
@@ -396,9 +396,10 @@ export async function compileIntro({ config, format, projectRoot, configRoot, ha
   lines.push('Configuration properties in `.crunes/config.json` control permissions, default variables, mappings, and plugin registration.')
   lines.push('')
   lines.push('### Sandbox Security & Permissions')
-  lines.push('Runes do not have direct access to Node.js APIs. They declare specific permission scopes in `.crunes/config.json`:')
-  lines.push('- **`allow`**: Whitelist of capabilities (e.g. `["fs:read:src/**", "http:fetch:api.github.com"]`).')
-  lines.push('- **`deny`**: Blacklist of capabilities (processed first).')
+  lines.push('Runes do not have direct access to Node.js APIs. They declare specific lifecycle-scoped permission scopes in `.crunes/config.json`:')
+  lines.push('```json')
+  lines.push('{"permissions": {"my-rune": {"use": {"allow": ["fs.read:src/**"]}}}}')
+  lines.push('```')
   lines.push('')
   lines.push('### Config File Fields Reference')
   lines.push('- **`permissions`**: Mappings of permission templates scoped to specific runes.')
@@ -447,7 +448,7 @@ export async function compileIntro({ config, format, projectRoot, configRoot, ha
       lines.push('| Key | Name | Path | Permissions (Allow) |')
       lines.push('| --- | --- | --- | --- |')
       for (const r of activeRunes) {
-        const allow = (r.permissions?.allow ?? []).join(', ') || '*none*'
+        const allow = (r.permissions?.use?.allow ?? r.permissions?.allow ?? []).join(', ') || '*none*'
         lines.push(`| \`${r.key}\` | ${r.name} | \`${r.path}\` | \`${allow}\` |`)
       }
       lines.push('')
