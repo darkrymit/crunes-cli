@@ -4,6 +4,7 @@ import { intro, outro, confirm, cancel } from '@clack/prompts';
 import { output } from '../../shared/output.js';
 
 const EMPTY_CONFIG = JSON.stringify({ runes: {} }, null, 2) + '\n';
+const GITIGNORE_CONTENT = '# local overrides (machine-specific, never commit)\nconfig.local.json\n\n# run logs\nlogs/\n';
 
 export async function handler({
   yes = false,
@@ -35,6 +36,11 @@ export async function handler({
 
   mkdirSync(configDir, { recursive: true });
   writeFileSync(configPath, EMPTY_CONFIG);
+
+  const gitignorePath = join(configDir, '.gitignore');
+  if (!existsSync(gitignorePath)) {
+    writeFileSync(gitignorePath, GITIGNORE_CONTENT);
+  }
 
   if (!isNonInteractive) {
     outro(`Created ${configPath}`);
