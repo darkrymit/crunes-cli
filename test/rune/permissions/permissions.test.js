@@ -293,3 +293,21 @@ describe('rune.spawn / rune.kill / rune.exists permissions', () => {
     expect(() => check('rune.exists', 'server')).toThrow(PermissionError)
   })
 })
+
+describe('makePermissionChecker — db.connect capability', () => {
+  it('allows db.connect when matched by allowance pattern', () => {
+    const checker = makePermissionChecker({
+      allow: ['db.connect:postgres:localhost:5432/dev_db'],
+      deny: []
+    })
+    expect(() => checker('db.connect', 'postgres:localhost:5432/dev_db')).not.toThrow()
+  })
+
+  it('throws PermissionError when db.connect is denied', () => {
+    const checker = makePermissionChecker({
+      allow: ['db.connect:postgres:localhost:5432/**'],
+      deny: ['db.connect:postgres:localhost:5432/prod_db']
+    })
+    expect(() => checker('db.connect', 'postgres:localhost:5432/prod_db')).toThrow(PermissionError)
+  })
+})

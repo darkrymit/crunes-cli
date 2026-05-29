@@ -262,6 +262,36 @@ globalThis.utils = {
       return db
     },
   },
+  db: {
+    connect: async (connectionString) => {
+      const id = await $__utils_db_connect.apply(undefined, [connectionString], { arguments: { copy: true }, result: { promise: true, copy: true } })
+      const client = {
+        query: (sql, params = []) =>
+          $__utils_db_query.apply(undefined, [id, sql, params], { arguments: { copy: true }, result: { promise: true, copy: true } }),
+        get: (sql, params = []) =>
+          $__utils_db_get.apply(undefined, [id, sql, params], { arguments: { copy: true }, result: { promise: true, copy: true } }),
+        exec: (sql, params = []) =>
+          $__utils_db_exec.apply(undefined, [id, sql, params], { arguments: { copy: true }, result: { promise: true, copy: true } }),
+        transaction: async (callback) => {
+          if (typeof callback !== 'function') {
+            throw new TypeError('transaction callback must be a function')
+          }
+          await client.exec('BEGIN')
+          try {
+            const result = await callback(client)
+            await client.exec('COMMIT')
+            return result
+          } catch (err) {
+            await client.exec('ROLLBACK')
+            throw err
+          }
+        },
+        close: () =>
+          $__utils_db_close.apply(undefined, [id], { arguments: { copy: true }, result: { promise: true, copy: true } }),
+      }
+      return client
+    },
+  },
   crypto: {
     hash: (algorithm, data) => {
       const d = data instanceof Uint8Array ? data.buffer : data
@@ -428,7 +458,7 @@ globalThis.utils = {
   tree,
 }
 
-export const { fs, shell, section, rune, json, yaml, xml, http, env, vars, archive, cache, sqlite, crypto, codec, ws, time } = globalThis.utils
+export const { fs, shell, section, rune, json, yaml, xml, http, env, vars, archive, cache, sqlite, db, crypto, codec, ws, time } = globalThis.utils
 export { md, tree }
 
 // ─── Global Sandbox Timers ───────────────────────────────────────────────────

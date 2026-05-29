@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { join } from 'node:path'
 import { mkdtemp, rm, writeFile, mkdir } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -6,6 +6,29 @@ import { createServer } from 'node:http'
 import { WebSocketServer } from 'ws'
 import { getPluginRunePath, runRuneInIsolate, getArgsSchema } from '../../../src/rune/isolation/runner.js'
 import { createJob, projectKey } from '../../../src/job/registry.js'
+
+vi.mock('pg', () => {
+  return {
+    default: {
+      Client: class {
+        async connect() {}
+        async query(sql, params) {
+          if (sql === 'BEGIN' || sql === 'COMMIT' || sql === 'ROLLBACK') {
+            return { rows: [], rowCount: 0 }
+          }
+          if (sql.includes('SELECT')) {
+            return { rows: [{ id: 42, name: 'Alice' }], rowCount: 1 }
+          }
+          if (sql.includes('UPDATE')) {
+            return { rows: [], rowCount: 1 }
+          }
+          return { rows: [], rowCount: 0 }
+        }
+        async end() {}
+      }
+    }
+  }
+})
 
 function startEchoServer() {
   return new Promise((resolve) => {
@@ -594,6 +617,82 @@ export async function use() {
 
     const result = await runRuneInIsolate(runeFile, { allow: ['shell.exec:**'], deny: [] }, [], tmp)
     expect(result[0].data.content).toBe('exited')
+  })
+})
+
+describe('runRuneInIsolate — db integration', () => {
+  let tmp
+
+  beforeEach(async () => {
+    tmp = await mkdtemp(join(tmpdir(), 'crunes-runner-db-'))
+  })
+
+  afterEach(async () => {
+    await rm(tmp, { recursive: true, force: true })
+  })
+
+  it('allows connecting to db and executing queries', async () => {
+    const runeFile = join(tmp, 'rune.js')
+    await writeFile(runeFile, `
+import { db, section } from '@utils'
+export async function use() {
+  const client = await db.connect('postgres://user:pass@mydb.com:5432/production')
+  const rows = await client.query('SELECT * FROM users WHERE id = $1', [42])
+  const first = await client.get('SELECT * FROM users WHERE id = $1', [42])
+  const execResult = await client.exec('UPDATE users SET name = $1 WHERE id = $2', ['Alice', 42])
+  await client.close()
+  return [section.create('r', { type: 'markdown', content: JSON.stringify({ rows, first, execResult }) })]
+}
+`)
+    const result = await runRuneInIsolate(
+      runeFile,
+      { allow: ['db.connect:postgres:mydb.com:5432/production'], deny: [] },
+      [],
+      tmp,
+    )
+    const parsed = JSON.parse(result[0].data.content)
+    expect(parsed.rows).toEqual([{ id: 42, name: 'Alice' }])
+    expect(parsed.first).toEqual({ id: 42, name: 'Alice' })
+    expect(parsed.execResult).toEqual({ changes: 1 })
+  })
+
+  it('supports transactions with BEGIN, COMMIT, and ROLLBACK', async () => {
+    const runeFile = join(tmp, 'rune.js')
+    await writeFile(runeFile, `
+import { db, section } from '@utils'
+export async function use() {
+  const client = await db.connect('postgres://user:pass@mydb.com:5432/production')
+  let txRun = false
+  const res = await client.transaction(async (tx) => {
+    txRun = true
+    return await tx.get('SELECT name FROM users WHERE id = $1', [42])
+  })
+  await client.close()
+  return [section.create('r', { type: 'markdown', content: JSON.stringify({ txRun, res }) })]
+}
+`)
+    const result = await runRuneInIsolate(
+      runeFile,
+      { allow: ['db.connect:postgres:mydb.com:5432/production'], deny: [] },
+      [],
+      tmp,
+    )
+    const parsed = JSON.parse(result[0].data.content)
+    expect(parsed.txRun).toBe(true)
+    expect(parsed.res).toEqual({ id: 42, name: 'Alice' })
+  })
+
+  it('throws PermissionError when db.connect is not allowed', async () => {
+    const runeFile = join(tmp, 'rune.js')
+    await writeFile(runeFile, `
+import { db } from '@utils'
+export async function use() {
+  await db.connect('postgres://user:pass@mydb.com:5432/production')
+}
+`)
+    await expect(
+      runRuneInIsolate(runeFile, { allow: [], deny: [] }, [], tmp)
+    ).rejects.toThrow()
   })
 })
 

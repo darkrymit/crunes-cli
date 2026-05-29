@@ -12,6 +12,7 @@ import { createArchiveUtils } from './archive.js'
 import { createCacheUtils } from './cache.js'
 import { createSqliteUtils } from './sqlite.js'
 import { createWsUtils } from './ws.js'
+import { createDbUtils } from './db.js'
 import micromatch from 'micromatch'
 
 export function createSectionUtils(patterns) {
@@ -34,6 +35,7 @@ export function createUtils(dir, checkPermission = null, pluginDir = null, permi
   const fs     = createFsUtils(dir, checkPermission, pluginDir, pluginId)
   const sqlite = createSqliteUtils(dir, checkPermission, { pluginId, projectName })
   const ws     = createWsUtils(checkPermission)
+  const db     = createDbUtils(dir, checkPermission)
   const utils  = {
     md,
     tree: treeUtils,
@@ -50,6 +52,7 @@ export function createUtils(dir, checkPermission = null, pluginDir = null, permi
     cache:   createCacheUtils(dir, checkPermission, { pluginId, projectName }),
     sqlite,
     ws,
+    db,
   }
-  return { utils, dispose: () => { sqlite.dispose(); ws.dispose() } }
+  return { utils, dispose: () => { sqlite.dispose(); ws.dispose(); db.dispose() } }
 }

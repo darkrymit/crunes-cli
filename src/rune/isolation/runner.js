@@ -366,6 +366,38 @@ async function injectUtils(isolate, context, utils, runeCallback, vars, projectD
     return utils.ws._getSession(sessionId).closedPromise
   }))
 
+  const dbHandles = new Map()
+  let nextDbHandle = 0
+
+  await jail.set('$__utils_db_connect', new ivm.Reference(async (connectionString) => {
+    const handle = await utils.db.connect(connectionString)
+    const id = String(nextDbHandle++)
+    dbHandles.set(id, handle)
+    return id
+  }))
+  await jail.set('$__utils_db_query', new ivm.Reference(async (id, sql, params) => {
+    const handle = dbHandles.get(id)
+    if (!handle) throw new Error(`Invalid db handle: ${id}`)
+    return handle.query(sql, params || [])
+  }))
+  await jail.set('$__utils_db_get', new ivm.Reference(async (id, sql, params) => {
+    const handle = dbHandles.get(id)
+    if (!handle) throw new Error(`Invalid db handle: ${id}`)
+    const row = await handle.get(sql, params || [])
+    return row !== null ? row : null
+  }))
+  await jail.set('$__utils_db_exec', new ivm.Reference(async (id, sql, params) => {
+    const handle = dbHandles.get(id)
+    if (!handle) throw new Error(`Invalid db handle: ${id}`)
+    return handle.exec(sql, params || [])
+  }))
+  await jail.set('$__utils_db_close', new ivm.Reference(async (id) => {
+    const handle = dbHandles.get(id)
+    if (!handle) return
+    await handle.close()
+    dbHandles.delete(id)
+  }))
+
   await jail.set('$__crypto_hash', new ivm.Reference((algorithm, data) => {
     const d = typeof data === 'string' ? data : new Uint8Array(data)
     const res = hash(algorithm, d)
