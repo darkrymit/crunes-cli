@@ -261,6 +261,7 @@ function formatGlobalsDocs(data) {
 
 export async function compileIntro({ config, format, projectRoot, configRoot, hasProjectError }) {
   const namespaces = walkUtilsDocs(utilsApiData)
+  const globalsTypes = walkUtilsDocs(globalsApiData)[0]?.types ?? {}
 
   const activeRunes = []
   if (config && !hasProjectError) {
@@ -447,7 +448,7 @@ export async function compileIntro({ config, format, projectRoot, configRoot, ha
       lines.push('')
     }
 
-    lines.push(formatUtilsNamespace(ns))
+    lines.push(formatUtilsNamespace(ns, globalsTypes))
     lines.push('')
     lines.push('---')
     lines.push('')

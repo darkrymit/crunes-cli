@@ -1,9 +1,11 @@
 import utilsApiData from '../generated/utils-api.json' assert { type: 'json' }
+import globalsApiData from '../generated/globals-api.json' assert { type: 'json' }
 import { walkUtilsDocs } from '../utils-walker.js'
 import { formatUtilsIndex, formatUtilsNamespace } from '../utils-formatter.js'
 import { output } from '../../shared/output.js'
 
 const ALL_NAMESPACES = walkUtilsDocs(utilsApiData)
+const GLOBALS_TYPES = walkUtilsDocs(globalsApiData)[0]?.types ?? {}
 
 export async function handler({ namespaces = [], format = 'text' } = {}) {
   let anyFailed = false
@@ -22,7 +24,7 @@ export async function handler({ namespaces = [], format = 'text' } = {}) {
     if (namespaces.length === 0) {
       process.stdout.write(formatUtilsIndex(targets) + '\n')
     } else {
-      const blocks = targets.map(formatUtilsNamespace)
+      const blocks = targets.map(ns => formatUtilsNamespace(ns, GLOBALS_TYPES))
       if (blocks.length > 0) process.stdout.write(blocks.join('\n\n') + '\n')
     }
   }

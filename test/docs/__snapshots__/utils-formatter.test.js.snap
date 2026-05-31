@@ -13,7 +13,10 @@ WebSocket client
 
     Returns: WsHandle
 
-    WsHandle methods:
+  Referenced Types:
+
+    WsHandle
+      WS connection handle
       open()               Connect.
       send(msg)            Send a message.
       close()              Close."

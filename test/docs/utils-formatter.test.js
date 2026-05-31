@@ -58,15 +58,16 @@ describe('formatUtilsNamespace', () => {
     expect(formatUtilsNamespace(WS_NS)).toContain('Returns: WsHandle')
   })
 
-  it('renders WsHandle methods block', () => {
+  it('renders WsHandle in Referenced Types block', () => {
     const out = formatUtilsNamespace(WS_NS)
-    expect(out).toContain('WsHandle methods')
+    expect(out).toContain('Referenced Types:')
+    expect(out).toContain('WsHandle')
     expect(out).toContain('open()')
     expect(out).toContain('send(msg)')
     expect(out).toContain('close()')
   })
 
-  it('renders WsHandle methods block when wrapped in Promise', () => {
+  it('renders WsHandle in Referenced Types block when wrapped in Promise', () => {
     const wsNsWithPromise = {
       ...WS_NS,
       functions: [
@@ -77,11 +78,12 @@ describe('formatUtilsNamespace', () => {
       ]
     }
     const out = formatUtilsNamespace(wsNsWithPromise)
-    expect(out).toContain('WsHandle methods')
+    expect(out).toContain('Referenced Types:')
+    expect(out).toContain('WsHandle')
     expect(out).toContain('open()')
   })
 
-  it('renders fields block when properties exist', () => {
+  it('renders properties and methods in Referenced Types block', () => {
     const nsWithProps = {
       ...WS_NS,
       types: {
@@ -96,9 +98,9 @@ describe('formatUtilsNamespace', () => {
       }
     }
     const out = formatUtilsNamespace(nsWithProps)
-    expect(out).toContain('WsHandle fields')
-    expect(out).toContain('ok   boolean   True if ok')
-    expect(out).toContain('WsHandle methods')
+    expect(out).toContain('Referenced Types:')
+    expect(out).toContain('WsHandle')
+    expect(out).toContain('ok  boolean  True if ok')
     expect(out).toContain('close()')
   })
 
