@@ -15,16 +15,10 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "better-sqlite3": "^12.10.0",
-    "fast-text-encoding": "^1.0.6",
-    "fast-xml-parser": "^5.8.0",
-    "isolated-vm": "^6.1.2",
-    "mysql2": "^3.12.0",
-    "pg": "^8.11.0",
-    "web-streams-polyfill": "^4.3.0",
-    "ws": "^8.21.0",
-    "yaml": "^2.9.0",
-    "yargs-parser": "^22.0.0"
+    "isolated-vm": "^6.1.2"
+  },
+  "optionalDependencies": {
+    "better-sqlite3": "^12.10.0"
   },
   "devDependencies": {
     "@clack/prompts": "^1.5.0",
@@ -34,19 +28,26 @@
     "commander": "^15.0.0",
     "dotenv": "^17.4.2",
     "esbuild": "^0.28.0",
+    "fast-text-encoding": "^1.0.6",
+    "fast-xml-parser": "^5.8.0",
     "jsonpath-plus": "^10.4.0",
     "micromatch": "^4.0.8",
+    "mysql2": "^3.12.0",
+    "pg": "^8.11.0",
     "tar": "^7.5.15",
     "tinyglobby": "^0.2.17",
     "typedoc": "^0.28.19",
     "typescript": "^6.0.3",
     "unzipper": "^0.12.3",
-    "vitest": "^4.1.7"
+    "vitest": "^4.1.7",
+    "web-streams-polyfill": "^4.3.0",
+    "ws": "^8.21.0",
+    "yaml": "^2.9.0",
+    "yargs-parser": "^22.0.0"
   },
   "license": "MIT",
   "author": "DarkRymit",
   "engines": {
     "node": ">=22"
   }
-
 }

@@ -1,8 +1,19 @@
 import { mkdirSync } from 'node:fs'
 import path from 'node:path'
-import Database from 'better-sqlite3'
 import { resolvePath, canonicalizeLocation } from './utils.js'
 import { upsertSqliteDb } from '../../sqlite/index.js'
+
+async function loadDatabase() {
+  try {
+    const { default: Database } = await import('better-sqlite3')
+    return Database
+  } catch {
+    throw new Error(
+      'better-sqlite3 is not installed.\n' +
+      'Run: npm install -g better-sqlite3'
+    )
+  }
+}
 import { upsertProject, ensureProjectIdentity } from '../../project/index.js'
 
 const SQLITE_SCOPES = {
@@ -26,7 +37,7 @@ function resolveFileName(name) {
   return /\.\w+$/.test(name) ? name : `${name}.sqlite`
 }
 
-function makeHandle(dbPath, checkRead, checkWrite, connections) {
+function makeHandle(Database, dbPath, checkRead, checkWrite, connections) {
   mkdirSync(path.dirname(dbPath), { recursive: true })
   const db = new Database(dbPath)
   db.pragma('journal_mode = WAL')
@@ -64,6 +75,7 @@ export function createSqliteUtils(dir, checkPermission, { pluginId = null, store
 
   return {
     async openHandle(location, name = 'default') {
+      const Database = await loadDatabase()
       const scope = detectSqliteScope(location)
       if (scope !== null && (name.includes('/') || name.includes('\\'))) {
         throw new TypeError('sqlite name must not contain path separators — use a flat name like "branch-main" instead of "branch/main"')
@@ -86,7 +98,7 @@ export function createSqliteUtils(dir, checkPermission, { pluginId = null, store
           await upsertProject(projectId, dir)
         }
       }
-      return makeHandle(dbPath, checkRead, checkWrite, connections)
+      return makeHandle(Database, dbPath, checkRead, checkWrite, connections)
     },
     dispose() {
       for (const db of connections) {

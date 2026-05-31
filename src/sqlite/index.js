@@ -1,9 +1,20 @@
 import { readFile, readdir, writeFile, mkdir, rm } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import path from 'node:path'
-import Database from 'better-sqlite3'
 import { getSqliteBasePath, getSqliteJsonPath } from '../store/index.js'
 import { storageKey } from '../store/storage-key.js'
+
+async function loadDatabase() {
+  try {
+    const { default: Database } = await import('better-sqlite3')
+    return Database
+  } catch {
+    throw new Error(
+      'better-sqlite3 is not installed.\n' +
+      'Run: npm install -g better-sqlite3'
+    )
+  }
+}
 
 export function getSqlitePluginDir(pluginId) {
   return path.join(getSqliteBasePath(), 'plugins', pluginId)
@@ -118,6 +129,7 @@ export async function deleteSqliteDb(id, projectKey = undefined) {
 }
 
 export async function querySqliteDb(id, sql, projectKey = undefined) {
+  const Database = await loadDatabase()
   const data = await loadSqliteDbs()
   const key = resolveKey(id, scopedDatabases(data, projectKey))
   const { path: dbPath } = data.databases[key]

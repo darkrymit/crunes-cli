@@ -48,7 +48,7 @@ await esbuild.build({
   platform: 'node',
   format: 'esm',
   outfile: 'dist/cli.js',
-  external: ['isolated-vm', '@aws-sdk/client-s3', 'better-sqlite3'],
+  external: ['isolated-vm', 'better-sqlite3', '@aws-sdk/client-s3'],
   inject: ['./require-shim.js'],
   plugins: [embedIsolateSourcesPlugin],
 })
