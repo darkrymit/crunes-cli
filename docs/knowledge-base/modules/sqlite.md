@@ -20,7 +20,7 @@ Runes call `utils.sqlite.open(location, name)` to open a named SQLite database h
 
 **Readonly query mode:** `querySqliteDb` opens the database with `new Database(path, { readonly: true })`. Write statements (`INSERT`, `UPDATE`, `DELETE`, `CREATE`) throw a `better-sqlite3` error, which the query handler surfaces as `Error: <message>` + `process.exit(1)`.
 
-**Scope model:** Same four scopes as cache (`global`, `project`, `plugin`, `project-plugin`), same subdirectory structure under `sqlite/`.
+**Scope model:** Same five scopes as cache (`global-project`, `global-plugin`, `global-project-plugin`, `local-project`, `local-project-plugin`), same subdirectory structure under `sqlite/`.
 
 ## Key Decisions
 

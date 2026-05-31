@@ -1,13 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { mkdtemp, rm, readFile } from 'node:fs/promises'
+import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createJob, getJob, cleanJobs, listJobs, deleteJob, resolveJobId } from '../../../src/job/registry.js'
-import { getProjectKey } from '../../../src/project/index.js'
 import { loadProjects } from '../../../src/project/index.js'
 
 const PROJ = '/proj'
-const PKEY = getProjectKey(PROJ)
 const META = { spawnedBy: 'server', runeKey: 'worker', projectDir: PROJ, args: ['--port', '3000'] }
 
 describe('job registry', () => {
@@ -25,14 +23,15 @@ describe('job registry', () => {
   it('createJob returns a full UUID id and writes a record with full provenance', async () => {
     const { id, projectKey: pk } = await createJob(12345, META)
     expect(id).toMatch(/^[0-9a-f-]{36}$/)
-    expect(pk).toBe(PKEY)
+    expect(typeof pk).toBe('string')
     const record = await getJob(pk, id)
     expect(record).toMatchObject({ id, pid: 12345, type: 'rune', projectKey: pk, ...META })
     expect(typeof record.startedAt).toBe('string')
   })
 
   it('getJob returns null for unknown id', async () => {
-    expect(await getJob(PKEY, 'no-such-id')).toBeNull()
+    const { projectKey: pk } = await createJob(process.pid, META)
+    expect(await getJob(pk, 'no-such-id')).toBeNull()
   })
 
   it('cleanJobs removes records for dead PIDs', async () => {
@@ -60,9 +59,9 @@ describe('job registry', () => {
   })
 
   it('createJob upserts projects.json via projects module', async () => {
-    await createJob(12345, { ...META })
+    const { projectKey: pk } = await createJob(12345, { ...META })
     const data = await loadProjects()
-    expect(data.projects[PKEY]).toBe(PROJ)
+    expect(data.projects[pk]).toMatchObject({ path: PROJ })
   })
 
   it('listJobs returns all records for a project', async () => {
@@ -90,7 +89,8 @@ describe('job registry', () => {
   })
 
   it('deleteJob is a no-op for unknown id', async () => {
-    await expect(deleteJob(PKEY, 'no-such-id')).resolves.toBeUndefined()
+    const { projectKey: pk } = await createJob(process.pid, META)
+    await expect(deleteJob(pk, 'no-such-id')).resolves.toBeUndefined()
   })
 })
 

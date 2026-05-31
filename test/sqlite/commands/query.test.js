@@ -4,7 +4,6 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import Database from 'better-sqlite3'
 import { upsertSqliteDb, loadSqliteDbs } from '../../../src/sqlite/index.js'
-import { getProjectKey } from '../../../src/project/index.js'
 import { handler } from '../../../src/sqlite/commands/query.js'
 
 const PROJ_KEY = 'abc123def456'
@@ -29,7 +28,7 @@ describe('sqlite query handler', () => {
     db.exec('CREATE TABLE t (id INTEGER PRIMARY KEY, val TEXT)')
     db.exec("INSERT INTO t VALUES (1, 'hello')")
     db.close()
-    await upsertSqliteDb(dbPath, { scope: 'project', projectKey: PROJ_KEY, pluginId: null, location: '@project-sqlite', name })
+    await upsertSqliteDb(dbPath, { scope: 'global-project', projectId: PROJ_KEY, pluginId: null, location: '@global-project-sqlite', name })
     const { databases } = await loadSqliteDbs()
     return Object.keys(databases)[0]
   }

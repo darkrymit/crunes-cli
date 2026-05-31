@@ -23,7 +23,7 @@ describe('cache delete handler', () => {
   it('deletes the bucket directory and prints confirmation (yes: true)', async () => {
     const bucketPath = join(tmp, 'caches', 'projects', PROJ_KEY, 'default')
     await mkdir(bucketPath, { recursive: true })
-    await upsertCacheBucket(bucketPath, { scope: 'project', projectKey: PROJ_KEY, pluginId: null, location: '@project-cache', name: 'default' })
+    await upsertCacheBucket(bucketPath, { scope: 'global-project', projectId: PROJ_KEY, pluginId: null, location: '@global-project-cache', name: 'default' })
     const { buckets } = await loadCacheBuckets()
     const id = Object.keys(buckets)[0]
     await handler({ id, yes: true, projectDir: tmp, global: true })
@@ -42,7 +42,7 @@ describe('cache delete handler', () => {
   it('exits 1 when id belongs to a different project (no -g)', async () => {
     const bucketPath = join(tmp, 'caches', 'projects', 'other-key', 'def')
     await mkdir(bucketPath, { recursive: true })
-    await upsertCacheBucket(bucketPath, { scope: 'project', projectKey: 'other-key', pluginId: null, location: '@project-cache', name: 'def' })
+    await upsertCacheBucket(bucketPath, { scope: 'global-project', projectId: 'other-key', pluginId: null, location: '@global-project-cache', name: 'def' })
     const { buckets } = await loadCacheBuckets()
     const id = Object.keys(buckets)[0]
     const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => { throw new Error('exit') })

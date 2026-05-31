@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
   getSqlitePluginDir, getSqliteProjectDir, getSqliteProjectPluginDir,
-  sqliteDbKey, upsertSqliteDb, loadSqliteDbs, listSqliteDbs,
+  upsertSqliteDb, loadSqliteDbs, listSqliteDbs,
   resolveKey, deleteSqliteDb, querySqliteDb,
 } from '../../src/sqlite/index.js'
 
@@ -38,31 +38,25 @@ describe('sqlite index', () => {
     expect(await loadSqliteDbs()).toEqual({ format: '1', databases: {} })
   })
 
-  it('sqliteDbKey produces stable <name>-<12hexchars> format', () => {
-    const key = sqliteDbKey('default', '/some/path/default.sqlite')
-    expect(key).toMatch(/^default-[0-9a-f]{12}$/)
-    expect(sqliteDbKey('default', '/some/path')).toBe(sqliteDbKey('default', '/some/path'))
-  })
-
   it('upsertSqliteDb creates sqlite.json with correct entry', async () => {
     const dbPath = join(tmp, 'sqlite', 'projects', PROJ_KEY, 'default.sqlite')
     await upsertSqliteDb(dbPath, {
-      scope: 'project', projectKey: PROJ_KEY, pluginId: null,
-      location: '@project-sqlite', name: 'default',
+      scope: 'global-project', projectId: PROJ_KEY, pluginId: null,
+      location: '@global-project-sqlite', name: 'default',
     })
     const data = await loadSqliteDbs()
     const entries = Object.values(data.databases)
     expect(entries).toHaveLength(1)
     expect(entries[0]).toMatchObject({
-      path: dbPath, scope: 'project', projectKey: PROJ_KEY,
-      pluginId: null, location: '@project-sqlite', name: 'default',
+      path: dbPath, scope: 'global-project', projectKey: PROJ_KEY,
+      pluginId: null, location: '@global-project-sqlite', name: 'default',
     })
     expect(typeof entries[0].firstSeenAt).toBe('string')
   })
 
   it('upsertSqliteDb preserves firstSeenAt on re-upsert', async () => {
     const dbPath = join(tmp, 'sqlite', 'projects', PROJ_KEY, 'default.sqlite')
-    const meta = { scope: 'project', projectKey: PROJ_KEY, pluginId: null, location: '@project-sqlite', name: 'default' }
+    const meta = { scope: 'global-project', projectId: PROJ_KEY, pluginId: null, location: '@global-project-sqlite', name: 'default' }
     await upsertSqliteDb(dbPath, meta)
     const first = await loadSqliteDbs()
     const key = Object.keys(first.databases)[0]
@@ -73,10 +67,10 @@ describe('sqlite index', () => {
 
   it('upsertSqliteDb accumulates multiple databases', async () => {
     await upsertSqliteDb(join(tmp, 'sqlite', 'projects', PROJ_KEY, 'a.sqlite'), {
-      scope: 'project', projectKey: PROJ_KEY, pluginId: null, location: '@project-sqlite', name: 'a',
+      scope: 'global-project', projectId: PROJ_KEY, pluginId: null, location: '@global-project-sqlite', name: 'a',
     })
     await upsertSqliteDb(join(tmp, 'sqlite', 'projects', PROJ_KEY, 'b.sqlite'), {
-      scope: 'project', projectKey: PROJ_KEY, pluginId: null, location: '@project-sqlite', name: 'b',
+      scope: 'global-project', projectId: PROJ_KEY, pluginId: null, location: '@global-project-sqlite', name: 'b',
     })
     expect(Object.keys((await loadSqliteDbs()).databases)).toHaveLength(2)
   })
@@ -84,11 +78,11 @@ describe('sqlite index', () => {
   it('listSqliteDbs returns array with key field', async () => {
     const dbPath = join(tmp, 'sqlite', 'projects', PROJ_KEY, 'default.sqlite')
     await upsertSqliteDb(dbPath, {
-      scope: 'project', projectKey: PROJ_KEY, pluginId: null, location: '@project-sqlite', name: 'default',
+      scope: 'global-project', projectId: PROJ_KEY, pluginId: null, location: '@global-project-sqlite', name: 'default',
     })
     const list = await listSqliteDbs()
     expect(list).toHaveLength(1)
-    expect(list[0].key).toMatch(/^default-[0-9a-f]{12}$/)
+    expect(list[0].key).toMatch(/^default-[0-9a-f]{8}$/)
     expect(list[0].path).toBe(dbPath)
   })
 
@@ -96,9 +90,9 @@ describe('sqlite index', () => {
     const p1 = join(tmp, 'sqlite', 'projects', PROJ_KEY, 'a.sqlite')
     const p2 = join(tmp, 'sqlite', 'projects', 'other-key', 'b.sqlite')
     const p3 = join(tmp, 'sqlite', 'plugins', 'my-plugin', 'c.sqlite')
-    await upsertSqliteDb(p1, { scope: 'project', projectKey: PROJ_KEY, pluginId: null, location: '@project-sqlite', name: 'a' })
-    await upsertSqliteDb(p2, { scope: 'project', projectKey: 'other-key', pluginId: null, location: '@project-sqlite', name: 'b' })
-    await upsertSqliteDb(p3, { scope: 'plugin', projectKey: null, pluginId: 'my-plugin', location: '@plugin-sqlite', name: 'c' })
+    await upsertSqliteDb(p1, { scope: 'global-project', projectId: PROJ_KEY, pluginId: null, location: '@global-project-sqlite', name: 'a' })
+    await upsertSqliteDb(p2, { scope: 'global-project', projectId: 'other-key', pluginId: null, location: '@global-project-sqlite', name: 'b' })
+    await upsertSqliteDb(p3, { scope: 'global-plugin', projectId: null, pluginId: 'my-plugin', location: '@global-plugin-sqlite', name: 'c' })
     const list = await listSqliteDbs(PROJ_KEY)
     expect(list).toHaveLength(1)
     expect(list[0].name).toBe('a')
@@ -107,8 +101,8 @@ describe('sqlite index', () => {
   it('listSqliteDbs() with no arg returns all entries', async () => {
     const p1 = join(tmp, 'sqlite', 'projects', PROJ_KEY, 'a.sqlite')
     const p2 = join(tmp, 'sqlite', 'projects', 'other-key', 'b.sqlite')
-    await upsertSqliteDb(p1, { scope: 'project', projectKey: PROJ_KEY, pluginId: null, location: '@project-sqlite', name: 'a' })
-    await upsertSqliteDb(p2, { scope: 'project', projectKey: 'other-key', pluginId: null, location: '@project-sqlite', name: 'b' })
+    await upsertSqliteDb(p1, { scope: 'global-project', projectId: PROJ_KEY, pluginId: null, location: '@global-project-sqlite', name: 'a' })
+    await upsertSqliteDb(p2, { scope: 'global-project', projectId: 'other-key', pluginId: null, location: '@global-project-sqlite', name: 'b' })
     expect(await listSqliteDbs()).toHaveLength(2)
   })
 })
@@ -121,7 +115,7 @@ describe('sqlite index — management operations', () => {
   // resolveKey
   it('resolveKey returns exact key when it exists', async () => {
     const dbPath = join(tmp, 'sqlite', 'projects', PROJ_KEY, 'default.sqlite')
-    await upsertSqliteDb(dbPath, { scope: 'project', projectKey: PROJ_KEY, pluginId: null, location: '@project-sqlite', name: 'default' })
+    await upsertSqliteDb(dbPath, { scope: 'global-project', projectId: PROJ_KEY, pluginId: null, location: '@global-project-sqlite', name: 'default' })
     const data = await loadSqliteDbs()
     const key = Object.keys(data.databases)[0]
     expect(resolveKey(key, data.databases)).toBe(key)
@@ -129,7 +123,7 @@ describe('sqlite index — management operations', () => {
 
   it('resolveKey matches by prefix', async () => {
     const dbPath = join(tmp, 'sqlite', 'projects', PROJ_KEY, 'default.sqlite')
-    await upsertSqliteDb(dbPath, { scope: 'project', projectKey: PROJ_KEY, pluginId: null, location: '@project-sqlite', name: 'default' })
+    await upsertSqliteDb(dbPath, { scope: 'global-project', projectId: PROJ_KEY, pluginId: null, location: '@global-project-sqlite', name: 'default' })
     const data = await loadSqliteDbs()
     const key = Object.keys(data.databases)[0]
     expect(resolveKey(key.slice(0, 10), data.databases)).toBe(key)
@@ -142,8 +136,8 @@ describe('sqlite index — management operations', () => {
   it('resolveKey throws on ambiguous prefix', async () => {
     const p1 = join(tmp, 'sqlite', 'projects', PROJ_KEY, 'a.sqlite')
     const p2 = join(tmp, 'sqlite', 'projects', PROJ_KEY, 'b.sqlite')
-    await upsertSqliteDb(p1, { scope: 'project', projectKey: PROJ_KEY, pluginId: null, location: '@project-sqlite', name: 'a' })
-    await upsertSqliteDb(p2, { scope: 'project', projectKey: PROJ_KEY, pluginId: null, location: '@project-sqlite', name: 'b' })
+    await upsertSqliteDb(p1, { scope: 'global-project', projectId: PROJ_KEY, pluginId: null, location: '@global-project-sqlite', name: 'a' })
+    await upsertSqliteDb(p2, { scope: 'global-project', projectId: PROJ_KEY, pluginId: null, location: '@global-project-sqlite', name: 'b' })
     const data = await loadSqliteDbs()
     expect(() => resolveKey('', data.databases)).toThrow('Ambiguous')
   })
@@ -154,7 +148,7 @@ describe('sqlite index — management operations', () => {
     const dbPath = join(tmp, 'sqlite', 'projects', PROJ_KEY, 'default.sqlite')
     await mk(join(tmp, 'sqlite', 'projects', PROJ_KEY), { recursive: true })
     await wf(dbPath, '')
-    await upsertSqliteDb(dbPath, { scope: 'project', projectKey: PROJ_KEY, pluginId: null, location: '@project-sqlite', name: 'default' })
+    await upsertSqliteDb(dbPath, { scope: 'global-project', projectId: PROJ_KEY, pluginId: null, location: '@global-project-sqlite', name: 'default' })
     const data = await loadSqliteDbs()
     const key = Object.keys(data.databases)[0]
     const result = await deleteSqliteDb(key)
@@ -168,7 +162,7 @@ describe('sqlite index — management operations', () => {
     const dbPath = join(tmp, 'sqlite', 'projects', PROJ_KEY, 'default.sqlite')
     await mk(join(tmp, 'sqlite', 'projects', PROJ_KEY), { recursive: true })
     await wf(dbPath, '')
-    await upsertSqliteDb(dbPath, { scope: 'project', projectKey: PROJ_KEY, pluginId: null, location: '@project-sqlite', name: 'default' })
+    await upsertSqliteDb(dbPath, { scope: 'global-project', projectId: PROJ_KEY, pluginId: null, location: '@global-project-sqlite', name: 'default' })
     const data = await loadSqliteDbs()
     const key = Object.keys(data.databases)[0]
     await expect(deleteSqliteDb(key)).resolves.not.toThrow()
@@ -184,7 +178,7 @@ describe('sqlite index — management operations', () => {
     db.exec("CREATE TABLE t (id INTEGER PRIMARY KEY, val TEXT)")
     db.exec("INSERT INTO t VALUES (1, 'hello')")
     db.close()
-    await upsertSqliteDb(dbPath, { scope: 'project', projectKey: PROJ_KEY, pluginId: null, location: '@project-sqlite', name: 'notes' })
+    await upsertSqliteDb(dbPath, { scope: 'global-project', projectId: PROJ_KEY, pluginId: null, location: '@global-project-sqlite', name: 'notes' })
     const data = await loadSqliteDbs()
     const key = Object.keys(data.databases)[0]
     const rows = await querySqliteDb(key, 'SELECT * FROM t')
@@ -199,7 +193,7 @@ describe('sqlite index — management operations', () => {
     const db = new Database(dbPath)
     db.exec("CREATE TABLE t (id INTEGER PRIMARY KEY)")
     db.close()
-    await upsertSqliteDb(dbPath, { scope: 'project', projectKey: PROJ_KEY, pluginId: null, location: '@project-sqlite', name: 'empty' })
+    await upsertSqliteDb(dbPath, { scope: 'global-project', projectId: PROJ_KEY, pluginId: null, location: '@global-project-sqlite', name: 'empty' })
     const data = await loadSqliteDbs()
     const key = Object.keys(data.databases)[0]
     expect(await querySqliteDb(key, 'SELECT * FROM t')).toEqual([])
@@ -210,7 +204,7 @@ describe('sqlite index — management operations', () => {
     const dbPath = join(tmp, 'sqlite', 'projects', 'other-key', 'x.sqlite')
     await mk(join(tmp, 'sqlite', 'projects', 'other-key'), { recursive: true })
     await wf(dbPath, '')
-    await upsertSqliteDb(dbPath, { scope: 'project', projectKey: 'other-key', pluginId: null, location: '@project-sqlite', name: 'x' })
+    await upsertSqliteDb(dbPath, { scope: 'global-project', projectId: 'other-key', pluginId: null, location: '@global-project-sqlite', name: 'x' })
     const data = await loadSqliteDbs()
     const id = Object.keys(data.databases)[0]
     await expect(deleteSqliteDb(id, PROJ_KEY)).rejects.toThrow(/No SQLite database matching/)
@@ -221,7 +215,7 @@ describe('sqlite index — management operations', () => {
     const dbPath = join(tmp, 'sqlite', 'projects', 'other-key', 'y.sqlite')
     await mk(join(tmp, 'sqlite', 'projects', 'other-key'), { recursive: true })
     await wf(dbPath, '')
-    await upsertSqliteDb(dbPath, { scope: 'project', projectKey: 'other-key', pluginId: null, location: '@project-sqlite', name: 'y' })
+    await upsertSqliteDb(dbPath, { scope: 'global-project', projectId: 'other-key', pluginId: null, location: '@global-project-sqlite', name: 'y' })
     const data = await loadSqliteDbs()
     const id = Object.keys(data.databases)[0]
     await expect(querySqliteDb(id, 'SELECT 1', PROJ_KEY)).rejects.toThrow(/No SQLite database matching/)

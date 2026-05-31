@@ -9,7 +9,7 @@ import { getAutoPermits } from '../api/utils.js'
 import { createModuleResolver } from './resolver.js'
 import { ALLOW_BUILTINS } from './builtins.js'
 import { createJob, getJob } from '../../job/index.js'
-import { getProjectKey } from '../../project/index.js'
+import { ensureProjectIdentity } from '../../project/index.js'
 import { hash, hashAsHex, hashAsBase64, hmac, hmacAsHex, hmacAsBase64, encrypt, decrypt, uuid as cryptoUuid, randomHex as cryptoHex, randomBase64 as cryptoBase64 } from '../api/crypto.js'
 import { computeEffectivePermissions, makePermissionChecker } from '../permissions/permissions.js'
 import { isVerbose } from '../../shared/output.js'
@@ -181,7 +181,7 @@ async function injectUtils(isolate, context, utils, runeCallback, vars, projectD
     child.unref()
     return createJob(child.pid, { spawnedBy: currentRuneKey, runeKey: key, projectDir, args: args || [] }).then(({ id, projectKey }) => ({ id, projectKey }))
   }))
-  const pKey = getProjectKey(projectDir)
+  const { id: pKey } = await ensureProjectIdentity(projectDir)
   await jail.set('$__utils_rune_kill', new ivm.Reference((id, signal) => {
     const sig = signal ?? 'SIGTERM'
     if (!VALID_SIGNALS.has(sig)) throw new Error(`Invalid signal: ${sig}`)

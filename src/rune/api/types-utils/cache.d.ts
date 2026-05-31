@@ -2,7 +2,7 @@
 declare namespace cache {
   /**
    * Opens (or creates) a named cache. Returns a handle with set/get/delete/clear.
-   * @param location Storage scope: "@project-cache", "@plugin-cache", "@project-plugin-cache", or a relative path
+   * @param location Storage scope: "@local-project-cache", "@global-project-cache", "@global-plugin-cache", "@local-project-plugin-cache", "@global-project-plugin-cache", or a relative path
    * @param name Cache name (default: "default")
    */
   function open(location: string, name?: string): Promise<CacheHandle>

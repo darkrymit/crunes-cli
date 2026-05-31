@@ -1,10 +1,10 @@
 import { querySqliteDb } from '../index.js'
-import { getProjectKey } from '../../project/index.js'
+import { ensureProjectIdentity } from '../../project/index.js'
 
 function pad(s, n) { return String(s ?? '').padEnd(n) }
 
 export async function handler({ id, sql, projectDir, global: isGlobal }) {
-  const key = isGlobal ? undefined : getProjectKey(projectDir)
+  const key = isGlobal ? undefined : (await ensureProjectIdentity(projectDir)).id
   let rows
   try {
     rows = await querySqliteDb(id, sql, key)

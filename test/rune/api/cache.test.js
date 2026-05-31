@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+﻿import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
@@ -24,34 +24,34 @@ describe('createCacheUtils', () => {
 
   it('set + get roundtrip preserves value', async () => {
     const cache = createCacheUtils(tmp, null, { pluginId: 'plug@1.0.0' })
-    const h = await cache.openHandle('@plugin-cache', 'test')
+    const h = await cache.openHandle('@global-plugin-cache', 'test')
     await h.set('k', { x: 1 })
     expect(await h.get('k')).toEqual({ x: 1 })
   })
 
   it('get on missing key returns null', async () => {
     const cache = createCacheUtils(tmp, null, { pluginId: 'plug@1.0.0' })
-    const h = await cache.openHandle('@plugin-cache', 'test')
+    const h = await cache.openHandle('@global-plugin-cache', 'test')
     expect(await h.get('missing')).toBe(null)
   })
 
   it('set with TTL: get before expiry returns value', async () => {
     const cache = createCacheUtils(tmp, null, { pluginId: 'plug@1.0.0' })
-    const h = await cache.openHandle('@plugin-cache', 'test')
+    const h = await cache.openHandle('@global-plugin-cache', 'test')
     await h.set('k', 'val', 3600)
     expect(await h.get('k')).toBe('val')
   })
 
   it('set with TTL: get after expiry returns null', async () => {
     const cache = createCacheUtils(tmp, null, { pluginId: 'plug@1.0.0' })
-    const h = await cache.openHandle('@plugin-cache', 'test')
+    const h = await cache.openHandle('@global-plugin-cache', 'test')
     await h.set('k', 'val', -1)
     expect(await h.get('k')).toBe(null)
   })
 
   it('delete removes a key', async () => {
     const cache = createCacheUtils(tmp, null, { pluginId: 'plug@1.0.0' })
-    const h = await cache.openHandle('@plugin-cache', 'test')
+    const h = await cache.openHandle('@global-plugin-cache', 'test')
     await h.set('k', 'val')
     await h.delete('k')
     expect(await h.get('k')).toBe(null)
@@ -59,7 +59,7 @@ describe('createCacheUtils', () => {
 
   it('clear removes all keys', async () => {
     const cache = createCacheUtils(tmp, null, { pluginId: 'plug@1.0.0' })
-    const h = await cache.openHandle('@plugin-cache', 'test')
+    const h = await cache.openHandle('@global-plugin-cache', 'test')
     await h.set('a', 1)
     await h.set('b', 2)
     await h.clear()
@@ -69,61 +69,61 @@ describe('createCacheUtils', () => {
 
   it('clear on missing cache dir does not throw', async () => {
     const cache = createCacheUtils(tmp, null, { pluginId: 'plug@1.0.0' })
-    const h = await cache.openHandle('@plugin-cache', 'nonexistent')
+    const h = await cache.openHandle('@global-plugin-cache', 'nonexistent')
     await expect(h.clear()).resolves.toBeUndefined()
   })
 
   it('non-serializable value throws TypeError', async () => {
     const cache = createCacheUtils(tmp, null, { pluginId: 'plug@1.0.0' })
-    const h = await cache.openHandle('@plugin-cache', 'test')
+    const h = await cache.openHandle('@global-plugin-cache', 'test')
     await expect(h.set('k', BigInt(1))).rejects.toThrow(TypeError)
   })
 
   it('name defaults to "default" when omitted', async () => {
     const cache = createCacheUtils(tmp, null, { pluginId: 'plug@1.0.0' })
-    const h1 = await cache.openHandle('@plugin-cache')
-    const h2 = await cache.openHandle('@plugin-cache', 'default')
+    const h1 = await cache.openHandle('@global-plugin-cache')
+    const h2 = await cache.openHandle('@global-plugin-cache', 'default')
     await h1.set('k', 42)
     expect(await h2.get('k')).toBe(42)
   })
 
   it('different cache names are isolated from each other', async () => {
     const cache = createCacheUtils(tmp, null, { pluginId: 'plug@1.0.0' })
-    const a = await cache.openHandle('@plugin-cache', 'a')
-    const b = await cache.openHandle('@plugin-cache', 'b')
+    const a = await cache.openHandle('@global-plugin-cache', 'a')
+    const b = await cache.openHandle('@global-plugin-cache', 'b')
     await a.set('k', 'in-a')
     expect(await b.get('k')).toBe(null)
   })
 
   // --- Location / pluginId guards ---
 
-  it('@plugin-cache without pluginId throws', async () => {
+  it('@global-plugin-cache without pluginId throws', async () => {
     const cache = createCacheUtils(tmp, null)
-    await expect(cache.openHandle('@plugin-cache', 'test')).rejects.toThrow('@plugin-cache requires a plugin context')
+    await expect(cache.openHandle('@global-plugin-cache', 'test')).rejects.toThrow('@global-plugin-cache requires a plugin context')
   })
 
-  it('@project-plugin-cache without pluginId throws', async () => {
+  it('@global-project-plugin-cache without pluginId throws', async () => {
     const cache = createCacheUtils(tmp, null)
-    await expect(cache.openHandle('@project-plugin-cache', 'test')).rejects.toThrow('@project-plugin-cache requires a plugin context')
+    await expect(cache.openHandle('@global-project-plugin-cache', 'test')).rejects.toThrow('@global-project-plugin-cache requires a plugin context')
   })
 
-  it('@project-cache works without pluginId (local rune)', async () => {
+  it('@global-project-cache works without pluginId (local rune)', async () => {
     const cache = createCacheUtils(tmp, null)
-    const h = await cache.openHandle('@project-cache', 'test')
+    const h = await cache.openHandle('@global-project-cache', 'test')
     await h.set('k', 'local-val')
     expect(await h.get('k')).toBe('local-val')
   })
 
   // --- Permissions ---
 
-  it('@plugin-cache calls checkPermission with @plugin-cache:name token', async () => {
+  it('@global-plugin-cache calls checkPermission with @global-plugin-cache:name token', async () => {
     const spy = vi.fn()
     const cache = createCacheUtils(tmp, spy, { pluginId: 'plug@1.0.0' })
-    const h = await cache.openHandle('@plugin-cache', 'test')
+    const h = await cache.openHandle('@global-plugin-cache', 'test')
     await h.set('k', 'v')
-    expect(spy).toHaveBeenCalledWith('cache.write', '@plugin-cache:test')
+    expect(spy).toHaveBeenCalledWith('cache.write', '@global-plugin-cache:test')
     await h.get('k')
-    expect(spy).toHaveBeenCalledWith('cache.read', '@plugin-cache:test')
+    expect(spy).toHaveBeenCalledWith('cache.read', '@global-plugin-cache:test')
   })
 
   it('cache.write checked on set for arbitrary paths', async () => {
@@ -188,47 +188,47 @@ describe('createCacheUtils', () => {
     expect(spy).toHaveBeenCalledWith('cache.read', './my-dir:default')
   })
 
-  it('@project-cache calls checkPermission with @project-cache:name token', async () => {
+  it('@global-project-cache calls checkPermission with @global-project-cache:name token', async () => {
     const spy = vi.fn()
     const cache = createCacheUtils(tmp, spy)
-    const h = await cache.openHandle('@project-cache', 'myns')
+    const h = await cache.openHandle('@global-project-cache', 'myns')
     try { await h.set('k', 'v') } catch {}
-    expect(spy).toHaveBeenCalledWith('cache.write', '@project-cache:myns')
+    expect(spy).toHaveBeenCalledWith('cache.write', '@global-project-cache:myns')
   })
 
-  it('@project-cache/subdir calls checkPermission with subpath token', async () => {
+  it('@global-project-cache/subdir calls checkPermission with subpath token', async () => {
     const spy = vi.fn()
     const cache = createCacheUtils(tmp, spy)
-    const h = await cache.openHandle('@project-cache/data', 'myns')
+    const h = await cache.openHandle('@global-project-cache/data', 'myns')
     try { await h.get('k') } catch {}
-    expect(spy).toHaveBeenCalledWith('cache.read', '@project-cache/data:myns')
+    expect(spy).toHaveBeenCalledWith('cache.read', '@global-project-cache/data:myns')
   })
 
-  it('@project-cache/subdir stores and retrieves values', async () => {
+  it('@global-project-cache/subdir stores and retrieves values', async () => {
     const cache = createCacheUtils(tmp, null)
-    const h = await cache.openHandle('@project-cache/level1/level2', 'myns')
+    const h = await cache.openHandle('@global-project-cache/level1/level2', 'myns')
     await h.set('k', 42)
     expect(await h.get('k')).toBe(42)
   })
 
   it('subpath escape throws RangeError', async () => {
     const cache = createCacheUtils(tmp, null)
-    await expect(cache.openHandle('@project-cache/../etc', 'myns')).rejects.toThrow(RangeError)
+    await expect(cache.openHandle('@global-project-cache/../etc', 'myns')).rejects.toThrow(RangeError)
   })
 
-  it('@plugin-cache permission granted via allow pattern passes check', async () => {
+  it('@global-plugin-cache permission granted via allow pattern passes check', async () => {
     const checker = makePermissionChecker({
-      allow: ['cache.read:@plugin-cache/**', 'cache.write:@plugin-cache/**'],
+      allow: ['cache.read:@global-plugin-cache/**', 'cache.write:@global-plugin-cache/**'],
       deny: [],
     })
     const cache = createCacheUtils(tmp, checker, { pluginId: 'plug@1.0.0' })
-    const h = await cache.openHandle('@plugin-cache', 'test')
+    const h = await cache.openHandle('@global-plugin-cache', 'test')
     await expect(h.set('k', 'v')).resolves.toBeUndefined()
     expect(await h.get('k')).toBe('v')
   })
 })
 
-describe('CacheHandle — has', () => {
+describe('CacheHandle â€” has', () => {
   let tmp
   beforeEach(async () => {
     tmp = await makeTmp()
@@ -241,27 +241,27 @@ describe('CacheHandle — has', () => {
 
   it('returns true for an existing key', async () => {
     const cache = createCacheUtils(tmp, null, { pluginId: 'plug@1.0.0' })
-    const h = await cache.openHandle('@plugin-cache', 'test')
+    const h = await cache.openHandle('@global-plugin-cache', 'test')
     await h.set('k', { x: 1 })
     expect(await h.has('k')).toBe(true)
   })
 
   it('returns false for a missing key', async () => {
     const cache = createCacheUtils(tmp, null, { pluginId: 'plug@1.0.0' })
-    const h = await cache.openHandle('@plugin-cache', 'test')
+    const h = await cache.openHandle('@global-plugin-cache', 'test')
     expect(await h.has('missing')).toBe(false)
   })
 
   it('returns false for an expired key', async () => {
     const cache = createCacheUtils(tmp, null, { pluginId: 'plug@1.0.0' })
-    const h = await cache.openHandle('@plugin-cache', 'test')
+    const h = await cache.openHandle('@global-plugin-cache', 'test')
     await h.set('k', 'val', -1)
     expect(await h.has('k')).toBe(false)
   })
 
   it('requires cache.read permission', async () => {
     const cache = createCacheUtils(tmp, makePermissionChecker({ allow: [], deny: [] }), { pluginId: 'plug@1.0.0' })
-    const h = await cache.openHandle('@plugin-cache', 'test')
+    const h = await cache.openHandle('@global-plugin-cache', 'test')
     await expect(h.has('k')).rejects.toThrow(PermissionError)
   })
 })

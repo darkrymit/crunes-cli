@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { createServer } from 'node:http'
 import { WebSocketServer } from 'ws'
 import { getPluginRunePath, runRuneInIsolate, getArgsSchema } from '../../../src/rune/isolation/runner.js'
-import { createJob, projectKey } from '../../../src/job/registry.js'
+import { createJob } from '../../../src/job/registry.js'
 
 vi.mock('pg', () => {
   return {

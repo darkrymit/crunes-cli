@@ -20,11 +20,12 @@ Runes call `utils.cache.open(location, name)` to get a typed bucket handle. Each
 
 **Prefix resolution:** `resolveKey(id, buckets)` matches against the object keys in `cache.json`. Exact match first, then `startsWith`. Same ambiguity/no-match error pattern as sqlite and job.
 
-**Scope model:** Each bucket has a `scope` field: `global`, `project`, `plugin`, or `project-plugin`. Scopes map to subdirectories under `caches/`:
-- `global` → `caches/global/<name>/`
-- `project` → `caches/projects/<projectKey>/<name>/`
-- `plugin` → `caches/plugins/<pluginId>/<name>/`
-- `project-plugin` → `caches/project-plugins/<projectKey>/<pluginId>/<name>/`
+**Scope model:** Each bucket has a `scope` field. Scopes map to storage locations:
+- `global-project` → `<store>/caches/projects/<projectId>/<name>/`
+- `global-plugin` → `<store>/caches/plugins/<pluginId>/<name>/`
+- `global-project-plugin` → `<store>/caches/project-plugins/<projectId>/<pluginId>/<name>/`
+- `local-project` → `<projectDir>/.crunes/caches/project/<name>/`
+- `local-project-plugin` → `<projectDir>/.crunes/caches/project-plugins/<pluginId>/<name>/`
 
 ## Key Decisions
 

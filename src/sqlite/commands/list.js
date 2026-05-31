@@ -1,16 +1,39 @@
-import { listSqliteDbs } from '../index.js'
-import { getProjectKey, loadProjects } from '../../project/index.js'
+import { listSqliteDbs, listLocalSqliteDbs } from '../index.js'
+import { ensureProjectIdentity, loadProjects } from '../../project/index.js'
 
 function pad(s, n) { return String(s ?? '-').padEnd(n) }
 
-export async function handler({ projectDir, global: isGlobal }) {
-  const key = isGlobal ? undefined : getProjectKey(projectDir)
-  const dbs = await listSqliteDbs(key)
+function applyPluginFilter(dbs, plugin) {
+  if (plugin === undefined) return dbs
+  const pluginScopes = new Set(['global-plugin', 'global-project-plugin', 'local-project-plugin'])
+  if (plugin === true) {
+    return dbs.filter(d => pluginScopes.has(d.scope))
+  }
+  return dbs.filter(d => pluginScopes.has(d.scope) && d.pluginId === plugin)
+}
 
-  let projectPaths = {}
+export async function handler({ projectDir, global: isGlobal, plugin }) {
+  let dbs
+
+  if (isGlobal) {
+    dbs = await listSqliteDbs()
+  } else {
+    const { id: projectId } = await ensureProjectIdentity(projectDir)
+    const [local, global] = await Promise.all([
+      listLocalSqliteDbs(projectDir),
+      listSqliteDbs(projectId),
+    ])
+    dbs = [...local, ...global]
+  }
+
+  dbs = applyPluginFilter(dbs, plugin)
+
+  let projectAliases = {}
   if (isGlobal) {
     const { projects } = await loadProjects()
-    projectPaths = projects
+    for (const [id, entry] of Object.entries(projects)) {
+      projectAliases[id] = typeof entry === 'object' ? (entry.alias ?? entry.path) : entry
+    }
   }
 
   if (dbs.length === 0) {
@@ -19,12 +42,12 @@ export async function handler({ projectDir, global: isGlobal }) {
   }
 
   function projectPlugin(entry) {
-    if (entry.scope === 'project') {
-      return projectPaths[entry.projectKey] ?? entry.projectKey ?? '-'
+    if (entry.scope === 'global-project' || entry.scope === 'local-project') {
+      return projectAliases[entry.projectKey] ?? entry.projectKey ?? '-'
     }
-    if (entry.scope === 'plugin') return entry.pluginId ?? '-'
-    if (entry.scope === 'project-plugin') {
-      const proj = projectPaths[entry.projectKey] ?? entry.projectKey
+    if (entry.scope === 'global-plugin') return entry.pluginId ?? '-'
+    if (entry.scope === 'global-project-plugin' || entry.scope === 'local-project-plugin') {
+      const proj = projectAliases[entry.projectKey] ?? entry.projectKey
       return `${proj}/${entry.pluginId}`
     }
     return '-'
@@ -36,7 +59,7 @@ export async function handler({ projectDir, global: isGlobal }) {
     d.name,
     d.scope,
     projectPlugin(d),
-    new Date(d.firstSeenAt).toLocaleString(),
+    d.firstSeenAt ? new Date(d.firstSeenAt).toLocaleString() : '-',
   ])
   const widths = cols.map((c, i) => Math.max(c.length, ...rows.map(r => String(r[i] ?? '').length)))
   console.log(cols.map((c, i) => pad(c, widths[i])).join('  '))

@@ -6,12 +6,16 @@ import { shortHash, getProjectKey } from '../../project/index.js'
 export { shortHash, getProjectKey }
 
 const VIRTUAL_STORE_PREFIXES = [
-  '@plugin-cache',
-  '@project-plugin-cache',
-  '@project-cache',
-  '@plugin-sqlite',
-  '@project-plugin-sqlite',
-  '@project-sqlite',
+  '@global-plugin-cache',
+  '@global-project-plugin-cache',
+  '@global-project-cache',
+  '@global-plugin-sqlite',
+  '@global-project-plugin-sqlite',
+  '@global-project-sqlite',
+  '@local-project-cache',
+  '@local-project-plugin-cache',
+  '@local-project-sqlite',
+  '@local-project-plugin-sqlite',
 ]
 
 function parseVirtualStore(location) {
@@ -27,29 +31,43 @@ function parseVirtualStore(location) {
   return null
 }
 
-function virtualStoreBase(prefix, { dir, pluginId, projectName }) {
-  const key = () => getProjectKey(dir, projectName)
+function virtualStoreBase(prefix, { dir, pluginId, projectName, projectId }) {
+  const key = () => {
+    if (projectId) return projectId
+    if (projectName) return `${projectName}-${shortHash(dir)}`
+    return shortHash(dir)
+  }
   switch (prefix) {
-    case '@plugin-cache':
-      if (!pluginId) throw new Error('@plugin-cache requires a plugin context')
+    case '@global-plugin-cache':
+      if (!pluginId) throw new Error('@global-plugin-cache requires a plugin context')
       return getCachePluginDir(pluginId)
-    case '@project-plugin-cache':
-      if (!pluginId) throw new Error('@project-plugin-cache requires a plugin context')
+    case '@global-project-plugin-cache':
+      if (!pluginId) throw new Error('@global-project-plugin-cache requires a plugin context')
       return getCacheProjectPluginDir(key(), pluginId)
-    case '@project-cache':
+    case '@global-project-cache':
       return getCacheProjectDir(key())
-    case '@plugin-sqlite':
-      if (!pluginId) throw new Error('@plugin-sqlite requires a plugin context')
+    case '@global-plugin-sqlite':
+      if (!pluginId) throw new Error('@global-plugin-sqlite requires a plugin context')
       return getSqlitePluginDir(pluginId)
-    case '@project-plugin-sqlite':
-      if (!pluginId) throw new Error('@project-plugin-sqlite requires a plugin context')
+    case '@global-project-plugin-sqlite':
+      if (!pluginId) throw new Error('@global-project-plugin-sqlite requires a plugin context')
       return getSqliteProjectPluginDir(key(), pluginId)
-    case '@project-sqlite':
+    case '@global-project-sqlite':
       return getSqliteProjectDir(key())
+    case '@local-project-cache':
+      return path.join(dir, '.crunes', 'caches', 'project')
+    case '@local-project-plugin-cache':
+      if (!pluginId) throw new Error('@local-project-plugin-cache requires a plugin context')
+      return path.join(dir, '.crunes', 'caches', 'project-plugins', pluginId)
+    case '@local-project-sqlite':
+      return path.join(dir, '.crunes', 'sqlite', 'project')
+    case '@local-project-plugin-sqlite':
+      if (!pluginId) throw new Error('@local-project-plugin-sqlite requires a plugin context')
+      return path.join(dir, '.crunes', 'sqlite', 'project-plugins', pluginId)
   }
 }
 
-export function resolvePath(location, { dir, pluginDir = null, pluginId = null, storeDir = null, projectName = undefined } = {}) {
+export function resolvePath(location, { dir, pluginDir = null, pluginId = null, storeDir = null, projectName = undefined, projectId = undefined } = {}) {
   if (location.startsWith('@plugin/')) {
     if (!pluginDir) throw new Error('@plugin/ paths are only available in plugin runes')
     return path.join(pluginDir, location.slice('@plugin/'.length))
@@ -59,7 +77,7 @@ export function resolvePath(location, { dir, pluginDir = null, pluginId = null, 
   }
   const virtual = parseVirtualStore(location)
   if (virtual) {
-    const base = virtualStoreBase(virtual.prefix, { dir, pluginId, projectName })
+    const base = virtualStoreBase(virtual.prefix, { dir, pluginId, projectName, projectId })
     return virtual.subpath ? path.join(base, virtual.subpath) : base
   }
   if (location === '~' || location.startsWith('~/') || location.startsWith('~\\')) {
@@ -83,25 +101,39 @@ export function canonicalizeLocation(location, { dir } = {}) {
 export function getAutoPermits({ pluginId = null, pluginDir = null } = {}) {
   const permits = []
   if (!pluginDir) {
-    permits.push('fs.read:./.crunes/**')
+    permits.push(
+      'fs.read:./.crunes/**',
+      'cache.read:@local-project-cache/**',
+      'cache.write:@local-project-cache/**',
+      'sqlite.read:@local-project-sqlite/**',
+      'sqlite.write:@local-project-sqlite/**',
+      'fs.read:@local-project-sqlite/**',
+      'fs.write:@local-project-sqlite/**',
+      'cache.read:@global-project-cache/**',
+      'cache.write:@global-project-cache/**',
+      'sqlite.read:@global-project-sqlite/**',
+      'sqlite.write:@global-project-sqlite/**',
+      'fs.read:@global-project-sqlite/**',
+      'fs.write:@global-project-sqlite/**',
+    )
   }
   if (pluginDir) {
     permits.push('fs.read:@plugin/**', 'fs.write:@plugin/**')
   }
   if (pluginId) {
     permits.push(
-      'cache.read:@plugin-cache/**',
-      'cache.write:@plugin-cache/**',
-      'cache.read:@project-plugin-cache/**',
-      'cache.write:@project-plugin-cache/**',
-      'sqlite.read:@plugin-sqlite/**',
-      'sqlite.write:@plugin-sqlite/**',
-      'sqlite.read:@project-plugin-sqlite/**',
-      'sqlite.write:@project-plugin-sqlite/**',
-      'fs.read:@plugin-sqlite/**',
-      'fs.write:@plugin-sqlite/**',
-      'fs.read:@project-plugin-sqlite/**',
-      'fs.write:@project-plugin-sqlite/**',
+      'cache.read:@global-plugin-cache/**',
+      'cache.write:@global-plugin-cache/**',
+      'cache.read:@global-project-plugin-cache/**',
+      'cache.write:@global-project-plugin-cache/**',
+      'sqlite.read:@global-plugin-sqlite/**',
+      'sqlite.write:@global-plugin-sqlite/**',
+      'sqlite.read:@global-project-plugin-sqlite/**',
+      'sqlite.write:@global-project-plugin-sqlite/**',
+      'fs.read:@global-plugin-sqlite/**',
+      'fs.write:@global-plugin-sqlite/**',
+      'fs.read:@global-project-plugin-sqlite/**',
+      'fs.write:@global-project-plugin-sqlite/**',
     )
   }
   return permits

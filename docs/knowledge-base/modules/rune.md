@@ -98,16 +98,21 @@ export { md, tree }
 
 | Token | Resolves to | Available in |
 |---|---|---|
-| `@project-cache` | `<store>/cache/projects/<project-key>` | Local + plugin runes |
-| `@project-plugin-cache` | `<store>/cache/projects/<key>/plugins/<pluginId>` | Plugin runes only |
-| `@plugin-cache` | `<store>/cache/plugins/<pluginId>` | Plugin runes only |
-| `@project-sqlite` | `<store>/sqlite/projects/<project-key>` | Local + plugin runes |
-| `@project-plugin-sqlite` | `<store>/sqlite/projects/<key>/plugins/<pluginId>` | Plugin runes only |
-| `@plugin-sqlite` | `<store>/sqlite/plugins/<pluginId>` | Plugin runes only |
+| `@local-project-cache` | `.crunes/caches/project/` (inside project dir) | Project runes |
+| `@local-project-plugin-cache` | `.crunes/caches/project-plugins/<pluginId>/` (inside project dir) | Plugin runes only |
+| `@global-project-cache` | `<store>/caches/projects/<projectId>/` | Project runes |
+| `@global-project-plugin-cache` | `<store>/caches/project-plugins/<projectId>/<pluginId>/` | Plugin runes only |
+| `@global-plugin-cache` | `<store>/caches/plugins/<pluginId>/` | Plugin runes only |
+| `@local-project-sqlite` | `.crunes/sqlite/project/` (inside project dir) | Project runes |
+| `@local-project-plugin-sqlite` | `.crunes/sqlite/project-plugins/<pluginId>/` (inside project dir) | Plugin runes only |
+| `@global-project-sqlite` | `<store>/sqlite/projects/<projectId>/` | Project runes |
+| `@global-project-plugin-sqlite` | `<store>/sqlite/project-plugins/<projectId>/<pluginId>/` | Plugin runes only |
+| `@global-plugin-sqlite` | `<store>/sqlite/plugins/<pluginId>/` | Plugin runes only |
 
 **Auto-grants** (`getAutoPermits` in `api/utils.js`):
-- Local runes: `fs.read:.crunes/**`
-- Plugin runes: `fs.read:@plugin/**`, `fs.write:@plugin/**`, plus `cache.*` and `sqlite.*` for all `@plugin-*` and `@project-plugin-*` virtual stores
+- Project runes (no `pluginDir`): `fs.read:./.crunes/**`, `cache.read/write:@local-project-cache/**`, `sqlite.read/write:@local-project-sqlite/**`, `fs.read/write:@local-project-sqlite/**`, `cache.read/write:@global-project-cache/**`, `sqlite.read/write:@global-project-sqlite/**`, `fs.read/write:@global-project-sqlite/**`
+- Plugin runes: `fs.read:@plugin/**`, `fs.write:@plugin/**`
+- Plugin runes with `pluginId`: `cache.*` and `sqlite.*` + `fs.*` for all `@global-plugin-*` and `@global-project-plugin-*` virtual stores
 
 ## Rune Authoring
 
@@ -164,7 +169,7 @@ The runner calls `args(builder)` before `use(parsedArgs)` and passes the schema 
 
 - **`cache.open` and `sqlite.open` are async:** They negotiate a handle ID with the host. Forgetting `await` before `open()` means all subsequent `.get()`/`.set()` calls operate on a Promise, not a handle — they will throw silently.
 
-- **`@project-plugin-cache` / `@project-plugin-sqlite` require a plugin context:** Calling these from a local rune throws `Error: @project-plugin-cache requires a plugin context`. Use `@project-cache` / `@project-sqlite` for local runes.
+- **`@local-project-plugin-cache` / `@local-project-plugin-sqlite` require a plugin context:** Calling these from a project rune throws `Error: @local-project-plugin-cache requires a plugin context`. Use `@local-project-cache` / `@local-project-sqlite` for project runes without a plugin context.
 
 - **`env.read` only resolves keys that match a declared `env.read:` permission pattern.** A key not covered by any `allow` pattern returns `undefined` (or the fallback), even if the key exists in `process.env`. There is no "env access denied" error — it silently falls through to the fallback.
 - **`env.read:` permission source is a filename, not `process.env`:** `env.read:process:KEY` reads `process.env`. `env.read:.env:KEY` reads the project's `.env` file. Using `env.read:KEY` (missing the source segment) produces a pattern that never matches and silently returns undefined.

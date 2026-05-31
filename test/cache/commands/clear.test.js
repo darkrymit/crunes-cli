@@ -25,7 +25,7 @@ describe('cache clear handler', () => {
     await mkdir(bucketPath, { recursive: true })
     await writeFile(join(bucketPath, 'old.json'), JSON.stringify({ value: 1, expiresAt: Date.now() - 5000 }))
     await writeFile(join(bucketPath, 'fresh.json'), JSON.stringify({ value: 2, expiresAt: Date.now() + 60000 }))
-    await upsertCacheBucket(bucketPath, { scope: 'project', projectKey: PROJ_KEY, pluginId: null, location: '@project-cache', name: 'default' })
+    await upsertCacheBucket(bucketPath, { scope: 'global-project', projectId: PROJ_KEY, pluginId: null, location: '@global-project-cache', name: 'default' })
     const { buckets } = await loadCacheBuckets()
     const id = Object.keys(buckets)[0]
     await handler({ id, projectDir: tmp, global: true })
@@ -35,7 +35,7 @@ describe('cache clear handler', () => {
   it('reports no expired keys when none found', async () => {
     const bucketPath = join(tmp, 'caches', 'projects', PROJ_KEY, 'default')
     await mkdir(bucketPath, { recursive: true })
-    await upsertCacheBucket(bucketPath, { scope: 'project', projectKey: PROJ_KEY, pluginId: null, location: '@project-cache', name: 'default' })
+    await upsertCacheBucket(bucketPath, { scope: 'global-project', projectId: PROJ_KEY, pluginId: null, location: '@global-project-cache', name: 'default' })
     const { buckets } = await loadCacheBuckets()
     const id = Object.keys(buckets)[0]
     await handler({ id, projectDir: tmp, global: true })
@@ -52,7 +52,7 @@ describe('cache clear handler', () => {
   it('exits 1 when id belongs to a different project (no -g)', async () => {
     const bucketPath = join(tmp, 'caches', 'projects', 'other-key', 'default')
     await mkdir(bucketPath, { recursive: true })
-    await upsertCacheBucket(bucketPath, { scope: 'project', projectKey: 'other-key', pluginId: null, location: '@project-cache', name: 'default' })
+    await upsertCacheBucket(bucketPath, { scope: 'global-project', projectId: 'other-key', pluginId: null, location: '@global-project-cache', name: 'default' })
     const { buckets } = await loadCacheBuckets()
     const id = Object.keys(buckets)[0]
     const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => { throw new Error('exit') })

@@ -1,14 +1,19 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
-import { resolvePath, canonicalizeLocation, getProjectKey } from './utils.js'
+import { resolvePath, canonicalizeLocation } from './utils.js'
 import { upsertCacheBucket } from '../../cache/index.js'
-import { upsertProject } from '../../project/index.js'
+import { upsertProject, ensureProjectIdentity } from '../../project/index.js'
 
 const CACHE_SCOPES = {
-  '@plugin-cache':         'plugin',
-  '@project-cache':        'project',
-  '@project-plugin-cache': 'project-plugin',
+  '@global-plugin-cache':         'global-plugin',
+  '@global-project-cache':        'global-project',
+  '@global-project-plugin-cache': 'global-project-plugin',
+  '@local-project-cache':         'local-project',
+  '@local-project-plugin-cache':  'local-project-plugin',
 }
+
+const LOCAL_SCOPES = new Set(['local-project', 'local-project-plugin'])
+const GLOBAL_SCOPES = new Set(['global-plugin', 'global-project', 'global-project-plugin'])
 
 function detectCacheScope(location) {
   for (const [prefix, scope] of Object.entries(CACHE_SCOPES)) {
@@ -100,18 +105,22 @@ export function createCacheUtils(dir, checkPermission, { pluginId = null, storeD
       if (scope !== null && (name.includes('/') || name.includes('\\'))) {
         throw new TypeError('cache name must not contain path separators — use a flat name like "branch-main" instead of "branch/main"')
       }
-      const ctx      = { dir, pluginId, storeDir, projectName }
+      let projectId = null
+      if (scope !== null) {
+        const { id } = await ensureProjectIdentity(dir)
+        projectId = id
+      }
+      const ctx      = { dir, pluginId, storeDir, projectName, projectId }
       const cacheDir = path.join(resolvePath(location, ctx), name)
       const canon    = canonicalizeLocation(location, { dir })
       const tokenValue = `${canon}:${name}`
       const checkRead  = checkPermission ? () => checkPermission('cache.read',  tokenValue) : null
       const checkWrite = checkPermission ? () => checkPermission('cache.write', tokenValue) : null
-      if (scope !== null) {
-        const projectKey = (scope === 'project' || scope === 'project-plugin')
-          ? getProjectKey(dir, projectName)
-          : null
-        await upsertCacheBucket(cacheDir, { scope, projectKey, pluginId: pluginId ?? null, location, name })
-        if (projectKey !== null) await upsertProject(projectKey, dir)
+      if (scope !== null && GLOBAL_SCOPES.has(scope)) {
+        await upsertCacheBucket(cacheDir, { scope, projectId, pluginId: pluginId ?? null, location, name })
+        if (scope === 'global-project' || scope === 'global-project-plugin') {
+          await upsertProject(projectId, dir)
+        }
       }
       return makeHandle(cacheDir, checkRead, checkWrite)
     },

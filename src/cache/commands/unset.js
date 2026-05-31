@@ -1,8 +1,8 @@
 import { deleteCacheKey } from '../index.js'
-import { getProjectKey } from '../../project/index.js'
+import { ensureProjectIdentity } from '../../project/index.js'
 
 export async function handler({ id, key: keyName, projectDir, global: isGlobal }) {
-  const projKey = isGlobal ? undefined : getProjectKey(projectDir)
+  const projKey = isGlobal ? undefined : (await ensureProjectIdentity(projectDir)).id
   let result
   try {
     result = await deleteCacheKey(id, keyName, projKey)

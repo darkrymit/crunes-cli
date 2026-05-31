@@ -1,8 +1,8 @@
 import { clearCacheBucket } from '../index.js'
-import { getProjectKey } from '../../project/index.js'
+import { ensureProjectIdentity } from '../../project/index.js'
 
 export async function handler({ id, projectDir, global: isGlobal }) {
-  const key = isGlobal ? undefined : getProjectKey(projectDir)
+  const key = isGlobal ? undefined : (await ensureProjectIdentity(projectDir)).id
   let result
   try {
     result = await clearCacheBucket(id, key)

@@ -29,21 +29,21 @@ describe('getProjectKey', () => {
   beforeEach(async () => { tmp = await makeTmp() })
   afterEach(async () => { await rm(tmp, { recursive: true, force: true }) })
 
-  it('returns bare hash when no config and no name arg', () => {
-    expect(getProjectKey(tmp)).toMatch(/^[0-9a-f]{8}$/)
+  it('returns bare hash when no config and no name arg', async () => {
+    expect(await getProjectKey(tmp)).toMatch(/^[0-9a-f]{8}$/)
   })
-  it('returns name-hash when name arg provided', () => {
-    expect(getProjectKey(tmp, 'myproject')).toBe(`myproject-${shortHash(tmp)}`)
+  it('returns name-hash when name arg provided', async () => {
+    expect(await getProjectKey(tmp, 'myproject')).toBe(`myproject-${shortHash(tmp)}`)
   })
-  it('falls back to config.json name when name arg absent', async () => {
+  it('returns stable id from project.local.json when present', async () => {
     await mkdir(join(tmp, '.crunes'), { recursive: true })
-    await writeFile(join(tmp, '.crunes', 'config.json'), JSON.stringify({ name: 'from-config' }), 'utf8')
-    expect(getProjectKey(tmp)).toBe(`from-config-${shortHash(tmp)}`)
+    await writeFile(join(tmp, '.crunes', 'project.local.json'), JSON.stringify({ id: 'stable-xyz', alias: 'myapp' }), 'utf8')
+    expect(await getProjectKey(tmp)).toBe('stable-xyz')
   })
-  it('name arg takes precedence over config.json', async () => {
+  it('name arg takes precedence over project.local.json', async () => {
     await mkdir(join(tmp, '.crunes'), { recursive: true })
-    await writeFile(join(tmp, '.crunes', 'config.json'), JSON.stringify({ name: 'from-config' }), 'utf8')
-    expect(getProjectKey(tmp, 'override')).toBe(`override-${shortHash(tmp)}`)
+    await writeFile(join(tmp, '.crunes', 'project.local.json'), JSON.stringify({ id: 'stable-xyz', alias: 'myapp' }), 'utf8')
+    expect(await getProjectKey(tmp, 'override')).toBe(`override-${shortHash(tmp)}`)
   })
 })
 
@@ -74,46 +74,62 @@ describe('resolvePath', () => {
     expect(resolvePath('@project/data/mydb', { dir: tmp }))
       .toBe(join(tmp, 'data', 'mydb'))
   })
-  it('@plugin-sqlite resolves to store sqlite plugins dir', () => {
+
+  // renamed global prefixes
+  it('@global-plugin-sqlite resolves to store sqlite plugins dir', () => {
     const store = process.env.CRUNES_STORE
-    expect(resolvePath('@plugin-sqlite', { dir: tmp, pluginId: 'plug@1.0' }))
+    expect(resolvePath('@global-plugin-sqlite', { dir: tmp, pluginId: 'plug@1.0' }))
       .toBe(join(store, 'sqlite', 'plugins', 'plug@1.0'))
   })
-  it('@project-sqlite resolves to store sqlite projects dir', () => {
+  it('@global-project-sqlite resolves to store sqlite projects dir via projectId', () => {
     const store = process.env.CRUNES_STORE
-    const key = getProjectKey(tmp)
-    expect(resolvePath('@project-sqlite', { dir: tmp }))
-      .toBe(join(store, 'sqlite', 'projects', key))
+    const projectId = 'stable-proj-id'
+    expect(resolvePath('@global-project-sqlite', { dir: tmp, projectId }))
+      .toBe(join(store, 'sqlite', 'projects', projectId))
   })
-  it('@project-sqlite/subdir appended to project sqlite base', () => {
+  it('@global-project-sqlite/subdir appended to project sqlite base', () => {
     const store = process.env.CRUNES_STORE
-    const key = getProjectKey(tmp)
-    expect(resolvePath('@project-sqlite/data/archive', { dir: tmp }))
-      .toBe(join(store, 'sqlite', 'projects', key, 'data', 'archive'))
+    const projectId = 'stable-proj-id'
+    expect(resolvePath('@global-project-sqlite/data/archive', { dir: tmp, projectId }))
+      .toBe(join(store, 'sqlite', 'projects', projectId, 'data', 'archive'))
   })
-  it('@plugin-cache resolves to store caches plugins dir', () => {
+  it('@global-plugin-cache resolves to store caches plugins dir', () => {
     const store = process.env.CRUNES_STORE
-    expect(resolvePath('@plugin-cache', { dir: tmp, pluginId: 'plug@1.0' }))
+    expect(resolvePath('@global-plugin-cache', { dir: tmp, pluginId: 'plug@1.0' }))
       .toBe(join(store, 'caches', 'plugins', 'plug@1.0'))
   })
-  it('@project-cache/subdir appended to project caches base', () => {
+  it('@global-project-cache/subdir appended to project caches base', () => {
     const store = process.env.CRUNES_STORE
-    const key = getProjectKey(tmp)
-    expect(resolvePath('@project-cache/ns', { dir: tmp }))
-      .toBe(join(store, 'caches', 'projects', key, 'ns'))
+    const projectId = 'stable-proj-id'
+    expect(resolvePath('@global-project-cache/ns', { dir: tmp, projectId }))
+      .toBe(join(store, 'caches', 'projects', projectId, 'ns'))
   })
+
+  // local prefixes
+  it('@local-project-cache resolves inside .crunes/caches/project', () => {
+    expect(resolvePath('@local-project-cache', { dir: tmp }))
+      .toBe(join(tmp, '.crunes', 'caches', 'project'))
+  })
+  it('@local-project-sqlite resolves inside .crunes/sqlite/project', () => {
+    expect(resolvePath('@local-project-sqlite', { dir: tmp }))
+      .toBe(join(tmp, '.crunes', 'sqlite', 'project'))
+  })
+  it('@local-project-plugin-cache resolves inside .crunes/caches/project-plugins/<pluginId>', () => {
+    expect(resolvePath('@local-project-plugin-cache', { dir: tmp, pluginId: 'plug@1.0' }))
+      .toBe(join(tmp, '.crunes', 'caches', 'project-plugins', 'plug@1.0'))
+  })
+  it('@local-project-plugin-sqlite without pluginId throws', () => {
+    expect(() => resolvePath('@local-project-plugin-sqlite', { dir: tmp }))
+      .toThrow('@local-project-plugin-sqlite requires a plugin context')
+  })
+
   it('subpath escaping virtual root throws RangeError', () => {
-    expect(() => resolvePath('@project-sqlite/../etc', { dir: tmp }))
+    expect(() => resolvePath('@global-project-sqlite/../etc', { dir: tmp }))
       .toThrow(RangeError)
   })
-  it('@plugin-sqlite without pluginId throws', () => {
-    expect(() => resolvePath('@plugin-sqlite', { dir: tmp }))
-      .toThrow('@plugin-sqlite requires a plugin context')
-  })
-  it('@project-sqlite uses projectName to avoid disk read', () => {
-    const store = process.env.CRUNES_STORE
-    expect(resolvePath('@project-sqlite', { dir: tmp, projectName: 'myproj' }))
-      .toBe(join(store, 'sqlite', 'projects', `myproj-${shortHash(tmp)}`))
+  it('@global-plugin-sqlite without pluginId throws', () => {
+    expect(() => resolvePath('@global-plugin-sqlite', { dir: tmp }))
+      .toThrow('@global-plugin-sqlite requires a plugin context')
   })
   it('~/path resolves to homedir', () => {
     expect(resolvePath('~/foo/bar', { dir: tmp })).toBe(join(homedir(), 'foo', 'bar'))
@@ -137,14 +153,14 @@ describe('canonicalizeLocation', () => {
   it('@plugin/path returned verbatim', () => {
     expect(canonicalizeLocation('@plugin/assets', { dir: tmp })).toBe('@plugin/assets')
   })
-  it('@project-sqlite returned verbatim', () => {
-    expect(canonicalizeLocation('@project-sqlite', { dir: tmp })).toBe('@project-sqlite')
+  it('@global-project-sqlite returned verbatim', () => {
+    expect(canonicalizeLocation('@global-project-sqlite', { dir: tmp })).toBe('@global-project-sqlite')
   })
-  it('@project-sqlite/subpath returned verbatim', () => {
-    expect(canonicalizeLocation('@project-sqlite/data/archive', { dir: tmp })).toBe('@project-sqlite/data/archive')
+  it('@global-project-sqlite/subpath returned verbatim', () => {
+    expect(canonicalizeLocation('@global-project-sqlite/data/archive', { dir: tmp })).toBe('@global-project-sqlite/data/archive')
   })
-  it('@plugin-sqlite returned verbatim', () => {
-    expect(canonicalizeLocation('@plugin-sqlite', { dir: tmp })).toBe('@plugin-sqlite')
+  it('@global-plugin-sqlite returned verbatim', () => {
+    expect(canonicalizeLocation('@global-plugin-sqlite', { dir: tmp })).toBe('@global-plugin-sqlite')
   })
   it('~/path returned verbatim', () => {
     expect(canonicalizeLocation('~/foo', { dir: tmp })).toBe('~/foo')
@@ -175,21 +191,26 @@ describe('getAutoPermits', () => {
     const p = getAutoPermits({ pluginDir: '/some/dir' })
     expect(p).toContain('fs.read:@plugin/**')
     expect(p).toContain('fs.write:@plugin/**')
-    expect(p).not.toContain('sqlite.read:@plugin-sqlite/**')
+    expect(p).not.toContain('sqlite.read:@global-plugin-sqlite/**')
   })
-  it('includes store permits when pluginId set', () => {
+  it('includes renamed global store permits when pluginId set', () => {
     const p = getAutoPermits({ pluginId: 'plug@1.0' })
-    expect(p).toContain('sqlite.read:@plugin-sqlite/**')
-    expect(p).toContain('sqlite.write:@plugin-sqlite/**')
-    expect(p).toContain('cache.read:@plugin-cache/**')
-    expect(p).toContain('sqlite.read:@project-plugin-sqlite/**')
-    expect(p).toContain('fs.read:@plugin-sqlite/**')
-    expect(p).toContain('fs.write:@plugin-sqlite/**')
+    expect(p).toContain('sqlite.read:@global-plugin-sqlite/**')
+    expect(p).toContain('sqlite.write:@global-plugin-sqlite/**')
+    expect(p).toContain('cache.read:@global-plugin-cache/**')
+    expect(p).toContain('sqlite.read:@global-project-plugin-sqlite/**')
+    expect(p).toContain('fs.read:@global-plugin-sqlite/**')
+    expect(p).toContain('fs.write:@global-plugin-sqlite/**')
+  })
+  it('does not include legacy permit names when pluginId set', () => {
+    const p = getAutoPermits({ pluginId: 'plug@1.0' })
+    expect(p).not.toContain('sqlite.read:@plugin-sqlite/**')
+    expect(p).not.toContain('cache.read:@plugin-cache/**')
   })
   it('includes all permits when both pluginId and pluginDir set', () => {
     const p = getAutoPermits({ pluginId: 'plug@1.0', pluginDir: '/dir' })
     expect(p).toContain('fs.read:@plugin/**')
-    expect(p).toContain('sqlite.read:@plugin-sqlite/**')
+    expect(p).toContain('sqlite.read:@global-plugin-sqlite/**')
     expect(p).not.toContain('fs.read:./.crunes/**')
   })
 })

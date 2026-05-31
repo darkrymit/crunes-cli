@@ -1,8 +1,8 @@
 import { listJobs, deleteJob, resolveJobId } from '../registry.js'
-import { getProjectKey } from '../../project/index.js'
+import { ensureProjectIdentity } from '../../project/index.js'
 
 export async function handler({ id, projectDir, global: isGlobal }) {
-  const key = isGlobal ? undefined : getProjectKey(projectDir)
+  const key = isGlobal ? undefined : (await ensureProjectIdentity(projectDir)).id
   const jobs = await listJobs(key)
 
   let resolvedId

@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
   getCachePluginDir, getCacheProjectDir, getCacheProjectPluginDir,
-  cacheBucketKey, upsertCacheBucket, loadCacheBuckets, listCacheBuckets,
+  upsertCacheBucket, loadCacheBuckets, listCacheBuckets,
   resolveKey, clearCacheBucket, deleteCacheKey, deleteCacheBucket,
 } from '../../src/cache/index.js'
 
@@ -38,31 +38,25 @@ describe('cache index', () => {
     expect(await loadCacheBuckets()).toEqual({ format: '1', buckets: {} })
   })
 
-  it('cacheBucketKey produces stable <name>-<12hexchars> format', () => {
-    const key = cacheBucketKey('default', '/some/path')
-    expect(key).toMatch(/^default-[0-9a-f]{12}$/)
-    expect(cacheBucketKey('default', '/some/path')).toBe(cacheBucketKey('default', '/some/path'))
-  })
-
   it('upsertCacheBucket creates cache.json with correct entry', async () => {
     const bucketPath = join(tmp, 'caches', 'projects', PROJ_KEY, 'default')
     await upsertCacheBucket(bucketPath, {
-      scope: 'project', projectKey: PROJ_KEY, pluginId: null,
-      location: '@project-cache', name: 'default',
+      scope: 'global-project', projectId: PROJ_KEY, pluginId: null,
+      location: '@global-project-cache', name: 'default',
     })
     const data = await loadCacheBuckets()
     const entries = Object.values(data.buckets)
     expect(entries).toHaveLength(1)
     expect(entries[0]).toMatchObject({
-      path: bucketPath, scope: 'project', projectKey: PROJ_KEY,
-      pluginId: null, location: '@project-cache', name: 'default',
+      path: bucketPath, scope: 'global-project', projectKey: PROJ_KEY,
+      pluginId: null, location: '@global-project-cache', name: 'default',
     })
     expect(typeof entries[0].firstSeenAt).toBe('string')
   })
 
   it('upsertCacheBucket preserves firstSeenAt on re-upsert', async () => {
     const bucketPath = join(tmp, 'caches', 'projects', PROJ_KEY, 'default')
-    const meta = { scope: 'project', projectKey: PROJ_KEY, pluginId: null, location: '@project-cache', name: 'default' }
+    const meta = { scope: 'global-project', projectId: PROJ_KEY, pluginId: null, location: '@global-project-cache', name: 'default' }
     await upsertCacheBucket(bucketPath, meta)
     const first = await loadCacheBuckets()
     const key = Object.keys(first.buckets)[0]
@@ -74,10 +68,10 @@ describe('cache index', () => {
 
   it('upsertCacheBucket accumulates multiple buckets', async () => {
     await upsertCacheBucket(join(tmp, 'caches', 'projects', PROJ_KEY, 'a'), {
-      scope: 'project', projectKey: PROJ_KEY, pluginId: null, location: '@project-cache', name: 'a',
+      scope: 'global-project', projectId: PROJ_KEY, pluginId: null, location: '@global-project-cache', name: 'a',
     })
     await upsertCacheBucket(join(tmp, 'caches', 'projects', PROJ_KEY, 'b'), {
-      scope: 'project', projectKey: PROJ_KEY, pluginId: null, location: '@project-cache', name: 'b',
+      scope: 'global-project', projectId: PROJ_KEY, pluginId: null, location: '@global-project-cache', name: 'b',
     })
     expect(Object.keys((await loadCacheBuckets()).buckets)).toHaveLength(2)
   })
@@ -85,11 +79,11 @@ describe('cache index', () => {
   it('listCacheBuckets returns array with key field', async () => {
     const bucketPath = join(tmp, 'caches', 'projects', PROJ_KEY, 'default')
     await upsertCacheBucket(bucketPath, {
-      scope: 'project', projectKey: PROJ_KEY, pluginId: null, location: '@project-cache', name: 'default',
+      scope: 'global-project', projectId: PROJ_KEY, pluginId: null, location: '@global-project-cache', name: 'default',
     })
     const list = await listCacheBuckets()
     expect(list).toHaveLength(1)
-    expect(list[0].key).toMatch(/^default-[0-9a-f]{12}$/)
+    expect(list[0].key).toMatch(/^default-[0-9a-f]{8}$/)
     expect(list[0].path).toBe(bucketPath)
   })
 
@@ -97,9 +91,9 @@ describe('cache index', () => {
     const p1 = join(tmp, 'caches', 'projects', PROJ_KEY, 'a')
     const p2 = join(tmp, 'caches', 'projects', 'other-key', 'b')
     const p3 = join(tmp, 'caches', 'plugins', 'my-plugin', 'c')
-    await upsertCacheBucket(p1, { scope: 'project', projectKey: PROJ_KEY, pluginId: null, location: '@project-cache', name: 'a' })
-    await upsertCacheBucket(p2, { scope: 'project', projectKey: 'other-key', pluginId: null, location: '@project-cache', name: 'b' })
-    await upsertCacheBucket(p3, { scope: 'plugin', projectKey: null, pluginId: 'my-plugin', location: '@plugin-cache', name: 'c' })
+    await upsertCacheBucket(p1, { scope: 'global-project', projectId: PROJ_KEY, pluginId: null, location: '@global-project-cache', name: 'a' })
+    await upsertCacheBucket(p2, { scope: 'global-project', projectId: 'other-key', pluginId: null, location: '@global-project-cache', name: 'b' })
+    await upsertCacheBucket(p3, { scope: 'global-plugin', projectId: null, pluginId: 'my-plugin', location: '@global-plugin-cache', name: 'c' })
     const list = await listCacheBuckets(PROJ_KEY)
     expect(list).toHaveLength(1)
     expect(list[0].name).toBe('a')
@@ -108,8 +102,8 @@ describe('cache index', () => {
   it('listCacheBuckets() with no arg returns all entries', async () => {
     const p1 = join(tmp, 'caches', 'projects', PROJ_KEY, 'a')
     const p2 = join(tmp, 'caches', 'projects', 'other-key', 'b')
-    await upsertCacheBucket(p1, { scope: 'project', projectKey: PROJ_KEY, pluginId: null, location: '@project-cache', name: 'a' })
-    await upsertCacheBucket(p2, { scope: 'project', projectKey: 'other-key', pluginId: null, location: '@project-cache', name: 'b' })
+    await upsertCacheBucket(p1, { scope: 'global-project', projectId: PROJ_KEY, pluginId: null, location: '@global-project-cache', name: 'a' })
+    await upsertCacheBucket(p2, { scope: 'global-project', projectId: 'other-key', pluginId: null, location: '@global-project-cache', name: 'b' })
     const list = await listCacheBuckets()
     expect(list).toHaveLength(2)
   })
@@ -123,7 +117,7 @@ describe('cache index — management operations', () => {
   // resolveKey
   it('resolveKey returns exact key when it exists', async () => {
     const p = join(tmp, 'caches', 'projects', PROJ_KEY, 'default')
-    await upsertCacheBucket(p, { scope: 'project', projectKey: PROJ_KEY, pluginId: null, location: '@project-cache', name: 'default' })
+    await upsertCacheBucket(p, { scope: 'global-project', projectId: PROJ_KEY, pluginId: null, location: '@global-project-cache', name: 'default' })
     const data = await loadCacheBuckets()
     const key = Object.keys(data.buckets)[0]
     expect(resolveKey(key, data.buckets)).toBe(key)
@@ -131,7 +125,7 @@ describe('cache index — management operations', () => {
 
   it('resolveKey matches by prefix', async () => {
     const p = join(tmp, 'caches', 'projects', PROJ_KEY, 'default')
-    await upsertCacheBucket(p, { scope: 'project', projectKey: PROJ_KEY, pluginId: null, location: '@project-cache', name: 'default' })
+    await upsertCacheBucket(p, { scope: 'global-project', projectId: PROJ_KEY, pluginId: null, location: '@global-project-cache', name: 'default' })
     const data = await loadCacheBuckets()
     const key = Object.keys(data.buckets)[0]
     expect(resolveKey(key.slice(0, 10), data.buckets)).toBe(key)
@@ -144,8 +138,8 @@ describe('cache index — management operations', () => {
   it('resolveKey throws on ambiguous prefix', async () => {
     const p1 = join(tmp, 'caches', 'projects', PROJ_KEY, 'a')
     const p2 = join(tmp, 'caches', 'projects', PROJ_KEY, 'b')
-    await upsertCacheBucket(p1, { scope: 'project', projectKey: PROJ_KEY, pluginId: null, location: '@project-cache', name: 'a' })
-    await upsertCacheBucket(p2, { scope: 'project', projectKey: PROJ_KEY, pluginId: null, location: '@project-cache', name: 'b' })
+    await upsertCacheBucket(p1, { scope: 'global-project', projectId: PROJ_KEY, pluginId: null, location: '@global-project-cache', name: 'a' })
+    await upsertCacheBucket(p2, { scope: 'global-project', projectId: PROJ_KEY, pluginId: null, location: '@global-project-cache', name: 'b' })
     const data = await loadCacheBuckets()
     expect(() => resolveKey('', data.buckets)).toThrow('Ambiguous')
   })
@@ -158,7 +152,7 @@ describe('cache index — management operations', () => {
     await wf(join(bucketPath, 'expired.json'), JSON.stringify({ value: 1, expiresAt: Date.now() - 1000 }))
     await wf(join(bucketPath, 'live.json'), JSON.stringify({ value: 2, expiresAt: Date.now() + 60000 }))
     await wf(join(bucketPath, 'noexpiry.json'), JSON.stringify({ value: 3, expiresAt: null }))
-    await upsertCacheBucket(bucketPath, { scope: 'project', projectKey: PROJ_KEY, pluginId: null, location: '@project-cache', name: 'default' })
+    await upsertCacheBucket(bucketPath, { scope: 'global-project', projectId: PROJ_KEY, pluginId: null, location: '@global-project-cache', name: 'default' })
     const data = await loadCacheBuckets()
     const key = Object.keys(data.buckets)[0]
     const result = await clearCacheBucket(key)
@@ -173,7 +167,7 @@ describe('cache index — management operations', () => {
 
   it('clearCacheBucket returns 0 when dir does not exist', async () => {
     const bucketPath = join(tmp, 'caches', 'projects', PROJ_KEY, 'ghost')
-    await upsertCacheBucket(bucketPath, { scope: 'project', projectKey: PROJ_KEY, pluginId: null, location: '@project-cache', name: 'ghost' })
+    await upsertCacheBucket(bucketPath, { scope: 'global-project', projectId: PROJ_KEY, pluginId: null, location: '@global-project-cache', name: 'ghost' })
     const data = await loadCacheBuckets()
     const key = Object.keys(data.buckets)[0]
     const result = await clearCacheBucket(key)
@@ -186,7 +180,7 @@ describe('cache index — management operations', () => {
     const bucketPath = join(tmp, 'caches', 'projects', PROJ_KEY, 'default')
     await mk(bucketPath, { recursive: true })
     await wf(join(bucketPath, 'mykey.json'), JSON.stringify({ value: 42, expiresAt: null }))
-    await upsertCacheBucket(bucketPath, { scope: 'project', projectKey: PROJ_KEY, pluginId: null, location: '@project-cache', name: 'default' })
+    await upsertCacheBucket(bucketPath, { scope: 'global-project', projectId: PROJ_KEY, pluginId: null, location: '@global-project-cache', name: 'default' })
     const data = await loadCacheBuckets()
     const key = Object.keys(data.buckets)[0]
     await deleteCacheKey(key, 'mykey')
@@ -197,7 +191,7 @@ describe('cache index — management operations', () => {
     const { mkdir: mk } = await import('node:fs/promises')
     const bucketPath = join(tmp, 'caches', 'projects', PROJ_KEY, 'default')
     await mk(bucketPath, { recursive: true })
-    await upsertCacheBucket(bucketPath, { scope: 'project', projectKey: PROJ_KEY, pluginId: null, location: '@project-cache', name: 'default' })
+    await upsertCacheBucket(bucketPath, { scope: 'global-project', projectId: PROJ_KEY, pluginId: null, location: '@global-project-cache', name: 'default' })
     const data = await loadCacheBuckets()
     const key = Object.keys(data.buckets)[0]
     await expect(deleteCacheKey(key, 'missing')).rejects.toThrow('Key "missing" not found')
@@ -208,7 +202,7 @@ describe('cache index — management operations', () => {
     const { mkdir: mk, access } = await import('node:fs/promises')
     const bucketPath = join(tmp, 'caches', 'projects', PROJ_KEY, 'default')
     await mk(bucketPath, { recursive: true })
-    await upsertCacheBucket(bucketPath, { scope: 'project', projectKey: PROJ_KEY, pluginId: null, location: '@project-cache', name: 'default' })
+    await upsertCacheBucket(bucketPath, { scope: 'global-project', projectId: PROJ_KEY, pluginId: null, location: '@global-project-cache', name: 'default' })
     const data = await loadCacheBuckets()
     const key = Object.keys(data.buckets)[0]
     const result = await deleteCacheBucket(key)
@@ -219,7 +213,7 @@ describe('cache index — management operations', () => {
 
   it('clearCacheBucket rejects an id from a different project', async () => {
     const bucketPath = join(tmp, 'caches', 'projects', 'other-key', 'default')
-    await upsertCacheBucket(bucketPath, { scope: 'project', projectKey: 'other-key', pluginId: null, location: '@project-cache', name: 'default' })
+    await upsertCacheBucket(bucketPath, { scope: 'global-project', projectId: 'other-key', pluginId: null, location: '@global-project-cache', name: 'default' })
     const data = await loadCacheBuckets()
     const id = Object.keys(data.buckets)[0]
     await expect(clearCacheBucket(id, PROJ_KEY)).rejects.toThrow(/No cache bucket matching/)
@@ -227,7 +221,7 @@ describe('cache index — management operations', () => {
 
   it('deleteCacheBucket rejects an id from a different project', async () => {
     const bucketPath = join(tmp, 'caches', 'projects', 'other-key', 'def')
-    await upsertCacheBucket(bucketPath, { scope: 'project', projectKey: 'other-key', pluginId: null, location: '@project-cache', name: 'def' })
+    await upsertCacheBucket(bucketPath, { scope: 'global-project', projectId: 'other-key', pluginId: null, location: '@global-project-cache', name: 'def' })
     const data = await loadCacheBuckets()
     const id = Object.keys(data.buckets)[0]
     await expect(deleteCacheBucket(id, PROJ_KEY)).rejects.toThrow(/No cache bucket matching/)

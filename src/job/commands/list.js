@@ -1,12 +1,12 @@
 import { listJobs, cleanJobs, isAlive } from '../registry.js'
-import { getProjectKey } from '../../project/index.js'
+import { ensureProjectIdentity } from '../../project/index.js'
 
 function pad(str, len) {
   return String(str ?? '-').padEnd(len)
 }
 
 export async function handler({ projectDir, global: isGlobal }) {
-  const key = isGlobal ? undefined : getProjectKey(projectDir)
+  const key = isGlobal ? undefined : (await ensureProjectIdentity(projectDir)).id
   await cleanJobs(key)
   const jobs = await listJobs(key)
 

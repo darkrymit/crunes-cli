@@ -1,9 +1,9 @@
-import { readFile, writeFile, mkdir, rm } from 'node:fs/promises'
+import { readFile, readdir, writeFile, mkdir, rm } from 'node:fs/promises'
 import { dirname } from 'node:path'
-import { createHash } from 'node:crypto'
 import path from 'node:path'
 import Database from 'better-sqlite3'
 import { getSqliteBasePath, getSqliteJsonPath } from '../store/index.js'
+import { storageKey } from '../store/storage-key.js'
 
 export function getSqlitePluginDir(pluginId) {
   return path.join(getSqliteBasePath(), 'plugins', pluginId)
@@ -17,11 +17,6 @@ export function getSqliteProjectPluginDir(key, pluginId) {
   return path.join(getSqliteBasePath(), 'project-plugins', key, pluginId)
 }
 
-export function sqliteDbKey(name, resolvedPath) {
-  const hash = createHash('sha256').update(resolvedPath).digest('hex').slice(0, 12)
-  return `${name}-${hash}`
-}
-
 export async function loadSqliteDbs() {
   try {
     return JSON.parse(await readFile(getSqliteJsonPath(), 'utf8'))
@@ -30,14 +25,15 @@ export async function loadSqliteDbs() {
   }
 }
 
-export async function upsertSqliteDb(resolvedPath, { scope, projectKey, pluginId, location, name }) {
+export async function upsertSqliteDb(resolvedPath, { scope, projectId, pluginId, location, name }) {
   const data = await loadSqliteDbs()
-  const key  = sqliteDbKey(name, resolvedPath)
+  const effectiveProjectId = projectId ?? null
+  const key = storageKey(scope, { projectId: effectiveProjectId, pluginId, name })
   data.databases[key] = {
     path: resolvedPath,
     scope,
-    projectKey: projectKey ?? null,
-    pluginId:   pluginId   ?? null,
+    projectKey: effectiveProjectId,
+    pluginId:   pluginId ?? null,
     location,
     name,
     firstSeenAt: data.databases[key]?.firstSeenAt ?? new Date().toISOString(),
@@ -51,7 +47,7 @@ function scopedDatabases(data, projectKey) {
   if (projectKey === undefined) return data.databases
   return Object.fromEntries(
     Object.entries(data.databases).filter(([, e]) =>
-      (e.scope === 'project' || e.scope === 'project-plugin') && e.projectKey === projectKey
+      (e.scope === 'global-project' || e.scope === 'global-project-plugin') && e.projectKey === projectKey
     )
   )
 }
@@ -59,6 +55,44 @@ function scopedDatabases(data, projectKey) {
 export async function listSqliteDbs(projectKey = undefined) {
   const data = await loadSqliteDbs()
   return Object.entries(scopedDatabases(data, projectKey)).map(([key, entry]) => ({ key, ...entry }))
+}
+
+export async function listLocalSqliteDbs(projectDir) {
+  let projectId
+  try {
+    const raw = await readFile(path.join(projectDir, '.crunes', 'project.local.json'), 'utf8')
+    projectId = JSON.parse(raw).id
+  } catch {
+    return []
+  }
+  const results = []
+  const localSqliteDir = path.join(projectDir, '.crunes', 'sqlite')
+
+  async function scanScope(scopeDir, scope, pluginId = null) {
+    let entries
+    try { entries = await readdir(scopeDir, { withFileTypes: true }) } catch { return }
+    for (const entry of entries) {
+      if (!entry.isFile() || !entry.name.endsWith('.sqlite')) continue
+      const name = entry.name.slice(0, -'.sqlite'.length)
+      const key = storageKey(scope, { projectId, pluginId, name })
+      const location = pluginId
+        ? `@local-project-plugin-sqlite/${pluginId}/${name}`
+        : `@local-project-sqlite/${name}`
+      results.push({ key, scope, projectKey: projectId, pluginId, location, name, firstSeenAt: null, path: path.join(scopeDir, entry.name) })
+    }
+  }
+
+  await scanScope(path.join(localSqliteDir, 'project'), 'local-project')
+
+  const pluginsDir = path.join(localSqliteDir, 'project-plugins')
+  let pluginEntries
+  try { pluginEntries = await readdir(pluginsDir, { withFileTypes: true }) } catch { pluginEntries = [] }
+  for (const pluginEntry of pluginEntries) {
+    if (!pluginEntry.isDirectory()) continue
+    await scanScope(path.join(pluginsDir, pluginEntry.name), 'local-project-plugin', pluginEntry.name)
+  }
+
+  return results
 }
 
 export function resolveKey(id, databases) {

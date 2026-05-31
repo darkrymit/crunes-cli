@@ -1,8 +1,8 @@
 import { readFile, readdir, writeFile, mkdir, rm } from 'node:fs/promises'
 import { dirname } from 'node:path'
-import { createHash } from 'node:crypto'
 import path from 'node:path'
 import { getCachesBasePath, getCacheJsonPath } from '../store/index.js'
+import { storageKey } from '../store/storage-key.js'
 
 export function getCachePluginDir(pluginId) {
   return path.join(getCachesBasePath(), 'plugins', pluginId)
@@ -16,11 +16,6 @@ export function getCacheProjectPluginDir(key, pluginId) {
   return path.join(getCachesBasePath(), 'project-plugins', key, pluginId)
 }
 
-export function cacheBucketKey(name, resolvedPath) {
-  const hash = createHash('sha256').update(resolvedPath).digest('hex').slice(0, 12)
-  return `${name}-${hash}`
-}
-
 export async function loadCacheBuckets() {
   try {
     return JSON.parse(await readFile(getCacheJsonPath(), 'utf8'))
@@ -29,14 +24,15 @@ export async function loadCacheBuckets() {
   }
 }
 
-export async function upsertCacheBucket(resolvedPath, { scope, projectKey, pluginId, location, name }) {
+export async function upsertCacheBucket(resolvedPath, { scope, projectId, pluginId, location, name }) {
   const data = await loadCacheBuckets()
-  const key  = cacheBucketKey(name, resolvedPath)
+  const key = storageKey(scope, { projectId, pluginId, name })
+  const effectiveProjectId = projectId ?? null
   data.buckets[key] = {
     path: resolvedPath,
     scope,
-    projectKey: projectKey ?? null,
-    pluginId:   pluginId   ?? null,
+    projectKey: effectiveProjectId,
+    pluginId:   pluginId ?? null,
     location,
     name,
     firstSeenAt: data.buckets[key]?.firstSeenAt ?? new Date().toISOString(),
@@ -50,7 +46,7 @@ function scopedBuckets(data, projectKey) {
   if (projectKey === undefined) return data.buckets
   return Object.fromEntries(
     Object.entries(data.buckets).filter(([, e]) =>
-      (e.scope === 'project' || e.scope === 'project-plugin') && e.projectKey === projectKey
+      (e.scope === 'global-project' || e.scope === 'global-project-plugin') && e.projectKey === projectKey
     )
   )
 }
@@ -60,8 +56,53 @@ export async function listCacheBuckets(projectKey = undefined) {
   const entries = Object.entries(data.buckets).map(([key, entry]) => ({ key, ...entry }))
   if (projectKey === undefined) return entries
   return entries.filter(e =>
-    (e.scope === 'project' || e.scope === 'project-plugin') && e.projectKey === projectKey
+    (e.scope === 'global-project' || e.scope === 'global-project-plugin') && e.projectKey === projectKey
   )
+}
+
+export async function listLocalCacheBuckets(projectDir) {
+  let projectId
+  try {
+    const raw = await readFile(path.join(projectDir, '.crunes', 'project.local.json'), 'utf8')
+    projectId = JSON.parse(raw).id
+  } catch {
+    return []
+  }
+  const results = []
+  const localCachesDir = path.join(projectDir, '.crunes', 'caches')
+
+  async function scanScope(scopeDir, scope, pluginId = null) {
+    let entries
+    try { entries = await readdir(scopeDir, { withFileTypes: true }) } catch { return }
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue
+      const name = entry.name
+      const key = storageKey(scope, { projectId, pluginId, name })
+      const location = pluginId
+        ? `@local-project-plugin-cache/${pluginId}/${name}`
+        : `@local-project-cache/${name}`
+      let firstSeenAt
+      try {
+        const stat = await readFile(path.join(scopeDir, name, '.firstSeen'), 'utf8')
+        firstSeenAt = stat.trim()
+      } catch {
+        firstSeenAt = null
+      }
+      results.push({ key, scope, projectKey: projectId, pluginId, location, name, firstSeenAt, path: path.join(scopeDir, name) })
+    }
+  }
+
+  await scanScope(path.join(localCachesDir, 'project'), 'local-project')
+
+  const pluginsDir = path.join(localCachesDir, 'project-plugins')
+  let pluginEntries
+  try { pluginEntries = await readdir(pluginsDir, { withFileTypes: true }) } catch { pluginEntries = [] }
+  for (const pluginEntry of pluginEntries) {
+    if (!pluginEntry.isDirectory()) continue
+    await scanScope(path.join(pluginsDir, pluginEntry.name), 'local-project-plugin', pluginEntry.name)
+  }
+
+  return results
 }
 
 export function resolveKey(id, buckets) {

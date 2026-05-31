@@ -3,7 +3,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { upsertSqliteDb } from '../../../src/sqlite/index.js'
-import { getProjectKey } from '../../../src/project/index.js'
+import { ensureProjectIdentity } from '../../../src/project/index.js'
 import { handler } from '../../../src/sqlite/commands/list.js'
 
 const PROJ_KEY = 'abc123def456'
@@ -28,7 +28,7 @@ describe('sqlite list handler', () => {
 
   it('prints a table with header and a row per database', async () => {
     const dbPath = join(tmp, 'sqlite', 'projects', PROJ_KEY, 'notes.sqlite')
-    await upsertSqliteDb(dbPath, { scope: 'project', projectKey: PROJ_KEY, pluginId: null, location: '@project-sqlite', name: 'notes' })
+    await upsertSqliteDb(dbPath, { scope: 'global-project', projectId: PROJ_KEY, pluginId: null, location: '@global-project-sqlite', name: 'notes' })
     await handler({ projectDir: tmp, global: true })
     const lines = console.log.mock.calls.map(c => c[0])
     expect(lines.some(l => l.includes('KEY'))).toBe(true)
@@ -37,11 +37,11 @@ describe('sqlite list handler', () => {
   })
 
   it('scopes to current project when global: false', async () => {
-    const projKey = getProjectKey(tmp)
+    const { id: projKey } = await ensureProjectIdentity(tmp)
     const p1 = join(tmp, 'sqlite', 'projects', projKey, 'mine.sqlite')
     const p2 = join(tmp, 'sqlite', 'projects', 'other-key', 'theirs.sqlite')
-    await upsertSqliteDb(p1, { scope: 'project', projectKey: projKey, pluginId: null, location: '@project-sqlite', name: 'mine' })
-    await upsertSqliteDb(p2, { scope: 'project', projectKey: 'other-key', pluginId: null, location: '@project-sqlite', name: 'theirs' })
+    await upsertSqliteDb(p1, { scope: 'global-project', projectId: projKey, pluginId: null, location: '@global-project-sqlite', name: 'mine' })
+    await upsertSqliteDb(p2, { scope: 'global-project', projectId: 'other-key', pluginId: null, location: '@global-project-sqlite', name: 'theirs' })
     await handler({ projectDir: tmp, global: false })
     const lines = console.log.mock.calls.map(c => c[0])
     expect(lines.some(l => l.includes('mine'))).toBe(true)

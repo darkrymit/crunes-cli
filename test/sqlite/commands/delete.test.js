@@ -3,7 +3,6 @@ import { mkdtemp, rm, mkdir, writeFile, access } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { upsertSqliteDb, loadSqliteDbs } from '../../../src/sqlite/index.js'
-import { getProjectKey } from '../../../src/project/index.js'
 import { handler } from '../../../src/sqlite/commands/delete.js'
 
 const PROJ_KEY = 'abc123def456'
@@ -25,7 +24,7 @@ describe('sqlite delete handler', () => {
     const dbPath = join(tmp, 'sqlite', 'projects', PROJ_KEY, 'notes.sqlite')
     await mkdir(join(tmp, 'sqlite', 'projects', PROJ_KEY), { recursive: true })
     await writeFile(dbPath, '')
-    await upsertSqliteDb(dbPath, { scope: 'project', projectKey: PROJ_KEY, pluginId: null, location: '@project-sqlite', name: 'notes' })
+    await upsertSqliteDb(dbPath, { scope: 'global-project', projectId: PROJ_KEY, pluginId: null, location: '@global-project-sqlite', name: 'notes' })
     const { databases } = await loadSqliteDbs()
     const id = Object.keys(databases)[0]
     await handler({ id, yes: true, projectDir: tmp, global: true })
@@ -45,7 +44,7 @@ describe('sqlite delete handler', () => {
     const dbPath = join(tmp, 'sqlite', 'projects', 'other-key', 'x.sqlite')
     await mkdir(join(tmp, 'sqlite', 'projects', 'other-key'), { recursive: true })
     await writeFile(dbPath, '')
-    await upsertSqliteDb(dbPath, { scope: 'project', projectKey: 'other-key', pluginId: null, location: '@project-sqlite', name: 'x' })
+    await upsertSqliteDb(dbPath, { scope: 'global-project', projectId: 'other-key', pluginId: null, location: '@global-project-sqlite', name: 'x' })
     const { databases } = await loadSqliteDbs()
     const id = Object.keys(databases)[0]
     const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => { throw new Error('exit') })

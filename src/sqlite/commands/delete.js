@@ -1,6 +1,6 @@
 import * as p from '@clack/prompts'
 import { deleteSqliteDb } from '../index.js'
-import { getProjectKey } from '../../project/index.js'
+import { ensureProjectIdentity } from '../../project/index.js'
 
 export async function handler({ id, yes, projectDir, global: isGlobal }) {
   if (!yes) {
@@ -10,7 +10,7 @@ export async function handler({ id, yes, projectDir, global: isGlobal }) {
       process.exit(0)
     }
   }
-  const key = isGlobal ? undefined : getProjectKey(projectDir)
+  const key = isGlobal ? undefined : (await ensureProjectIdentity(projectDir)).id
   let result
   try {
     result = await deleteSqliteDb(id, key)

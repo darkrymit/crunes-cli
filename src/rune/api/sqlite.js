@@ -1,15 +1,19 @@
 import { mkdirSync } from 'node:fs'
 import path from 'node:path'
 import Database from 'better-sqlite3'
-import { resolvePath, canonicalizeLocation, getProjectKey } from './utils.js'
+import { resolvePath, canonicalizeLocation } from './utils.js'
 import { upsertSqliteDb } from '../../sqlite/index.js'
-import { upsertProject } from '../../project/index.js'
+import { upsertProject, ensureProjectIdentity } from '../../project/index.js'
 
 const SQLITE_SCOPES = {
-  '@plugin-sqlite':         'plugin',
-  '@project-sqlite':        'project',
-  '@project-plugin-sqlite': 'project-plugin',
+  '@global-plugin-sqlite':         'global-plugin',
+  '@global-project-sqlite':        'global-project',
+  '@global-project-plugin-sqlite': 'global-project-plugin',
+  '@local-project-sqlite':         'local-project',
+  '@local-project-plugin-sqlite':  'local-project-plugin',
 }
+
+const GLOBAL_SCOPES = new Set(['global-plugin', 'global-project', 'global-project-plugin'])
 
 function detectSqliteScope(location) {
   for (const [prefix, scope] of Object.entries(SQLITE_SCOPES)) {
@@ -64,19 +68,23 @@ export function createSqliteUtils(dir, checkPermission, { pluginId = null, store
       if (scope !== null && (name.includes('/') || name.includes('\\'))) {
         throw new TypeError('sqlite name must not contain path separators — use a flat name like "branch-main" instead of "branch/main"')
       }
-      const ctx    = { dir, pluginId, storeDir, projectName }
+      let projectId = null
+      if (scope !== null) {
+        const { id } = await ensureProjectIdentity(dir)
+        projectId = id
+      }
+      const ctx    = { dir, pluginId, storeDir, projectName, projectId }
       const base   = resolvePath(location, ctx)
       const dbPath = path.join(base, resolveFileName(name))
       const canon  = canonicalizeLocation(location, { dir })
       const tokenValue = `${canon}:${name}`
       const checkRead  = checkPermission ? () => checkPermission('sqlite.read',  tokenValue) : null
       const checkWrite = checkPermission ? () => checkPermission('sqlite.write', tokenValue) : null
-      if (scope !== null) {
-        const projectKey = (scope === 'project' || scope === 'project-plugin')
-          ? getProjectKey(dir, projectName)
-          : null
-        await upsertSqliteDb(dbPath, { scope, projectKey, pluginId: pluginId ?? null, location, name })
-        if (projectKey !== null) await upsertProject(projectKey, dir)
+      if (scope !== null && GLOBAL_SCOPES.has(scope)) {
+        await upsertSqliteDb(dbPath, { scope, projectId, pluginId: pluginId ?? null, location, name })
+        if (scope === 'global-project' || scope === 'global-project-plugin') {
+          await upsertProject(projectId, dir)
+        }
       }
       return makeHandle(dbPath, checkRead, checkWrite, connections)
     },
