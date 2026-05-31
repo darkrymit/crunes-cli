@@ -6,10 +6,7 @@ import { PermissionError } from '../../../src/rune/permissions/permissions.js'
 import { runRuneInIsolate } from '../../../src/rune/isolation/runner.js'
 import fs from 'node:fs/promises'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url))
-const testRuneFile = path.join(__dirname, 'test-ws-binary-inline.js')
+import { tmpdir } from 'node:os'
 
 function fakeRef(fn) {
   return { apply: (_thisArg, args, _opts) => Promise.resolve().then(() => fn(...args)) }
@@ -209,17 +206,28 @@ describe('createWsUtils', () => {
 
 describe('WebSocket sandboxed integration', () => {
   let integrationServer
+  let tmpDir
 
   beforeAll(async () => {
     integrationServer = await startEchoServer()
   })
 
   afterAll(async () => {
-    await fs.unlink(testRuneFile).catch(() => {})
     await stopServer(integrationServer)
   })
 
+  beforeEach(async () => {
+    tmpDir = await fs.mkdtemp(path.join(tmpdir(), 'crunes-ws-test-'))
+  })
+
+  afterEach(async () => {
+    if (tmpDir) {
+      await fs.rm(tmpDir, { recursive: true, force: true })
+    }
+  })
+
   it('successfully executes sandboxed run with sendText and sendBinary in Isolate', async () => {
+    const runeFile = path.join(tmpDir, 'test-ws-binary-inline.js')
     const runeSrc = `
       import { ws } from '@utils'
       export async function use() {
@@ -249,8 +257,8 @@ describe('WebSocket sandboxed integration', () => {
         }
       }
     `
-    await fs.writeFile(testRuneFile, runeSrc, 'utf8')
-    const res = await runRuneInIsolate(testRuneFile, { allow: ['ws.client:**'], deny: [] }, [], __dirname)
+    await fs.writeFile(runeFile, runeSrc, 'utf8')
+    const res = await runRuneInIsolate(runeFile, { allow: ['ws.client:**'], deny: [] }, [], tmpDir)
     expect(res).toEqual({
       textResult: 'hello sandboxed world',
       binaryIsUint8: true,
