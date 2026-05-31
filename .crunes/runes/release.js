@@ -6,9 +6,9 @@ export async function args(b) {
     .command('bump', 'Perform package version bump and release automation', bump => {
       bump
         .positional('<type>', 'Bump type: major, minor, patch, or specific semver version')
-        .option('-a, --added', 'Feature(s) added (repeatable option)')
-        .option('-f, --fixed', 'Bug(s) fixed (repeatable option)')
-        .option('-c, --changed', 'Improvement(s)/change(s) made (repeatable option)')
+        .option('-a, --added <value>', 'Feature(s) added (repeatable option)')
+        .option('-f, --fixed <value>', 'Bug(s) fixed (repeatable option)')
+        .option('-c, --changed <value>', 'Improvement(s)/change(s) made (repeatable option)')
         .option('-d, --date', 'Changelog release date override (YYYY-MM-DD, defaults to today)', '')
     })
     .command('git', 'Automatically stage, commit, and tag the current version in Git')
