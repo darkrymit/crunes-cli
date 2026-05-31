@@ -1,6 +1,6 @@
-# help
+# docs
 
-Rune help rendering: loads a rune's `args()` schema and formats it as a human-readable or JSON usage block. Full docs: `docs/knowledge-base/modules/help.md`
+Rune and utils documentation commands: loads TypeDoc-generated JSON, walks and formats API surfaces, and renders the full sandbox intro. Full docs: `docs/knowledge-base/modules/docs.md`
 
 ## Key Files
 

@@ -12,7 +12,7 @@ The `utils` object injected into every rune at runtime. `index.js` assembles the
 - **json.js** — JSON file access with JSONPath: `read`, `get`, `getAll`, `write`, `modify`. (`modify` is implemented in `utils-bootstrap.js`.)
 - **yaml.js** — YAML file access with comment-preserving round-trips: `read`, `write`, `modify`. (`modify` is implemented in `utils-bootstrap.js`.)
 - **xml.js** — XML file access (`@_` attribute prefix, `#comment` comments): `read`, `write`, `modify`. (`modify` is implemented in `utils-bootstrap.js`.)
-- **fetch.js** — Permission-gated HTTP client (mirrors Web Fetch API) + `FetchError`.
+- **http.js** — Permission-gated HTTP client (mirrors Web Fetch API). Exposed as `utils.http.fetch(input, init?)`. The same function is also available as the global `fetch()` inside every rune.
 - **env.js** — Permission-gated env var access from `process.env` or `.env` files: `get`, `has`.
 - **vars.js** — Static key/value vars injected per-rune from project config: `get`, `has`.
 - **archive.js** — Compression: `unzip`, `zip`, `untar`, `tar`.
@@ -22,7 +22,7 @@ The `utils` object injected into every rune at runtime. `index.js` assembles the
 - **utils.js** — Internal helpers: `resolvePath`, `canonicalizeLocation`, `getAutoPermits`, `getProjectKey`. Handles virtual location tokens (`@project/`, `@plugin/`, `@project-cache`, `@project-sqlite`, etc.).
 - **args-parser.js** — `parseArgs(rawArgs, schema)`, `buildYargsConfig(schema)`, `parseFlags(flagStr)` — converts the schema produced by a rune's `args()` export into a yargs-parser config and runs the parser. Called by `isolation/runner.js` before invoking `use(parsedArgs)`.
 
-**Sandbox globals:** `setTimeout`, `clearTimeout`, `setInterval`, `clearInterval`, `TextEncoder`, `TextDecoder`, `AbortController`, and `AbortSignal` are available on `globalThis` inside every rune without any import.
+**Sandbox globals:** `setTimeout`, `clearTimeout`, `setInterval`, `clearInterval`, `TextEncoder`, `TextDecoder`, `TextEncoderStream`, `TextDecoderStream`, `AbortController`, `AbortSignal`, `Blob`, `Headers`, `FormData`, `URLSearchParams`, `Request`, `ReadableStream`, `WritableStream`, `TransformStream`, and `fetch` are available on `globalThis` inside every rune without any import.
 
 ## Related Modules
 
