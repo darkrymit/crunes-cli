@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.10] - 2026-05-31
+
+### Added
+- **Local Project Storage**: New `@local-project-cache` and `@local-project-sqlite` virtual prefixes store data in `.crunes/caches/` and `.crunes/sqlite/` within the project directory, alongside matching `@global-project-*`, `@global-plugin-*`, and `@local-project-plugin-*` prefixes replacing the old `@project-*` / `@plugin-*` naming.
+- **Local Config Overrides**: `config.local.json` and `project.local.json` are merged on top of their base counterparts at load time, allowing machine-specific overrides without modifying committed config.
+- **Separate Args Lifecycle Permissions**: `args` lifecycle now enforces its own permission scope independently from `use` to prevent privilege leakage across lifecycle phases.
+- **utils.db Network Database Client**: New `utils.db` namespace provides a unified HTTP-based database client for interacting with remote SQL databases over a REST API.
+- **codec Namespace**: Encoding utilities (base64, hex, etc.) extracted from `utils.crypto` into a dedicated `utils.codec` namespace for clearer separation of concerns.
+- **sqlite.run() Multi-Statement Support**: New `run(sql)` method on `SqliteHandle` executes raw multi-statement SQL strings (schema init, migrations) without parameter binding.
+- **cache.has() Method**: New `has(key)` method on `CacheHandle` returns whether a key exists and has not expired without retrieving the value.
+- **fs.append, fs.appendAsBytes, fs.chmod**: Three new filesystem utilities — `append` and `appendAsBytes` write to files without truncating, `chmod` sets file permissions.
+
+---
+
 ## [0.5.9] - 2026-05-26
 
 ### Added
