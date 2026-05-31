@@ -87,3 +87,7 @@ export function decrypt(algorithm, key, iv, ciphertext) {
 export function uuid() { return randomUUID() }
 export function randomHex(size) { return randomBytes(size).toString('hex') }
 export function randomBase64(size) { return randomBytes(size).toString('base64') }
+export function randomBytesFn(size) {
+  const buf = randomBytes(size)
+  return new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength)
+}

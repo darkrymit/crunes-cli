@@ -179,6 +179,7 @@ export async function handler({
       : sections
 
     // Print any sections returned by the rune that were not progressively emitted
+    const instanceId = String(i + 1)
     for (const sect of filtered) {
       const alreadyPrinted = Array.from(printedSections).some(p => p.name === sect.name)
       if (!alreadyPrinted) {
@@ -186,7 +187,18 @@ export async function handler({
           process.stdout.write(JSON.stringify({ type: 'section', section: sect }) + '\n')
         } else {
           const rendered = renderSection(sect)
-          if (rendered) process.stdout.write(rendered + '\n')
+          if (rendered) {
+            const prefix = `[${instanceId}:${key}:section]`
+            const lines = rendered.split('\n')
+            let contentStartIndex = 1
+            let attrs = ''
+            if (lines[1] && lines[1].startsWith('[')) {
+              attrs = ' ' + lines[1]
+              contentStartIndex = 2
+            }
+            const content = lines.slice(contentStartIndex).join('\n')
+            process.stdout.write(`${prefix} ${sect.name}${attrs}\n${content}\n\n`)
+          }
         }
         printedSections.add(sect)
       }

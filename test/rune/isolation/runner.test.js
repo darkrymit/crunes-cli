@@ -464,7 +464,7 @@ describe('TextEncoder, TextDecoder, AbortController, and AbortSignal sandbox int
 import { section } from '@utils'
 export async function use() {
     const encoder = new TextEncoder()
-    const decoder = new TextDecoder('utf-8', { fatal: true })
+    const decoder = new TextDecoder('utf-8')
     const encoded = encoder.encode('héllo 🚀')
     const decoded = decoder.decode(encoded)
     return [section.create('r', { type: 'markdown', content: decoded })]

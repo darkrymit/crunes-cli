@@ -30,6 +30,9 @@ declare namespace crypto {
   /** Generates cryptographically secure random bytes as a base64 string */
   function randomBase64(size: number): string
 
+  /** Generates cryptographically secure random bytes as a Uint8Array */
+  function randomBytes(size: number): Uint8Array
+
   /**
    * Generates an HMAC signature and returns raw Uint8Array bytes.
    * @param algorithm Hash algorithm e.g. sha256, sha512

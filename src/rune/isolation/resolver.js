@@ -1,20 +1,16 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
-import { createRequire } from 'node:module'
-import { ALLOW_BUILTINS, DENY_BUILTINS } from './builtins.js'
+import { DENY_BUILTINS } from './builtins.js'
 import micromatch from 'micromatch'
-
-const require = createRequire(import.meta.url)
 
 /**
  * Create an ESM module resolver for use inside an isolated-vm isolate.
  *
  * Priority order (first match wins):
  *   1. Relative / absolute path    → plugin's own files
- *   2. ALLOW_BUILTINS              → safe Node built-in proxy
- *   3. effectiveAllow ∩ pluginDeps → declared npm dep from plugin node_modules
- *   4. DENY_BUILTINS ∪ effectiveDeny → PermissionError with message
- *   5. Zero-trust default          → PermissionError
+ *   2. effectiveAllow ∩ pluginDeps → declared npm dep from plugin node_modules
+ *   3. DENY_BUILTINS ∪ effectiveDeny → PermissionError with message
+ *   4. Zero-trust default          → PermissionError
  */
 export function createModuleResolver(isolate, pluginDir, pluginNodeModules, pluginDeps, effectiveAllow, effectiveDeny, projectDir = null, pluginRootDir = null, virtualModules = new Map()) {
   // Cache compiled modules to avoid re-compiling within one isolate lifetime
@@ -24,22 +20,6 @@ export function createModuleResolver(isolate, pluginDir, pluginNodeModules, plug
     if (cache.has(specifier)) return cache.get(specifier)
     const source = await fs.readFile(absPath, 'utf8')
     const mod = await isolate.compileModule(source, { filename: absPath })
-    cache.set(specifier, mod)
-    return mod
-  }
-
-  async function compileBuiltinProxy(specifier) {
-    if (cache.has(specifier)) return cache.get(specifier)
-    // Build a thin ESM proxy that re-exports from the host's require
-    const hostExports = require(specifier)
-    const names = Object.keys(hostExports).filter(k => k !== 'default')
-    const namedExports = names.map(n => `export const ${n} = hostExports.${n};`).join('\n')
-    const source = `
-const hostExports = $__hostRequire('${specifier}');
-${namedExports}
-export default hostExports.default ?? hostExports;
-`.trim()
-    const mod = await isolate.compileModule(source, { filename: `builtin:${specifier}` })
     cache.set(specifier, mod)
     return mod
   }
@@ -76,7 +56,7 @@ export default hostExports.default ?? hostExports;
       const normalizedRel = './' + rel.replace(/\\/g, '/')
       const token = `fs.read:${normalizedRel}`
       const allowed = micromatch.isMatch(token, effectiveAllow)
-      const denied  = effectiveDeny.length > 0 && micromatch.isMatch(token, effectiveDeny)
+      const denied = effectiveDeny.length > 0 && micromatch.isMatch(token, effectiveDeny)
       if (!allowed || denied) {
         throw new Error(`PermissionError: '${specifier}' — add 'fs.read:${normalizedRel}' to allow list.`)
       }
@@ -90,17 +70,14 @@ export default hostExports.default ?? hostExports;
       return compileFile(absPath, absPath) // Use absPath as cache key instead of specifier
     }
 
-    // Step 2 — safe Node built-in
-    if (ALLOW_BUILTINS.has(specifier)) {
-      return compileBuiltinProxy(specifier)
-    }
+
 
     // Step 3 — declared npm dep: must be in effectiveAllow AND in pluginDeps
     const moduleToken = `module:${specifier}`
     const isAllowed = micromatch.isMatch(moduleToken, effectiveAllow)
     const isDeclared = pluginDeps && Object.prototype.hasOwnProperty.call(pluginDeps, specifier)
     if (isAllowed && isDeclared) {
-      const pkgDir     = path.join(pluginNodeModules, specifier)
+      const pkgDir = path.join(pluginNodeModules, specifier)
       const pkgJsonPath = path.join(pkgDir, 'package.json')
       let entry = 'index.js'
       try {

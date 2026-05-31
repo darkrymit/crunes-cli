@@ -80,6 +80,37 @@ declare namespace globals {
     readonly signal: AbortSignal
     abort(): void
   }
+
+  interface ReadableStream<R = any> {
+    readonly locked: boolean
+    cancel(reason?: any): Promise<void>
+    getReader(): any
+    pipeTo(dest: WritableStream<R>, options?: any): Promise<void>
+    pipeThrough<T>(transform: TransformStream<R, T>, options?: any): ReadableStream<T>
+    [Symbol.asyncIterator](): AsyncIterableIterator<R>
+  }
+
+  interface WritableStream<W = any> {
+    readonly locked: boolean
+    abort(reason?: any): Promise<void>
+    close(): Promise<void>
+    getWriter(): any
+  }
+
+  interface TransformStream<I = any, O = any> {
+    readonly readable: ReadableStream<O>
+    readonly writable: WritableStream<I>
+  }
+
+  interface ByteLengthQueuingStrategy {
+    readonly highWaterMark: number
+    readonly size: Function
+  }
+
+  interface CountQueuingStrategy {
+    readonly highWaterMark: number
+    readonly size: Function
+  }
 }
 
 // Top-level type aliases so rune API .d.ts files can reference these types
@@ -87,3 +118,8 @@ declare namespace globals {
 // so TypeDoc documentation output is unaffected.
 type AbortSignal = globals.AbortSignal
 type AbortController = globals.AbortController
+type ReadableStream<R = any> = globals.ReadableStream<R>
+type WritableStream<W = any> = globals.WritableStream<W>
+type TransformStream<I = any, O = any> = globals.TransformStream<I, O>
+type ByteLengthQueuingStrategy = globals.ByteLengthQueuingStrategy
+type CountQueuingStrategy = globals.CountQueuingStrategy

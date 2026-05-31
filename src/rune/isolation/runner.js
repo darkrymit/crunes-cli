@@ -2,21 +2,19 @@ import ivm from 'isolated-vm'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { createRequire } from 'node:module'
 import { spawn as spawnProcess } from 'node:child_process'
 import { createUtils } from '../api/index.js'
 import { getAutoPermits } from '../api/utils.js'
 import { createModuleResolver } from './resolver.js'
-import { ALLOW_BUILTINS } from './builtins.js'
+import { DENY_BUILTINS } from './builtins.js'
 import { createJob, getJob } from '../../job/index.js'
 import { ensureProjectIdentity } from '../../project/index.js'
-import { hash, hashAsHex, hashAsBase64, hmac, hmacAsHex, hmacAsBase64, encrypt, decrypt, uuid as cryptoUuid, randomHex as cryptoHex, randomBase64 as cryptoBase64 } from '../api/crypto.js'
+import { hash, hashAsHex, hashAsBase64, hmac, hmacAsHex, hmacAsBase64, encrypt, decrypt, uuid as cryptoUuid, randomHex as cryptoHex, randomBase64 as cryptoBase64, randomBytesFn } from '../api/crypto.js'
 import { computeEffectivePermissions, makePermissionChecker } from '../permissions/permissions.js'
 import { isVerbose } from '../../shared/output.js'
 import * as EMBEDDED from './embedded.js'
 import { parseArgs } from '../api/args-parser.js'
 
-const hostRequire = createRequire(import.meta.url)
 const __isolationDir = path.dirname(fileURLToPath(import.meta.url))
 
 // Map from embedded key → source file path (used as fallback in dev/test when EMBEDDED is empty)
@@ -100,6 +98,47 @@ async function injectUtils(isolate, context, utils, runeCallback, vars, projectD
   await jail.set('$__utils_fs_chmod', new ivm.Reference(async (relPath, mode) => {
     return utils.fs.chmod(relPath, mode)
   }))
+
+  const streams = new Map()
+  let nextStreamId = 1
+
+  await jail.set('$__utils_fs_readStream', new ivm.Reference(async (relPath) => {
+    const iter = utils.fs.readStreamIter(relPath)[Symbol.asyncIterator]()
+    const id = nextStreamId++
+    streams.set(id, iter)
+    return id
+  }))
+  await jail.set('$__utils_fs_readStream_next', new ivm.Reference(async (id) => {
+    const iter = streams.get(id)
+    if (!iter) throw new Error(`Invalid read stream ID: ${id}`)
+    const { value, done } = await iter.next()
+    if (done) {
+      streams.delete(id)
+      return null
+    }
+    const copy = new Uint8Array(value.length)
+    copy.set(value)
+    return copy.buffer
+  }))
+
+  await jail.set('$__utils_fs_writeStream', new ivm.Reference(async (relPath) => {
+    const ref = utils.fs.writeStreamRef(relPath)
+    const id = nextStreamId++
+    streams.set(id, ref)
+    return id
+  }))
+  await jail.set('$__utils_fs_writeStream_write', new ivm.Reference(async (id, arrayBuffer) => {
+    const ref = streams.get(id)
+    if (!ref) throw new Error(`Invalid write stream ID: ${id}`)
+    const bytes = new Uint8Array(arrayBuffer)
+    await ref.write(bytes)
+  }))
+  await jail.set('$__utils_fs_writeStream_close', new ivm.Reference(async (id) => {
+    const ref = streams.get(id)
+    if (!ref) throw new Error(`Invalid write stream ID: ${id}`)
+    await ref.close()
+    streams.delete(id)
+  }))
   const shellHandles = new Map()
   let nextShellHandle = 0
 
@@ -132,23 +171,7 @@ async function injectUtils(isolate, context, utils, runeCallback, vars, projectD
     }
   }))
 
-  const decoders = new Map()
-  let nextDecoderId = 1
-  const _hostEncoder = new TextEncoder()
-  await jail.set('$__utils_encode', new ivm.Reference((str) => {
-    return _hostEncoder.encode(str).buffer
-  }))
-  await jail.set('$__utils_decoder_create', new ivm.Reference((label, options) => {
-    const d = new TextDecoder(label ?? 'utf-8', options ?? undefined)
-    const id = nextDecoderId++
-    decoders.set(id, d)
-    return id
-  }))
-  await jail.set('$__utils_decoder_decode', new ivm.Reference((id, arrayBuffer, decodeOptions) => {
-    const d = decoders.get(id)
-    if (!d) throw new Error(`Invalid decoder ID: ${id}`)
-    return d.decode(new Uint8Array(arrayBuffer), decodeOptions ?? undefined)
-  }))
+
 
   await jail.set('$__utils_section_emit', new ivm.Reference((section) => {
     if (sections) sections.push(section)
@@ -398,58 +421,38 @@ async function injectUtils(isolate, context, utils, runeCallback, vars, projectD
     dbHandles.delete(id)
   }))
 
-  await jail.set('$__crypto_hash', new ivm.Reference((algorithm, data) => {
-    const d = typeof data === 'string' ? data : new Uint8Array(data)
-    const res = hash(algorithm, d)
-    return Array.from(res)
+  await jail.set('$__utils_crypto_hash', new ivm.Reference((algorithm, data) => {
+    return hash(algorithm, data)
   }))
-  await jail.set('$__crypto_hash_hex', new ivm.Reference((algorithm, data) => {
-    const d = typeof data === 'string' ? data : new Uint8Array(data)
-    return hashAsHex(algorithm, d)
+  await jail.set('$__utils_crypto_hash_hex', new ivm.Reference((algorithm, data) => {
+    return hashAsHex(algorithm, data)
   }))
-  await jail.set('$__crypto_hash_base64', new ivm.Reference((algorithm, data) => {
-    const d = typeof data === 'string' ? data : new Uint8Array(data)
-    return hashAsBase64(algorithm, d)
+  await jail.set('$__utils_crypto_hash_base64', new ivm.Reference((algorithm, data) => {
+    return hashAsBase64(algorithm, data)
   }))
-  await jail.set('$__crypto_uuid',        new ivm.Reference(cryptoUuid))
-  await jail.set('$__crypto_random_hex',  new ivm.Reference(cryptoHex))
-  await jail.set('$__crypto_random_base64', new ivm.Reference(cryptoBase64))
+  await jail.set('$__utils_crypto_uuid', new ivm.Reference(cryptoUuid))
+  await jail.set('$__utils_crypto_random_hex', new ivm.Reference(cryptoHex))
+  await jail.set('$__utils_crypto_random_base64', new ivm.Reference(cryptoBase64))
+  await jail.set('$__utils_crypto_random_bytes', new ivm.Reference((size) => {
+    return randomBytesFn(size)
+  }))
   
-  await jail.set('$__crypto_hmac', new ivm.Reference((algorithm, key, data) => {
-    const k = typeof key === 'string' ? key : new Uint8Array(key)
-    const d = typeof data === 'string' ? data : new Uint8Array(data)
-    const res = hmac(algorithm, k, d)
-    return Array.from(res)
+  await jail.set('$__utils_crypto_hmac', new ivm.Reference((algorithm, key, data) => {
+    return hmac(algorithm, key, data)
   }))
-  await jail.set('$__crypto_hmac_hex', new ivm.Reference((algorithm, key, data) => {
-    const k = typeof key === 'string' ? key : new Uint8Array(key)
-    const d = typeof data === 'string' ? data : new Uint8Array(data)
-    return hmacAsHex(algorithm, k, d)
+  await jail.set('$__utils_crypto_hmac_hex', new ivm.Reference((algorithm, key, data) => {
+    return hmacAsHex(algorithm, key, data)
   }))
-  await jail.set('$__crypto_hmac_base64', new ivm.Reference((algorithm, key, data) => {
-    const k = typeof key === 'string' ? key : new Uint8Array(key)
-    const d = typeof data === 'string' ? data : new Uint8Array(data)
-    return hmacAsBase64(algorithm, k, d)
+  await jail.set('$__utils_crypto_hmac_base64', new ivm.Reference((algorithm, key, data) => {
+    return hmacAsBase64(algorithm, key, data)
   }))
 
-  await jail.set('$__crypto_encrypt', new ivm.Reference((algorithm, key, iv, data) => {
-    const k = typeof key === 'string' ? key : new Uint8Array(key)
-    const i = typeof iv === 'string' ? iv : new Uint8Array(iv)
-    const d = typeof data === 'string' ? data : new Uint8Array(data)
-    const res = encrypt(algorithm, k, i, d)
-    const copy = new Uint8Array(res.length)
-    copy.set(res)
-    return copy.buffer
+  await jail.set('$__utils_crypto_encrypt', new ivm.Reference((algorithm, key, iv, data) => {
+    return encrypt(algorithm, key, iv, data)
   }))
 
-  await jail.set('$__crypto_decrypt', new ivm.Reference((algorithm, key, iv, ciphertext) => {
-    const k = typeof key === 'string' ? key : new Uint8Array(key)
-    const i = typeof iv === 'string' ? iv : new Uint8Array(iv)
-    const c = typeof ciphertext === 'string' ? ciphertext : new Uint8Array(ciphertext)
-    const res = decrypt(algorithm, k, i, c)
-    const copy = new Uint8Array(res.length)
-    copy.set(res)
-    return copy.buffer
+  await jail.set('$__utils_crypto_decrypt', new ivm.Reference((algorithm, key, iv, ciphertext) => {
+    return decrypt(algorithm, key, iv, ciphertext)
   }))
 
   await jail.set('$__vars', JSON.stringify(vars))
@@ -533,8 +536,8 @@ export async function runRuneInIsolate(runeFile, effective, args, projectDir, {
 
     if (isVerbose) console.error(`[crunes:debug] injecting $__hostRequire...`)
     await context.global.set('$__hostRequire', new ivm.Reference((spec) => {
-      if (!ALLOW_BUILTINS.has(spec)) throw new Error(`PermissionError: Sandbox escape blocked. Cannot require '${spec}' on host.`);
-      return hostRequire(spec)
+      const msg = DENY_BUILTINS.get(spec) ?? `Sandbox escape blocked. Cannot require '${spec}' on host.`
+      throw new Error(`PermissionError: ${msg}`)
     }))
 
     if (isVerbose) console.error(`[crunes:debug] injecting utils and console...`)
@@ -549,7 +552,6 @@ export async function runRuneInIsolate(runeFile, effective, args, projectDir, {
     // Builtin proxy modules call it during their own evaluation (triggered by runeMod.evaluate),
     // so it must stay until then — but must not remain accessible to rune code after that.
     // We delete it via context.eval after evaluate() completes below.
-
     // Compile the rune module. Conditionally capture the target export into globalThis
     // so context.eval() can call it. The typeof guard prevents ReferenceError when the
     // rune does not export it — the missing-export check below handles that case.
@@ -579,7 +581,6 @@ export async function runRuneInIsolate(runeFile, effective, args, projectDir, {
     // Builtin proxy modules have now been evaluated — remove the host require bridge.
     if (isVerbose) console.error(`[crunes:debug] cleaning up $__hostRequire...`)
     await context.eval('delete globalThis.$__hostRequire')
-
     // Extract args schema from rune if it exports args(), then parse on host.
     // use(args) always receives a yargs-parser object; args.$raw holds the original array.
     let parsedArgs
@@ -705,8 +706,8 @@ export async function getArgsSchema(runeFile, effective, projectDir, {
   try {
     const context = await isolate.createContext()
     await context.global.set('$__hostRequire', new ivm.Reference((spec) => {
-      if (!ALLOW_BUILTINS.has(spec)) throw new Error(`PermissionError: Sandbox escape blocked. Cannot require '${spec}' on host.`);
-      return hostRequire(spec)
+      const msg = DENY_BUILTINS.get(spec) ?? `Sandbox escape blocked. Cannot require '${spec}' on host.`
+      throw new Error(`PermissionError: ${msg}`)
     }))
     const utilsMod = await injectUtils(isolate, context, utils, null, vars, projectDir, checkPermission, null, null, null)
     await injectConsole(isolate, context, null)

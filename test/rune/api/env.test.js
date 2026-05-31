@@ -1,17 +1,21 @@
-import { describe, it, expect, vi, afterEach } from 'vitest'
-
-vi.mock('node:fs', () => ({ readFileSync: vi.fn() }))
-vi.mock('dotenv', () => ({ parse: vi.fn() }))
-
-import { readFileSync } from 'node:fs'
-import { parse } from 'dotenv'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { writeFileSync, mkdirSync, rmSync } from 'node:fs'
+import { join } from 'node:path'
+import { tmpdir } from 'node:os'
 import { makePermissionChecker } from '../../../src/rune/permissions/permissions.js'
 import { createEnvUtils } from '../../../src/rune/api/env.js'
 
 describe('createEnvUtils', () => {
-  const dir = '/project'
+  let dir = ''
 
-  afterEach(() => { vi.clearAllMocks() })
+  beforeEach(() => {
+    dir = join(tmpdir(), `crunes-test-${Date.now()}-${Math.floor(Math.random() * 10000)}`)
+    mkdirSync(dir, { recursive: true })
+  })
+
+  afterEach(() => {
+    try { rmSync(dir, { recursive: true, force: true }) } catch {}
+  })
 
   it('read returns value from process.env when permitted', () => {
     process.env.MY_TOKEN = 'secret'
@@ -21,17 +25,14 @@ describe('createEnvUtils', () => {
   })
 
   it('read returns value from .env file when permitted', () => {
-    readFileSync.mockReturnValue('DB_URL=postgres://localhost')
-    parse.mockReturnValue({ DB_URL: 'postgres://localhost' })
+    writeFileSync(join(dir, '.env'), 'DB_URL=postgres://localhost\n')
     const utils = createEnvUtils(dir, null, { allow: ['env.read:.env:DB_URL'], deny: [] })
     expect(utils.read('DB_URL')).toBe('postgres://localhost')
-    expect(readFileSync).toHaveBeenCalledWith('/project/.env', 'utf8')
   })
 
   it('multi-entry allow drives source order — process entry first wins', () => {
     process.env.API_KEY = 'from-process'
-    readFileSync.mockReturnValue('')
-    parse.mockReturnValue({ API_KEY: 'from-file' })
+    writeFileSync(join(dir, '.env'), 'API_KEY=from-file\n')
     const utils = createEnvUtils(dir, null, {
       allow: ['env.read:process:API_KEY', 'env.read:.env:API_KEY'],
       deny: [],
@@ -42,8 +43,7 @@ describe('createEnvUtils', () => {
 
   it('multi-entry allow drives source order — .env entry first wins', () => {
     process.env.API_KEY = 'from-process'
-    readFileSync.mockReturnValue('')
-    parse.mockReturnValue({ API_KEY: 'from-file' })
+    writeFileSync(join(dir, '.env'), 'API_KEY=from-file\n')
     const utils = createEnvUtils(dir, null, {
       allow: ['env.read:.env:API_KEY', 'env.read:process:API_KEY'],
       deny: [],
@@ -82,14 +82,12 @@ describe('createEnvUtils', () => {
   })
 
   it('missing .env file is silently ignored — read returns fallback', () => {
-    readFileSync.mockImplementation(() => { throw new Error('ENOENT') })
     const utils = createEnvUtils(dir, null, { allow: ['env.read:.env:KEY'], deny: [] })
     expect(utils.read('KEY', 'fallback')).toBe('fallback')
   })
 
   it('multiple allow patterns — each pattern tried in order', () => {
-    readFileSync.mockReturnValue('')
-    parse.mockReturnValue({ API_KEY: 'file-val' })
+    writeFileSync(join(dir, '.env'), 'API_KEY=file-val\n')
     process.env.DB_HOST = 'localhost'
     const utils = createEnvUtils(dir, null, {
       allow: ['env.read:.env:API_*', 'env.read:process:DB_*'],
@@ -101,11 +99,11 @@ describe('createEnvUtils', () => {
   })
 
   it('.env file contents are cached — readFileSync called only once per source', () => {
-    readFileSync.mockReturnValue('')
-    parse.mockReturnValue({ CACHED: 'yes' })
+    writeFileSync(join(dir, '.env'), 'CACHED=yes\n')
     const utils = createEnvUtils(dir, null, { allow: ['env.read:.env:CACHED'], deny: [] })
-    utils.read('CACHED')
-    utils.read('CACHED')
-    expect(readFileSync).toHaveBeenCalledTimes(1)
+    expect(utils.read('CACHED')).toBe('yes')
+    // We overwrite it, but cache should keep it "yes"
+    writeFileSync(join(dir, '.env'), 'CACHED=no\n')
+    expect(utils.read('CACHED')).toBe('yes')
   })
 })

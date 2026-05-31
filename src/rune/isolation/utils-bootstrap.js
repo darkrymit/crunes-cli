@@ -7,22 +7,14 @@ import * as tree from 'crunes:tree'
 
 const __vars = JSON.parse($__vars)
 
-class TextEncoder {
-  encode(str) {
-    const ab = $__utils_encode.applySync(undefined, [str], { result: { copy: true } })
-    return new Uint8Array(ab)
-  }
-}
+import { TextEncoder, TextDecoder } from 'fast-text-encoding'
+import { ReadableStream, WritableStream, TransformStream, ByteLengthQueuingStrategy, CountQueuingStrategy } from 'web-streams-polyfill'
 
-class TextDecoder {
-  constructor(label, options) {
-    this._id = $__utils_decoder_create.applySync(undefined, [label ?? null, options ?? null], { arguments: { copy: true } })
-  }
-  decode(bytes, decodeOptions) {
-    const ab = bytes instanceof Uint8Array ? bytes.buffer : bytes
-    return $__utils_decoder_decode.applySync(undefined, [this._id, ab, decodeOptions ?? null], { arguments: { copy: true } })
-  }
-}
+globalThis.ReadableStream = ReadableStream
+globalThis.WritableStream = WritableStream
+globalThis.TransformStream = TransformStream
+globalThis.ByteLengthQueuingStrategy = ByteLengthQueuingStrategy
+globalThis.CountQueuingStrategy = CountQueuingStrategy
 
 class AbortSignal {
   constructor() {
@@ -61,6 +53,39 @@ globalThis.TextDecoder = TextDecoder
 globalThis.AbortController = AbortController
 globalThis.AbortSignal = AbortSignal
 
+class TextEncoderStream {
+  constructor() {
+    const encoder = new TextEncoder()
+    const transform = new TransformStream({
+      transform(chunk, controller) {
+        controller.enqueue(encoder.encode(chunk))
+      }
+    })
+    this.readable = transform.readable
+    this.writable = transform.writable
+  }
+}
+
+class TextDecoderStream {
+  constructor(label = 'utf-8', options = {}) {
+    const decoder = new TextDecoder(label, options)
+    const transform = new TransformStream({
+      transform(chunk, controller) {
+        controller.enqueue(decoder.decode(chunk))
+      },
+      flush(controller) {
+        const remaining = decoder.decode(new Uint8Array(0))
+        if (remaining) controller.enqueue(remaining)
+      }
+    })
+    this.readable = transform.readable
+    this.writable = transform.writable
+  }
+}
+
+globalThis.TextEncoderStream = TextEncoderStream
+globalThis.TextDecoderStream = TextDecoderStream
+
 globalThis.utils = {
   fs: {
     cwd:    ()           => $__projectDir,
@@ -77,6 +102,49 @@ globalThis.utils = {
     readAsBytes: async (path, opts) => {
       const ab = await $__utils_fs_read_bytes.apply(undefined, [path, opts], { result: { promise: true, copy: true } })
       return ab ? new Uint8Array(ab) : null
+    },
+    readStreamAsBytes: (path) => {
+      let streamId = null
+      return new ReadableStream({
+        async start() {
+          streamId = await $__utils_fs_readStream.apply(undefined, [path], { result: { promise: true } })
+        },
+        async pull(controller) {
+          const ab = await $__utils_fs_readStream_next.apply(undefined, [streamId], { result: { promise: true, copy: true } })
+          if (ab === null) controller.close()
+          else controller.enqueue(new Uint8Array(ab))
+        }
+      })
+    },
+    readStream: (path) => {
+      return globalThis.utils.fs.readStreamAsBytes(path).pipeThrough(new TextDecoderStream())
+    },
+    writeStreamAsBytes: (path) => {
+      let streamId = null
+      return new WritableStream({
+        async start() {
+          streamId = await $__utils_fs_writeStream.apply(undefined, [path], { result: { promise: true } })
+        },
+        async write(chunk) {
+          if (!(chunk instanceof Uint8Array)) throw new TypeError('writeStreamAsBytes requires Uint8Array chunks')
+          await $__utils_fs_writeStream_write.apply(undefined, [streamId, chunk.buffer], { arguments: { copy: true }, result: { promise: true } })
+        },
+        async close() {
+          if (streamId !== null) {
+            await $__utils_fs_writeStream_close.apply(undefined, [streamId], { result: { promise: true } })
+          }
+        },
+        async abort() {
+          if (streamId !== null) {
+            await $__utils_fs_writeStream_close.apply(undefined, [streamId], { result: { promise: true } })
+          }
+        }
+      })
+    },
+    writeStream: (path) => {
+      const ts = new TextEncoderStream()
+      ts.readable.pipeTo(globalThis.utils.fs.writeStreamAsBytes(path))
+      return ts.writable
     },
     writeAsBytes: (path, content) => {
       if (!(content instanceof Uint8Array)) throw new TypeError('writeAsBytes requires a Uint8Array')
@@ -294,53 +362,37 @@ globalThis.utils = {
   },
   crypto: {
     hash: (algorithm, data) => {
-      const d = data instanceof Uint8Array ? data.buffer : data
-      return $__crypto_hash.apply(undefined, [algorithm, d], { arguments: { copy: true }, result: { promise: true, copy: true } })
-        .then(arr => new Uint8Array(arr))
+      return $__utils_crypto_hash.apply(undefined, [algorithm, data], { arguments: { copy: true }, result: { promise: true, copy: true } })
     },
     hashAsHex: (algorithm, data) => {
-      const d = data instanceof Uint8Array ? data.buffer : data
-      return $__crypto_hash_hex.apply(undefined, [algorithm, d], { arguments: { copy: true }, result: { promise: true, copy: true } })
+      return $__utils_crypto_hash_hex.apply(undefined, [algorithm, data], { arguments: { copy: true }, result: { promise: true, copy: true } })
     },
     hashAsBase64: (algorithm, data) => {
-      const d = data instanceof Uint8Array ? data.buffer : data
-      return $__crypto_hash_base64.apply(undefined, [algorithm, d], { arguments: { copy: true }, result: { promise: true, copy: true } })
+      return $__utils_crypto_hash_base64.apply(undefined, [algorithm, data], { arguments: { copy: true }, result: { promise: true, copy: true } })
     },
-    uuid:         ()     => $__crypto_uuid.applySync(undefined,   []),
-    randomHex:    (size) => $__crypto_random_hex.applySync(undefined,    [size]),
-    randomBase64: (size) => $__crypto_random_base64.applySync(undefined, [size]),
+    uuid:         ()     => $__utils_crypto_uuid.applySync(undefined,   []),
+    randomHex:    (size) => $__utils_crypto_random_hex.applySync(undefined,    [size]),
+    randomBase64: (size) => $__utils_crypto_random_base64.applySync(undefined, [size]),
+    randomBytes:  (size) => {
+      return $__utils_crypto_random_bytes.applySync(undefined, [size], { result: { copy: true } })
+    },
 
     hmac: (algorithm, key, data) => {
-      const k = key instanceof Uint8Array ? key.buffer : key
-      const d = data instanceof Uint8Array ? data.buffer : data
-      return $__crypto_hmac.apply(undefined, [algorithm, k, d], { arguments: { copy: true }, result: { promise: true, copy: true } })
-        .then(arr => new Uint8Array(arr))
+      return $__utils_crypto_hmac.apply(undefined, [algorithm, key, data], { arguments: { copy: true }, result: { promise: true, copy: true } })
     },
     hmacAsHex: (algorithm, key, data) => {
-      const k = key instanceof Uint8Array ? key.buffer : key
-      const d = data instanceof Uint8Array ? data.buffer : data
-      return $__crypto_hmac_hex.apply(undefined, [algorithm, k, d], { arguments: { copy: true }, result: { promise: true, copy: true } })
+      return $__utils_crypto_hmac_hex.apply(undefined, [algorithm, key, data], { arguments: { copy: true }, result: { promise: true, copy: true } })
     },
     hmacAsBase64: (algorithm, key, data) => {
-      const k = key instanceof Uint8Array ? key.buffer : key
-      const d = data instanceof Uint8Array ? data.buffer : data
-      return $__crypto_hmac_base64.apply(undefined, [algorithm, k, d], { arguments: { copy: true }, result: { promise: true, copy: true } })
+      return $__utils_crypto_hmac_base64.apply(undefined, [algorithm, key, data], { arguments: { copy: true }, result: { promise: true, copy: true } })
     },
 
     encrypt: (algorithm, key, iv, data) => {
-      const k = key instanceof Uint8Array ? Array.from(key) : key
-      const i = iv instanceof Uint8Array ? Array.from(iv) : iv
-      const d = data instanceof Uint8Array ? Array.from(data) : data
-      return $__crypto_encrypt.apply(undefined, [algorithm, k, i, d], { arguments: { copy: true }, result: { promise: true, copy: true } })
-        .then(ab => new Uint8Array(ab))
+      return $__utils_crypto_encrypt.apply(undefined, [algorithm, key, iv, data], { arguments: { copy: true }, result: { promise: true, copy: true } })
     },
 
     decrypt: (algorithm, key, iv, ciphertext) => {
-      const k = key instanceof Uint8Array ? Array.from(key) : key
-      const i = iv instanceof Uint8Array ? Array.from(iv) : iv
-      const c = ciphertext instanceof Uint8Array ? Array.from(ciphertext) : ciphertext
-      return $__crypto_decrypt.apply(undefined, [algorithm, k, i, c], { arguments: { copy: true }, result: { promise: true, copy: true } })
-        .then(ab => new Uint8Array(ab))
+      return $__utils_crypto_decrypt.apply(undefined, [algorithm, key, iv, ciphertext], { arguments: { copy: true }, result: { promise: true, copy: true } })
     },
 
   },

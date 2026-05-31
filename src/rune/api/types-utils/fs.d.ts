@@ -135,7 +135,35 @@ declare namespace fs {
    * On Windows this call succeeds silently — the execute bit is not meaningful on Windows.
    * Requires `fs.write:<path>` permission.
    * @param path Relative file path
-   * @param mode Octal permission number (e.g. 0o755) or string (e.g. '755')
+   * @param mode Permission mode string (e.g. "755", "a+x") or numeric octal (e.g. 0o755)
    */
-  function chmod(path: string, mode: number | string): Promise<void>
+  function chmod(path: string, mode: string | number): Promise<void>
+
+  /**
+   * Reads a file chunk-by-chunk as a UTF-8 string stream.
+   * Requires `fs.read:<path>` permission.
+   * @param path Relative file path
+   */
+  function readStream(path: string): ReadableStream<string>
+
+  /**
+   * Writes to a file chunk-by-chunk using a UTF-8 string stream.
+   * Requires `fs.write:<path>` permission.
+   * @param path Relative file path
+   */
+  function writeStream(path: string): WritableStream<string>
+
+  /**
+   * Reads a file chunk-by-chunk as a raw binary byte stream.
+   * Requires `fs.read:<path>` permission.
+   * @param path Relative file path
+   */
+  function readStreamAsBytes(path: string): ReadableStream<Uint8Array>
+
+  /**
+   * Writes to a file chunk-by-chunk using a raw binary byte stream.
+   * Requires `fs.write:<path>` permission.
+   * @param path Relative file path
+   */
+  function writeStreamAsBytes(path: string): WritableStream<Uint8Array>
 }

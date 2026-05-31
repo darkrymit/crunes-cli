@@ -1,0 +1,10 @@
+# local overrides (machine-specific, never commit)
+config.local.json
+project.local.json
+
+# run logs
+logs/
+
+# local caches and databases (gitignored by default)
+caches/
+sqlite/
