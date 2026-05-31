@@ -75,14 +75,25 @@ export async function use() {
 import { http, section } from '@utils'
 
 export async function use() {
-  // Fetch from permitted hosts
-  const response = await http.fetch('https://api.github.com/repos/darkrymit/crunes');
-  const repo = await response.json();
+  // Buffered fetch — reads the full body at once
+  const res = await http.fetch('https://api.github.com/repos/darkrymit/crunes');
+  const repo = await res.json();
+
+  // Streaming fetch — consume body chunk-by-chunk
+  const stream = await http.fetch('https://httpbin.org/stream/3');
+  const reader = stream.body().getReader();
+  const decoder = new TextDecoder();
+  const chunks = [];
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(decoder.decode(value, { stream: true }));
+  }
 
   return [
-    section.create('github-repo', {
+    section.create('result', {
       type: 'markdown',
-      content: \`**Repo Description**: \${repo.description}\`
+      content: \`**Repo**: \${repo.description}\\n\\n**Stream chunks**: \${chunks.length}\`
     })
   ];
 }
@@ -225,6 +236,14 @@ function formatGlobalsDocs(data) {
       lines.push('')
       if (typeDef.description) lines.push(typeDef.description)
       lines.push('')
+      if (typeDef.properties?.length) {
+        lines.push('| Property | Type | Description |')
+        lines.push('| --- | --- | --- |')
+        for (const p of typeDef.properties) {
+          lines.push(`| \`${p.name}\` | \`${p.type}\` | ${p.description ?? ''} |`)
+        }
+        lines.push('')
+      }
       if (typeDef.methods?.length) {
         lines.push('| Method | Returns | Description |')
         lines.push('| --- | --- | --- |')

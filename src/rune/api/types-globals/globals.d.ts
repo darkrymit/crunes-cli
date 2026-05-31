@@ -1,12 +1,12 @@
 /**
  * Global Sandbox Timing and Utility Functions
- * 
+ *
  * These functions and classes are exposed globally inside the isolated-vm sandbox execution context.
  */
 declare namespace globals {
   /**
    * Invokes the callback after the specified delay.
-   * 
+   *
    * @param callback The function to execute when the timer expires.
    * @param delay The number of milliseconds to wait before invoking the callback (default: 0).
    * @param args Additional arguments to pass to the callback.
@@ -16,14 +16,14 @@ declare namespace globals {
 
   /**
    * Cancels a timeout previously established by calling setTimeout().
-   * 
+   *
    * @param id The identifier returned by setTimeout().
    */
   function clearTimeout(id?: number): void
 
   /**
    * Repeatedly invokes the callback with a fixed time delay between each call.
-   * 
+   *
    * @param callback The function to execute at each interval.
    * @param delay The number of milliseconds to wait between executions (default: 0).
    * @param args Additional arguments to pass to the callback.
@@ -33,29 +33,43 @@ declare namespace globals {
 
   /**
    * Cancels an interval execution previously established by calling setInterval().
-   * 
+   *
    * @param id The identifier returned by setInterval().
    */
   function clearInterval(id?: number): void
 
   /**
-   * High-performance string-to-UTF8 encoder.
+   * High-performance string-to-UTF-8 encoder.
    */
   class TextEncoder {
+    /** Always "utf-8". */
+    readonly encoding: string
     /**
-     * Encodes a string into raw UTF-8 binary bytes.
-     * 
+     * Encodes a string into raw UTF-8 bytes.
+     *
      * @param str The string to encode.
      */
     encode(str: string): Uint8Array
   }
 
   /**
-   * Decodes UTF-8 binary bytes into a string.
+   * Decodes UTF-8 bytes into a string.
    */
   class TextDecoder {
+    /** The encoding label — always "utf-8" for this implementation. */
+    readonly encoding: string
+    /** Always false — fatal mode is not supported. */
+    readonly fatal: boolean
+    /** Always false — BOM stripping is not supported. */
+    readonly ignoreBOM: boolean
     /**
-     * Decodes raw UTF-8 binary bytes into a string.
+     * Creates a new TextDecoder.
+     *
+     * @param label Encoding label (default: "utf-8"). Only UTF-8 encodings are supported.
+     */
+    constructor(label?: string)
+    /**
+     * Decodes raw UTF-8 bytes into a string.
      *
      * @param bytes The raw binary bytes.
      */
@@ -77,16 +91,52 @@ declare namespace globals {
    * Provides an AbortSignal that can be used to abort one or more operations.
    */
   class AbortController {
+    /** The associated AbortSignal. */
     readonly signal: AbortSignal
     abort(): void
+  }
+
+  /** A reader returned by ReadableStream.getReader(). */
+  interface ReadableStreamDefaultReader<R = any> {
+    /** Resolves when the stream closes or errors. */
+    readonly closed: Promise<void>
+    /** Read the next chunk. Returns { value, done }. */
+    read(): Promise<ReadableStreamReadResult<R>>
+    /** Cancel the stream with an optional reason. */
+    cancel(reason?: any): Promise<void>
+    /** Release the lock on the stream, allowing another reader to acquire it. */
+    releaseLock(): void
+  }
+
+  interface ReadableStreamReadResult<T> {
+    value: T | undefined
+    done: boolean
+  }
+
+  /** A writer returned by WritableStream.getWriter(). */
+  interface WritableStreamDefaultWriter<W = any> {
+    /** Resolves when the stream closes or errors. */
+    readonly closed: Promise<void>
+    /** The number of chunks that can be written before back-pressure applies. */
+    readonly desiredSize: number | null
+    /** Resolves when it is appropriate to write (i.e. no back-pressure). */
+    readonly ready: Promise<void>
+    /** Abort the stream with an optional reason. */
+    abort(reason?: any): Promise<void>
+    /** Close the stream. */
+    close(): Promise<void>
+    /** Release the lock on the stream. */
+    releaseLock(): void
+    /** Write a chunk. */
+    write(chunk: W): Promise<void>
   }
 
   interface ReadableStream<R = any> {
     readonly locked: boolean
     cancel(reason?: any): Promise<void>
-    getReader(): any
-    pipeTo(dest: WritableStream<R>, options?: any): Promise<void>
-    pipeThrough<T>(transform: TransformStream<R, T>, options?: any): ReadableStream<T>
+    getReader(): ReadableStreamDefaultReader<R>
+    pipeTo(dest: WritableStream<R>, options?: { preventClose?: boolean; preventAbort?: boolean; preventCancel?: boolean }): Promise<void>
+    pipeThrough<T>(transform: TransformStream<R, T>, options?: { preventClose?: boolean; preventAbort?: boolean; preventCancel?: boolean }): ReadableStream<T>
     [Symbol.asyncIterator](): AsyncIterableIterator<R>
   }
 
@@ -94,7 +144,7 @@ declare namespace globals {
     readonly locked: boolean
     abort(reason?: any): Promise<void>
     close(): Promise<void>
-    getWriter(): any
+    getWriter(): WritableStreamDefaultWriter<W>
   }
 
   interface TransformStream<I = any, O = any> {
@@ -112,9 +162,28 @@ declare namespace globals {
     readonly size: Function
   }
 
+  /**
+   * Transforms a string ReadableStream to a UTF-8 byte ReadableStream.
+   */
+  class TextEncoderStream {
+    readonly readable: ReadableStream<Uint8Array>
+    readonly writable: WritableStream<string>
+  }
+
+  /**
+   * Transforms a UTF-8 byte ReadableStream to a string ReadableStream.
+   */
+  class TextDecoderStream {
+    constructor(label?: string, options?: { fatal?: boolean })
+    readonly readable: ReadableStream<string>
+    readonly writable: WritableStream<Uint8Array>
+  }
+
   class Blob {
     constructor(parts?: (string | Uint8Array | Blob | ArrayBuffer)[], options?: { type?: string })
+    /** Total byte length of the blob. */
     readonly size: number
+    /** MIME type of the blob. */
     readonly type: string
     text(): Promise<string>
     arrayBuffer(): Promise<ArrayBuffer>
@@ -136,6 +205,7 @@ declare namespace globals {
   }
 
   class FormData {
+    constructor()
     append(name: string, value: string | Uint8Array | Blob, filename?: string): void
     get(name: string): string | Blob | null
     getAll(name: string): (string | Blob)[]
@@ -160,30 +230,38 @@ declare namespace globals {
     [Symbol.iterator](): IterableIterator<[string, string]>
   }
 
-  interface FetchRequestInit {
+  /** Options accepted by http.fetch() and global fetch(). */
+  interface RequestInit {
     method?: string
     headers?: Record<string, string> | Headers
     body?: string | Uint8Array | ReadableStream<Uint8Array> | FormData | URLSearchParams | Blob
+    /** Request timeout in milliseconds. Default: 30000. crunes-specific extension. */
     timeout?: number
   }
 
-  interface FetchResponse {
+  /** Response returned by http.fetch() and global fetch(). */
+  interface Response {
     readonly ok: boolean
     readonly status: number
     readonly statusText: string
     readonly headers: Headers
     readonly bodyUsed: boolean
+    /** Reads and returns the response body as a UTF-8 string. Consumes the body. */
     text(): Promise<string>
+    /** Reads and parses the response body as JSON. Consumes the body. */
     json(): Promise<unknown>
+    /** Reads and returns the response body as a Blob. Consumes the body. */
     blob(): Promise<Blob>
+    /** Returns a live ReadableStream of the response body. Consumes the body. */
     body(): ReadableStream<Uint8Array>
   }
 
   class Request {
-    constructor(input: string | Request, init?: FetchRequestInit)
+    constructor(input: string | Request, init?: RequestInit)
     readonly url: string
     readonly method: string
     readonly headers: Headers
+    /** The request body as a ReadableStream, or null if there is no body. */
     readonly body: ReadableStream<Uint8Array> | null
     readonly bodyUsed: boolean
     text(): Promise<string>
@@ -191,12 +269,18 @@ declare namespace globals {
     blob(): Promise<Blob>
   }
 
-  function fetch(input: string | Request, init?: FetchRequestInit): Promise<FetchResponse>
+  /**
+   * Makes an HTTP request. Requires `http.fetch:<METHOD>:<url>` permission.
+   * Aligns with the Web Fetch API. Also available as `utils.http.fetch()`.
+   *
+   * @param input Request URL string or Request object.
+   * @param init Request options.
+   */
+  function fetch(input: string | Request, init?: RequestInit): Promise<Response>
 }
 
 // Top-level type aliases so rune API .d.ts files can reference these types
-// without namespace qualification. walkUtilsDocs ignores type aliases (kind 4194304),
-// so TypeDoc documentation output is unaffected.
+// without namespace qualification.
 type AbortSignal = globals.AbortSignal
 type AbortController = globals.AbortController
 type ReadableStream<R = any> = globals.ReadableStream<R>
@@ -209,3 +293,5 @@ type Headers = globals.Headers
 type FormData = globals.FormData
 type URLSearchParams = globals.URLSearchParams
 type Request = globals.Request
+type ReadableStreamDefaultReader<R = any> = globals.ReadableStreamDefaultReader<R>
+type WritableStreamDefaultWriter<W = any> = globals.WritableStreamDefaultWriter<W>
