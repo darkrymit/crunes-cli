@@ -38,19 +38,11 @@ export function createHttpUtils(checkPermission) {
 
     try {
       const res = await globalThis.fetch(url, { method, headers, body: finalBody, signal: controller.signal })
-      const text = await res.text()
-      return {
-        ok:         res.ok,
-        status:     res.status,
-        statusText: res.statusText,
-        headers:    Object.fromEntries(res.headers),
-        text:       () => Promise.resolve(text),
-        json:       () => Promise.resolve(JSON.parse(text)),
-      }
-    } catch (err) {
-      throw new FetchError(err.message, { cause: err })
-    } finally {
       clearTimeout(timer)
+      return res
+    } catch (err) {
+      clearTimeout(timer)
+      throw new FetchError(err.message, { cause: err })
     }
   }
 

@@ -53,6 +53,142 @@ globalThis.TextDecoder = TextDecoder
 globalThis.AbortController = AbortController
 globalThis.AbortSignal = AbortSignal
 
+class Blob {
+  constructor(parts = [], { type = '' } = {}) {
+    this.type = type
+    const chunks = []
+    for (const part of parts) {
+      if (typeof part === 'string') {
+        chunks.push(new TextEncoder().encode(part))
+      } else if (part instanceof Uint8Array) {
+        chunks.push(part)
+      } else if (part instanceof Blob) {
+        chunks.push(part._bytes)
+      } else if (part instanceof ArrayBuffer) {
+        chunks.push(new Uint8Array(part))
+      } else {
+        chunks.push(new TextEncoder().encode(String(part)))
+      }
+    }
+    let totalLen = 0
+    for (const c of chunks) totalLen += c.length
+    const combined = new Uint8Array(totalLen)
+    let offset = 0
+    for (const c of chunks) { combined.set(c, offset); offset += c.length }
+    this._bytes = combined
+  }
+  get size() { return this._bytes.length }
+  async text() { return new TextDecoder().decode(this._bytes) }
+  async arrayBuffer() { return this._bytes.buffer.slice(this._bytes.byteOffset, this._bytes.byteOffset + this._bytes.byteLength) }
+  slice(start = 0, end = this._bytes.length, contentType = '') {
+    return new Blob([this._bytes.slice(start, end)], { type: contentType })
+  }
+}
+globalThis.Blob = Blob
+
+class Headers {
+  constructor(init) {
+    this._map = new Map()
+    if (init instanceof Headers) {
+      for (const [k, v] of init._map) this._map.set(k, v)
+    } else if (Array.isArray(init)) {
+      for (const [k, v] of init) this._map.set(k.toLowerCase(), v)
+    } else if (init && typeof init === 'object') {
+      for (const [k, v] of Object.entries(init)) this._map.set(k.toLowerCase(), String(v))
+    }
+  }
+  get(name) { return this._map.get(name.toLowerCase()) ?? null }
+  set(name, value) { this._map.set(name.toLowerCase(), String(value)) }
+  has(name) { return this._map.has(name.toLowerCase()) }
+  append(name, value) {
+    const key = name.toLowerCase()
+    const existing = this._map.get(key)
+    this._map.set(key, existing != null ? `${existing}, ${value}` : String(value))
+  }
+  delete(name) { this._map.delete(name.toLowerCase()) }
+  entries() { return this._map.entries() }
+  keys() { return this._map.keys() }
+  values() { return this._map.values() }
+  forEach(fn) { this._map.forEach((v, k) => fn(v, k)) }
+  [Symbol.iterator]() { return this._map.entries() }
+}
+globalThis.Headers = Headers
+
+class FormData {
+  constructor() { this._entries = [] }
+  append(name, value, filename) {
+    this._entries.push({ name, value, filename })
+  }
+  get(name) {
+    const entry = this._entries.find(e => e.name === name)
+    return entry ? entry.value : null
+  }
+  getAll(name) { return this._entries.filter(e => e.name === name).map(e => e.value) }
+  has(name) { return this._entries.some(e => e.name === name) }
+  set(name, value, filename) {
+    const idx = this._entries.findIndex(e => e.name === name)
+    if (idx !== -1) { this._entries.splice(idx, 1, { name, value, filename }) }
+    else { this._entries.push({ name, value, filename }) }
+  }
+  delete(name) { this._entries = this._entries.filter(e => e.name !== name) }
+  entries() { return this._entries.map(e => [e.name, e.value])[Symbol.iterator]() }
+  _toWire() {
+    const boundary = '----CrunesFormBoundary' + Math.random().toString(36).slice(2)
+    const parts = this._entries.map(e => ({
+      name: e.name,
+      filename: e.filename ?? null,
+      value: e.value instanceof Blob
+        ? { type: 'Buffer', data: Array.from(e.value._bytes), contentType: e.value.type || 'application/octet-stream' }
+        : e.value instanceof Uint8Array
+          ? { type: 'Buffer', data: Array.from(e.value), contentType: 'application/octet-stream' }
+          : e.value,
+    }))
+    return { type: 'FormData', boundary, parts }
+  }
+}
+globalThis.FormData = FormData
+
+class URLSearchParams {
+  constructor(init) {
+    this._params = []
+    if (typeof init === 'string') {
+      const s = init.startsWith('?') ? init.slice(1) : init
+      for (const pair of s.split('&')) {
+        if (!pair) continue
+        const eq = pair.indexOf('=')
+        if (eq === -1) { this._params.push([decodeURIComponent(pair), '']) }
+        else { this._params.push([decodeURIComponent(pair.slice(0, eq)), decodeURIComponent(pair.slice(eq + 1))]) }
+      }
+    } else if (Array.isArray(init)) {
+      for (const [k, v] of init) this._params.push([k, v])
+    } else if (init && typeof init === 'object') {
+      for (const [k, v] of Object.entries(init)) this._params.push([k, String(v)])
+    }
+  }
+  append(name, value) { this._params.push([name, String(value)]) }
+  get(name) { return (this._params.find(([k]) => k === name) ?? [null, null])[1] }
+  getAll(name) { return this._params.filter(([k]) => k === name).map(([, v]) => v) }
+  has(name) { return this._params.some(([k]) => k === name) }
+  set(name, value) {
+    const idx = this._params.findIndex(([k]) => k === name)
+    if (idx !== -1) {
+      this._params = this._params.filter(([k]) => k !== name)
+      this._params.splice(idx, 0, [name, String(value)])
+    } else {
+      this._params.push([name, String(value)])
+    }
+  }
+  delete(name) { this._params = this._params.filter(([k]) => k !== name) }
+  toString() {
+    return this._params.map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join('&')
+  }
+  entries() { return this._params[Symbol.iterator]() }
+  keys() { return this._params.map(([k]) => k)[Symbol.iterator]() }
+  values() { return this._params.map(([, v]) => v)[Symbol.iterator]() }
+  [Symbol.iterator]() { return this._params[Symbol.iterator]() }
+}
+globalThis.URLSearchParams = URLSearchParams
+
 class TextEncoderStream {
   constructor() {
     const encoder = new TextEncoder()
@@ -85,6 +221,101 @@ class TextDecoderStream {
 
 globalThis.TextEncoderStream = TextEncoderStream
 globalThis.TextDecoderStream = TextDecoderStream
+
+class Request {
+  constructor(input, init = {}) {
+    if (input instanceof Request) {
+      this.url = input.url
+      this.method = input.method
+      this.headers = new Headers(input.headers)
+      this._body = input._body
+      this._bodyUsed = false
+    } else {
+      this.url = String(input)
+      this.method = (init.method ?? 'GET').toUpperCase()
+      this.headers = new Headers(init.headers)
+      this._body = init.body ?? null
+      this._bodyUsed = false
+    }
+    if (init.method) this.method = init.method.toUpperCase()
+    if (init.headers) { for (const [k, v] of new Headers(init.headers)) this.headers.set(k, v) }
+    if (init.body !== undefined) { this._body = init.body; this._bodyUsed = false }
+  }
+  get body() {
+    if (this._body instanceof ReadableStream) return this._body
+    if (this._body == null) return null
+    const bytes = this._body instanceof Blob
+      ? this._body._bytes
+      : this._body instanceof Uint8Array
+        ? this._body
+        : new TextEncoder().encode(String(this._body))
+    return new ReadableStream({ start(c) { c.enqueue(bytes); c.close() } })
+  }
+  get bodyUsed() { return this._bodyUsed }
+  _consume() {
+    if (this._body != null && this._bodyUsed) throw new TypeError('body already used')
+    if (this._body != null) this._bodyUsed = true
+  }
+  async text() {
+    this._consume()
+    if (this._body == null) return ''
+    if (this._body instanceof Blob) return this._body.text()
+    if (this._body instanceof Uint8Array) return new TextDecoder().decode(this._body)
+    return String(this._body)
+  }
+  async json() { return JSON.parse(await this.text()) }
+  async blob() {
+    this._consume()
+    if (this._body == null) return new Blob([], { type: '' })
+    if (this._body instanceof Blob) return this._body
+    if (this._body instanceof Uint8Array) return new Blob([this._body])
+    return new Blob([new TextEncoder().encode(String(this._body))])
+  }
+}
+globalThis.Request = Request
+
+function _makeResponse(raw, responseHeaders, consumeGuard, url, opts, serializedBody) {
+  return {
+    get ok()         { return raw.ok },
+    get status()     { return raw.status },
+    get statusText() { return raw.statusText },
+    get headers()    { return responseHeaders },
+    get bodyUsed()   { return false },
+    text() {
+      consumeGuard()
+      return Promise.resolve(new TextDecoder().decode(raw._bytes))
+    },
+    json() {
+      consumeGuard()
+      return Promise.resolve(JSON.parse(new TextDecoder().decode(raw._bytes)))
+    },
+    blob() {
+      consumeGuard()
+      const contentType = responseHeaders.get('content-type') ?? ''
+      return Promise.resolve(new Blob([raw._bytes], { type: contentType }))
+    },
+    body() {
+      consumeGuard()
+      let controller
+      const stream = new ReadableStream({
+        start(c) { controller = c },
+      })
+      let metaReceived = false
+      const onChunk = async (chunk, meta) => {
+        if (!metaReceived) { metaReceived = true; return }
+        if (chunk != null) controller.enqueue(new Uint8Array(chunk))
+      }
+      const onEnd = async () => { controller.close() }
+      const onError = async (msg) => { controller.error(new Error(msg)) }
+      $__utils_http_fetch_stream.apply(
+        undefined,
+        [url, { ...opts, body: serializedBody }, onChunk, onEnd, onError],
+        { arguments: { reference: true }, result: { promise: true } }
+      )
+      return stream
+    },
+  }
+}
 
 globalThis.utils = {
   fs: {
@@ -257,25 +488,79 @@ globalThis.utils = {
     },
   },
   http: {
-    fetch: async (url, opts = {}) => {
-      let body = opts.body
-      if (Array.isArray(body)) {
-        body = body.map(entry => {
-          if (entry.value instanceof Uint8Array) {
-            return { ...entry, value: { type: 'Buffer', data: Array.from(entry.value) } }
-          }
-          return entry
-        })
+    fetch: async (input, init = {}) => {
+      let url, method, reqHeaders, reqBody
+      if (input instanceof Request) {
+        url        = input.url
+        method     = init.method ?? input.method
+        reqHeaders = new Headers(input.headers)
+        reqBody    = input._body
+        if (input._body != null) {
+          if (input._bodyUsed) throw new TypeError('body already used')
+          input._bodyUsed = true
+        }
+      } else {
+        url        = String(input)
+        method     = init.method ?? 'GET'
+        reqHeaders = new Headers(init.headers)
+        reqBody    = init.body ?? null
       }
-      const raw = await $__utils_http_fetch.apply(undefined, [url, { ...opts, body }], { arguments: { copy: true }, result: { promise: true, copy: true } })
-      return {
-        ok:         raw.ok,
-        status:     raw.status,
-        statusText: raw.statusText,
-        headers:    raw.headers,
-        text:       () => Promise.resolve(raw._text),
-        json:       () => Promise.resolve(JSON.parse(raw._text)),
+      if (init.headers) { for (const [k, v] of new Headers(init.headers)) reqHeaders.set(k, v) }
+      if (init.body !== undefined) reqBody = init.body
+
+      let serializedBody = reqBody
+      let isStream = false
+      if (reqBody instanceof FormData) {
+        serializedBody = reqBody._toWire()
+        if (!reqHeaders.has('content-type')) {
+          reqHeaders.set('content-type', `multipart/form-data; boundary=${serializedBody.boundary}`)
+        }
+      } else if (reqBody instanceof URLSearchParams) {
+        serializedBody = reqBody.toString()
+        if (!reqHeaders.has('content-type')) {
+          reqHeaders.set('content-type', 'application/x-www-form-urlencoded')
+        }
+      } else if (reqBody instanceof Blob) {
+        serializedBody = { type: 'Buffer', data: Array.from(reqBody._bytes) }
+        if (!reqHeaders.has('content-type') && reqBody.type) {
+          reqHeaders.set('content-type', reqBody.type)
+        }
+      } else if (reqBody instanceof Uint8Array) {
+        serializedBody = { type: 'Buffer', data: Array.from(reqBody) }
+      } else if (reqBody instanceof ReadableStream) {
+        isStream = true
       }
+
+      const opts = { method, headers: Object.fromEntries(reqHeaders.entries()), timeout: init.timeout }
+
+      let _bodyUsed = false
+      function consumeGuard() {
+        if (_bodyUsed) throw new TypeError('body already used')
+        _bodyUsed = true
+      }
+
+      if (isStream) {
+        const reader = reqBody.getReader()
+        const raw = await $__utils_http_body_reader.apply(
+          undefined,
+          [url, { ...opts }, async () => {
+            const { done, value } = await reader.read()
+            if (done) return null
+            return value.buffer
+          }],
+          { arguments: { reference: true }, result: { promise: true, copy: true } }
+        )
+        const responseHeaders = new Headers(raw.headers)
+        return _makeResponse(raw, responseHeaders, consumeGuard)
+      }
+
+      const raw = await $__utils_http_fetch.apply(
+        undefined,
+        [url, { ...opts, body: serializedBody }],
+        { arguments: { copy: true }, result: { promise: true, copy: true } }
+      )
+      const responseHeaders = new Headers(raw.headers)
+      return _makeResponse(raw, responseHeaders, consumeGuard, url, opts, serializedBody)
     },
   },
   env: {
@@ -573,3 +858,5 @@ globalThis.clearInterval = function(id) {
   const timer = timers.get(id)
   if (timer) timer.clear()
 }
+
+globalThis.fetch = (input, init) => globalThis.utils.http.fetch(input, init)

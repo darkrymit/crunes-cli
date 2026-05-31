@@ -252,7 +252,7 @@ async function injectUtils(isolate, context, utils, runeCallback, vars, projectD
     await utils.xml.write(relPath, data, opts)
   }))
   await jail.set('$__utils_http_fetch', new ivm.Reference(async (url, opts) => {
-    let body = opts.body
+    let body = opts?.body
     if (Array.isArray(body)) {
       body = body.map(entry => {
         if (entry.value && typeof entry.value === 'object' && entry.value.type === 'Buffer') {
@@ -260,16 +260,80 @@ async function injectUtils(isolate, context, utils, runeCallback, vars, projectD
         }
         return entry
       })
+    } else if (body && typeof body === 'object' && body.type === 'Buffer') {
+      body = new Uint8Array(body.data)
     }
     const res = await utils.http.fetch(url, { ...opts, body })
-    // In Node 18+, res.headers is a Headers instance; use Object.fromEntries(res.headers.entries()) or Object.fromEntries(Object.entries(res.headers))
-    const headers = typeof res.headers.entries === 'function' ? Object.fromEntries(res.headers.entries()) : res.headers
+    const headerPairs = typeof res.headers?.entries === 'function'
+      ? [...res.headers.entries()]
+      : Object.entries(res.headers ?? {})
+    const ab = await res.arrayBuffer()
     return {
       ok:         res.ok,
       status:     res.status,
       statusText: res.statusText,
-      headers:    headers,
-      _text:      await res.text(),
+      headers:    headerPairs,
+      _bytes:     new Uint8Array(ab),
+    }
+  }))
+  await jail.set('$__utils_http_fetch_stream', new ivm.Reference(async (url, opts, onChunk, onEnd, onError) => {
+    let body = opts?.body
+    if (Array.isArray(body)) {
+      body = body.map(entry => {
+        if (entry.value && typeof entry.value === 'object' && entry.value.type === 'Buffer') {
+          return { ...entry, value: new Uint8Array(entry.value.data) }
+        }
+        return entry
+      })
+    } else if (body && typeof body === 'object' && body.type === 'Buffer') {
+      body = new Uint8Array(body.data)
+    }
+    try {
+      const res = await utils.http.fetch(url, { ...opts, body })
+      const headerPairs = typeof res.headers?.entries === 'function'
+        ? [...res.headers.entries()]
+        : Object.entries(res.headers ?? {})
+      await onChunk.apply(undefined, [null, { ok: res.ok, status: res.status, statusText: res.statusText, headers: headerPairs }], {
+        arguments: { copy: true }, result: { promise: true }
+      })
+      for await (const chunk of res.body) {
+        await onChunk.apply(undefined, [chunk, null], { arguments: { copy: true }, result: { promise: true } })
+      }
+      await onEnd.apply(undefined, [], { result: { promise: true } })
+    } catch (err) {
+      await onError.apply(undefined, [err.message], { arguments: { copy: true }, result: { promise: true } })
+    }
+  }))
+  await jail.set('$__utils_http_body_reader', new ivm.Reference(async (url, opts, pullChunk) => {
+    const { Readable } = await import('node:stream')
+    let done = false
+    const nodeReadable = new Readable({
+      async read() {
+        if (done) { this.push(null); return }
+        try {
+          const ab = await pullChunk.apply(undefined, [], { result: { promise: true, copy: true } })
+          if (ab === null) {
+            done = true
+            this.push(null)
+          } else {
+            this.push(Buffer.from(new Uint8Array(ab)))
+          }
+        } catch (err) {
+          this.destroy(err)
+        }
+      }
+    })
+    const res = await utils.http.fetch(url, { ...opts, body: nodeReadable })
+    const pairs = typeof res.headers?.entries === 'function'
+      ? [...res.headers.entries()]
+      : Object.entries(res.headers ?? {})
+    const ab = await res.arrayBuffer()
+    return {
+      ok:         res.ok,
+      status:     res.status,
+      statusText: res.statusText,
+      headers:    pairs,
+      _bytes:     new Uint8Array(ab),
     }
   }))
   await jail.set('$__utils_env_read', new ivm.Reference(async (key, fallback) => {

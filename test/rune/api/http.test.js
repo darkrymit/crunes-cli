@@ -3,12 +3,14 @@ import { createHttpUtils, FetchError } from '../../../src/rune/api/http.js'
 import { PermissionError } from '../../../src/rune/permissions/permissions.js'
 
 function makeResponse({ ok = true, status = 200, statusText = 'OK', headers = {}, body = '' } = {}) {
+  const bodyBytes = typeof body === 'string' ? new TextEncoder().encode(body) : body
   return {
     ok,
     status,
     statusText,
     headers: new Headers(headers),
-    text: vi.fn().mockResolvedValue(body),
+    arrayBuffer: vi.fn().mockResolvedValue(bodyBytes.buffer),
+    body: { [Symbol.asyncIterator]: async function*() { yield bodyBytes } },
   }
 }
 
@@ -16,35 +18,13 @@ describe('createHttpUtils', () => {
   beforeEach(() => { vi.stubGlobal('fetch', vi.fn()) })
   afterEach(() => { vi.unstubAllGlobals() })
 
-  it('returns ok response with correct fields', async () => {
-    globalThis.fetch.mockResolvedValue(makeResponse({ body: 'hello' }))
+  it('returns raw response object', async () => {
+    const mockRes = makeResponse({ body: 'hello' })
+    globalThis.fetch.mockResolvedValue(mockRes)
     const { fetch } = createHttpUtils(null)
     const res = await fetch('https://example.com')
     expect(res.ok).toBe(true)
     expect(res.status).toBe(200)
-    expect(await res.text()).toBe('hello')
-  })
-
-  it('json() parses response body', async () => {
-    globalThis.fetch.mockResolvedValue(makeResponse({ body: '{"key":"val"}' }))
-    const { fetch } = createHttpUtils(null)
-    const res = await fetch('https://example.com')
-    expect(await res.json()).toEqual({ key: 'val' })
-  })
-
-  it('headers are returned as a plain object', async () => {
-    globalThis.fetch.mockResolvedValue(makeResponse({ headers: { 'content-type': 'text/plain' } }))
-    const { fetch } = createHttpUtils(null)
-    const res = await fetch('https://example.com')
-    expect(res.headers['content-type']).toBe('text/plain')
-  })
-
-  it('returns ok: false for non-2xx without throwing', async () => {
-    globalThis.fetch.mockResolvedValue(makeResponse({ ok: false, status: 404, statusText: 'Not Found', body: 'nope' }))
-    const { fetch } = createHttpUtils(null)
-    const res = await fetch('https://example.com')
-    expect(res.ok).toBe(false)
-    expect(res.status).toBe(404)
   })
 
   it('throws FetchError on network failure', async () => {
@@ -131,12 +111,44 @@ describe('createHttpUtils', () => {
       { name: 'file1', value: new Uint8Array([1, 2, 3]), filename: 'test.bin', contentType: 'application/octet-stream' }
     ]
     await fetch('https://example.com', { method: 'POST', body: arrayBody })
-    
     expect(globalThis.fetch).toHaveBeenCalled()
     const callArgs = globalThis.fetch.mock.calls[0][1]
     expect(callArgs.body).toBeInstanceOf(globalThis.FormData)
     expect(callArgs.body.get('field1')).toBe('hello')
     const filePart = callArgs.body.get('file1')
     expect(filePart).toBeInstanceOf(globalThis.Blob)
+  })
+})
+
+describe('createHttpUtils — streaming and new body types', () => {
+  beforeEach(() => { vi.stubGlobal('fetch', vi.fn()) })
+  afterEach(() => { vi.unstubAllGlobals() })
+
+  it('returns raw response (no body consumed)', async () => {
+    const mockRes = {
+      ok: true, status: 200, statusText: 'OK',
+      headers: new Headers({ 'content-type': 'text/plain' }),
+      arrayBuffer: vi.fn().mockResolvedValue(new TextEncoder().encode('hi').buffer),
+      body: { [Symbol.asyncIterator]: async function*() { yield new TextEncoder().encode('hi') } },
+    }
+    globalThis.fetch.mockResolvedValue(mockRes)
+    const { fetch } = createHttpUtils(null)
+    const res = await fetch('https://example.com')
+    expect(res.arrayBuffer).toBeDefined()
+    expect(mockRes.arrayBuffer).not.toHaveBeenCalled()
+  })
+
+  it('passes Uint8Array body to underlying fetch', async () => {
+    globalThis.fetch.mockResolvedValue({
+      ok: true, status: 200, statusText: 'OK',
+      headers: new Headers(),
+      arrayBuffer: vi.fn().mockResolvedValue(new ArrayBuffer(0)),
+      body: { [Symbol.asyncIterator]: async function*() {} },
+    })
+    const { fetch } = createHttpUtils(null)
+    const bytes = new Uint8Array([1, 2, 3])
+    await fetch('https://example.com', { method: 'POST', body: bytes })
+    const callBody = globalThis.fetch.mock.calls[0][1].body
+    expect(callBody).toBeInstanceOf(Uint8Array)
   })
 })

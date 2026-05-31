@@ -111,6 +111,87 @@ declare namespace globals {
     readonly highWaterMark: number
     readonly size: Function
   }
+
+  class Blob {
+    constructor(parts?: (string | Uint8Array | Blob | ArrayBuffer)[], options?: { type?: string })
+    readonly size: number
+    readonly type: string
+    text(): Promise<string>
+    arrayBuffer(): Promise<ArrayBuffer>
+    slice(start?: number, end?: number, contentType?: string): Blob
+  }
+
+  class Headers {
+    constructor(init?: Record<string, string> | [string, string][] | Headers)
+    get(name: string): string | null
+    set(name: string, value: string): void
+    has(name: string): boolean
+    append(name: string, value: string): void
+    delete(name: string): void
+    entries(): IterableIterator<[string, string]>
+    keys(): IterableIterator<string>
+    values(): IterableIterator<string>
+    forEach(fn: (value: string, key: string) => void): void
+    [Symbol.iterator](): IterableIterator<[string, string]>
+  }
+
+  class FormData {
+    append(name: string, value: string | Uint8Array | Blob, filename?: string): void
+    get(name: string): string | Blob | null
+    getAll(name: string): (string | Blob)[]
+    has(name: string): boolean
+    set(name: string, value: string | Uint8Array | Blob, filename?: string): void
+    delete(name: string): void
+    entries(): IterableIterator<[string, string | Blob]>
+  }
+
+  class URLSearchParams {
+    constructor(init?: string | Record<string, string> | [string, string][])
+    append(name: string, value: string): void
+    get(name: string): string | null
+    getAll(name: string): string[]
+    has(name: string): boolean
+    set(name: string, value: string): void
+    delete(name: string): void
+    toString(): string
+    entries(): IterableIterator<[string, string]>
+    keys(): IterableIterator<string>
+    values(): IterableIterator<string>
+    [Symbol.iterator](): IterableIterator<[string, string]>
+  }
+
+  interface FetchRequestInit {
+    method?: string
+    headers?: Record<string, string> | Headers
+    body?: string | Uint8Array | ReadableStream<Uint8Array> | FormData | URLSearchParams | Blob
+    timeout?: number
+  }
+
+  interface FetchResponse {
+    readonly ok: boolean
+    readonly status: number
+    readonly statusText: string
+    readonly headers: Headers
+    readonly bodyUsed: boolean
+    text(): Promise<string>
+    json(): Promise<unknown>
+    blob(): Promise<Blob>
+    body(): ReadableStream<Uint8Array>
+  }
+
+  class Request {
+    constructor(input: string | Request, init?: FetchRequestInit)
+    readonly url: string
+    readonly method: string
+    readonly headers: Headers
+    readonly body: ReadableStream<Uint8Array> | null
+    readonly bodyUsed: boolean
+    text(): Promise<string>
+    json(): Promise<unknown>
+    blob(): Promise<Blob>
+  }
+
+  function fetch(input: string | Request, init?: FetchRequestInit): Promise<FetchResponse>
 }
 
 // Top-level type aliases so rune API .d.ts files can reference these types
@@ -123,3 +204,8 @@ type WritableStream<W = any> = globals.WritableStream<W>
 type TransformStream<I = any, O = any> = globals.TransformStream<I, O>
 type ByteLengthQueuingStrategy = globals.ByteLengthQueuingStrategy
 type CountQueuingStrategy = globals.CountQueuingStrategy
+type Blob = globals.Blob
+type Headers = globals.Headers
+type FormData = globals.FormData
+type URLSearchParams = globals.URLSearchParams
+type Request = globals.Request
