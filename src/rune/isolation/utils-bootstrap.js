@@ -525,22 +525,54 @@ globalThis.utils = {
 
       if (isStream) {
         const reader = reqBody.getReader()
-        const raw = await $__utils_http_body_reader.apply(
-          undefined,
-          [url, { ...opts }, async () => {
-            const { done, value } = await reader.read()
-            if (done) return null
-            return value.buffer
-          }],
-          { arguments: { reference: true }, result: { promise: true, copy: true } }
-        )
-        const responseHeaders = new Headers(raw.headers)
-        // isStream responses have no body() streaming — body was already consumed uploading
-        const bytesPromise = Promise.resolve(raw._bytes)
-        const bodyStream = new ReadableStream({
-          start(c) { c.enqueue(raw._bytes); c.close() }
+        const streamResponseHeaders = new Headers()
+        let streamStreamController = null
+        const streamChunks = []
+        let streamResolveMeta, streamRejectMeta
+        const streamMetaPromise = new Promise((res, rej) => { streamResolveMeta = res; streamRejectMeta = rej })
+        const streamBytesPromise = new Promise((resolve, reject) => {
+          let metaReceived = false
+          const onChunk = async (chunk, chunkMeta) => {
+            if (!metaReceived) {
+              metaReceived = true
+              for (const [k, v] of chunkMeta.headers) streamResponseHeaders.set(k, v)
+              streamResolveMeta(chunkMeta)
+              return
+            }
+            if (chunk != null) {
+              const bytes = new Uint8Array(chunk)
+              streamChunks.push(bytes)
+              if (streamStreamController) streamStreamController.enqueue(bytes)
+            }
+          }
+          const onEnd = async () => {
+            if (streamStreamController) streamStreamController.close()
+            const total = streamChunks.reduce((n, c) => n + c.byteLength, 0)
+            const merged = new Uint8Array(total)
+            let offset = 0
+            for (const c of streamChunks) { merged.set(c, offset); offset += c.byteLength }
+            resolve(merged)
+          }
+          const onError = async (msg) => {
+            if (streamStreamController) streamStreamController.error(new Error(msg))
+            streamRejectMeta(new Error(msg))
+            reject(new Error(msg))
+          }
+          $__utils_http_body_reader.apply(
+            undefined,
+            [url, { ...opts }, async () => {
+              const { done, value } = await reader.read()
+              if (done) return null
+              return value.buffer
+            }, onChunk, onEnd, onError],
+            { arguments: { reference: true }, result: { promise: true } }
+          )
         })
-        return _makeResponse(raw, responseHeaders, bytesPromise, bodyStream, consumeGuard)
+        const streamMeta = await streamMetaPromise
+        const streamBodyStream = new ReadableStream({
+          start(c) { streamStreamController = c },
+        })
+        return _makeResponse(streamMeta, streamResponseHeaders, streamBytesPromise, streamBodyStream, consumeGuard)
       }
 
       const responseHeaders = new Headers()
