@@ -7,8 +7,8 @@ import fs from 'node:fs/promises';
 describe('shell utils', () => {
   it('runs a simple command', async () => {
     const shellUtils = createShellUtils(process.cwd());
-    const result = await shellUtils.exec('node -e "console.log(\'hello\')"');
-    expect(result).toBe('hello');
+    const { stdout } = await shellUtils.exec('node -e "console.log(\'hello\')"');
+    expect(stdout).toBe('hello');
   });
 
   it('runs an interactive session', async () => {
@@ -138,7 +138,7 @@ describe('shell utils', () => {
       const script = `
         import { shell } from '@utils'
         export async function use() {
-          const res = await shell.exec('node -e "process.stdout.write(Buffer.from([10, 20, 30]))"', { binary: true })
+          const { stdout: res } = await shell.exec('node -e "process.stdout.write(Buffer.from([10, 20, 30]))"', { binary: true })
           return {
             isUint8: res instanceof Uint8Array,
             length: res.length,

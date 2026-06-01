@@ -23,7 +23,21 @@ declare namespace shell {
       stdin?: ReadableStream<Uint8Array | string> | Uint8Array | string
       binary?: boolean
     }
-  ): Promise<string | Uint8Array | { stdout: string | Uint8Array, stderr: string, exitCode: number }>
+  ): Promise<ShellResult>
+
+  interface ShellResult {
+    /** 
+     * The standard output (stdout) of the process. 
+     * If `opts.binary` is true, this is a `Uint8Array`; otherwise, a string.
+     */
+    stdout: string | Uint8Array
+    /** The standard error (stderr) of the process (always a string). */
+    stderr: string
+    /** The exit status code of the process. */
+    exitCode: number
+    /** Helper property: true if exitCode is 0, false otherwise. */
+    ok: boolean
+  }
 
   /**
    * Spawns an interactive shell session, allowing progressive streaming and real-time stdin/stdout interaction.

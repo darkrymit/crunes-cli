@@ -345,7 +345,7 @@ globalThis.utils = {
         },
         async write(chunk) {
           if (!(chunk instanceof Uint8Array)) throw new TypeError('writeStreamAsBytes requires Uint8Array chunks')
-          await $__utils_fs_writeStream_write.apply(undefined, [streamId, chunk.buffer], { arguments: { copy: true }, result: { promise: true } })
+          await $__utils_fs_writeStream_write.apply(undefined, [streamId, chunk.buffer, chunk.byteOffset, chunk.byteLength], { arguments: { copy: true }, result: { promise: true } })
         },
         async close() {
           if (streamId !== null) {
@@ -377,12 +377,12 @@ globalThis.utils = {
     },
     writeAsBytes: (path, content) => {
       if (!(content instanceof Uint8Array)) throw new TypeError('writeAsBytes requires a Uint8Array')
-      return $__utils_fs_write_bytes.apply(undefined, [path, content.buffer], { arguments: { copy: true }, result: { promise: true } })
+      return $__utils_fs_write_bytes.apply(undefined, [path, content.buffer, content.byteOffset, content.byteLength], { arguments: { copy: true }, result: { promise: true } })
     },
     append: (p, c) => $__utils_fs_append.apply(undefined, [p, c], { arguments: { copy: true }, result: { promise: true } }),
     appendAsBytes: async (p, content) => {
       if (!(content instanceof Uint8Array)) throw new TypeError('appendAsBytes requires a Uint8Array')
-      return $__utils_fs_append_bytes.apply(undefined, [p, content.buffer], { arguments: { copy: true }, result: { promise: true } })
+      return $__utils_fs_append_bytes.apply(undefined, [p, content.buffer, content.byteOffset, content.byteLength], { arguments: { copy: true }, result: { promise: true } })
     },
     chmod: (p, mode) => $__utils_fs_chmod.apply(undefined, [p, mode], { arguments: { copy: true }, result: { promise: true } }),
     replace: async (p, regex, replacement) => {
@@ -448,8 +448,6 @@ globalThis.utils = {
       const res = await promise
       if (res && res.stdout instanceof ArrayBuffer) {
         return { ...res, stdout: new Uint8Array(res.stdout) }
-      } else if (res && res instanceof ArrayBuffer) {
-        return new Uint8Array(res)
       }
       return res
     },
@@ -820,7 +818,7 @@ globalThis.utils = {
         },
         async write(chunk) {
           if (!(chunk instanceof Uint8Array)) throw new TypeError('unzipStream requires Uint8Array chunks')
-          await $__utils_fs_writeStream_write.apply(undefined, [streamId, chunk.buffer], { arguments: { copy: true }, result: { promise: true } })
+          await $__utils_fs_writeStream_write.apply(undefined, [streamId, chunk.buffer, chunk.byteOffset, chunk.byteLength], { arguments: { copy: true }, result: { promise: true } })
         },
         async close() {
           if (streamId !== null) {
@@ -842,7 +840,7 @@ globalThis.utils = {
         },
         async write(chunk) {
           if (!(chunk instanceof Uint8Array)) throw new TypeError('untarStream requires Uint8Array chunks')
-          await $__utils_fs_writeStream_write.apply(undefined, [streamId, chunk.buffer], { arguments: { copy: true }, result: { promise: true } })
+          await $__utils_fs_writeStream_write.apply(undefined, [streamId, chunk.buffer, chunk.byteOffset, chunk.byteLength], { arguments: { copy: true }, result: { promise: true } })
         },
         async close() {
           if (streamId !== null) {

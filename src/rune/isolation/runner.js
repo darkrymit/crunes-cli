@@ -84,15 +84,15 @@ async function injectUtils(isolate, context, utils, runeCallback, vars, projectD
     copy.set(bytes)
     return copy.buffer
   }))
-  await jail.set('$__utils_fs_write_bytes', new ivm.Reference(async (relPath, arrayBuffer) => {
-    const bytes = new Uint8Array(arrayBuffer)
+  await jail.set('$__utils_fs_write_bytes', new ivm.Reference(async (relPath, arrayBuffer, byteOffset, byteLength) => {
+    const bytes = new Uint8Array(arrayBuffer, byteOffset ?? 0, byteLength ?? arrayBuffer.byteLength)
     return utils.fs.writeAsBytes(relPath, bytes)
   }))
   await jail.set('$__utils_fs_append', new ivm.Reference(async (relPath, content) => {
     return utils.fs.append(relPath, content)
   }))
-  await jail.set('$__utils_fs_append_bytes', new ivm.Reference(async (relPath, arrayBuffer) => {
-    const bytes = new Uint8Array(arrayBuffer)
+  await jail.set('$__utils_fs_append_bytes', new ivm.Reference(async (relPath, arrayBuffer, byteOffset, byteLength) => {
+    const bytes = new Uint8Array(arrayBuffer, byteOffset ?? 0, byteLength ?? arrayBuffer.byteLength)
     return utils.fs.appendAsBytes(relPath, bytes)
   }))
   await jail.set('$__utils_fs_chmod', new ivm.Reference(async (relPath, mode) => {
@@ -127,10 +127,10 @@ async function injectUtils(isolate, context, utils, runeCallback, vars, projectD
     streams.set(id, ref)
     return id
   }))
-  await jail.set('$__utils_fs_writeStream_write', new ivm.Reference(async (id, arrayBuffer) => {
+  await jail.set('$__utils_fs_writeStream_write', new ivm.Reference(async (id, arrayBuffer, byteOffset, byteLength) => {
     const ref = streams.get(id)
     if (!ref) throw new Error(`Invalid write stream ID: ${id}`)
-    const bytes = new Uint8Array(arrayBuffer)
+    const bytes = new Uint8Array(arrayBuffer, byteOffset ?? 0, byteLength ?? arrayBuffer.byteLength)
     await ref.write(bytes)
   }))
   await jail.set('$__utils_fs_writeStream_close', new ivm.Reference(async (id) => {
@@ -185,14 +185,24 @@ async function injectUtils(isolate, context, utils, runeCallback, vars, projectD
     
     const res = await utils.shell.exec(cmd, { ...opts, stdin: stdinStream })
     
-    if (res && res.stdout && res.stdout instanceof Uint8Array) {
-      const copy = new Uint8Array(res.stdout)
-      const ab = copy.buffer.slice(copy.byteOffset, copy.byteOffset + copy.byteLength)
-      return { ...res, stdout: ab }
-    } else if (res && res instanceof Uint8Array) {
-      const copy = new Uint8Array(res)
-      const ab = copy.buffer.slice(copy.byteOffset, copy.byteOffset + copy.byteLength)
-      return ab
+    if (res && typeof res === 'object') {
+      if (res.stdout instanceof Uint8Array) {
+        const copy = new Uint8Array(res.stdout)
+        const ab = copy.buffer.slice(copy.byteOffset, copy.byteOffset + copy.byteLength)
+        return {
+          stdout: ab,
+          stderr: res.stderr,
+          exitCode: res.exitCode,
+          ok: res.ok,
+        }
+      } else {
+        return {
+          stdout: res.stdout,
+          stderr: res.stderr,
+          exitCode: res.exitCode,
+          ok: res.ok,
+        }
+      }
     }
     return res
   }))

@@ -58,5 +58,8 @@
         }
       }
     }
-  }
+  },
+  "plugins": [
+    "crunes-plugins@git"
+  ]
 }

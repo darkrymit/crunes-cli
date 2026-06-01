@@ -171,26 +171,29 @@ export function createShellUtils(dir, checkPermission) {
     })
 
     if (result.exitCode !== 0 && shouldThrow) {
+      const finalStdout = trim && typeof result.stdout === 'string' ? result.stdout.trim() : result.stdout
+      const finalStderr = trim && typeof result.stderr === 'string' ? result.stderr.trim() : result.stderr
       throw new ShellError({
         message: `Command failed (exit ${result.exitCode}): ${cmd}`,
-        stdout: result.stdout,
-        stderr: result.stderr,
+        stdout: finalStdout,
+        stderr: finalStderr,
         exitCode: result.exitCode,
       })
     }
 
-    if (!shouldThrow) {
-      if (trim) {
-        if (typeof result.stdout === 'string') result.stdout = result.stdout.trim()
-        if (typeof result.stderr === 'string') result.stderr = result.stderr.trim()
-      }
-      return result
+    let finalStdout = result.stdout
+    let finalStderr = result.stderr
+    if (trim) {
+      if (typeof finalStdout === 'string') finalStdout = finalStdout.trim()
+      if (typeof finalStderr === 'string') finalStderr = finalStderr.trim()
     }
 
-    if (trim) {
-      return binary ? result.stdout : result.stdout.trim()
+    return {
+      stdout: finalStdout,
+      stderr: finalStderr,
+      exitCode: result.exitCode,
+      ok: result.exitCode === 0,
     }
-    return result
   }
 
   function execInSession(cmd, opts = {}) {

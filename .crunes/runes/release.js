@@ -37,10 +37,10 @@ async function runInfo() {
   const cliVersionMatch = programSrc.match(/\.version\(['"]([^'"]+)['"]/)
   const cliVersion = cliVersionMatch ? cliVersionMatch[1] : 'unknown'
 
-  const gitLog = await shell.exec('git log --oneline -10 --no-decorate', { throw: false, trim: true })
-  const branch  = await shell.exec('git rev-parse --abbrev-ref HEAD', { throw: false, trim: true })
-  const lastTag = await shell.exec('git describe --tags --abbrev=0', { throw: false, trim: true })
-  const unpushed = await shell.exec('git rev-list --count @{u}..HEAD', { throw: false, trim: true })
+  const { stdout: gitLog } = await shell.exec('git log --oneline -10 --no-decorate', { throw: false, trim: true })
+  const { stdout: branch } = await shell.exec('git rev-parse --abbrev-ref HEAD', { throw: false, trim: true })
+  const { stdout: lastTag } = await shell.exec('git describe --tags --abbrev=0', { throw: false, trim: true })
+  const { stdout: unpushed } = await shell.exec('git rev-list --count @{u}..HEAD', { throw: false, trim: true })
 
   const changelog = await fs.read('CHANGELOG.md', { throw: false }) ?? ''
   const recent = changelog
