@@ -19,8 +19,7 @@ export async function handler({ projectRoot = process.cwd() } = {}) {
   if (versionResult.status === 0) {
     output.success(`crunes ${versionResult.stdout.trim()} in PATH`)
   } else {
-    output.error('crunes not found in PATH — is it installed globally?')
-    anyFailed = true
+    output.warn('crunes not found globally in PATH (you can still run it locally or via npx)')
   }
 
   let config
