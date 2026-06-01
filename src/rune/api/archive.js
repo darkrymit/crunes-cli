@@ -144,20 +144,26 @@ export function createArchiveUtils(dir, checkPermission) {
       if (checkPermission) checkPermission('fs.write', dstToken)
       const dstAbs = resolveToAbs(dir, dest)
       
+      const activePromises = new Set()
       const parser = unzipper.Parse()
       parser.on('entry', (entry) => {
         try {
           assertNoSlip(dstAbs, entry.path)
           const absEntry = path.resolve(dstAbs, entry.path)
+          
+          let p
           if (entry.type === 'Directory') {
-            fs.mkdir(absEntry, { recursive: true })
+            p = fs.mkdir(absEntry, { recursive: true })
               .then(() => entry.autodrain())
               .catch(() => entry.autodrain())
           } else {
-            fs.mkdir(path.dirname(absEntry), { recursive: true })
+            p = fs.mkdir(path.dirname(absEntry), { recursive: true })
               .then(() => pipeline(entry, createWriteStream(absEntry)))
               .catch(() => entry.autodrain())
           }
+          
+          activePromises.add(p)
+          p.finally(() => activePromises.delete(p))
         } catch (err) {
           entry.autodrain()
         }
@@ -186,27 +192,41 @@ export function createArchiveUtils(dir, checkPermission) {
           return new Promise((resolve, reject) => {
             const onError = (err) => reject(err)
             parser.once('error', onError)
-            parser.end(() => {
+            parser.end(async () => {
               parser.removeListener('error', onError)
-              resolve()
+              try {
+                while (activePromises.size > 0) {
+                  await Promise.all(Array.from(activePromises))
+                }
+                resolve()
+              } catch (err) {
+                reject(err)
+              }
             })
           })
         }
       }
     },
 
-    tarStream(source, { gzip = true } = {}) {
+    async tarStream(source, { gzip = true } = {}) {
       const srcToken = canonicalizePath(dir, source)
       if (checkPermission) checkPermission('fs.read', srcToken)
       const srcAbs = resolveToAbs(dir, source)
       
-      return tarCreate({ gzip, cwd: path.dirname(srcAbs) }, [path.basename(srcAbs)])
+      const stat = await fs.stat(srcAbs)
+      if (stat.isDirectory()) {
+        return tarCreate({ gzip, cwd: srcAbs }, ['.'])
+      } else {
+        return tarCreate({ gzip, cwd: path.dirname(srcAbs) }, [path.basename(srcAbs)])
+      }
     },
 
-    untarStream(dest, { gzip } = {}) {
+    async untarStream(dest, { gzip } = {}) {
       const dstToken = canonicalizePath(dir, dest)
       if (checkPermission) checkPermission('fs.write', dstToken)
       const dstAbs = resolveToAbs(dir, dest)
+      
+      await fs.mkdir(dstAbs, { recursive: true })
       
       const extractor = tarExtract({
         gzip,

@@ -175,11 +175,12 @@ export function createFsUtils(dir, checkPermission, pluginDir = null, pluginId =
       return createReadStream(abs)
     },
 
-    writeStreamRef(relPath) {
+    async writeStreamRef(relPath) {
       const token = canonicalizeLocation(relPath, { dir })
       const abs   = resolvePath(relPath, ctx())
       if (checkPermission) checkPermission('fs.write', token)
       
+      await fsPromises.mkdir(path.dirname(abs), { recursive: true })
       const stream = createWriteStream(abs)
       return {
         write(chunk) {

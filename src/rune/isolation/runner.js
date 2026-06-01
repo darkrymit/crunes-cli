@@ -122,7 +122,7 @@ async function injectUtils(isolate, context, utils, runeCallback, vars, projectD
   }))
 
   await jail.set('$__utils_fs_writeStream', new ivm.Reference(async (relPath) => {
-    const ref = utils.fs.writeStreamRef(relPath)
+    const ref = await utils.fs.writeStreamRef(relPath)
     const id = nextStreamId++
     streams.set(id, ref)
     return id
@@ -693,7 +693,7 @@ async function injectUtils(isolate, context, utils, runeCallback, vars, projectD
   }))
   await jail.set('$__utils_archive_tarStream', new ivm.Reference(async (source, optsRef) => {
     const opts = optsRef ? optsRef.copySync() : undefined
-    const stream = utils.archive.tarStream(source, opts)
+    const stream = await utils.archive.tarStream(source, opts)
     const iter = stream[Symbol.asyncIterator]()
     const id = nextStreamId++
     streams.set(id, iter)
@@ -707,7 +707,7 @@ async function injectUtils(isolate, context, utils, runeCallback, vars, projectD
   }))
   await jail.set('$__utils_archive_untarStream', new ivm.Reference(async (dest, optsRef) => {
     const opts = optsRef ? optsRef.copySync() : undefined
-    const writeStream = utils.archive.untarStream(dest, opts)
+    const writeStream = await utils.archive.untarStream(dest, opts)
     const id = nextStreamId++
     streams.set(id, writeStream)
     return id
@@ -912,7 +912,7 @@ export async function runRuneInIsolate(runeFile, effective, args, projectDir, {
     return result
   } finally {
     if (isVerbose) console.error(`[crunes:debug] disposing Isolate...`)
-    dispose()
+    await dispose()
     isolate.dispose()
   }
 }
@@ -1038,7 +1038,7 @@ export async function getArgsSchema(runeFile, effective, projectDir, {
     )
     return schema
   } finally {
-    dispose()
+    await dispose()
     isolate.dispose()
   }
 }

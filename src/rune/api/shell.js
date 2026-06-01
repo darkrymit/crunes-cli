@@ -13,9 +13,10 @@ export class ShellError extends Error {
 }
 
 export class ShellSession {
-  constructor(cmd, { dir, env, binary = false }) {
+  constructor(cmd, { dir, env, binary = false, activeSessions }) {
     this.handlers = new Map()
     this.binary = binary
+    this.activeSessions = activeSessions
     this.proc = spawn(cmd, [], {
       shell:              true,
       cwd:                dir,
@@ -23,12 +24,19 @@ export class ShellSession {
       env: env ? { ...process.env, ...env } : process.env,
     })
 
+    if (activeSessions) {
+      activeSessions.add(this)
+    }
+
     this.proc.stdout.on('data', chunk => this.emit('stdout', 'data', chunk))
     this.proc.stderr.on('data', chunk => this.emit('stderr', 'data', chunk))
     this.proc.stdout.on('end', () => this.emit('stdout', 'end'))
     this.proc.stderr.on('end', () => this.emit('stderr', 'end'))
     
-    this.proc.on('exit', code => this.emit('session', 'exit', code ?? 0))
+    this.proc.on('exit', code => {
+      if (activeSessions) activeSessions.delete(this)
+      this.emit('session', 'exit', code ?? 0)
+    })
     this.proc.on('error', err => this.emit('session', 'error', err))
   }
 
@@ -78,6 +86,9 @@ export class ShellSession {
   }
 
   kill(signal) {
+    if (this.activeSessions) {
+      this.activeSessions.delete(this)
+    }
     if (process.platform === 'win32') {
       try {
         spawn('taskkill', ['/pid', String(this.proc.pid), '/t', '/f'], { windowsHideConsole: true })
@@ -91,6 +102,8 @@ export class ShellSession {
 }
 
 export function createShellUtils(dir, checkPermission) {
+  const activeSessions = new Set()
+
   async function exec(cmd, { throw: shouldThrow = true, trim = true, timeout = 30000, env, stdin, binary = false } = {}) {
     if (checkPermission) checkPermission('shell.exec', cmd)
 
@@ -166,6 +179,14 @@ export function createShellUtils(dir, checkPermission) {
       })
     }
 
+    if (!shouldThrow) {
+      if (trim) {
+        if (typeof result.stdout === 'string') result.stdout = result.stdout.trim()
+        if (typeof result.stderr === 'string') result.stderr = result.stderr.trim()
+      }
+      return result
+    }
+
     if (trim) {
       return binary ? result.stdout : result.stdout.trim()
     }
@@ -174,8 +195,19 @@ export function createShellUtils(dir, checkPermission) {
 
   function execInSession(cmd, opts = {}) {
     if (checkPermission) checkPermission('shell.exec', cmd)
-    return new ShellSession(cmd, { dir, ...opts })
+    return new ShellSession(cmd, { dir, ...opts, activeSessions })
   }
 
-  return { exec, execInSession }
+  return {
+    exec,
+    execInSession,
+    dispose() {
+      for (const session of activeSessions) {
+        try {
+          session.kill('SIGKILL')
+        } catch {}
+      }
+      activeSessions.clear()
+    }
+  }
 }

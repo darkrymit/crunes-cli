@@ -107,9 +107,9 @@ export async function handler({
   }
 
   let anyFailed = false
-  const printedSections = new Set()
 
   for (let i = 0; i < segments.length; i++) {
+    const printedSections = new Set()
     const { key, sections: sectionFilter, runeArgs } = segments[i]
     let sections
     try {

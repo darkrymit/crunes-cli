@@ -419,7 +419,7 @@ export async function use() {
   await socket.sendText('a')
   await socket.sendText('b')
   await socket.sendText('c')
-  await socket.close()
+  await socket.closed()
   return [section.create('r', { type: 'markdown', content: msgs.join(',') })]
 }
 `)

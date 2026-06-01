@@ -313,12 +313,12 @@ globalThis.utils = {
     glob:   (p, o) => $__utils_fs_glob.apply(undefined, [p, o], { arguments: { copy: true }, result: { promise: true, copy: true } }),
     write:  (p, c) => $__utils_fs_write.apply(undefined, [p, c], { arguments: { copy: true }, result: { promise: true } }),
     copy:   (src, dest) => $__utils_fs_copy.apply(undefined, [src, dest], { result: { promise: true } }),
-    remove: (path, opts) => $__utils_fs_remove.apply(undefined, [path, opts], { result: { promise: true } }),
+    remove: (path, opts) => $__utils_fs_remove.apply(undefined, [path, opts], { arguments: { copy: true }, result: { promise: true } }),
     move:   (src, dest)  => $__utils_fs_move.apply(undefined, [src, dest], { result: { promise: true } }),
     stat:   (path)       => $__utils_fs_stat.apply(undefined, [path], { result: { promise: true, copy: true } }),
     mkdir:  (path)       => $__utils_fs_mkdir.apply(undefined, [path], { result: { promise: true } }),
     readAsBytes: async (path, opts) => {
-      const ab = await $__utils_fs_read_bytes.apply(undefined, [path, opts], { result: { promise: true, copy: true } })
+      const ab = await $__utils_fs_read_bytes.apply(undefined, [path, opts], { arguments: { copy: true }, result: { promise: true, copy: true } })
       return ab ? new Uint8Array(ab) : null
     },
     readStreamAsBytes: (path) => {
@@ -360,9 +360,20 @@ globalThis.utils = {
       })
     },
     writeStream: (path) => {
-      const ts = new TextEncoderStream()
-      ts.readable.pipeTo(globalThis.utils.fs.writeStreamAsBytes(path))
-      return ts.writable
+      const wsBytes = globalThis.utils.fs.writeStreamAsBytes(path)
+      const writer = wsBytes.getWriter()
+      const encoder = new TextEncoder()
+      return new WritableStream({
+        async write(chunk) {
+          await writer.write(encoder.encode(chunk))
+        },
+        async close() {
+          await writer.close()
+        },
+        async abort(reason) {
+          await writer.abort(reason)
+        }
+      })
     },
     writeAsBytes: (path, content) => {
       if (!(content instanceof Uint8Array)) throw new TypeError('writeAsBytes requires a Uint8Array')

@@ -1,5 +1,18 @@
 /** Run shell commands from the project directory */
 declare namespace shell {
+  /**
+   * Runs a shell command asynchronously and returns its output.
+   * Requires `shell.exec:<command>` permission.
+   *
+   * @param cmd Shell command to execute
+   * @param opts Option object to configure shell execution
+   * @param opts.throw Throw a ShellError on non-zero exit codes (default: true). If false, returns the result object.
+   * @param opts.trim Trim leading/trailing whitespace from stdout (default: true).
+   * @param opts.timeout Timeout in milliseconds (default: 30000).
+   * @param opts.env Key-value pairs of environment variables to inject.
+   * @param opts.stdin Input string, buffer, or ReadableStream piped to stdin.
+   * @param opts.binary Return stdout as raw Uint8Array instead of string (default: false).
+   */
   export function exec(
     cmd: string, 
     opts?: { 
@@ -12,6 +25,16 @@ declare namespace shell {
     }
   ): Promise<string | Uint8Array | { stdout: string | Uint8Array, stderr: string, exitCode: number }>
 
+  /**
+   * Spawns an interactive shell session, allowing progressive streaming and real-time stdin/stdout interaction.
+   * Requires `shell.exec:<command>` permission.
+   *
+   * @param cmd Shell command to spawn
+   * @param opts Option object to configure interactive execution
+   * @param opts.env Key-value pairs of environment variables to inject.
+   * @param opts.signal AbortSignal to kill the session and its child process tree.
+   * @param opts.binary Stream stdout/stderr chunks as Uint8Array instead of string (default: false).
+   */
   export function execInSession(
     cmd: string, 
     opts?: { 

@@ -26,7 +26,10 @@ export function formatConsentScreen(pluginName, pluginJson) {
   return lines.join('\n')
 }
 
-export async function promptConsent(pluginName, pluginJson) {
+export async function promptConsent(pluginName, pluginJson, { yes = false } = {}) {
+  const isYes = yes || !process.stdout.isTTY
+  if (isYes) return true
+
   p.note(formatConsentScreen(pluginName, pluginJson), 'Permissions requested')
 
   const answer = await p.confirm({ message: 'Allow these permissions?' })
@@ -35,10 +38,6 @@ export async function promptConsent(pluginName, pluginJson) {
   return answer === true
 }
 
-/**
- * Returns new permission patterns added in newPluginJson compared to oldConsented.
- * oldConsented is { runeKey: string[] } (the consentedPermissions from registry).
- */
 export function diffPermissions(oldConsented, newPluginJson) {
   const added = {}
   for (const [runeKey, rune] of Object.entries(newPluginJson.runes)) {
@@ -50,7 +49,10 @@ export function diffPermissions(oldConsented, newPluginJson) {
   return added
 }
 
-export async function promptReConsent(pluginName, diff) {
+export async function promptReConsent(pluginName, diff, { yes = false } = {}) {
+  const isYes = yes || !process.stdout.isTTY
+  if (isYes) return true
+
   const lines = [`${pluginName} has added new permissions:\n`]
   for (const [runeKey, perms] of Object.entries(diff)) {
     lines.push(`  ${runeKey}`)

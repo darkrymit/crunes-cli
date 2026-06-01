@@ -69,10 +69,11 @@ export function createDbUtils(dir, checkPermission) {
 
       throw new TypeError(`Unsupported DB protocol: "${protocol}"`)
     },
-    dispose() {
-      for (const conn of connections) {
-        try { conn.close() } catch {}
-      }
+    async dispose() {
+      const closes = connections.map(async (conn) => {
+        try { await conn.close() } catch {}
+      })
+      await Promise.all(closes)
       connections.length = 0
     }
   }

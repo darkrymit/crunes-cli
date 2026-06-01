@@ -1,7 +1,7 @@
 import yargsParser from 'yargs-parser'
 
 const FLAG_SHORT = /^-([a-zA-Z])$/
-const FLAG_LONG  = /^--([a-zA-Z][a-zA-Z0-9-]*)(?:\s+<([a-zA-Z]+)>|\s+\[([a-zA-Z]+)\])?$/
+const FLAG_LONG  = /^--([a-zA-Z][a-zA-Z0-9-]*)(?:\s+<([a-zA-Z0-9_-]+)>|\s+\[([a-zA-Z0-9_-]+)\])?$/
 
 export function parseFlags(flagStr) {
   const parts = flagStr.split(',').map(s => s.trim())

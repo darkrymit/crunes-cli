@@ -77,7 +77,8 @@ async function downloadNpm(packageName, destDir) {
  * @param {string} projectDir  - project root (for updating .crunes/config.json)
  * @param {{ marketplaceName?: string, pluginName?: string }} provenance
  */
-export async function installPlugin(source, projectDir, provenance = {}) {
+export async function installPlugin(source, projectDir, provenance = {}, options = {}) {
+  const { yes = false } = options
   if (!provenance.marketplaceName) {
     throw new Error('Direct installs are not allowed. Use: crunes plugin install <marketplace>@<plugin>')
   }
@@ -112,7 +113,7 @@ export async function installPlugin(source, projectDir, provenance = {}) {
     const registry = await loadRegistry()
     const existing = registry.plugins?.[pluginKey]
     if (existing) {
-      return await updatePlugin(pluginKey, stagingDir, pluginJson, projectDir, type === 'local', provenance)
+      return await updatePlugin(pluginKey, stagingDir, pluginJson, projectDir, type === 'local', provenance, { yes })
     }
 
     const isLocal = type === 'local'
@@ -128,7 +129,7 @@ export async function installPlugin(source, projectDir, provenance = {}) {
     await installDeps(cacheDir, pluginJson.dependencies)
 
     // Consent
-    const consented = await promptConsent(name, pluginJson)
+    const consented = await promptConsent(name, pluginJson, { yes })
     if (!consented) {
       await fs.rm(cacheDir, { recursive: true, force: true })
       return { installed: false, name }
@@ -151,14 +152,15 @@ export async function installPlugin(source, projectDir, provenance = {}) {
   }
 }
 
-async function updatePlugin(pluginKey, newPluginDir, newPluginJson, projectDir, isLocal, provenance = {}) {
+async function updatePlugin(pluginKey, newPluginDir, newPluginJson, projectDir, isLocal, provenance = {}, options = {}) {
+  const { yes = false } = options
   const registry = await loadRegistry()
   const existing = registry.plugins[pluginKey]
   if (!existing) throw new Error(`Plugin "${pluginKey}" is not installed.`)
 
   const diff = diffPermissions(existing.consentedPermissions ?? {}, newPluginJson)
   if (Object.keys(diff).length > 0) {
-    const consented = await promptReConsent(pluginKey, diff)
+    const consented = await promptReConsent(pluginKey, diff, { yes })
     if (!consented) return { installed: false, name: pluginKey }
   }
 
