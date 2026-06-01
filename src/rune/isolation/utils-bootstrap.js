@@ -381,31 +381,165 @@ globalThis.utils = {
     },
   },
   shell: {
-    exec: (cmd, o) => $__utils_shell_exec.apply(undefined, [cmd, o], { arguments: { copy: true }, result: { promise: true, copy: true } }),
+    exec: async (cmd, o) => {
+      let stdinStreamId = null
+      let opts = { ...o }
+      const hasStdinStream = o && o.stdin && typeof o.stdin.getReader === 'function'
+      
+      if (hasStdinStream) {
+        stdinStreamId = 'shell_stdin_' + Math.random().toString(36).slice(2)
+        delete opts.stdin
+      } else if (o && o.stdin instanceof Uint8Array) {
+        opts.stdin = { type: 'Buffer', data: Array.from(o.stdin) }
+      } else if (o && o.stdin && typeof o.stdin === 'object' && o.stdin.buffer) {
+        opts.stdin = { type: 'Buffer', data: Array.from(new Uint8Array(o.stdin.buffer)) }
+      }
+      
+      const promise = $__utils_shell_exec.apply(
+        undefined, 
+        [cmd, opts, stdinStreamId], 
+        { arguments: { copy: true }, result: { promise: true, copy: true } }
+      )
+      
+      if (hasStdinStream) {
+        const reader = o.stdin.getReader()
+        const pump = async () => {
+          try {
+            while (true) {
+              const { value, done } = await reader.read()
+              if (done) break
+              
+              let chunk = value
+              if (typeof chunk === 'string') {
+                chunk = new TextEncoder().encode(chunk)
+              }
+              if (!(chunk instanceof Uint8Array)) {
+                throw new TypeError('stdin stream must yield string or Uint8Array chunks')
+              }
+              
+              await $__utils_fs_writeStream_write.apply(
+                undefined, 
+                [stdinStreamId, chunk.buffer], 
+                { arguments: { copy: true }, result: { promise: true } }
+              )
+            }
+          } finally {
+            await $__utils_fs_writeStream_close.apply(
+              undefined, 
+              [stdinStreamId], 
+              { result: { promise: true } }
+            )
+          }
+        }
+        pump()
+      }
+      
+      const res = await promise
+      if (res && res.stdout instanceof ArrayBuffer) {
+        return { ...res, stdout: new Uint8Array(res.stdout) }
+      } else if (res && res instanceof ArrayBuffer) {
+        return new Uint8Array(res)
+      }
+      return res
+    },
     execInSession: (cmd, o) => {
+      const binaryMode = !!(o && o.binary)
       const id = $__utils_shell_execInSession_open.applySync(undefined, [cmd, o], { arguments: { copy: true } })
+      
+      const createHybridReadable = (streamType) => {
+        let controller
+        const listeners = []
+        
+        const stream = new ReadableStream({
+          start(c) {
+            controller = c
+          }
+        })
+        
+        stream.on = (event, callback) => {
+          listeners.push({ event, callback })
+        }
+        
+        const handleData = (ab) => {
+          let chunk
+          if (binaryMode) {
+            chunk = new Uint8Array(ab)
+          } else {
+            chunk = new TextDecoder().decode(ab)
+          }
+          
+          if (controller) {
+            try { controller.enqueue(chunk) } catch (e) {}
+          }
+          for (const l of listeners) {
+            if (l.event === 'data') {
+              l.callback(chunk)
+            }
+          }
+        }
+        
+        const handleEnd = () => {
+          if (controller) {
+            try { controller.close() } catch (e) {}
+          }
+          for (const l of listeners) {
+            if (l.event === 'end') {
+              l.callback()
+            }
+          }
+        }
+        
+        $__utils_shell_execInSession_on.applySync(undefined, [id, streamType, 'data', handleData], { arguments: { reference: true } })
+        $__utils_shell_execInSession_on.applySync(undefined, [id, streamType, 'end', handleEnd], { arguments: { reference: true } })
+        
+        return stream
+      }
+      
+      const stdoutStream = createHybridReadable('stdout')
+      const stderrStream = createHybridReadable('stderr')
+      
+      const stdinStream = new WritableStream({
+        async write(chunk) {
+          let rawChunk = chunk
+          if (rawChunk instanceof Uint8Array) {
+            rawChunk = rawChunk.buffer
+          }
+          await $__utils_shell_execInSession_write.apply(
+            undefined,
+            [id, rawChunk],
+            { arguments: { copy: true }, result: { promise: true } }
+          )
+        },
+        async close() {
+          await $__utils_shell_execInSession_end.apply(
+            undefined,
+            [id],
+            { result: { promise: true } }
+          )
+        }
+      })
+      
+      stdinStream.write = (text) => {
+        let rawChunk = text
+        if (rawChunk instanceof Uint8Array) {
+          rawChunk = rawChunk.buffer
+        }
+        $__utils_shell_execInSession_write.applySync(undefined, [id, rawChunk], { arguments: { copy: true } })
+      }
+      stdinStream.end = () => {
+        $__utils_shell_execInSession_end.applySync(undefined, [id])
+      }
+      
       const session = {
-        stdin: {
-          write: (text) => $__utils_shell_execInSession_write.applySync(undefined, [id, text]),
-          end: () => $__utils_shell_execInSession_end.applySync(undefined, [id])
-        },
-        stdout: {
-          on(event, callback) {
-            const wrappedCallback = event === 'data' ? (ab) => callback(new Uint8Array(ab)) : callback;
-            $__utils_shell_execInSession_on.applySync(undefined, [id, 'stdout', event, wrappedCallback], { arguments: { reference: true } })
-          }
-        },
-        stderr: {
-          on(event, callback) {
-            const wrappedCallback = event === 'data' ? (ab) => callback(new Uint8Array(ab)) : callback;
-            $__utils_shell_execInSession_on.applySync(undefined, [id, 'stderr', event, wrappedCallback], { arguments: { reference: true } })
-          }
-        },
+        stdin: stdinStream,
+        stdout: stdoutStream,
+        stderr: stderrStream,
         on(event, callback) {
           $__utils_shell_execInSession_on.applySync(undefined, [id, 'session', event, callback], { arguments: { reference: true } })
         },
         kill: (signal) => $__utils_shell_execInSession_kill.applySync(undefined, [id, signal ?? null])
       }
+      
       if (o && o.signal) {
         o.signal.addEventListener('abort', () => session.kill('SIGTERM'))
       }

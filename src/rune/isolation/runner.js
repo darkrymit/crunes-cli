@@ -142,8 +142,59 @@ async function injectUtils(isolate, context, utils, runeCallback, vars, projectD
   const shellHandles = new Map()
   let nextShellHandle = 0
 
-  await jail.set('$__utils_shell_exec', new ivm.Reference(async (cmd, opts) => {
-    return utils.shell.exec(cmd, opts)
+  await jail.set('$__utils_shell_exec', new ivm.Reference(async (cmd, opts, stdinStreamId) => {
+    let stdinStream
+    if (stdinStreamId !== undefined && stdinStreamId !== null) {
+      const { PassThrough } = await import('node:stream')
+      const stream = new PassThrough()
+      stdinStream = stream
+      
+      const wrapped = {
+        write(chunk) {
+          return new Promise((resolve, reject) => {
+            const onDrain = () => {
+              stream.removeListener('error', onError)
+              resolve()
+            }
+            const onError = (err) => {
+              stream.removeListener('drain', onDrain)
+              reject(err)
+            }
+            
+            if (!stream.write(chunk)) {
+              stream.once('drain', onDrain)
+              stream.once('error', onError)
+            } else {
+              resolve()
+            }
+          })
+        },
+        close() {
+          return new Promise((resolve, reject) => {
+            const onError = (err) => reject(err)
+            stream.once('error', onError)
+            stream.end(() => {
+              stream.removeListener('error', onError)
+              resolve()
+            })
+          })
+        }
+      }
+      streams.set(stdinStreamId, wrapped)
+    }
+    
+    const res = await utils.shell.exec(cmd, { ...opts, stdin: stdinStream })
+    
+    if (res && res.stdout && res.stdout instanceof Uint8Array) {
+      const copy = new Uint8Array(res.stdout)
+      const ab = copy.buffer.slice(copy.byteOffset, copy.byteOffset + copy.byteLength)
+      return { ...res, stdout: ab }
+    } else if (res && res instanceof Uint8Array) {
+      const copy = new Uint8Array(res)
+      const ab = copy.buffer.slice(copy.byteOffset, copy.byteOffset + copy.byteLength)
+      return ab
+    }
+    return res
   }))
   await jail.set('$__utils_shell_execInSession_open', new ivm.Reference((cmd, opts) => {
     const session = utils.shell.execInSession(cmd, opts)
@@ -151,17 +202,32 @@ async function injectUtils(isolate, context, utils, runeCallback, vars, projectD
     shellHandles.set(id, session)
     return id
   }))
-  await jail.set('$__utils_shell_execInSession_write', new ivm.Reference((id, text) => {
-    shellHandles.get(id).write(text)
+  await jail.set('$__utils_shell_execInSession_write', new ivm.Reference((idRef, chunkRef) => {
+    const id = typeof idRef === 'object' && idRef.copySync ? idRef.copySync() : idRef
+    const chunk = typeof chunkRef === 'object' && chunkRef.copySync ? chunkRef.copySync() : chunkRef
+    const handle = shellHandles.get(id)
+    if (handle) {
+      if (chunk instanceof ArrayBuffer) {
+        handle.write(Buffer.from(chunk))
+      } else {
+        handle.write(chunk)
+      }
+    }
   }))
   await jail.set('$__utils_shell_execInSession_end', new ivm.Reference((id) => {
-    shellHandles.get(id).proc.stdin.end()
+    const handle = shellHandles.get(id)
+    if (handle) {
+      handle.proc.stdin.end()
+    }
   }))
   await jail.set('$__utils_shell_execInSession_on', new ivm.Reference((idRef, typeRef, eventRef, callbackRef) => {
     const id = typeof idRef === 'object' && idRef.copySync ? idRef.copySync() : idRef
     const type = typeof typeRef === 'object' && typeRef.copySync ? typeRef.copySync() : typeRef
     const event = typeof eventRef === 'object' && eventRef.copySync ? eventRef.copySync() : eventRef
-    shellHandles.get(id).setHandler(type, event, callbackRef)
+    const handle = shellHandles.get(id)
+    if (handle) {
+      handle.setHandler(type, event, callbackRef)
+    }
   }))
   await jail.set('$__utils_shell_execInSession_kill', new ivm.Reference((id, signal) => {
     const handle = shellHandles.get(id)

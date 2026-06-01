@@ -13,8 +13,9 @@ export class ShellError extends Error {
 }
 
 export class ShellSession {
-  constructor(cmd, { dir, env }) {
+  constructor(cmd, { dir, env, binary = false }) {
     this.handlers = new Map()
+    this.binary = binary
     this.proc = spawn(cmd, [], {
       shell:              true,
       cwd:                dir,
@@ -66,8 +67,14 @@ export class ShellSession {
     }
   }
 
-  write(text) {
-    this.proc.stdin.write(text)
+  write(chunk) {
+    if (chunk && typeof chunk === 'object' && chunk.type === 'Buffer') {
+      this.proc.stdin.write(Buffer.from(chunk.data))
+    } else if (Buffer.isBuffer(chunk) || chunk instanceof Uint8Array) {
+      this.proc.stdin.write(chunk)
+    } else {
+      this.proc.stdin.write(String(chunk))
+    }
   }
 
   kill(signal) {
@@ -84,7 +91,7 @@ export class ShellSession {
 }
 
 export function createShellUtils(dir, checkPermission) {
-  async function exec(cmd, { throw: shouldThrow = true, trim = true, timeout = 30000, env } = {}) {
+  async function exec(cmd, { throw: shouldThrow = true, trim = true, timeout = 30000, env, stdin, binary = false } = {}) {
     if (checkPermission) checkPermission('shell.exec', cmd)
 
     const result = await new Promise((resolve, reject) => {
@@ -95,6 +102,7 @@ export function createShellUtils(dir, checkPermission) {
         env: env ? { ...process.env, ...env } : process.env,
       })
 
+      let stdoutParts = []
       let stdout = ''
       let stderr = ''
       let timedOut = false
@@ -104,21 +112,43 @@ export function createShellUtils(dir, checkPermission) {
         proc.kill()
         reject(new ShellError({
           message: `Command timed out after ${timeout}ms: ${cmd}`,
-          stdout,
+          stdout: binary ? Buffer.concat(stdoutParts) : stdout,
           stderr,
           exitCode: null,
         }))
       }, timeout)
 
-      proc.stdout.on('data', chunk => { stdout += chunk })
+      // Handle stdin writing/piping
+      if (stdin !== undefined && stdin !== null) {
+        if (typeof stdin === 'string' || Buffer.isBuffer(stdin) || stdin instanceof Uint8Array) {
+          proc.stdin.write(stdin)
+          proc.stdin.end()
+        } else if (stdin && typeof stdin.pipe === 'function') {
+          stdin.pipe(proc.stdin)
+        }
+      }
+
+      proc.stdout.on('data', chunk => {
+        if (binary) {
+          stdoutParts.push(chunk)
+        } else {
+          stdout += chunk
+        }
+      })
       proc.stderr.on('data', chunk => { stderr += chunk })
 
       proc.on('close', exitCode => {
         clearTimeout(timer)
         if (timedOut) return
-        stdout = stdout.replace(/\r\n/g, '\n').replace(ANSI_RE, '')
+        
+        let finalStdout
+        if (binary) {
+          finalStdout = new Uint8Array(Buffer.concat(stdoutParts))
+        } else {
+          finalStdout = stdout.replace(/\r\n/g, '\n').replace(ANSI_RE, '')
+        }
         stderr = stderr.replace(/\r\n/g, '\n').replace(ANSI_RE, '')
-        resolve({ stdout, stderr, exitCode })
+        resolve({ stdout: finalStdout, stderr, exitCode })
       })
 
       proc.on('error', err => {
@@ -136,13 +166,15 @@ export function createShellUtils(dir, checkPermission) {
       })
     }
 
-    if (trim) return result.stdout.trim()
+    if (trim) {
+      return binary ? result.stdout : result.stdout.trim()
+    }
     return result
   }
 
-  function execInSession(cmd, { env } = {}) {
+  function execInSession(cmd, opts = {}) {
     if (checkPermission) checkPermission('shell.exec', cmd)
-    return new ShellSession(cmd, { dir, env })
+    return new ShellSession(cmd, { dir, ...opts })
   }
 
   return { exec, execInSession }
