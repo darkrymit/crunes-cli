@@ -253,7 +253,17 @@ async function injectUtils(isolate, context, utils, runeCallback, vars, projectD
   }))
   await jail.set('$__utils_http_fetch', new ivm.Reference(async (url, opts) => {
     let body = opts?.body
-    if (Array.isArray(body)) {
+    if (body && typeof body === 'object' && body.type === 'FormData') {
+      const fd = new FormData()
+      for (const part of body.parts) {
+        const value = part.value && typeof part.value === 'object' && part.value.type === 'Buffer'
+          ? new Blob([new Uint8Array(part.value.data)], { type: part.value.contentType ?? 'application/octet-stream' })
+          : part.value
+        if (part.filename) fd.append(part.name, value, part.filename)
+        else fd.append(part.name, value)
+      }
+      body = fd
+    } else if (Array.isArray(body)) {
       body = body.map(entry => {
         if (entry.value && typeof entry.value === 'object' && entry.value.type === 'Buffer') {
           return { ...entry, value: new Uint8Array(entry.value.data) }
@@ -276,9 +286,21 @@ async function injectUtils(isolate, context, utils, runeCallback, vars, projectD
       _bytes:     new Uint8Array(ab),
     }
   }))
-  await jail.set('$__utils_http_fetch_stream', new ivm.Reference(async (url, opts, onChunk, onEnd, onError) => {
+  await jail.set('$__utils_http_fetch_stream', new ivm.Reference(async (urlRef, optsRef, onChunk, onEnd, onError) => {
+    const url  = urlRef.copySync()
+    const opts = optsRef.copySync()
     let body = opts?.body
-    if (Array.isArray(body)) {
+    if (body && typeof body === 'object' && body.type === 'FormData') {
+      const fd = new FormData()
+      for (const part of body.parts) {
+        const value = part.value && typeof part.value === 'object' && part.value.type === 'Buffer'
+          ? new Blob([new Uint8Array(part.value.data)], { type: part.value.contentType ?? 'application/octet-stream' })
+          : part.value
+        if (part.filename) fd.append(part.name, value, part.filename)
+        else fd.append(part.name, value)
+      }
+      body = fd
+    } else if (Array.isArray(body)) {
       body = body.map(entry => {
         if (entry.value && typeof entry.value === 'object' && entry.value.type === 'Buffer') {
           return { ...entry, value: new Uint8Array(entry.value.data) }
