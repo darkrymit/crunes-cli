@@ -53,6 +53,24 @@ describe('shell utils', () => {
     }
   });
 
+  it('terminate clears handlers and kills the process', async () => {
+    const shellUtils = createShellUtils(process.cwd());
+    const session = shellUtils.execInSession('node -e "setTimeout(() => {}, 10000)"');
+    
+    let exitCalled = false;
+    session.setHandler('session', 'exit', () => {
+      exitCalled = true;
+    });
+
+    session.terminate();
+    
+    // Wait a brief moment to ensure process has been killed
+    await new Promise(r => setTimeout(r, 200));
+    
+    expect(exitCalled).toBe(false);
+    expect(session.handlers.size).toBe(0);
+  });
+
   describe('sandboxed streaming and binary processes', () => {
     it('execInSession stdout/stderr act as text streams by default', async () => {
       const script = `

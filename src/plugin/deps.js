@@ -63,29 +63,29 @@ async function installDepsViaNpm(pluginCacheDir, dependencies) {
   const nodeModulesDir = path.join(pluginCacheDir, 'node_modules')
   await fs.mkdir(nodeModulesDir, { recursive: true })
 
-  for (const [name, ver] of Object.entries(dependencies)) {
-    const tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'crunes-dep-'))
-    try {
-      await execFileAsync('npm', [
-        'pack', `${name}@${ver}`,
-        '--pack-destination', tmp,
-      ], { shell: process.platform === 'win32' })
+  const packageJsonPath = path.join(pluginCacheDir, 'package.json')
+  const packageLockJsonPath = path.join(pluginCacheDir, 'package-lock.json')
 
-      // Find the tarball
-      const files = await fs.readdir(tmp)
-      const tarball = files.find(f => f.endsWith('.tgz'))
-      if (!tarball) throw new Error(`npm pack did not produce a tarball for ${name}@${ver}`)
+  // Write minimal package.json
+  await fs.writeFile(
+    packageJsonPath,
+    JSON.stringify({ dependencies }, null, 2),
+    'utf8'
+  )
 
-      // Extract tarball into node_modules/<name>/
-      const destDir = path.join(nodeModulesDir, name)
-      await fs.mkdir(destDir, { recursive: true })
-      await execFileAsync('tar', [
-        '-xzf', path.join(tmp, tarball),
-        '-C', destDir,
-        '--strip-components=1',
-      ], { shell: process.platform === 'win32' })
-    } finally {
-      await fs.rm(tmp, { recursive: true, force: true })
-    }
+  try {
+    await execFileAsync('npm', [
+      'install',
+      '--no-audit',
+      '--no-fund',
+      '--omit=dev'
+    ], {
+      cwd: pluginCacheDir,
+      shell: process.platform === 'win32'
+    })
+  } finally {
+    // Clean up temporary package.json and lockfile
+    await fs.rm(packageJsonPath, { force: true })
+    await fs.rm(packageLockJsonPath, { force: true })
   }
 }

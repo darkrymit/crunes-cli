@@ -51,24 +51,22 @@ export class ShellSession {
     if (!h) return
 
     if (typeof h === 'object' && h.apply) {
+      const handleCatch = err => {
+        if (err && err.message !== 'Isolate is disposed') {
+          console.error('[crunes:debug] shell callback error:', err)
+        }
+      }
+
       if (event === 'data') {
         const arrayBuffer = arg.buffer.slice(arg.byteOffset, arg.byteOffset + arg.byteLength)
-        h.apply(undefined, [arrayBuffer], { arguments: { copy: true } }).catch(err => {
-          console.error('[crunes:debug] shell callback error:', err)
-        })
+        h.apply(undefined, [arrayBuffer], { arguments: { copy: true } }).catch(handleCatch)
       } else if (event === 'error') {
         const errStr = arg instanceof Error ? arg.message : String(arg)
-        h.apply(undefined, [errStr], { arguments: { copy: true } }).catch(err => {
-          console.error('[crunes:debug] shell callback error:', err)
-        })
+        h.apply(undefined, [errStr], { arguments: { copy: true } }).catch(handleCatch)
       } else if (event === 'exit') {
-        h.apply(undefined, [arg], { arguments: { copy: true } }).catch(err => {
-          console.error('[crunes:debug] shell callback error:', err)
-        })
+        h.apply(undefined, [arg], { arguments: { copy: true } }).catch(handleCatch)
       } else {
-        h.apply(undefined, [], { arguments: { copy: true } }).catch(err => {
-          console.error('[crunes:debug] shell callback error:', err)
-        })
+        h.apply(undefined, [], { arguments: { copy: true } }).catch(handleCatch)
       }
     } else {
       h(arg)
@@ -83,6 +81,11 @@ export class ShellSession {
     } else {
       this.proc.stdin.write(String(chunk))
     }
+  }
+
+  terminate() {
+    this.handlers.clear()
+    this.kill('SIGKILL')
   }
 
   kill(signal) {
@@ -207,7 +210,7 @@ export function createShellUtils(dir, checkPermission) {
     dispose() {
       for (const session of activeSessions) {
         try {
-          session.kill('SIGKILL')
+          session.terminate()
         } catch {}
       }
       activeSessions.clear()

@@ -43,6 +43,16 @@ describe('validateConfig', () => {
       'config.json: permissions for "my-rune" must be lifecycle-scoped (e.g. permissions["my-rune"].use.allow)'
     )
   })
+
+  it('throws when permission value is a flat array', () => {
+    const config = {
+      permissions: {
+        myrune: ['shell.exec:git status']
+      }
+    }
+    expect(() => validateConfig(config))
+      .toThrow('config.json: permissions for "myrune" must be lifecycle-scoped (e.g. permissions["myrune"].use.allow)')
+  })
 })
 
 describe('mergeConfigs', () => {

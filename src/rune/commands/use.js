@@ -97,6 +97,14 @@ export async function handler({
   projectRoot = process.cwd(),
   configRoot = projectRoot,
 }) {
+  // Early gating for empty/missing keys
+  for (const seg of segments) {
+    if (!seg.key) {
+      output.error('Missing required argument: <rune>')
+      process.exit(1)
+    }
+  }
+
   let config
   try {
     config = loadConfig(configRoot)
@@ -184,7 +192,12 @@ export async function handler({
       const alreadyPrinted = Array.from(printedSections).some(p => p.name === sect.name)
       if (!alreadyPrinted) {
         if (format === 'jsonl') {
-          process.stdout.write(JSON.stringify({ type: 'section', section: sect }) + '\n')
+          process.stdout.write(JSON.stringify({
+            type: 'section',
+            rune: key,
+            instance: instanceId,
+            section: sect
+          }) + '\n')
         } else {
           const rendered = renderSection(sect)
           if (rendered) {

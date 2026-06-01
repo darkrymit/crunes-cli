@@ -16,7 +16,10 @@ export function validatePluginJson(json) {
   if (!json.runes || typeof json.runes !== 'object') throw new Error('plugin.json: "runes" must be an object')
 
   for (const [key, rune] of Object.entries(json.runes)) {
-    const perms = rune.permissions ?? {}
+    if (!rune.permissions || Object.keys(rune.permissions).length === 0) {
+      continue
+    }
+    const perms = rune.permissions
     const hasLifecycleScoped = Object.values(perms).some(v => v && Array.isArray(v.allow))
     if (!hasLifecycleScoped) {
       throw new Error(`plugin.json: rune "${key}" must have lifecycle-scoped permissions (e.g. permissions.use.allow)`)

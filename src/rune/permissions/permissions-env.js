@@ -3,6 +3,9 @@ import micromatch from 'micromatch'
 export function parseEnvPattern(pattern) {
   const body       = pattern.slice(9)
   const lastColon  = body.lastIndexOf(':')
+  if (lastColon === -1) {
+    return { source: '*', keyPattern: body }
+  }
   const source     = body.slice(0, lastColon)
   const keyPattern = body.slice(lastColon + 1)
   return { source, keyPattern }
@@ -16,5 +19,6 @@ export function matchEnvPermission(value, pattern) {
   const source = value.slice(0, colonIdx)
   const key    = value.slice(colonIdx + 1)
   const { source: patternSource, keyPattern } = parseEnvPattern(pattern)
-  return source === patternSource && micromatch.isMatch(key, keyPattern)
+  const sourceOk = patternSource === '*' || patternSource === source
+  return sourceOk && micromatch.isMatch(key, keyPattern)
 }

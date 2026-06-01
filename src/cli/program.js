@@ -294,7 +294,7 @@ export function buildProgram() {
 
   plugin
     .command('install <source>')
-    .description('Install a plugin from a local path, GitHub repo (owner/repo), git URL, or npm package')
+    .description('Install a plugin from a configured marketplace in the format <marketplace>@<plugin>')
     .action(async (source) => {
       const { handler } = await import('../plugin/commands/install.js')
       await handler({ source, projectRoot: projectRoot(), yes: !!program.opts().yes })

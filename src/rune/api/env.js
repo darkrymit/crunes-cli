@@ -19,13 +19,28 @@ export function createEnvUtils(dir, checkPermission, permissions) {
       if (!pattern.startsWith('env.read:')) continue
       const { source, keyPattern } = parseEnvPattern(pattern)
       if (!micromatch.isMatch(key, keyPattern)) continue
-      try {
-        if (checkPermission) checkPermission('env.read', `${source}:${key}`)
-      } catch {
-        continue
+      
+      if (source === '*') {
+        if (Object.hasOwn(process.env, key)) {
+          try {
+            if (checkPermission) checkPermission('env.read', `process:${key}`)
+            return process.env[key]
+          } catch {}
+        }
+        try {
+          if (checkPermission) checkPermission('env.read', `.env:${key}`)
+          const data = loadFile(dir, '.env', fileCache)
+          if (Object.hasOwn(data, key)) return data[key]
+        } catch {}
+      } else {
+        try {
+          if (checkPermission) checkPermission('env.read', `${source}:${key}`)
+        } catch {
+          continue
+        }
+        const data = source === 'process' ? process.env : loadFile(dir, source, fileCache)
+        if (Object.hasOwn(data, key)) return data[key]
       }
-      const data = source === 'process' ? process.env : loadFile(dir, source, fileCache)
-      if (Object.hasOwn(data, key)) return data[key]
     }
     return undefined
   }

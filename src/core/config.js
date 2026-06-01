@@ -62,6 +62,9 @@ export function mergeConfigs(shared, local) {
 export function validateConfig(config, fileName = 'config.json') {
   if (config.permissions && typeof config.permissions === 'object') {
     for (const [runeKey, perms] of Object.entries(config.permissions)) {
+      if (Array.isArray(perms)) {
+        throw new Error(`${fileName}: permissions for "${runeKey}" must be lifecycle-scoped (e.g. permissions["${runeKey}"].use.allow)`)
+      }
       if (perms && typeof perms === 'object') {
         if (Array.isArray(perms.allow) || Array.isArray(perms.deny)) {
           throw new Error(`${fileName}: permissions for "${runeKey}" must be lifecycle-scoped (e.g. permissions["${runeKey}"].use.allow)`)

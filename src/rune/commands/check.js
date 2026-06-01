@@ -4,10 +4,40 @@ import { loadConfig } from '../../core/config.js'
 import { runRune } from '../resolver.js'
 import { output } from '../../shared/output.js'
 
-const GATED_UTILS = ['utils.fs', 'utils.shell', 'utils.fetch', 'utils.env', 'utils.archive', 'utils.cache']
-
 export function scanPermissionWarnings(runeSource) {
-  return GATED_UTILS.filter(u => runeSource.includes(u))
+  const warnings = []
+  
+  // Legacy global utils checking
+  const GATED_UTILS = ['utils.fs', 'utils.shell', 'utils.fetch', 'utils.env', 'utils.archive', 'utils.cache']
+  for (const u of GATED_UTILS) {
+    if (runeSource.includes(u)) {
+      warnings.push(u)
+    }
+  }
+
+  // Modern destructured named imports from '@utils'
+  const importRegex = /import\s*\{\s*([^}]+)\s*\}\s*from\s*['"]@utils['"]/g
+  let match
+  const importedNames = new Set()
+  
+  while ((match = importRegex.exec(runeSource)) !== null) {
+    const names = match[1].split(',').map(n => n.trim().split(/\s+as\s+/)[0])
+    for (const name of names) {
+      if (name) importedNames.add(name)
+    }
+  }
+
+  const namespaces = ['fs', 'shell', 'fetch', 'env', 'archive', 'cache']
+  for (const ns of namespaces) {
+    if (importedNames.has(ns)) {
+      const warningKey = `utils.${ns}`
+      if (!warnings.includes(warningKey)) {
+        warnings.push(warningKey)
+      }
+    }
+  }
+
+  return warnings
 }
 
 const KEBAB_RE = /^[a-z0-9-]+$/
@@ -16,7 +46,7 @@ function checkSections(sections) {
   const errors = []
 
   if (!Array.isArray(sections)) {
-    errors.push({ section: null, message: 'generate() must return an array' })
+    errors.push({ section: null, message: 'use() must return an array' })
     return errors
   }
 

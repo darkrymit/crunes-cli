@@ -62,6 +62,35 @@ describe('matchFetchPermission', () => {
       'http.fetch:GET:https://api.github.com/*',
     )).toBe(false)
   })
+
+  it('supports double colon method separator', () => {
+    expect(matchFetchPermission(
+      'GET:https://api.github.com/issues',
+      'http.fetch:GET::https://api.github.com/*',
+    )).toBe(true)
+  })
+
+  it('supports comma-separated methods list', () => {
+    expect(matchFetchPermission(
+      'POST:https://api.github.com/issues',
+      'http.fetch:GET,POST::https://api.github.com/*',
+    )).toBe(true)
+    expect(matchFetchPermission(
+      'DELETE:https://api.github.com/issues',
+      'http.fetch:GET,POST::https://api.github.com/*',
+    )).toBe(false)
+  })
+
+  it('protocol-smart fallback parses single-colon prefix as protocol when starting with http/https', () => {
+    expect(matchFetchPermission(
+      'GET:https://api.github.com/issues',
+      'http.fetch:https://api.github.com/*',
+    )).toBe(true)
+    expect(matchFetchPermission(
+      'POST:http://localhost:3000/api',
+      'http.fetch:http://localhost:3000/*',
+    )).toBe(true)
+  })
 })
 
 describe('makePermissionChecker — http.fetch capability', () => {

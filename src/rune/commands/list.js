@@ -20,17 +20,54 @@ export async function handler({
 
   const runes = config.runes ?? {};
   const keys = Object.keys(runes);
+  const entries = [];
 
-  if (keys.length === 0) {
+  for (const key of keys) {
+    const entry = getRune(config, key);
+    const source = entry.plugin ? `→ ${entry.plugin}` : (entry.path ?? '');
+    entries.push({ key, source, name: entry.name ?? null, description: entry.description ?? null });
+  }
+
+  const enabledPlugins = config.plugins ?? [];
+  if (enabledPlugins.length > 0) {
+    try {
+      const { loadRegistry } = await import('../../plugin/registry.js');
+      const { loadPluginJson } = await import('../../plugin/manifest.js');
+      const registry = await loadRegistry();
+      for (const pluginKey of enabledPlugins) {
+        const entry = registry.plugins?.[pluginKey];
+        if (!entry) continue;
+        let pluginJson;
+        try {
+          pluginJson = await loadPluginJson(entry.path);
+        } catch {
+          continue;
+        }
+
+        for (const [runeKey, runeEntry] of Object.entries(pluginJson.runes ?? {})) {
+          const idx = pluginKey.indexOf('@');
+          const shortName = idx !== -1 ? pluginKey.slice(idx + 1) : pluginKey;
+          const displayKey = `${shortName}:${runeKey}`;
+
+          if (!entries.some(e => e.key === displayKey)) {
+            entries.push({
+              key: displayKey,
+              source: `plugin: ${pluginKey}`,
+              name: runeEntry.name ?? null,
+              description: runeEntry.description ?? null
+            });
+          }
+        }
+      }
+    } catch (e) {
+      // Ignored silently
+    }
+  }
+
+  if (entries.length === 0) {
     process.stdout.write('No runes configured. Run `crunes create <key>` to add one.\n');
     return;
   }
-
-  const entries = keys.map(key => {
-    const entry = getRune(config, key);
-    const source = entry.plugin ? `→ ${entry.plugin}` : (entry.path ?? '');
-    return { key, source, name: entry.name ?? null, description: entry.description ?? null };
-  });
 
   if (format === 'json') {
     process.stdout.write(JSON.stringify(entries, null, 2) + '\n');

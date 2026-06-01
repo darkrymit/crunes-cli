@@ -27,12 +27,12 @@ describe('validatePluginJson', () => {
     expect(() => validatePluginJson(rest)).toThrow('"runes" must be an object')
   })
 
-  it('throws when a rune has no permissions', () => {
+  it('passes when a rune has no permissions block', () => {
     const json = {
       ...VALID,
       runes: { example: {} },
     }
-    expect(() => validatePluginJson(json)).toThrow('lifecycle-scoped permissions')
+    expect(() => validatePluginJson(json)).not.toThrow()
   })
 
   it('throws when permissions has no lifecycle with an allow array', () => {
@@ -54,6 +54,22 @@ describe('validatePluginJson', () => {
         a: { permissions: { use: { allow: [], deny: [] } } },
         b: { permissions: { use: { allow: ['shell:**'], deny: [] } } },
       },
+    }
+    expect(() => validatePluginJson(json)).not.toThrow()
+  })
+
+  it('passes when permissions block is omitted', () => {
+    const json = {
+      ...VALID,
+      runes: { example: { name: 'Zero Perm' } },
+    }
+    expect(() => validatePluginJson(json)).not.toThrow()
+  })
+
+  it('passes when permissions block is empty', () => {
+    const json = {
+      ...VALID,
+      runes: { example: { name: 'Zero Perm', permissions: {} } },
     }
     expect(() => validatePluginJson(json)).not.toThrow()
   })

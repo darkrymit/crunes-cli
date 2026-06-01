@@ -264,6 +264,52 @@ describe('handler — progressive streaming and console logs', () => {
     expect(lines[0]).toEqual({ type: 'log', message: 'started' })
     expect(lines[1]).toEqual({ type: 'error', message: 'warning' })
     expect(lines[2]).toEqual({ type: 'section', section: { name: 'sec1', data: { type: 'markdown', content: 'c1' } } })
-    expect(lines[3]).toEqual({ type: 'section', section: { name: 'sec2', data: { type: 'markdown', content: 'c2' } } })
+    expect(lines[3]).toEqual({
+      type: 'section',
+      rune: 'docs',
+      instance: '1',
+      section: { name: 'sec2', data: { type: 'markdown', content: 'c2' } }
+    })
+  })
+
+  it('harmonizes final section JSONL output schema with metadata keys', async () => {
+    runRune.mockResolvedValue([{ name: 'finalSec', data: { type: 'markdown', content: 'hello' } }])
+    
+    let written = ''
+    vi.spyOn(process.stdout, 'write').mockImplementation(s => { written += s })
+    
+    await handler({ segments: [{ key: 'docs', sections: null, runeArgs: [] }], format: 'jsonl' })
+    
+    const events = written.split('\n').filter(Boolean).map(JSON.parse)
+    expect(events).toHaveLength(1)
+    expect(events[0]).toEqual({
+      type: 'section',
+      rune: 'docs',
+      instance: '1',
+      section: { name: 'finalSec', data: { type: 'markdown', content: 'hello' } }
+    })
   })
 })
+
+describe('handler — early gating of empty keys', () => {
+  beforeEach(() => {
+    vi.spyOn(process, 'exit').mockImplementation((code) => { throw new Error(`exit(${code})`) })
+  })
+
+  afterEach(() => { vi.clearAllMocks(); vi.restoreAllMocks() })
+
+  it('exits 1 and prints early gating error when key is missing', async () => {
+    const { output } = await import('../../../src/shared/output.js')
+    const errorSpy = vi.spyOn(output, 'error').mockImplementation(() => {})
+    
+    await expect(handler({
+      segments: [{ key: null, sections: null, runeArgs: [] }],
+      format: 'text',
+      failFast: false
+    })).rejects.toThrow('exit(1)')
+    
+    expect(errorSpy).toHaveBeenCalledWith('Missing required argument: <rune>')
+    errorSpy.mockRestore()
+  })
+})
+

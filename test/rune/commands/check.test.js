@@ -39,6 +39,25 @@ describe('scanPermissionWarnings', () => {
   it('returns empty array for empty source', () => {
     expect(scanPermissionWarnings('')).toEqual([])
   })
+
+  it('detects named imports from @utils', () => {
+    const src = 'import { fs, shell } from "@utils"; await fs.read("x");'
+    const warnings = scanPermissionWarnings(src)
+    expect(warnings).toContain('utils.fs')
+    expect(warnings).toContain('utils.shell')
+  })
+
+  it('detects named imports across multiple lines', () => {
+    const src = `
+      import {
+        fetch,
+        env
+      } from '@utils';
+    `
+    const warnings = scanPermissionWarnings(src)
+    expect(warnings).toContain('utils.fetch')
+    expect(warnings).toContain('utils.env')
+  })
 })
 
 describe('handler — runeArgs', () => {
@@ -66,5 +85,18 @@ describe('handler — runeArgs', () => {
     await handler({ key: 'myrune', runeArgs: [], projectRoot: '/p', configRoot: '/p' })
     const [, , calledKey] = runRune.mock.calls[0]
     expect(calledKey).toBe('myrune')
+  })
+
+  it('exits with error "use() must return an array" when result is not an array', async () => {
+    runRune.mockResolvedValue({})
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => { throw new Error('exit-1') })
+    const { output } = await import('../../../src/shared/output.js')
+    const errorSpy = vi.spyOn(output, 'error').mockImplementation(() => {})
+
+    await expect(handler({ key: 'myrune', runeArgs: [], projectRoot: '/p', configRoot: '/p' })).rejects.toThrow('exit-1')
+    expect(errorSpy).toHaveBeenCalledWith('myrune — use() must return an array')
+    
+    exitSpy.mockRestore()
+    errorSpy.mockRestore()
   })
 })

@@ -46,8 +46,15 @@ describe('matchEnvPermission', () => {
     expect(matchEnvPermission('process:ANY_KEY', 'env.read:process:*')).toBe(true)
   })
 
-  it('returns false for pattern without env: prefix', () => {
-    expect(matchEnvPermission('process:TOKEN', 'fetch:GET:https://example.com')).toBe(false)
+  it('supports env.read:* wildcard source matching', () => {
+    expect(matchEnvPermission('process:API_KEY', 'env.read:*')).toBe(true)
+    expect(matchEnvPermission('.env:API_KEY', 'env.read:*')).toBe(true)
+  })
+
+  it('supports env.read:KEY_NAME wildcard source matching for specific key', () => {
+    expect(matchEnvPermission('process:TOKEN', 'env.read:TOKEN')).toBe(true)
+    expect(matchEnvPermission('.env:TOKEN', 'env.read:TOKEN')).toBe(true)
+    expect(matchEnvPermission('.env:OTHER', 'env.read:TOKEN')).toBe(false)
   })
 })
 
