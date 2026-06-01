@@ -274,45 +274,32 @@ class Request {
 }
 globalThis.Request = Request
 
-function _makeResponse(raw, responseHeaders, consumeGuard, url, opts, serializedBody) {
+function _makeResponse(meta, responseHeaders, bytesPromise, bodyStream, consumeGuard) {
   return {
-    get ok()         { return raw.ok },
-    get status()     { return raw.status },
-    get statusText() { return raw.statusText },
+    get ok()         { return meta.ok },
+    get status()     { return meta.status },
+    get statusText() { return meta.statusText },
     get headers()    { return responseHeaders },
     get bodyUsed()   { return false },
-    text() {
+    async text() {
       consumeGuard()
-      return Promise.resolve(new TextDecoder().decode(raw._bytes))
+      const bytes = await bytesPromise
+      return new TextDecoder().decode(bytes)
     },
-    json() {
+    async json() {
       consumeGuard()
-      return Promise.resolve(JSON.parse(new TextDecoder().decode(raw._bytes)))
+      const bytes = await bytesPromise
+      return JSON.parse(new TextDecoder().decode(bytes))
     },
-    blob() {
+    async blob() {
       consumeGuard()
+      const bytes = await bytesPromise
       const contentType = responseHeaders.get('content-type') ?? ''
-      return Promise.resolve(new Blob([raw._bytes], { type: contentType }))
+      return new Blob([bytes], { type: contentType })
     },
     body() {
       consumeGuard()
-      let controller
-      const stream = new ReadableStream({
-        start(c) { controller = c },
-      })
-      let metaReceived = false
-      const onChunk = async (chunk, meta) => {
-        if (!metaReceived) { metaReceived = true; return }
-        if (chunk != null) controller.enqueue(new Uint8Array(chunk))
-      }
-      const onEnd = async () => { controller.close() }
-      const onError = async (msg) => { controller.error(new Error(msg)) }
-      $__utils_http_fetch_stream.apply(
-        undefined,
-        [url, { ...opts, body: serializedBody }, onChunk, onEnd, onError],
-        { arguments: { reference: true }, result: { promise: true } }
-      )
-      return stream
+      return bodyStream
     },
   }
 }
@@ -512,9 +499,6 @@ globalThis.utils = {
       let isStream = false
       if (reqBody instanceof FormData) {
         serializedBody = reqBody._toWire()
-        if (!reqHeaders.has('content-type')) {
-          reqHeaders.set('content-type', `multipart/form-data; boundary=${serializedBody.boundary}`)
-        }
       } else if (reqBody instanceof URLSearchParams) {
         serializedBody = reqBody.toString()
         if (!reqHeaders.has('content-type')) {
@@ -551,16 +535,62 @@ globalThis.utils = {
           { arguments: { reference: true }, result: { promise: true, copy: true } }
         )
         const responseHeaders = new Headers(raw.headers)
-        return _makeResponse(raw, responseHeaders, consumeGuard, url, opts, null)
+        // isStream responses have no body() streaming — body was already consumed uploading
+        const bytesPromise = Promise.resolve(raw._bytes)
+        const bodyStream = new ReadableStream({
+          start(c) { c.enqueue(raw._bytes); c.close() }
+        })
+        return _makeResponse(raw, responseHeaders, bytesPromise, bodyStream, consumeGuard)
       }
 
-      const raw = await $__utils_http_fetch.apply(
-        undefined,
-        [url, { ...opts, body: serializedBody }],
-        { arguments: { copy: true }, result: { promise: true, copy: true } }
-      )
-      const responseHeaders = new Headers(raw.headers)
-      return _makeResponse(raw, responseHeaders, consumeGuard, url, opts, serializedBody)
+      const responseHeaders = new Headers()
+      let streamController = null
+      const chunks = []
+      let resolveMeta, rejectMeta
+      const metaPromise = new Promise((res, rej) => { resolveMeta = res; rejectMeta = rej })
+
+      const bytesPromise = new Promise((resolve, reject) => {
+        let metaReceived = false
+        const onChunk = async (chunk, chunkMeta) => {
+          if (!metaReceived) {
+            metaReceived = true
+            for (const [k, v] of chunkMeta.headers) responseHeaders.set(k, v)
+            resolveMeta(chunkMeta)
+            return
+          }
+          if (chunk != null) {
+            const bytes = new Uint8Array(chunk)
+            chunks.push(bytes)
+            if (streamController) streamController.enqueue(bytes)
+          }
+        }
+        const onEnd = async () => {
+          if (streamController) streamController.close()
+          const total = chunks.reduce((n, c) => n + c.byteLength, 0)
+          const merged = new Uint8Array(total)
+          let offset = 0
+          for (const c of chunks) { merged.set(c, offset); offset += c.byteLength }
+          resolve(merged)
+        }
+        const onError = async (msg) => {
+          if (streamController) streamController.error(new Error(msg))
+          rejectMeta(new Error(msg))
+          reject(new Error(msg))
+        }
+        $__utils_http_fetch.apply(
+          undefined,
+          [url, { ...opts, body: serializedBody }, onChunk, onEnd, onError],
+          { arguments: { reference: true }, result: { promise: true } }
+        )
+      })
+
+      const meta = await metaPromise
+
+      const bodyStream = new ReadableStream({
+        start(c) { streamController = c },
+      })
+
+      return _makeResponse(meta, responseHeaders, bytesPromise, bodyStream, consumeGuard)
     },
   },
   env: {

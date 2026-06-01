@@ -251,44 +251,7 @@ async function injectUtils(isolate, context, utils, runeCallback, vars, projectD
   await jail.set('$__utils_xml_write', new ivm.Reference(async (relPath, data, opts) => {
     await utils.xml.write(relPath, data, opts)
   }))
-  await jail.set('$__utils_http_fetch', new ivm.Reference(async (url, opts) => {
-    let body = opts?.body
-    let headers = opts?.headers ? { ...opts.headers } : {}
-    if (body && typeof body === 'object' && body.type === 'FormData') {
-      const fd = new FormData()
-      for (const part of body.parts) {
-        const value = part.value && typeof part.value === 'object' && part.value.type === 'Buffer'
-          ? new Blob([new Uint8Array(part.value.data)], { type: part.value.contentType ?? 'application/octet-stream' })
-          : part.value
-        if (part.filename) fd.append(part.name, value, part.filename)
-        else fd.append(part.name, value)
-      }
-      body = fd
-      delete headers['content-type']
-    } else if (Array.isArray(body)) {
-      body = body.map(entry => {
-        if (entry.value && typeof entry.value === 'object' && entry.value.type === 'Buffer') {
-          return { ...entry, value: new Uint8Array(entry.value.data) }
-        }
-        return entry
-      })
-    } else if (body && typeof body === 'object' && body.type === 'Buffer') {
-      body = new Uint8Array(body.data)
-    }
-    const res = await utils.http.fetch(url, { ...opts, headers, body })
-    const headerPairs = typeof res.headers?.entries === 'function'
-      ? [...res.headers.entries()]
-      : Object.entries(res.headers ?? {})
-    const ab = await res.arrayBuffer()
-    return {
-      ok:         res.ok,
-      status:     res.status,
-      statusText: res.statusText,
-      headers:    headerPairs,
-      _bytes:     new Uint8Array(ab),
-    }
-  }))
-  await jail.set('$__utils_http_fetch_stream', new ivm.Reference(async (urlRef, optsRef, onChunk, onEnd, onError) => {
+  await jail.set('$__utils_http_fetch', new ivm.Reference(async (urlRef, optsRef, onChunk, onEnd, onError) => {
     const url  = urlRef.copySync()
     const opts = optsRef.copySync()
     let body = opts?.body
