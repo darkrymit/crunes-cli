@@ -253,6 +253,7 @@ async function injectUtils(isolate, context, utils, runeCallback, vars, projectD
   }))
   await jail.set('$__utils_http_fetch', new ivm.Reference(async (url, opts) => {
     let body = opts?.body
+    let headers = opts?.headers ? { ...opts.headers } : {}
     if (body && typeof body === 'object' && body.type === 'FormData') {
       const fd = new FormData()
       for (const part of body.parts) {
@@ -263,6 +264,7 @@ async function injectUtils(isolate, context, utils, runeCallback, vars, projectD
         else fd.append(part.name, value)
       }
       body = fd
+      delete headers['content-type']
     } else if (Array.isArray(body)) {
       body = body.map(entry => {
         if (entry.value && typeof entry.value === 'object' && entry.value.type === 'Buffer') {
@@ -273,7 +275,7 @@ async function injectUtils(isolate, context, utils, runeCallback, vars, projectD
     } else if (body && typeof body === 'object' && body.type === 'Buffer') {
       body = new Uint8Array(body.data)
     }
-    const res = await utils.http.fetch(url, { ...opts, body })
+    const res = await utils.http.fetch(url, { ...opts, headers, body })
     const headerPairs = typeof res.headers?.entries === 'function'
       ? [...res.headers.entries()]
       : Object.entries(res.headers ?? {})
@@ -290,6 +292,7 @@ async function injectUtils(isolate, context, utils, runeCallback, vars, projectD
     const url  = urlRef.copySync()
     const opts = optsRef.copySync()
     let body = opts?.body
+    let headers = opts?.headers ? { ...opts.headers } : {}
     if (body && typeof body === 'object' && body.type === 'FormData') {
       const fd = new FormData()
       for (const part of body.parts) {
@@ -300,6 +303,7 @@ async function injectUtils(isolate, context, utils, runeCallback, vars, projectD
         else fd.append(part.name, value)
       }
       body = fd
+      delete headers['content-type']
     } else if (Array.isArray(body)) {
       body = body.map(entry => {
         if (entry.value && typeof entry.value === 'object' && entry.value.type === 'Buffer') {
@@ -311,7 +315,7 @@ async function injectUtils(isolate, context, utils, runeCallback, vars, projectD
       body = new Uint8Array(body.data)
     }
     try {
-      const res = await utils.http.fetch(url, { ...opts, body })
+      const res = await utils.http.fetch(url, { ...opts, headers, body })
       const headerPairs = typeof res.headers?.entries === 'function'
         ? [...res.headers.entries()]
         : Object.entries(res.headers ?? {})

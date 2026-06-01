@@ -551,7 +551,7 @@ globalThis.utils = {
           { arguments: { reference: true }, result: { promise: true, copy: true } }
         )
         const responseHeaders = new Headers(raw.headers)
-        return _makeResponse(raw, responseHeaders, consumeGuard)
+        return _makeResponse(raw, responseHeaders, consumeGuard, url, opts, null)
       }
 
       const raw = await $__utils_http_fetch.apply(
