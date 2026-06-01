@@ -77,4 +77,28 @@ declare namespace crypto {
    */
   function decrypt(algorithm: string, key: string | Uint8Array, iv: string | Uint8Array, ciphertext: Uint8Array): Promise<Uint8Array>
 
+  /**
+   * Hashes a stream of Uint8Array chunks, yielding a single Uint8Array chunk containing the hash digest at the end.
+   * @param algorithm Hash algorithm e.g. 'sha256', 'md5'
+   */
+  function hashStream(algorithm: string): TransformStream<Uint8Array, Uint8Array>
+
+  /**
+   * Encrypts a stream of raw bytes.
+   * For AEAD algorithms like GCM, the authentication tag is automatically appended to the very end of the stream.
+   * @param algorithm Symmetric encryption algorithm e.g. 'aes-256-gcm'
+   * @param key Secret key buffer
+   * @param iv Initialization Vector buffer
+   */
+  function encryptStream(algorithm: string, key: Uint8Array, iv: Uint8Array): TransformStream<Uint8Array, Uint8Array>
+
+  /**
+   * Decrypts a stream of encrypted bytes.
+   * For AEAD algorithms like GCM, the authentication tag is expected at the end of the input stream.
+   * @param algorithm Symmetric encryption algorithm e.g. 'aes-256-gcm'
+   * @param key Secret key buffer
+   * @param iv Initialization Vector buffer
+   */
+  function decryptStream(algorithm: string, key: Uint8Array, iv: Uint8Array): TransformStream<Uint8Array, Uint8Array>
 }
+

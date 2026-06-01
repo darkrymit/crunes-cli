@@ -34,4 +34,35 @@ declare namespace archive {
    * @param opts.gzip Gzip-compress the output (default: true)
    */
   function tar(source: string, dest: string, opts?: { gzip?: boolean }): Promise<void>
+
+  /**
+   * Compresses a file or directory on disk on-the-fly, yielding a stream of compressed zip bytes.
+   * Requires `fs.read:<sourceDir>` permission.
+   * @param sourceDir Relative path to directory or file to zip
+   */
+  function zipStream(sourceDir: string): ReadableStream<Uint8Array>
+
+  /**
+   * Returns a WritableStream that extracts zip bytes directly to the target destination folder.
+   * Requires `fs.write:<destDir>` permission.
+   * @param destDir Relative path to the output directory
+   */
+  function unzipStream(destDir: string): WritableStream<Uint8Array>
+
+  /**
+   * Compresses a file or directory into a TAR stream.
+   * Requires `fs.read:<sourceDir>` permission.
+   * @param sourceDir Relative path to directory or file to tar
+   * @param opts.gzip Compress the tar stream with gzip (default: true)
+   */
+  function tarStream(sourceDir: string, opts?: { gzip?: boolean }): ReadableStream<Uint8Array>
+
+  /**
+   * Returns a WritableStream that extracts tar/tar.gz bytes directly to the target destination folder.
+   * Requires `fs.write:<destDir>` permission.
+   * @param destDir Relative path to the output directory
+   * @param opts.gzip Force gzip decompression; if omitted, automatically detects from headers
+   */
+  function untarStream(destDir: string, opts?: { gzip?: boolean }): WritableStream<Uint8Array>
 }
+

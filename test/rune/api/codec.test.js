@@ -7,6 +7,9 @@ import {
   fromUtf8,
   toUtf8,
 } from '../../../src/rune/api/codec.js'
+import { runRuneInIsolate } from '../../../src/rune/isolation/runner.js'
+import path from 'node:path'
+import fs from 'node:fs/promises'
 
 describe('toHex / fromHex', () => {
   it('toHex encodes a string to hex', () => {
@@ -57,5 +60,85 @@ describe('fromUtf8 / toUtf8', () => {
 
   it('fromUtf8 and toUtf8 roundtrip', () => {
     expect(toUtf8(fromUtf8('hello world'))).toBe('hello world')
+  })
+})
+
+describe('sandboxed streaming codecs', () => {
+  it('codec base64 encoder handles non-aligned chunk remainder boundaries', async () => {
+    const script = `
+      import { codec } from '@utils'
+      export async function use() {
+        const stream = new ReadableStream({
+          start(c) {
+            c.enqueue(codec.fromUtf8("he")) // 2 bytes
+            c.enqueue(codec.fromUtf8("llo")) // 3 bytes
+            c.close()
+          }
+        })
+        const encoder = codec.base64EncoderStream()
+        const outStream = stream.pipeThrough(encoder)
+        const reader = outStream.getReader()
+        let text = ''
+        while (true) {
+          const { value, done } = await reader.read()
+          if (done) break
+          text += value
+        }
+        return text
+      }
+    `
+    const scriptPath = path.join(process.cwd(), 'scratch_test_codec.js')
+    await fs.writeFile(scriptPath, script)
+    try {
+      const result = await runRuneInIsolate(scriptPath, { allow: [], deny: [] }, [], process.cwd())
+      expect(result).toBe('aGVsbG8=')
+    } finally {
+      await fs.rm(scriptPath, { force: true })
+    }
+  })
+
+  it('codec hex encoder and decoder stream roundtrip', async () => {
+    const script = `
+      import { codec } from '@utils'
+      export async function use() {
+        const stream = new ReadableStream({
+          start(c) {
+            c.enqueue(codec.fromUtf8("s"))
+            c.enqueue(codec.fromUtf8("tre"))
+            c.enqueue(codec.fromUtf8("aming hex!"))
+            c.close()
+          }
+        })
+        const enc = codec.hexEncoderStream()
+        const dec = codec.hexDecoderStream()
+        
+        const piped = stream.pipeThrough(enc).pipeThrough(dec)
+        const reader = piped.getReader()
+        const chunks = []
+        while (true) {
+          const { value, done } = await reader.read()
+          if (done) break
+          chunks.push(value)
+        }
+        
+        let total = 0
+        for (const c of chunks) total += c.length
+        const merged = new Uint8Array(total)
+        let offset = 0
+        for (const c of chunks) {
+          merged.set(c, offset)
+          offset += c.length
+        }
+        return codec.toUtf8(merged)
+      }
+    `
+    const scriptPath = path.join(process.cwd(), 'scratch_test_codec_hex.js')
+    await fs.writeFile(scriptPath, script)
+    try {
+      const result = await runRuneInIsolate(scriptPath, { allow: [], deny: [] }, [], process.cwd())
+      expect(result).toBe('streaming hex!')
+    } finally {
+      await fs.rm(scriptPath, { force: true })
+    }
   })
 })

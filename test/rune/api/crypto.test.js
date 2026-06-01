@@ -12,6 +12,9 @@ import {
   encrypt,
   decrypt,
 } from '../../../src/rune/api/crypto.js'
+import { runRuneInIsolate } from '../../../src/rune/isolation/runner.js'
+import path from 'node:path'
+import fs from 'node:fs/promises'
 
 describe('hashing', () => {
   it('hash returns raw Uint8Array bytes', () => {
@@ -79,5 +82,85 @@ describe('randomizer utilities', () => {
   })
   it('randomBase64', () => {
     expect(randomBase64(16)).toMatch(/^[A-Za-z0-9+/]+=*$/)
+  })
+})
+
+describe('sandboxed streaming hashing and ciphers', () => {
+  it('hashStream matches whole-buffer hash digest', async () => {
+    const script = `
+      import { crypto, codec } from '@utils'
+      export async function use() {
+        const stream = new ReadableStream({
+          start(c) {
+            c.enqueue(codec.fromUtf8("hello world"))
+            c.close()
+          }
+        })
+        const hashOut = await stream.pipeThrough(crypto.hashStream('sha256'))
+        const reader = hashOut.getReader()
+        const { value } = await reader.read()
+        return codec.toHex(value)
+      }
+    `
+    const scriptPath = path.join(process.cwd(), 'scratch_test_crypto.js')
+    await fs.writeFile(scriptPath, script)
+    try {
+      const result = await runRuneInIsolate(scriptPath, { allow: [], deny: [] }, [], process.cwd())
+      expect(result).toBe('b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9')
+    } finally {
+      await fs.rm(scriptPath, { force: true })
+    }
+  })
+
+  it('encryptStream and decryptStream roundtrip matches exactly', async () => {
+    const script = `
+      import { crypto, codec } from '@utils'
+      export async function use() {
+        const key = crypto.randomBytes(32)
+        const iv = crypto.randomBytes(12)
+        const plaintext = codec.fromUtf8("this is a super secret streaming payload of considerable size")
+        
+        const stream = new ReadableStream({
+          start(c) {
+            c.enqueue(plaintext.subarray(0, 15))
+            c.enqueue(plaintext.subarray(15, 30))
+            c.enqueue(plaintext.subarray(30))
+            c.close()
+          }
+        })
+        
+        const encStream = crypto.encryptStream('aes-256-gcm', key, iv)
+        const decStream = crypto.decryptStream('aes-256-gcm', key, iv)
+        
+        const piped = stream.pipeThrough(encStream).pipeThrough(decStream)
+        const reader = piped.getReader()
+        
+        const chunks = []
+        while (true) {
+          const { value, done } = await reader.read()
+          if (done) break
+          chunks.push(value)
+        }
+        
+        let total = 0
+        for (const c of chunks) total += c.length
+        const merged = new Uint8Array(total)
+        let offset = 0
+        for (const c of chunks) {
+          merged.set(c, offset)
+          offset += c.length
+        }
+        
+        return codec.toUtf8(merged)
+      }
+    `
+    const scriptPath = path.join(process.cwd(), 'scratch_test_crypto_roundtrip.js')
+    await fs.writeFile(scriptPath, script)
+    try {
+      const result = await runRuneInIsolate(scriptPath, { allow: [], deny: [] }, [], process.cwd())
+      expect(result).toBe('this is a super secret streaming payload of considerable size')
+    } finally {
+      await fs.rm(scriptPath, { force: true })
+    }
   })
 })

@@ -7,7 +7,7 @@ export class FetchError extends Error {
 }
 
 export function createHttpUtils(checkPermission) {
-  async function fetch(url, { method = 'GET', headers = {}, body, timeout = 30_000 } = {}) {
+  async function fetch(url, { method = 'GET', headers = {}, body, timeout = 30_000, ...rest } = {}) {
     if (checkPermission) checkPermission('http.fetch', `${method}:${url}`)
 
     let finalBody = body
@@ -37,7 +37,7 @@ export function createHttpUtils(checkPermission) {
     const timer = setTimeout(() => controller.abort(), timeout)
 
     try {
-      const res = await globalThis.fetch(url, { method, headers, body: finalBody, signal: controller.signal })
+      const res = await globalThis.fetch(url, { method, headers, body: finalBody, signal: controller.signal, ...rest })
       clearTimeout(timer)
       return res
     } catch (err) {

@@ -293,7 +293,9 @@ async function injectUtils(isolate, context, utils, runeCallback, vars, projectD
       await onError.apply(undefined, [err.message], { arguments: { copy: true }, result: { promise: true } })
     }
   }))
-  await jail.set('$__utils_http_body_reader', new ivm.Reference(async (url, opts, pullChunk, onChunk, onEnd, onError) => {
+  await jail.set('$__utils_http_body_reader', new ivm.Reference(async (urlRef, optsRef, pullChunk, onChunk, onEnd, onError) => {
+    const url = typeof urlRef === 'object' && urlRef.copySync ? urlRef.copySync() : urlRef
+    const opts = typeof optsRef === 'object' && optsRef.copySync ? optsRef.copySync() : optsRef
     const { Readable } = await import('node:stream')
     let done = false
     const nodeReadable = new Readable({
@@ -313,7 +315,7 @@ async function injectUtils(isolate, context, utils, runeCallback, vars, projectD
       }
     })
     try {
-      const res = await utils.http.fetch(url, { ...opts, body: nodeReadable })
+      const res = await utils.http.fetch(url, { ...opts, duplex: 'half', body: nodeReadable })
       const headerPairs = typeof res.headers?.entries === 'function'
         ? [...res.headers.entries()]
         : Object.entries(res.headers ?? {})
@@ -509,6 +511,140 @@ async function injectUtils(isolate, context, utils, runeCallback, vars, projectD
 
   await jail.set('$__utils_crypto_decrypt', new ivm.Reference((algorithm, key, iv, ciphertext) => {
     return decrypt(algorithm, key, iv, ciphertext)
+  }))
+
+  // Streaming Cryptography Host Bridges
+  const hashStates = new Map()
+  let nextHashId = 1
+  await jail.set('$__utils_crypto_hash_init', new ivm.Reference(async (algorithm) => {
+    const { createHash } = await import('node:crypto')
+    const h = createHash(algorithm)
+    const id = nextHashId++
+    hashStates.set(id, h)
+    return id
+  }))
+  await jail.set('$__utils_crypto_hash_update', new ivm.Reference((id, arrayBuffer) => {
+    const h = hashStates.get(id)
+    if (!h) throw new Error(`Invalid hash stream ID: ${id}`)
+    h.update(Buffer.from(arrayBuffer))
+  }))
+  await jail.set('$__utils_crypto_hash_digest', new ivm.Reference((id) => {
+    const h = hashStates.get(id)
+    if (!h) throw new Error(`Invalid hash stream ID: ${id}`)
+    const digest = h.digest()
+    hashStates.delete(id)
+    const copy = new Uint8Array(digest.length)
+    copy.set(digest)
+    return copy.buffer
+  }))
+
+  const cipherStates = new Map()
+  let nextCipherId = 1
+  await jail.set('$__utils_crypto_cipher_init', new ivm.Reference(async (algorithm, keyRef, ivRef, isEncrypt) => {
+    const { createCipheriv, createDecipheriv } = await import('node:crypto')
+    const key = Buffer.from(keyRef)
+    const iv = Buffer.from(ivRef)
+    const id = nextCipherId++
+    
+    let cipher
+    let state = { algorithm, key, iv, isEncrypt, bufferedBytes: Buffer.alloc(0) }
+    if (isEncrypt) {
+      cipher = createCipheriv(algorithm, key, iv)
+    } else {
+      cipher = createDecipheriv(algorithm, key, iv)
+    }
+    state.cipher = cipher
+    cipherStates.set(id, state)
+    return id
+  }))
+  await jail.set('$__utils_crypto_cipher_update', new ivm.Reference((id, arrayBuffer) => {
+    const state = cipherStates.get(id)
+    if (!state) throw new Error(`Invalid cipher stream ID: ${id}`)
+    const chunk = Buffer.from(arrayBuffer)
+    
+    if (state.isEncrypt) {
+      const out = state.cipher.update(chunk)
+      if (out.length === 0) return null
+      const copy = new Uint8Array(out.length)
+      copy.set(out)
+      return copy.buffer
+    } else {
+      if (state.algorithm.includes('gcm')) {
+        const total = Buffer.concat([state.bufferedBytes, chunk])
+        if (total.length <= 16) {
+          state.bufferedBytes = total
+          return null
+        }
+        const toDecrypt = total.subarray(0, total.length - 16)
+        state.bufferedBytes = total.subarray(total.length - 16)
+        const out = state.cipher.update(toDecrypt)
+        if (out.length === 0) return null
+        const copy = new Uint8Array(out.length)
+        copy.set(out)
+        return copy.buffer
+      } else {
+        const out = state.cipher.update(chunk)
+        if (out.length === 0) return null
+        const copy = new Uint8Array(out.length)
+        copy.set(out)
+        return copy.buffer
+      }
+    }
+  }))
+  await jail.set('$__utils_crypto_cipher_final', new ivm.Reference((id) => {
+    const state = cipherStates.get(id)
+    if (!state) throw new Error(`Invalid cipher stream ID: ${id}`)
+    
+    let finalParts = []
+    if (!state.isEncrypt && state.algorithm.includes('gcm')) {
+      if (state.bufferedBytes.length < 16) {
+        throw new Error('Streaming GCM Decrypt: Ciphertext too short to contain auth tag')
+      }
+      state.cipher.setAuthTag(state.bufferedBytes)
+    }
+    
+    finalParts.push(state.cipher.final())
+    
+    if (state.isEncrypt && state.algorithm.includes('gcm')) {
+      finalParts.push(state.cipher.getAuthTag())
+    }
+    
+    cipherStates.delete(id)
+    const merged = Buffer.concat(finalParts)
+    if (merged.length === 0) return null
+    const copy = new Uint8Array(merged.length)
+    copy.set(merged)
+    return copy.buffer
+  }))
+
+  // Streaming Archive Host Bridges
+  await jail.set('$__utils_archive_zipStream', new ivm.Reference(async (source) => {
+    const stream = utils.archive.zipStream(source)
+    const iter = stream[Symbol.asyncIterator]()
+    const id = nextStreamId++
+    streams.set(id, iter)
+    return id
+  }))
+  await jail.set('$__utils_archive_tarStream', new ivm.Reference(async (source, optsRef) => {
+    const opts = optsRef ? optsRef.copySync() : undefined
+    const stream = utils.archive.tarStream(source, opts)
+    const iter = stream[Symbol.asyncIterator]()
+    const id = nextStreamId++
+    streams.set(id, iter)
+    return id
+  }))
+  await jail.set('$__utils_archive_unzipStream', new ivm.Reference(async (dest) => {
+    const writeStream = utils.archive.unzipStream(dest)
+    const id = nextStreamId++
+    streams.set(id, writeStream)
+    return id
+  }))
+  await jail.set('$__utils_archive_untarStream', new ivm.Reference(async (dest, optsRef) => {
+    const opts = optsRef ? optsRef.copySync() : undefined
+    const writeStream = utils.archive.untarStream(dest, opts)
+    const id = nextStreamId++
+    streams.set(id, writeStream)
+    return id
   }))
 
   await jail.set('$__vars', JSON.stringify(vars))

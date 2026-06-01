@@ -119,5 +119,134 @@ export function createArchiveUtils(dir, checkPermission) {
         await tarCreate({ gzip, file: dstAbs, cwd: path.dirname(srcAbs) }, [path.basename(srcAbs)])
       }
     },
+
+    zipStream(source) {
+      const srcToken = canonicalizePath(dir, source)
+      if (checkPermission) checkPermission('fs.read', srcToken)
+      const srcAbs = resolveToAbs(dir, source)
+      
+      const arc = new ZipArchive({ zlib: { level: 9 } })
+      fs.stat(srcAbs).then(stat => {
+        if (stat.isDirectory()) {
+          arc.directory(srcAbs, false)
+        } else {
+          arc.file(srcAbs, { name: path.basename(srcAbs) })
+        }
+        arc.finalize()
+      }).catch(err => {
+        arc.emit('error', err)
+      })
+      return arc
+    },
+
+    unzipStream(dest) {
+      const dstToken = canonicalizePath(dir, dest)
+      if (checkPermission) checkPermission('fs.write', dstToken)
+      const dstAbs = resolveToAbs(dir, dest)
+      
+      const parser = unzipper.Parse()
+      parser.on('entry', (entry) => {
+        try {
+          assertNoSlip(dstAbs, entry.path)
+          const absEntry = path.resolve(dstAbs, entry.path)
+          if (entry.type === 'Directory') {
+            fs.mkdir(absEntry, { recursive: true })
+              .then(() => entry.autodrain())
+              .catch(() => entry.autodrain())
+          } else {
+            fs.mkdir(path.dirname(absEntry), { recursive: true })
+              .then(() => pipeline(entry, createWriteStream(absEntry)))
+              .catch(() => entry.autodrain())
+          }
+        } catch (err) {
+          entry.autodrain()
+        }
+      })
+      
+      return {
+        write(chunk) {
+          return new Promise((resolve, reject) => {
+            const onDrain = () => {
+              parser.removeListener('error', onError)
+              resolve()
+            }
+            const onError = (err) => {
+              parser.removeListener('drain', onDrain)
+              reject(err)
+            }
+            if (!parser.write(chunk)) {
+              parser.once('drain', onDrain)
+              parser.once('error', onError)
+            } else {
+              resolve()
+            }
+          })
+        },
+        close() {
+          return new Promise((resolve, reject) => {
+            const onError = (err) => reject(err)
+            parser.once('error', onError)
+            parser.end(() => {
+              parser.removeListener('error', onError)
+              resolve()
+            })
+          })
+        }
+      }
+    },
+
+    tarStream(source, { gzip = true } = {}) {
+      const srcToken = canonicalizePath(dir, source)
+      if (checkPermission) checkPermission('fs.read', srcToken)
+      const srcAbs = resolveToAbs(dir, source)
+      
+      return tarCreate({ gzip, cwd: path.dirname(srcAbs) }, [path.basename(srcAbs)])
+    },
+
+    untarStream(dest, { gzip } = {}) {
+      const dstToken = canonicalizePath(dir, dest)
+      if (checkPermission) checkPermission('fs.write', dstToken)
+      const dstAbs = resolveToAbs(dir, dest)
+      
+      const extractor = tarExtract({
+        gzip,
+        cwd: dstAbs,
+        filter: (pathEntry, entry) => {
+          assertNoSlip(dstAbs, pathEntry)
+          return true
+        }
+      })
+
+      return {
+        write(chunk) {
+          return new Promise((resolve, reject) => {
+            const onDrain = () => {
+              extractor.removeListener('error', onError)
+              resolve()
+            }
+            const onError = (err) => {
+              extractor.removeListener('drain', onDrain)
+              reject(err)
+            }
+            if (!extractor.write(chunk)) {
+              extractor.once('drain', onDrain)
+              extractor.once('error', onError)
+            } else {
+              resolve()
+            }
+          })
+        },
+        close() {
+          return new Promise((resolve, reject) => {
+            const onError = (err) => reject(err)
+            extractor.once('error', onError)
+            extractor.end(() => {
+              extractor.removeListener('error', onError)
+              resolve()
+            })
+          })
+        }
+      }
+    },
   }
 }

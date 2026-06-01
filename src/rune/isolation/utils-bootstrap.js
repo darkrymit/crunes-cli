@@ -641,6 +641,76 @@ globalThis.utils = {
     unzip:   (s, d) => $__utils_archive_unzip.apply(undefined,   [s, d], { result: { promise: true } }),
     tar:   (s, d, o) => $__utils_archive_tar.apply(undefined,   [s, d, o], { arguments: { copy: true }, result: { promise: true } }),
     untar: (s, d, o) => $__utils_archive_untar.apply(undefined, [s, d, o], { arguments: { copy: true }, result: { promise: true } }),
+    zipStream: (source) => {
+      let streamId = null
+      return new ReadableStream({
+        async start() {
+          streamId = await $__utils_archive_zipStream.apply(undefined, [source], { result: { promise: true } })
+        },
+        async pull(controller) {
+          const ab = await $__utils_fs_readStream_next.apply(undefined, [streamId], { result: { promise: true, copy: true } })
+          if (ab === null) controller.close()
+          else controller.enqueue(new Uint8Array(ab))
+        }
+      })
+    },
+    tarStream: (source, opts) => {
+      let streamId = null
+      return new ReadableStream({
+        async start() {
+          streamId = await $__utils_archive_tarStream.apply(undefined, [source, opts], { arguments: { copy: true }, result: { promise: true } })
+        },
+        async pull(controller) {
+          const ab = await $__utils_fs_readStream_next.apply(undefined, [streamId], { result: { promise: true, copy: true } })
+          if (ab === null) controller.close()
+          else controller.enqueue(new Uint8Array(ab))
+        }
+      })
+    },
+    unzipStream: (dest) => {
+      let streamId = null
+      return new WritableStream({
+        async start() {
+          streamId = await $__utils_archive_unzipStream.apply(undefined, [dest], { result: { promise: true } })
+        },
+        async write(chunk) {
+          if (!(chunk instanceof Uint8Array)) throw new TypeError('unzipStream requires Uint8Array chunks')
+          await $__utils_fs_writeStream_write.apply(undefined, [streamId, chunk.buffer], { arguments: { copy: true }, result: { promise: true } })
+        },
+        async close() {
+          if (streamId !== null) {
+            await $__utils_fs_writeStream_close.apply(undefined, [streamId], { result: { promise: true } })
+          }
+        },
+        async abort() {
+          if (streamId !== null) {
+            await $__utils_fs_writeStream_close.apply(undefined, [streamId], { result: { promise: true } })
+          }
+        }
+      })
+    },
+    untarStream: (dest, opts) => {
+      let streamId = null
+      return new WritableStream({
+        async start() {
+          streamId = await $__utils_archive_untarStream.apply(undefined, [dest, opts], { arguments: { copy: true }, result: { promise: true } })
+        },
+        async write(chunk) {
+          if (!(chunk instanceof Uint8Array)) throw new TypeError('untarStream requires Uint8Array chunks')
+          await $__utils_fs_writeStream_write.apply(undefined, [streamId, chunk.buffer], { arguments: { copy: true }, result: { promise: true } })
+        },
+        async close() {
+          if (streamId !== null) {
+            await $__utils_fs_writeStream_close.apply(undefined, [streamId], { result: { promise: true } })
+          }
+        },
+        async abort() {
+          if (streamId !== null) {
+            await $__utils_fs_writeStream_close.apply(undefined, [streamId], { result: { promise: true } })
+          }
+        }
+      })
+    },
   },
   cache: {
     open: async (location, name) => {
@@ -741,6 +811,65 @@ globalThis.utils = {
     decrypt: (algorithm, key, iv, ciphertext) => {
       return $__utils_crypto_decrypt.apply(undefined, [algorithm, key, iv, ciphertext], { arguments: { copy: true }, result: { promise: true, copy: true } })
     },
+    hashStream: (algorithm) => {
+      let id = null
+      return new TransformStream({
+        async start() {
+          id = await $__utils_crypto_hash_init.apply(undefined, [algorithm], { result: { promise: true } })
+        },
+        async transform(chunk, controller) {
+          if (!(chunk instanceof Uint8Array)) throw new TypeError('hashStream requires Uint8Array chunks')
+          const buf = chunk.slice().buffer
+          await $__utils_crypto_hash_update.apply(undefined, [id, buf], { arguments: { copy: true }, result: { promise: true } })
+        },
+        async flush(controller) {
+          const ab = await $__utils_crypto_hash_digest.apply(undefined, [id], { result: { promise: true, copy: true } })
+          if (ab) controller.enqueue(new Uint8Array(ab))
+        }
+      })
+    },
+    encryptStream: (algorithm, key, iv) => {
+      let id = null
+      if (!(key instanceof Uint8Array) || !(iv instanceof Uint8Array)) {
+        throw new TypeError('encryptStream requires Uint8Array for key and iv')
+      }
+      return new TransformStream({
+        async start() {
+          id = await $__utils_crypto_cipher_init.apply(undefined, [algorithm, key.buffer, iv.buffer, true], { arguments: { copy: true }, result: { promise: true } })
+        },
+        async transform(chunk, controller) {
+          if (!(chunk instanceof Uint8Array)) throw new TypeError('encryptStream requires Uint8Array chunks')
+          const buf = chunk.slice().buffer
+          const ab = await $__utils_crypto_cipher_update.apply(undefined, [id, buf], { arguments: { copy: true }, result: { promise: true, copy: true } })
+          if (ab) controller.enqueue(new Uint8Array(ab))
+        },
+        async flush(controller) {
+          const ab = await $__utils_crypto_cipher_final.apply(undefined, [id], { result: { promise: true, copy: true } })
+          if (ab) controller.enqueue(new Uint8Array(ab))
+        }
+      })
+    },
+    decryptStream: (algorithm, key, iv) => {
+      let id = null
+      if (!(key instanceof Uint8Array) || !(iv instanceof Uint8Array)) {
+        throw new TypeError('decryptStream requires Uint8Array for key and iv')
+      }
+      return new TransformStream({
+        async start() {
+          id = await $__utils_crypto_cipher_init.apply(undefined, [algorithm, key.buffer, iv.buffer, false], { arguments: { copy: true }, result: { promise: true } })
+        },
+        async transform(chunk, controller) {
+          if (!(chunk instanceof Uint8Array)) throw new TypeError('decryptStream requires Uint8Array chunks')
+          const buf = chunk.slice().buffer
+          const ab = await $__utils_crypto_cipher_update.apply(undefined, [id, buf], { arguments: { copy: true }, result: { promise: true, copy: true } })
+          if (ab) controller.enqueue(new Uint8Array(ab))
+        },
+        async flush(controller) {
+          const ab = await $__utils_crypto_cipher_final.apply(undefined, [id], { result: { promise: true, copy: true } })
+          if (ab) controller.enqueue(new Uint8Array(ab))
+        }
+      })
+    },
 
   },
   codec: {
@@ -798,6 +927,121 @@ globalThis.utils = {
     },
     fromUtf8: (utf8) => new TextEncoder().encode(utf8),
     toUtf8: (data) => new TextDecoder().decode(data),
+    hexEncoderStream: () => {
+      return new TransformStream({
+        transform(chunk, controller) {
+          if (!(chunk instanceof Uint8Array)) throw new TypeError('hexEncoderStream requires Uint8Array chunks')
+          let hex = ''
+          for (let i = 0; i < chunk.length; i++) {
+            hex += chunk[i].toString(16).padStart(2, '0')
+          }
+          controller.enqueue(hex)
+        }
+      })
+    },
+    hexDecoderStream: () => {
+      let buffered = ''
+      return new TransformStream({
+        transform(chunk, controller) {
+          const total = buffered + chunk
+          const len = Math.floor(total.length / 2) * 2
+          const hex = total.slice(0, len)
+          buffered = total.slice(len)
+          
+          if (hex.length > 0) {
+            const bytes = new Uint8Array(hex.length / 2)
+            for (let i = 0; i < bytes.length; i++) {
+              bytes[i] = parseInt(hex.substring(i * 2, i * 2 + 2), 16)
+            }
+            controller.enqueue(bytes)
+          }
+        },
+        flush(controller) {
+          if (buffered.length > 0) {
+            throw new Error(`hexDecoderStream: trailing single hex character '${buffered}'`)
+          }
+        }
+      })
+    },
+    base64EncoderStream: () => {
+      let bufferedBytes = new Uint8Array(0)
+      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+      const encode = (bytes) => {
+        let result = ''
+        const len = bytes.length
+        for (let i = 0; i < len; i += 3) {
+          const b1 = bytes[i]
+          const b2 = i + 1 < len ? bytes[i + 1] : NaN
+          const b3 = i + 2 < len ? bytes[i + 2] : NaN
+          const enc1 = b1 >> 2
+          const enc2 = ((b1 & 3) << 4) | (isNaN(b2) ? 0 : b2 >> 4)
+          const enc3 = isNaN(b2) ? 64 : ((b2 & 15) << 2) | (isNaN(b3) ? 0 : b3 >> 6)
+          const enc4 = isNaN(b3) ? 64 : b3 & 63
+          result += chars[enc1] + chars[enc2] + (enc3 === 64 ? '=' : chars[enc3]) + (enc4 === 64 ? '=' : chars[enc4])
+        }
+        return result
+      }
+      return new TransformStream({
+        transform(chunk, controller) {
+          if (!(chunk instanceof Uint8Array)) throw new TypeError('base64EncoderStream requires Uint8Array chunks')
+          const total = new Uint8Array(bufferedBytes.length + chunk.length)
+          total.set(bufferedBytes)
+          total.set(chunk, bufferedBytes.length)
+          
+          const encodeLen = Math.floor(total.length / 3) * 3
+          const toEncode = total.subarray(0, encodeLen)
+          bufferedBytes = total.subarray(encodeLen)
+          
+          if (toEncode.length > 0) {
+            controller.enqueue(encode(toEncode))
+          }
+        },
+        flush(controller) {
+          if (bufferedBytes.length > 0) {
+            controller.enqueue(encode(bufferedBytes))
+          }
+        }
+      })
+    },
+    base64DecoderStream: () => {
+      let bufferedChars = ''
+      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+      const lookup = new Uint8Array(256)
+      for (let i = 0; i < chars.length; i++) lookup[chars.charCodeAt(i)] = i
+      const decode = (base64) => {
+        const clean = base64.replace(/=/g, '')
+        const len = clean.length
+        const bytes = new Uint8Array(Math.floor(len * 0.75))
+        let p = 0
+        for (let i = 0; i < len; i += 4) {
+          const w1 = lookup[clean.charCodeAt(i)]
+          const w2 = i + 1 < len ? lookup[clean.charCodeAt(i + 1)] : 0
+          const w3 = i + 2 < len ? lookup[clean.charCodeAt(i + 2)] : 0
+          const w4 = i + 3 < len ? lookup[clean.charCodeAt(i + 3)] : 0
+          bytes[p++] = (w1 << 2) | (w2 >> 4)
+          if (p < bytes.length) bytes[p++] = ((w2 & 15) << 4) | (w3 >> 2)
+          if (p < bytes.length) bytes[p++] = ((w3 & 3) << 6) | w4
+        }
+        return bytes
+      }
+      return new TransformStream({
+        transform(chunk, controller) {
+          const total = bufferedChars + chunk.replace(/\s/g, '')
+          const decodeLen = Math.floor(total.length / 4) * 4
+          const toDecode = total.slice(0, decodeLen)
+          bufferedChars = total.slice(decodeLen)
+          
+          if (toDecode.length > 0) {
+            controller.enqueue(decode(toDecode))
+          }
+        },
+        flush(controller) {
+          if (bufferedChars.length > 0) {
+            controller.enqueue(decode(bufferedChars.padEnd(4, '=')))
+          }
+        }
+      })
+    },
   },
   ws: {
     client(url, opts) {

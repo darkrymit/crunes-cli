@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { createArchiveUtils } from '../../../src/rune/api/archive.js'
 import { makePermissionChecker, PermissionError } from '../../../src/rune/permissions/permissions.js'
+import { runRuneInIsolate } from '../../../src/rune/isolation/runner.js'
 
 async function makeTmp() {
   return mkdtemp(join(tmpdir(), 'crunes-archive-'))
@@ -110,5 +111,41 @@ describe('createArchiveUtils — permissions', () => {
     const arc = createArchiveUtils(tmp, check)
     await expect(arc.zip('file.txt', 'out.zip')).rejects.toThrow(PermissionError)
     await expect(readFile(join(tmp, 'out.zip'))).rejects.toThrow()
+  })
+})
+
+describe('sandboxed streaming archives', () => {
+  it('archive zipStream and unzipStream roundtrip', async () => {
+    // Create directories and mock files on disk to compress/extract
+    const sourceDir = join(process.cwd(), 'scratch_test_zip_src')
+    const destDir = join(process.cwd(), 'scratch_test_zip_dest')
+    await mkdir(sourceDir, { recursive: true })
+    await writeFile(join(sourceDir, 'file1.txt'), 'hello streaming world')
+    await writeFile(join(sourceDir, 'file2.txt'), 'this is streamed compression')
+    
+    const script = `
+      import { archive } from '@utils'
+      export async function use() {
+        const zipStream = archive.zipStream('scratch_test_zip_src')
+        await zipStream.pipeTo(archive.unzipStream('scratch_test_zip_dest'))
+        return "OK"
+      }
+    `
+    const scriptPath = join(process.cwd(), 'scratch_test_archive.js')
+    await writeFile(scriptPath, script)
+    try {
+      const result = await runRuneInIsolate(scriptPath, { allow: ['fs.read:./scratch_test_zip_src', 'fs.write:./scratch_test_zip_dest'], deny: [] }, [], process.cwd())
+      expect(result).toBe('OK')
+      
+      // Assert extracted files match
+      const f1 = await readFile(join(destDir, 'file1.txt'), 'utf8')
+      const f2 = await readFile(join(destDir, 'file2.txt'), 'utf8')
+      expect(f1).toBe('hello streaming world')
+      expect(f2).toBe('this is streamed compression')
+    } finally {
+      await rm(scriptPath, { force: true })
+      await rm(sourceDir, { recursive: true, force: true })
+      await rm(destDir, { recursive: true, force: true })
+    }
   })
 })
