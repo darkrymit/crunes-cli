@@ -154,7 +154,7 @@ export async function runRune(dir, config, key, args, opts = {}, _callStack = []
 
   const fullPath = join(configDir, entry.path ?? `.crunes/runes/${key}.js`)
   const basePerms = entry.permissions ?? { allow: [], deny: [] }
-  const effective = computeEffectivePermissions(basePerms, config.permissions?.[key], 'use')
+  const effective = computeEffectivePermissions(basePerms, config.permissions?.[key], 'use', dir)
   const result = await runRuneInIsolate(fullPath, effective, args, dir, {
     runeCallback,
     sections: opts.sections ?? null,

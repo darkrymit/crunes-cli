@@ -1058,7 +1058,7 @@ export async function getArgsSchema(runeFile, effective, projectDir, {
  */
 export async function executePluginRune({ pluginDir, pluginCacheDir, runeKey, pluginJson, projectPerms, projectVars = {}, args, projectDir, opts, runeCallback, sections, lifecycle = 'use', onEvent = null, instanceId = '1', }) {
   const runePerms     = pluginJson.runes[runeKey]?.permissions ?? {}
-  const effective     = computeEffectivePermissions(runePerms, projectPerms, lifecycle)
+  const effective     = computeEffectivePermissions(runePerms, projectPerms, lifecycle, projectDir)
   const runeVars      = pluginJson.runes[runeKey]?.vars ?? {}
   const effectiveVars = { ...runeVars, ...projectVars }
   return runPluginRune(pluginDir, pluginCacheDir, runeKey, pluginJson, effective, args, projectDir, {

@@ -87,12 +87,28 @@ export function resolvePath(location, { dir, pluginDir = null, pluginId = null, 
   return path.resolve(dir, location)
 }
 
+function normalizeGitBashPath(p) {
+  // Git bash on Windows emits /c/Users/... instead of C:/Users/...
+  // path.relative can't resolve these correctly on Windows, so rewrite them.
+  if (process.platform === 'win32') {
+    const m = p.match(/^\/([a-zA-Z])(\/|$)/)
+    if (m) return `${m[1].toUpperCase()}:/${p.slice(3)}`
+  }
+  return p
+}
+
 export function canonicalizeLocation(location, { dir } = {}) {
-  const p = location.replace(/\\/g, '/')
+  const p = normalizeGitBashPath(location.replace(/\\/g, '/'))
   if (p.startsWith('@project/')) return './' + p.slice('@project/'.length)
   if (p.startsWith('@')) return p
   if (p === '~' || p.startsWith('~/')) return p
-  if (path.isAbsolute(location)) return p
+  if (path.isAbsolute(p)) {
+    if (dir) {
+      const rel = path.relative(dir, p).replace(/\\/g, '/')
+      if (!rel.startsWith('..')) return './' + rel
+    }
+    return p
+  }
   const resolved = path.resolve(dir, location)
   const rel = path.relative(dir, resolved).replace(/\\/g, '/')
   return rel.startsWith('..') ? rel : './' + rel

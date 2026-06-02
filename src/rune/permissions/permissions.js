@@ -1,3 +1,4 @@
+import path from 'node:path'
 import micromatch from 'micromatch'
 import { matchFetchPermission } from './permissions-http.js'
 import { matchEnvPermission } from './permissions-env.js'
@@ -13,17 +14,30 @@ export class PermissionError extends Error {
   }
 }
 
-function normalizePermission(perm) {
+function normalizeGitBashPath(p) {
+  if (process.platform === 'win32') {
+    const m = p.match(/^\/([a-zA-Z])(\/|$)/)
+    if (m) return `${m[1].toUpperCase()}:/${p.slice(3)}`
+  }
+  return p
+}
+
+function normalizePermission(perm, dir) {
   if (perm.startsWith('fs.read:') || perm.startsWith('fs.write:') || perm.startsWith('fs.exists:') || perm.startsWith('fs.glob:')) {
     const [cap, ...rest] = perm.split(':')
-    const val = rest.join(':')
+    const rawVal = rest.join(':')
+    const val = normalizeGitBashPath(rawVal.replace(/\\/g, '/'))
+    const isAbsolute = val.startsWith('/') || /^[a-zA-Z]:/.test(val)
+    if (isAbsolute && dir) {
+      const rel = path.relative(dir, val).replace(/\\/g, '/')
+      if (!rel.startsWith('..')) return `${cap}:./${rel}`
+    }
     if (
       !val.startsWith('./') &&
       !val.startsWith('../') &&
       !val.startsWith('@') &&
       !val.startsWith('~/') &&
-      !val.startsWith('/') &&
-      !/^[a-zA-Z]:/.test(val) // Windows absolute path
+      !isAbsolute
     ) {
       return `${cap}:./${val}`
     }
@@ -58,16 +72,17 @@ function normalizePermission(perm) {
  * Compute effective allow/deny from plugin.json permissions + optional project override.
  * Must be namespaced under the requested lifecycle (e.g. `use`).
  */
-export function computeEffectivePermissions(pluginPerms, projectPerms, lifecycle) {
+export function computeEffectivePermissions(pluginPerms, projectPerms, lifecycle, dir) {
   const namespacePlugin = pluginPerms?.[lifecycle] || {}
   const namespaceProject = projectPerms?.[lifecycle]
+  const norm = p => normalizePermission(p, dir)
 
-  const pluginAllow = (namespacePlugin.allow ?? []).map(normalizePermission)
-  const pluginDeny  = (namespacePlugin.deny ?? []).map(normalizePermission)
-  
+  const pluginAllow = (namespacePlugin.allow ?? []).map(norm)
+  const pluginDeny  = (namespacePlugin.deny ?? []).map(norm)
+
   return {
-    allow: (namespaceProject?.allow ?? pluginAllow).map(normalizePermission),
-    deny:  [...pluginDeny, ...(namespaceProject?.deny ?? []).map(normalizePermission)],
+    allow: (namespaceProject?.allow ?? pluginAllow).map(norm),
+    deny:  [...pluginDeny, ...(namespaceProject?.deny ?? []).map(norm)],
   }
 }
 

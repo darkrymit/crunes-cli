@@ -174,6 +174,16 @@ describe('canonicalizeLocation', () => {
   it('../outside preserved with ../ prefix', () => {
     expect(canonicalizeLocation('../outside', { dir: tmp })).toBe('../outside')
   })
+  it('absolute path inside dir relativized to ./subpath form', () => {
+    const abs = join(tmp, 'dev', 'test-ref', 'img', 'photo.webp')
+    expect(canonicalizeLocation(abs, { dir: tmp })).toBe('./dev/test-ref/img/photo.webp')
+  })
+  it('absolute path outside dir returned as normalized absolute', () => {
+    const outside = join(tmpdir(), 'other', 'file.txt')
+    const result = canonicalizeLocation(outside, { dir: tmp })
+    expect(result).toBe(outside.replace(/\\/g, '/'))
+    expect(result.startsWith('./')).toBe(false)
+  })
 })
 
 describe('getAutoPermits', () => {

@@ -46,11 +46,11 @@ describe('createFsUtils — canonical permission tokens', () => {
     expect(spy).toHaveBeenCalledWith('fs.read', './package.json')
   })
 
-  it('absolute path token has normalized separators', async () => {
+  it('absolute path token is relativized when inside project dir', async () => {
     const spy = vi.fn()
     const abs = path.join(dir, 'package.json')
     await createFsUtils(dir, spy).read(abs).catch(() => {})
-    expect(spy).toHaveBeenCalledWith('fs.read', abs.replace(/\\/g, '/'))
+    expect(spy).toHaveBeenCalledWith('fs.read', './package.json')
   })
 
   it('~ prefix is kept as canonical token', async () => {

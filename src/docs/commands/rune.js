@@ -28,7 +28,7 @@ export async function handler({ keys, format = 'text', projectRoot = process.cwd
 
     const runeFile = join(configRoot, entry.path ?? `.crunes/runes/${key}.js`)
     const basePerms = entry.permissions ?? { allow: [], deny: [] }
-    const effective = computeEffectivePermissions(basePerms, config.permissions?.[key], 'args')
+    const effective = computeEffectivePermissions(basePerms, config.permissions?.[key], 'args', projectRoot)
 
     let schema = null
     try {
