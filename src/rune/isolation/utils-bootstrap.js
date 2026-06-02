@@ -813,12 +813,15 @@ globalThis.utils = {
           reject(new Error(msg))
         }
         const signal = init.signal ?? null
-        const signalListenerRef = signal
-          ? (abortCb) => { signal.addEventListener('abort', () => abortCb.applyIgnored(undefined, [])) }
-          : null
+        const fetchArgs = [url, { ...opts, body: serializedBody }, onChunk, onEnd, onError]
+        if (signal) {
+          fetchArgs.push((abortCb) => {
+            signal.addEventListener('abort', () => abortCb.applyIgnored(undefined, []))
+          })
+        }
         $__utils_http_fetch.apply(
           undefined,
-          [url, { ...opts, body: serializedBody }, onChunk, onEnd, onError, signalListenerRef],
+          fetchArgs,
           { arguments: { reference: true }, result: { promise: true } }
         )
       })
@@ -830,6 +833,95 @@ globalThis.utils = {
       })
 
       return _makeResponse(meta, responseHeaders, bytesPromise, bodyStream, consumeGuard)
+    },
+    server(port, opts = {}) {
+      const id = $__utils_http_server_create.applySync(undefined, [port, opts], { arguments: { copy: true } })
+      let resolvedPort = port
+      return {
+        _httpServerId: id,
+        get port() { return resolvedPort },
+        on(event, handler) {
+          if (event !== 'request') throw new Error(`Unknown http.server event: ${event}`)
+          $__utils_http_server_set_handler.applySync(undefined, [id, async (meta) => {
+            const reqHeaders = new Headers(meta.headers)
+            const bodyStream = meta.body
+              ? new ReadableStream({ start(c) { c.enqueue(new Uint8Array(meta.body)); c.close() } })
+              : null
+
+            const abortCtrl = new AbortController()
+            const closedPromise = $__utils_http_server_request_closed
+              .apply(undefined, [id, meta.reqId], { result: { promise: true } })
+            closedPromise.then(() => abortCtrl.abort())
+
+            const req = Object.assign(Object.create(null), {
+              method: meta.method,
+              url: meta.url,
+              pathname: meta.pathname,
+              searchParams: new URLSearchParams(meta.searchParams),
+              headers: reqHeaders,
+              body: bodyStream,
+              bodyUsed: false,
+              signal: abortCtrl.signal,
+              closed() { return closedPromise },
+              on(event, fn) {
+                if (event !== 'close') throw new Error(`Unknown IncomingRequest event: ${event}`)
+                closedPromise.then(fn)
+              },
+              async text() {
+                if (!meta.body) return ''
+                return new TextDecoder().decode(new Uint8Array(meta.body))
+              },
+              async json() { return JSON.parse(await this.text()) },
+              async blob() {
+                if (!meta.body) return new Blob([], { type: '' })
+                return new Blob([new Uint8Array(meta.body)], { type: meta.headers['content-type'] ?? '' })
+              },
+            })
+
+            const response = await handler(req)
+            const resHeaders = {}
+            if (response.headers) response.headers.forEach((v, k) => { resHeaders[k] = v })
+            let bodyData = null
+            if (response._body != null) {
+              if (response._body instanceof ReadableStream) {
+                const reader = response._body.getReader()
+                const chunks = []
+                while (true) {
+                  const { value, done } = await reader.read()
+                  if (done) break
+                  chunks.push(value)
+                }
+                const total = new Uint8Array(chunks.reduce((n, c) => n + c.byteLength, 0))
+                let offset = 0
+                for (const c of chunks) { total.set(c, offset); offset += c.byteLength }
+                bodyData = total.buffer.slice(total.byteOffset, total.byteOffset + total.byteLength)
+              } else if (response._body instanceof Uint8Array) {
+                bodyData = response._body.buffer.slice(response._body.byteOffset, response._body.byteOffset + response._body.byteLength)
+              } else if (response._body instanceof Blob) {
+                const ab = await response._body.arrayBuffer()
+                bodyData = ab
+              } else {
+                bodyData = new TextEncoder().encode(String(response._body)).buffer
+              }
+            }
+            return {
+              status: response.status,
+              statusText: response.statusText,
+              headers: resHeaders,
+              body: bodyData,
+            }
+          }], { arguments: { reference: true } })
+        },
+        async open() {
+          resolvedPort = await $__utils_http_server_open.apply(undefined, [id], { result: { promise: true, copy: true } })
+        },
+        async close() {
+          await $__utils_http_server_close.apply(undefined, [id], { result: { promise: true } })
+        },
+        async closed() {
+          await $__utils_http_server_closed.apply(undefined, [id], { result: { promise: true } })
+        },
+      }
     },
   },
   env: {
@@ -1298,6 +1390,75 @@ globalThis.utils = {
         },
         close: ()    => $__utils_ws_close.apply(undefined, [id],      { result: { promise: true, copy: true } }),
         closed: ()   => $__utils_ws_closed.apply(undefined, [id],     { result: { promise: true, copy: true } }),
+      }
+    },
+    server(portOrServer, opts = {}) {
+      const isHttpSession = typeof portOrServer === 'object' && portOrServer !== null && '_httpServerId' in portOrServer
+      const portOrId = isHttpSession ? portOrServer._httpServerId : portOrServer
+      let resolvedPort = isHttpSession ? portOrServer.port : portOrServer
+
+      const id = $__utils_ws_server_create.applySync(undefined, [portOrId, opts, isHttpSession], { arguments: { copy: true } })
+
+      function makeConnHandle(connId) {
+        const connAbort = new AbortController()
+        const connHandle = {
+          get id() { return connId },
+          get signal() { return connAbort.signal },
+          on(event, handler) {
+            const isolateHandler = event === 'error'
+              ? async (errJson) => {
+                  let d; try { d = JSON.parse(errJson) } catch { d = { message: errJson } }
+                  const e = new Error(d.message); e.name = 'WebSocketError'; if (d.code) e.code = d.code
+                  handler(e)
+                }
+              : event === 'binary'
+              ? async (ab) => { handler(new Uint8Array(ab)) }
+              : handler
+            $__utils_ws_server_conn_on.applySync(undefined, [connId, event, isolateHandler], { arguments: { reference: true } })
+          },
+          sendText: (msg) => $__utils_ws_server_conn_send_text.apply(undefined, [connId, msg], { result: { promise: true } }),
+          sendBinary: (data) => {
+            if (data instanceof Uint8Array) {
+              return $__utils_ws_server_conn_send_binary.apply(undefined, [connId, data.buffer, data.byteOffset, data.byteLength], { arguments: { copy: true }, result: { promise: true } })
+            } else if (data instanceof ArrayBuffer) {
+              return $__utils_ws_server_conn_send_binary.apply(undefined, [connId, data, 0, data.byteLength], { arguments: { copy: true }, result: { promise: true } })
+            }
+            throw new TypeError('sendBinary requires ArrayBuffer or Uint8Array')
+          },
+          close: (code, reason) => $__utils_ws_server_conn_close.apply(undefined, [connId, code ?? 1000, reason ?? ''], { result: { promise: true, copy: true } }),
+          closed: () => $__utils_ws_server_conn_closed.apply(undefined, [connId], { result: { promise: true, copy: true } }),
+        }
+        connHandle.closed().then(() => connAbort.abort())
+        return connHandle
+      }
+
+      return {
+        _wsServerId: id,
+        get port() { return resolvedPort },
+        on(event, handler) {
+          if (event === 'connection') {
+            $__utils_ws_server_set_connection_handler.applySync(undefined, [id, async (connId) => {
+              handler(makeConnHandle(connId))
+            }], { arguments: { reference: true } })
+          } else if (event === 'error') {
+            $__utils_ws_server_set_error_handler.applySync(undefined, [id, async (errJson) => {
+              let d; try { d = JSON.parse(errJson) } catch { d = { message: errJson } }
+              const e = new Error(d.message); e.name = 'WebSocketError'; if (d.code) e.code = d.code
+              handler(e)
+            }], { arguments: { reference: true } })
+          } else {
+            throw new Error(`Unknown ws.server event: ${event}`)
+          }
+        },
+        async open() {
+          resolvedPort = await $__utils_ws_server_open.apply(undefined, [id], { result: { promise: true, copy: true } })
+        },
+        async close() {
+          await $__utils_ws_server_close.apply(undefined, [id], { result: { promise: true } })
+        },
+        async closed() {
+          await $__utils_ws_server_closed.apply(undefined, [id], { result: { promise: true } })
+        },
       }
     },
   },

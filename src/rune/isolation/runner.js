@@ -529,6 +529,75 @@ async function injectUtils(isolate, context, utils, runeCallback, vars, projectD
     return utils.ws._getSession(sessionId).closedPromise
   }))
 
+  await jail.set('$__utils_http_server_create', new ivm.Reference((port, opts) => {
+    return utils.http.server(port, opts)
+  }))
+  await jail.set('$__utils_http_server_set_handler', new ivm.Reference(async (idRef, handlerRef) => {
+    const id = typeof idRef === 'object' && idRef !== null && typeof idRef.copySync === 'function' ? idRef.copySync() : idRef
+    utils.http._getServerSession(id).setHandler(handlerRef)
+  }))
+  await jail.set('$__utils_http_server_open', new ivm.Reference(async (idRef) => {
+    const id = typeof idRef === 'object' && idRef !== null && typeof idRef.copySync === 'function' ? idRef.copySync() : idRef
+    await utils.http._getServerSession(id).open()
+    return utils.http._getServerSession(id).port
+  }))
+  await jail.set('$__utils_http_server_close', new ivm.Reference(async (idRef) => {
+    const id = typeof idRef === 'object' && idRef !== null && typeof idRef.copySync === 'function' ? idRef.copySync() : idRef
+    await utils.http._getServerSession(id).close()
+  }))
+  await jail.set('$__utils_http_server_closed', new ivm.Reference(async (idRef) => {
+    const id = typeof idRef === 'object' && idRef !== null && typeof idRef.copySync === 'function' ? idRef.copySync() : idRef
+    await utils.http._getServerSession(id).closed()
+  }))
+  await jail.set('$__utils_http_server_request_closed', new ivm.Reference(async (idRef, reqIdRef) => {
+    const id = typeof idRef === 'object' && idRef !== null && typeof idRef.copySync === 'function' ? idRef.copySync() : idRef
+    const reqId = typeof reqIdRef === 'object' && reqIdRef !== null && typeof reqIdRef.copySync === 'function' ? reqIdRef.copySync() : reqIdRef
+    const session = utils.http._getServerSession(id)
+    const abort = session.getRequestAbort(reqId)
+    if (!abort) return
+    return new Promise(resolve => abort.signal.addEventListener('abort', resolve))
+  }))
+
+  await jail.set('$__utils_ws_server_create', new ivm.Reference((portOrHttpId, opts, isHttpSession) => {
+    const portOrSession = isHttpSession ? utils.http._getServerSession(portOrHttpId) : portOrHttpId
+    return utils.ws.server(portOrSession, opts)
+  }))
+  await jail.set('$__utils_ws_server_set_connection_handler', new ivm.Reference(async (idRef, handlerRef) => {
+    const id = typeof idRef === 'object' && idRef !== null && typeof idRef.copySync === 'function' ? idRef.copySync() : idRef
+    utils.ws._getWsServerSession(id).setConnectionHandler(handlerRef)
+  }))
+  await jail.set('$__utils_ws_server_set_error_handler', new ivm.Reference(async (idRef, handlerRef) => {
+    const id = typeof idRef === 'object' && idRef !== null && typeof idRef.copySync === 'function' ? idRef.copySync() : idRef
+    utils.ws._getWsServerSession(id).setErrorHandler(handlerRef)
+  }))
+  await jail.set('$__utils_ws_server_open', new ivm.Reference(async (id) => {
+    await utils.ws._getWsServerSession(id).open()
+    return utils.ws._getWsServerSession(id).port
+  }))
+  await jail.set('$__utils_ws_server_close', new ivm.Reference(async (id) => {
+    await utils.ws._getWsServerSession(id).close()
+  }))
+  await jail.set('$__utils_ws_server_closed', new ivm.Reference(async (id) => {
+    await utils.ws._getWsServerSession(id).closed()
+  }))
+  await jail.set('$__utils_ws_server_conn_on', new ivm.Reference(async (connIdRef, eventRef, handlerRef) => {
+    const connId = typeof connIdRef === 'object' && connIdRef !== null && typeof connIdRef.copySync === 'function' ? connIdRef.copySync() : connIdRef
+    const event = typeof eventRef === 'object' && eventRef !== null && typeof eventRef.copySync === 'function' ? eventRef.copySync() : eventRef
+    utils.ws._getWsServerConn(connId).setHandler(event, handlerRef)
+  }))
+  await jail.set('$__utils_ws_server_conn_send_text', new ivm.Reference(async (connId, msg) => {
+    await utils.ws._getWsServerConn(connId).sendText(msg)
+  }))
+  await jail.set('$__utils_ws_server_conn_send_binary', new ivm.Reference(async (connId, ab, byteOffset, byteLength) => {
+    await utils.ws._getWsServerConn(connId).sendBinary(ab, byteOffset, byteLength)
+  }))
+  await jail.set('$__utils_ws_server_conn_close', new ivm.Reference(async (connId, code, reason) => {
+    return utils.ws._getWsServerConn(connId).close(code, reason)
+  }))
+  await jail.set('$__utils_ws_server_conn_closed', new ivm.Reference(async (connId) => {
+    return utils.ws._getWsServerConn(connId).closed()
+  }))
+
   const dbHandles = new Map()
   let nextDbHandle = 0
 

@@ -59,6 +59,7 @@ export function createUtils(dir, checkPermission = null, pluginDir = null, permi
     dispose: async () => {
       sqlite.dispose()
       ws.dispose()
+      utils.http.disposeServers()
       await db.dispose()
       utils.shell.dispose()
     }

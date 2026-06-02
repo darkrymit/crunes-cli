@@ -3,7 +3,8 @@ import micromatch from 'micromatch'
 import { matchFetchPermission } from './permissions-http.js'
 import { matchEnvPermission } from './permissions-env.js'
 import { matchStorePermission } from './permissions-store.js'
-import { matchWsPermission } from './permissions-ws.js'
+import { matchWsPermission, matchWsServerPermission } from './permissions-ws.js'
+import { matchHttpServerPermission, isLoopbackHost } from './permissions-http-server.js'
 
 export class PermissionError extends Error {
   constructor(capability, value) {
@@ -95,6 +96,24 @@ export function makePermissionChecker(effective) {
     if (capability === 'ws.client') {
       const allowed = effective.allow.some(p => matchWsPermission(value, p))
       const denied  = effective.deny.length > 0 && effective.deny.some(p => matchWsPermission(value, p))
+      if (!allowed || denied) throw new PermissionError(capability, value)
+      return
+    }
+    if (capability === 'http.server') {
+      const colonIdx = value.lastIndexOf(':')
+      const host = colonIdx !== -1 ? value.slice(0, colonIdx) : value
+      if (isLoopbackHost(host)) return
+      const allowed = effective.allow.some(p => matchHttpServerPermission(value, p))
+      const denied  = effective.deny.length > 0 && effective.deny.some(p => matchHttpServerPermission(value, p))
+      if (!allowed || denied) throw new PermissionError(capability, value)
+      return
+    }
+    if (capability === 'ws.server') {
+      const firstColon = value.indexOf(':')
+      const host = firstColon !== -1 ? value.slice(0, firstColon) : value
+      if (isLoopbackHost(host)) return
+      const allowed = effective.allow.some(p => matchWsServerPermission(value, p))
+      const denied  = effective.deny.length > 0 && effective.deny.some(p => matchWsServerPermission(value, p))
       if (!allowed || denied) throw new PermissionError(capability, value)
       return
     }
