@@ -82,9 +82,11 @@ declare namespace globals {
   class AbortSignal {
     /** Whether the signal has been aborted. */
     readonly aborted: boolean
-    addEventListener(type: 'abort', listener: (event: { type: string }) => void): void
-    removeEventListener(type: 'abort', listener: (event: { type: string }) => void): void
+    addEventListener(type: 'abort', listener: () => void): void
+    removeEventListener(type: 'abort', listener: () => void): void
     dispatchEvent(event: { type: string }): void
+    /** Creates a signal that aborts after the given number of milliseconds. */
+    static timeout(ms: number): AbortSignal
   }
 
   /**
@@ -235,25 +237,25 @@ declare namespace globals {
     method?: string
     headers?: Record<string, string> | Headers
     body?: string | Uint8Array | ReadableStream<Uint8Array> | FormData | URLSearchParams | Blob
-    /** Request timeout in milliseconds. Default: 30000. crunes-specific extension. */
-    timeout?: number
+    signal?: AbortSignal
   }
 
-  /** Response returned by http.fetch() and global fetch(). */
-  interface Response {
+  /** HTTP response — returned by http.fetch() and constructed by http.server() request handlers. */
+  class Response {
+    constructor(
+      body?: string | Uint8Array | ReadableStream<Uint8Array> | Blob | null,
+      init?: { status?: number; statusText?: string; headers?: Record<string, string> | Headers }
+    )
     readonly ok: boolean
     readonly status: number
     readonly statusText: string
     readonly headers: Headers
     readonly bodyUsed: boolean
-    /** Reads and returns the response body as a UTF-8 string. Consumes the body. */
+    /** The response body as a ReadableStream, or null if there is no body. */
+    readonly body: ReadableStream<Uint8Array> | null
     text(): Promise<string>
-    /** Reads and parses the response body as JSON. Consumes the body. */
     json(): Promise<unknown>
-    /** Reads and returns the response body as a Blob. Consumes the body. */
     blob(): Promise<Blob>
-    /** Returns a live ReadableStream of the response body. Consumes the body. */
-    body(): ReadableStream<Uint8Array>
   }
 
   class Request {
@@ -295,3 +297,4 @@ type URLSearchParams = globals.URLSearchParams
 type Request = globals.Request
 type ReadableStreamDefaultReader<R = any> = globals.ReadableStreamDefaultReader<R>
 type WritableStreamDefaultWriter<W = any> = globals.WritableStreamDefaultWriter<W>
+type Response = globals.Response

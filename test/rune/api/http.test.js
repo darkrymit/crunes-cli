@@ -33,20 +33,28 @@ describe('createHttpUtils', () => {
     await expect(fetch('https://example.com')).rejects.toThrow(FetchError)
   })
 
-  it('throws FetchError on timeout', async () => {
-    vi.useFakeTimers()
+  it('throws FetchError when signal is already aborted', async () => {
+    const ctrl = new AbortController()
+    ctrl.abort()
     globalThis.fetch.mockImplementation((_url, { signal }) =>
-      new Promise((_, reject) => {
-        signal.addEventListener('abort', () =>
-          reject(new DOMException('The operation was aborted.', 'AbortError'))
-        )
+      new Promise((_res, rej) => {
+        if (signal && signal.aborted) return rej(new Error('aborted'))
+        signal.addEventListener('abort', () => rej(new Error('aborted')))
       })
     )
     const { fetch } = createHttpUtils(null)
-    const promise = fetch('https://example.com', { timeout: 100 })
-    vi.advanceTimersByTime(101)
+    await expect(fetch('https://example.com', { signal: ctrl.signal })).rejects.toThrow(FetchError)
+  })
+
+  it('throws FetchError when signal aborts mid-flight', async () => {
+    const ctrl = new AbortController()
+    globalThis.fetch.mockImplementation((_url, { signal }) =>
+      new Promise((_res, rej) => signal.addEventListener('abort', () => rej(new Error('aborted'))))
+    )
+    const { fetch } = createHttpUtils(null)
+    const promise = fetch('https://example.com', { signal: ctrl.signal })
+    ctrl.abort()
     await expect(promise).rejects.toThrow(FetchError)
-    vi.useRealTimers()
   })
 
   it('FetchError carries the original error as cause', async () => {

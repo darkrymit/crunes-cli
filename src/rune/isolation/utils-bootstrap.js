@@ -52,6 +52,11 @@ globalThis.TextEncoder = TextEncoder
 globalThis.TextDecoder = TextDecoder
 globalThis.AbortController = AbortController
 globalThis.AbortSignal = AbortSignal
+AbortSignal.timeout = (ms) => {
+  const ctrl = new AbortController()
+  setTimeout(() => ctrl.abort(), ms)
+  return ctrl.signal
+}
 
 class Blob {
   constructor(parts = [], { type = '' } = {}) {
@@ -274,6 +279,61 @@ class Request {
 }
 globalThis.Request = Request
 
+class Response {
+  constructor(body = null, init = {}) {
+    this.status = init.status ?? 200
+    this.statusText = init.statusText ?? ''
+    this.headers = new Headers(init.headers)
+    this.ok = this.status >= 200 && this.status < 300
+    this._body = body ?? null
+    this._bodyUsed = false
+  }
+  get bodyUsed() { return this._bodyUsed }
+  get body() {
+    if (this._body == null) return null
+    if (this._body instanceof ReadableStream) return this._body
+    const bytes = this._body instanceof Blob
+      ? this._body._bytes
+      : this._body instanceof Uint8Array
+        ? this._body
+        : new TextEncoder().encode(String(this._body))
+    return new ReadableStream({ start(c) { c.enqueue(bytes); c.close() } })
+  }
+  _consume() {
+    if (this._bodyUsed) throw new TypeError('body already used')
+    this._bodyUsed = true
+  }
+  async text() {
+    this._consume()
+    if (this._body == null) return ''
+    if (this._body instanceof Blob) return this._body.text()
+    if (this._body instanceof Uint8Array) return new TextDecoder().decode(this._body)
+    if (this._body instanceof ReadableStream) {
+      const reader = this._body.getReader()
+      const chunks = []
+      while (true) {
+        const { value, done } = await reader.read()
+        if (done) break
+        chunks.push(value)
+      }
+      const total = new Uint8Array(chunks.reduce((n, c) => n + c.byteLength, 0))
+      let offset = 0
+      for (const c of chunks) { total.set(c, offset); offset += c.byteLength }
+      return new TextDecoder().decode(total)
+    }
+    return String(this._body)
+  }
+  async json() { return JSON.parse(await this.text()) }
+  async blob() {
+    this._consume()
+    if (this._body == null) return new Blob([], { type: '' })
+    if (this._body instanceof Blob) return this._body
+    if (this._body instanceof Uint8Array) return new Blob([this._body])
+    return new Blob([new TextEncoder().encode(String(this._body))])
+  }
+}
+globalThis.Response = Response
+
 function _makeResponse(meta, responseHeaders, bytesPromise, bodyStream, consumeGuard) {
   return {
     get ok()         { return meta.ok },
@@ -297,7 +357,7 @@ function _makeResponse(meta, responseHeaders, bytesPromise, bodyStream, consumeG
       const contentType = responseHeaders.get('content-type') ?? ''
       return new Blob([bytes], { type: contentType })
     },
-    body() {
+    get body() {
       consumeGuard()
       return bodyStream
     },
@@ -658,7 +718,7 @@ globalThis.utils = {
         isStream = true
       }
 
-      const opts = { method, headers: Object.fromEntries(reqHeaders.entries()), timeout: init.timeout }
+      const opts = { method, headers: Object.fromEntries(reqHeaders.entries()) }
 
       let _bodyUsed = false
       function consumeGuard() {
@@ -752,9 +812,13 @@ globalThis.utils = {
           rejectMeta(new Error(msg))
           reject(new Error(msg))
         }
+        const signal = init.signal ?? null
+        const signalListenerRef = signal
+          ? (abortCb) => { signal.addEventListener('abort', () => abortCb.applyIgnored(undefined, [])) }
+          : null
         $__utils_http_fetch.apply(
           undefined,
-          [url, { ...opts, body: serializedBody }, onChunk, onEnd, onError],
+          [url, { ...opts, body: serializedBody }, onChunk, onEnd, onError, signalListenerRef],
           { arguments: { reference: true }, result: { promise: true } }
         )
       })

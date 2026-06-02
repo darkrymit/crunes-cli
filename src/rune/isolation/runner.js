@@ -327,7 +327,7 @@ async function injectUtils(isolate, context, utils, runeCallback, vars, projectD
   await jail.set('$__utils_xml_write', new ivm.Reference(async (relPath, data, opts) => {
     await utils.xml.write(relPath, data, opts)
   }))
-  await jail.set('$__utils_http_fetch', new ivm.Reference(async (urlRef, optsRef, onChunk, onEnd, onError) => {
+  await jail.set('$__utils_http_fetch', new ivm.Reference(async (urlRef, optsRef, onChunk, onEnd, onError, signalListenerRef) => {
     const url  = urlRef.copySync()
     const opts = optsRef.copySync()
     let body = opts?.body
@@ -353,8 +353,14 @@ async function injectUtils(isolate, context, utils, runeCallback, vars, projectD
     } else if (body && typeof body === 'object' && body.type === 'Buffer') {
       body = new Uint8Array(body.data)
     }
+    let signal = null
+    if (signalListenerRef) {
+      const ctrl = new AbortController()
+      signal = ctrl.signal
+      await signalListenerRef.apply(undefined, [new ivm.Reference(() => ctrl.abort())], { arguments: { reference: true } })
+    }
     try {
-      const res = await utils.http.fetch(url, { ...opts, headers, body })
+      const res = await utils.http.fetch(url, { ...opts, headers, body, signal })
       const headerPairs = typeof res.headers?.entries === 'function'
         ? [...res.headers.entries()]
         : Object.entries(res.headers ?? {})
