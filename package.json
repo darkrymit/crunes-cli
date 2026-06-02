@@ -45,6 +45,10 @@
     "yaml": "^2.9.0",
     "yargs-parser": "^22.0.0"
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/darkrymit/crunes-cli"
+  },
   "license": "MIT",
   "author": "DarkRymit",
   "engines": {
