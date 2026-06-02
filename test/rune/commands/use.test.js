@@ -272,6 +272,23 @@ describe('handler — progressive streaming and console logs', () => {
     })
   })
 
+  it('filters progressive JSONL section events when section filter is present', async () => {
+    runRune.mockImplementation(async (dir, config, key, args, opts) => {
+      opts.onEvent({ type: 'section', section: { name: 'matching-sec', data: { type: 'markdown', content: 'c1' } } })
+      opts.onEvent({ type: 'section', section: { name: 'other-sec', data: { type: 'markdown', content: 'c2' } } })
+      return []
+    })
+
+    let stdoutWritten = ''
+    vi.spyOn(process.stdout, 'write').mockImplementation(s => { stdoutWritten += s })
+
+    await handler({ segments: [{ key: 'docs', sections: ['matching-sec'], runeArgs: [] }], format: 'jsonl' })
+
+    const lines = stdoutWritten.split('\n').filter(Boolean).map(JSON.parse)
+    expect(lines).toHaveLength(1)
+    expect(lines[0].section.name).toBe('matching-sec')
+  })
+
   it('harmonizes final section JSONL output schema with metadata keys', async () => {
     runRune.mockResolvedValue([{ name: 'finalSec', data: { type: 'markdown', content: 'hello' } }])
     

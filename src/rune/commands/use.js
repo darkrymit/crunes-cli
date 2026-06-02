@@ -131,6 +131,12 @@ export async function handler({
           const { type, message, section, instanceId, rune } = event
           const prefix = `[${instanceId}:${rune}:${type}]`
           if (format === 'jsonl') {
+            if (type === 'section') {
+              if (sectionFilter && !micromatch.isMatch(section.name, sectionFilter)) {
+                return
+              }
+              printedSections.add(section)
+            }
             process.stdout.write(JSON.stringify({
               type,
               rune,
@@ -138,7 +144,6 @@ export async function handler({
               ...(message != null ? { message } : {}),
               ...(section != null ? { section } : {}),
             }) + '\n')
-            if (type === 'section') printedSections.add(section)
           } else {
             if (type === 'section') {
               if (!sectionFilter || micromatch.isMatch(section.name, sectionFilter)) {

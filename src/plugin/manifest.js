@@ -20,8 +20,19 @@ export function validatePluginJson(json) {
       continue
     }
     const perms = rune.permissions
+    if (Array.isArray(perms)) {
+      throw new Error(`plugin.json: rune "${key}" permissions must be lifecycle-scoped (e.g. permissions.use.allow)`)
+    }
+    if (perms.allow || perms.deny) {
+      throw new Error(`plugin.json: rune "${key}" permissions must be lifecycle-scoped (e.g. permissions.use.allow)`)
+    }
     const hasLifecycleScoped = Object.values(perms).some(v => v && Array.isArray(v.allow))
     if (!hasLifecycleScoped) {
+      const hasEmptyUse = perms.use && typeof perms.use === 'object' && Object.keys(perms.use).length === 0
+      if (hasEmptyUse) {
+        console.warn(`[crunes:warn] plugin.json: rune "${key}" permissions.use is empty.`)
+        continue
+      }
       throw new Error(`plugin.json: rune "${key}" must have lifecycle-scoped permissions (e.g. permissions.use.allow)`)
     }
   }

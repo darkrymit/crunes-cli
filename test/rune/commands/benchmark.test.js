@@ -47,6 +47,53 @@ describe('parseBenchArgs', () => {
   })
 })
 
+describe('handler — runs validation', () => {
+  let exitSpy
+
+  beforeEach(() => {
+    loadConfig.mockReturnValue({ runes: {} })
+    exitSpy = vi.spyOn(process, 'exit').mockImplementation((code) => {
+      throw new Error(`process.exit(${code})`)
+    })
+    vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+  })
+
+  afterEach(() => { vi.clearAllMocks(); vi.restoreAllMocks() })
+
+  it('exits 1 when --runs is 0', async () => {
+    await expect(handler({ key: 'api', runs: 0, projectRoot: '/p', configRoot: '/p' }))
+      .rejects.toThrow('process.exit(1)')
+    expect(exitSpy).toHaveBeenCalledWith(1)
+  })
+
+  it('exits 1 when --runs is negative', async () => {
+    await expect(handler({ key: 'api', runs: -3, projectRoot: '/p', configRoot: '/p' }))
+      .rejects.toThrow('process.exit(1)')
+    expect(exitSpy).toHaveBeenCalledWith(1)
+  })
+
+  it('exits 1 when --runs is NaN (from non-numeric string)', async () => {
+    await expect(handler({ key: 'api', runs: NaN, projectRoot: '/p', configRoot: '/p' }))
+      .rejects.toThrow('process.exit(1)')
+    expect(exitSpy).toHaveBeenCalledWith(1)
+  })
+
+  it('exits 1 when --runs is a float', async () => {
+    await expect(handler({ key: 'api', runs: 1.5, projectRoot: '/p', configRoot: '/p' }))
+      .rejects.toThrow('process.exit(1)')
+    expect(exitSpy).toHaveBeenCalledWith(1)
+  })
+
+  it('does not exit when --runs is 1', async () => {
+    loadConfig.mockReturnValue({ runes: { api: { path: 'runes/api.js' } } })
+    runRune.mockResolvedValue([{ name: 'out', data: { type: 'markdown', content: 'x' } }])
+    vi.spyOn(console, 'log').mockImplementation(() => {})
+    await expect(handler({ key: 'api', runs: 1, plain: true, projectRoot: '/p', configRoot: '/p' }))
+      .resolves.toBeUndefined()
+    expect(exitSpy).not.toHaveBeenCalled()
+  })
+})
+
 describe('handler — key required', () => {
   let exitSpy
 

@@ -54,7 +54,7 @@ class WsSession {
           }
         } else {
           const h = this.handlers.get('message')
-          if (h) await h.apply(undefined, [String(data)], { result: { promise: true } })
+          if (h) await h.apply(undefined, [String(data)], { result: { promise: true } }).catch(() => {})
         }
       })
 

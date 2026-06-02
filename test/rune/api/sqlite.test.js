@@ -268,6 +268,11 @@ describe('createSqliteUtils â€” permissions', () => {
     expect(() => h.query('SELECT * FROM t')).not.toThrow()
     h.close()
   })
+
+  it('throws TypeError if custom scope sqlite name contains separators', async () => {
+    sqlite = createSqliteUtils(tmp, null)
+    await expect(sqlite.openHandle('./custom', 'sub/dir')).rejects.toThrow(TypeError)
+  })
 })
 
 describe('createSqliteUtils â€” dispose', () => {

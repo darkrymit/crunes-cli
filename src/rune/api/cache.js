@@ -102,7 +102,7 @@ export function createCacheUtils(dir, checkPermission, { pluginId = null, storeD
   return {
     async openHandle(location, name = 'default') {
       const scope = detectCacheScope(location)
-      if (scope !== null && (name.includes('/') || name.includes('\\'))) {
+      if (name.includes('/') || name.includes('\\')) {
         throw new TypeError('cache name must not contain path separators — use a flat name like "branch-main" instead of "branch/main"')
       }
       let projectId = null

@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { validateConfig, mergeConfigs } from '../../src/core/config.js'
 
 describe('validateConfig', () => {
@@ -52,6 +52,27 @@ describe('validateConfig', () => {
     }
     expect(() => validateConfig(config))
       .toThrow('config.json: permissions for "myrune" must be lifecycle-scoped (e.g. permissions["myrune"].use.allow)')
+  })
+
+  it('throws error if local runes permissions block is flat (non-scoped)', () => {
+    const bad = {
+      runes: {
+        myrune: { permissions: { allow: ['fs.read:*'] } }
+      }
+    }
+    expect(() => validateConfig(bad)).toThrow()
+  })
+
+  it('warns if local runes permissions block is empty', () => {
+    const spy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const config = {
+      runes: {
+        myrune: { permissions: { use: {} } }
+      }
+    }
+    validateConfig(config)
+    expect(spy).toHaveBeenCalled()
+    spy.mockRestore()
   })
 })
 

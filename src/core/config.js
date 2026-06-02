@@ -72,6 +72,25 @@ export function validateConfig(config, fileName = 'config.json') {
       }
     }
   }
+
+  if (config.runes && typeof config.runes === 'object') {
+    for (const [runeKey, entry] of Object.entries(config.runes)) {
+      if (entry && typeof entry === 'object' && entry.permissions) {
+        const perms = entry.permissions
+        if (Array.isArray(perms)) {
+          throw new Error(`${fileName}: runes["${runeKey}"].permissions must be lifecycle-scoped (e.g. permissions.use.allow)`)
+        }
+        if (perms && typeof perms === 'object') {
+          if (Array.isArray(perms.allow) || Array.isArray(perms.deny)) {
+            throw new Error(`${fileName}: runes["${runeKey}"].permissions must be lifecycle-scoped (e.g. permissions.use.allow)`)
+          }
+          if (perms.use && typeof perms.use === 'object' && Object.keys(perms.use).length === 0) {
+            console.warn(`[crunes:warn] ${fileName}: runes["${runeKey}"].permissions.use is empty. No extra permissions will be granted.`)
+          }
+        }
+      }
+    }
+  }
 }
 
 export function loadConfig(dir) {

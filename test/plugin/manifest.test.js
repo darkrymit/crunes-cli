@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { validatePluginJson } from '../../src/plugin/manifest.js'
 
 const VALID = {
@@ -72,5 +72,28 @@ describe('validatePluginJson', () => {
       runes: { example: { name: 'Zero Perm', permissions: {} } },
     }
     expect(() => validatePluginJson(json)).not.toThrow()
+  })
+
+  it('throws error if plugin rune permissions contain flat allowance arrays', () => {
+    const bad = {
+      format: '1',
+      runes: {
+        myrune: { permissions: { allow: ['fs.read:*'] } }
+      }
+    }
+    expect(() => validatePluginJson(bad)).toThrow()
+  })
+
+  it('passes and warns if plugin rune permissions.use is empty', () => {
+    const spy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const json = {
+      format: '1',
+      runes: {
+        myrune: { permissions: { use: {} } }
+      }
+    }
+    expect(() => validatePluginJson(json)).not.toThrow()
+    expect(spy).toHaveBeenCalled()
+    spy.mockRestore()
   })
 })

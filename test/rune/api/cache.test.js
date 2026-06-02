@@ -226,6 +226,11 @@ describe('createCacheUtils', () => {
     await expect(h.set('k', 'v')).resolves.toBeUndefined()
     expect(await h.get('k')).toBe('v')
   })
+
+  it('throws TypeError if custom scope cache name contains separators', async () => {
+    const cache = createCacheUtils(tmp, null)
+    await expect(cache.openHandle('./custom', 'sub/dir')).rejects.toThrow(TypeError)
+  })
 })
 
 describe('CacheHandle â€” has', () => {

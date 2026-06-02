@@ -77,7 +77,7 @@ export function createSqliteUtils(dir, checkPermission, { pluginId = null, store
     async openHandle(location, name = 'default') {
       const Database = await loadDatabase()
       const scope = detectSqliteScope(location)
-      if (scope !== null && (name.includes('/') || name.includes('\\'))) {
+      if (name.includes('/') || name.includes('\\')) {
         throw new TypeError('sqlite name must not contain path separators — use a flat name like "branch-main" instead of "branch/main"')
       }
       let projectId = null

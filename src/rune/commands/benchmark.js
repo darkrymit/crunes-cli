@@ -74,6 +74,11 @@ export async function handler({
     process.exit(1)
   }
 
+  if (!Number.isInteger(runs) || runs < 1) {
+    output.error('Invalid option: --runs must be a positive integer >= 1')
+    process.exit(1)
+  }
+
   let config
   try {
     config = loadConfig(configRoot)
