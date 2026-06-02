@@ -144,23 +144,48 @@ describe('parseArgs nested commands', () => {
 
   it('resolves intermediate command paths', () => {
     const parsed = parseArgs(['remote'], schema)
-    expect(parsed.command).toBe('remote')
-    expect(parsed.commands).toEqual(['remote'])
+    expect(parsed.$command).toBe('remote')
+    expect(parsed.$commands).toEqual(['remote'])
     expect(parsed.fetch).toBe(true)
   })
 
   it('resolves deeply nested commands and merges options', () => {
     const parsed = parseArgs(['--verbose', 'remote', 'add', 'origin', 'https://github.com', '--force'], schema)
-    expect(parsed.command).toBe('remote add')
-    expect(parsed.commands).toEqual(['remote', 'add'])
+    expect(parsed.$command).toBe('remote add')
+    expect(parsed.$commands).toEqual(['remote', 'add'])
     expect(parsed.verbose).toBe(true)
     expect(parsed.fetch).toBe(true)
     expect(parsed.force).toBe(true)
   })
 
-  it('maps positionals to named properties using correct offsets', () => {
+  it('maps positionals to named properties', () => {
     const parsed = parseArgs(['remote', 'add', 'origin', 'https://github.com'], schema)
     expect(parsed.name).toBe('origin')
     expect(parsed.url).toBe('https://github.com')
+  })
+
+  it('args._ contains only data positionals, not command tokens', () => {
+    const parsed = parseArgs(['remote', 'add', 'origin', 'https://github.com'], schema)
+    expect(parsed._).toEqual(['origin', 'https://github.com'])
+  })
+
+  it('args._ is empty when no data positionals provided', () => {
+    const parsed = parseArgs(['remote', 'add'], schema)
+    expect(parsed._).toEqual([])
+  })
+
+  it('does not set $command/$commands when no subcommand matched', () => {
+    const schemaNoCmd = { options: [], positionals: [] }
+    const parsed = parseArgs(['hello'], schemaNoCmd)
+    expect(parsed.$command).toBeUndefined()
+    expect(parsed.$commands).toBeUndefined()
+  })
+
+  it('does not expose legacy command/commands/subcommand/subcommands keys', () => {
+    const parsed = parseArgs(['remote', 'add', 'origin', 'https://github.com'], schema)
+    expect(parsed.command).toBeUndefined()
+    expect(parsed.commands).toBeUndefined()
+    expect(parsed.subcommand).toBeUndefined()
+    expect(parsed.subcommands).toBeUndefined()
   })
 })

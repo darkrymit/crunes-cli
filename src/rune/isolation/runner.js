@@ -850,7 +850,7 @@ export async function runRuneInIsolate(runeFile, effective, args, projectDir, {
     if (isVerbose) console.error(`[crunes:debug] cleaning up $__hostRequire...`)
     await context.eval('delete globalThis.$__hostRequire')
     // Extract args schema from rune if it exports args(), then parse on host.
-    // use(args) always receives a yargs-parser object; args.$raw holds the original array.
+    // use(args) always receives a parsed args object; args._ holds data positionals (command tokens stripped), args.$raw holds the original array.
     let parsedArgs
     if (await context.eval('typeof __crunes_args !== "undefined"')) {
       const schema = await context.evalClosure(

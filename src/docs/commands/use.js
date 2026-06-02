@@ -6,16 +6,16 @@ The entrypoint \`export async function use(args)\` executes the rune's main scri
 ## 1. Parsed Arguments Structure
 
 Inside \`use(args)\`, the \`args\` parameter contains:
-- **\`args.command\`** *(string)*: The full, space-separated matched command path (e.g. \`"remote add"\`).
-- **\`args.commands\`** *(string[])*: The array of matched command levels (e.g. \`["remote", "add"]\`).
-- **\`args._\`** *(string[])*: The raw, unmapped positional arguments array.
+- **\`args.$command\`** *(string)*: The full, space-separated matched command path (e.g. \`"remote add"\`).
+- **\`args.$commands\`** *(string[])*: The array of matched command levels (e.g. \`["remote", "add"]\`).
+- **\`args._\`** *(string[])*: Data positionals only — command tokens are stripped, so \`args._[0]\` is always the first user-supplied value after the matched command.
 - **\`args.$raw\`** *(string[])*: The exact raw string array before parsing.
 - **Named Options**: Values parsed from option flags (e.g., \`args.verbose\`).
 
-## 2. Named Positional Mapping Quirks
-To make developers' lives significantly simpler, positional parameters defined in \`args(builder)\` are **automatically mapped** to their named keys:
+## 2. Named Positional Mapping
+Positional parameters defined in \`args(builder)\` are **automatically mapped** to their named keys:
 - **Root Level**: If you define \`.positional('<who>', ...)\` and run \`crunes use greeting "Alice"\`, you can access \`args.who\` directly!
-- **Nested Command Offset**: If you define \`remote add <name> <url>\`, the parser automatically skips command tokens and maps \`args.name\` and \`args.url\` starting at the correct index!
+- **Subcommands**: If you define \`remote add <name> <url>\`, after matching \`remote add\` the parser maps \`args.name\` and \`args.url\` from the remaining data positionals.
 
 ## 3. Strict 3-Tier Parsing Boundary
 1. **Global Flags**: Scoped to the process prefix (e.g. \`crunes --cwd ./project\`).

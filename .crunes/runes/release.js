@@ -15,7 +15,7 @@ export async function args(b) {
 }
 
 export async function use(args) {
-  const command = args.command || 'info'
+  const command = args.$command || 'info'
 
   if (command === 'info') {
     return runInfo()

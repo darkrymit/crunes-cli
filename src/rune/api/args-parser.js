@@ -116,17 +116,18 @@ export function parseArgs(rawArgs, schema) {
   const parsed = yargsParser(rawArgs, finalCfg)
   
   parsed.$raw = rawArgs
-  
+
   // 3. Expose Unified Command Properties
   if (commandsMatched.length > 0) {
-    parsed.command = commandsMatched.join(' ')
-    parsed.commands = commandsMatched
-    parsed.subcommand = parsed.command
-    parsed.subcommands = parsed.commands
+    parsed.$command = commandsMatched.join(' ')
+    parsed.$commands = commandsMatched
   }
 
-  // 4. Map Named Positional Parameters
-  mapPositionals(parsed, currentSchema.positionals, commandsMatched.length)
+  // 4. Strip command tokens from args._ so it contains only data positionals
+  parsed._ = parsed._.slice(commandsMatched.length)
+
+  // 5. Map Named Positional Parameters (offset is now 0 since _ is already sliced)
+  mapPositionals(parsed, currentSchema.positionals, 0)
 
   return parsed
 }

@@ -19,7 +19,7 @@ export function templateStub(name) {
     `// }`,
     ``,
     `export async function use(args) {`,
-    `  // args._         — positional arguments (string[])`,
+    `  // args._         — data positionals (command tokens stripped)`,
     `  // args.verbose   — named flag (if args export is defined above)`,
     `  // utils.fs.cwd() — absolute path to the project root`,
     ``,

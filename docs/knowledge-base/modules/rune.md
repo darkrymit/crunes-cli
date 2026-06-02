@@ -122,7 +122,9 @@ Every rune must export a `use` function with a **single `args` parameter** — t
 import { md, section } from '@utils'
 
 export async function use(args) {
-  // args._       — positional arguments (string[])
+  // args._         — data positionals (command tokens stripped)
+  // args.$command  — space-separated matched command path (e.g. 'remote add')
+  // args.$commands — array of matched command levels (e.g. ['remote', 'add'])
   // args.verbose — named flag value (if args() export is defined)
   // fs.cwd()     — absolute path to the project root
 }
