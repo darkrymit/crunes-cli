@@ -17,29 +17,37 @@ export function createEnvUtils(dir, checkPermission, permissions) {
   function resolve(key) {
     for (const pattern of permissions.allow) {
       if (!pattern.startsWith('env.read:')) continue
-      const { source, keyPattern } = parseEnvPattern(pattern)
-      if (!micromatch.isMatch(key, keyPattern)) continue
+      const { sources, keyPatterns } = parseEnvPattern(pattern)
+      const keyOk = keyPatterns.some(pat => micromatch.isMatch(key, pat))
+      if (!keyOk) continue
       
-      if (source === '*') {
-        if (Object.hasOwn(process.env, key)) {
+      for (const source of sources) {
+        if (source === '*') {
+          if (Object.hasOwn(process.env, key)) {
+            try {
+              if (checkPermission) checkPermission('env.read', `process:${key}`)
+              return process.env[key]
+            } catch {}
+          }
           try {
-            if (checkPermission) checkPermission('env.read', `process:${key}`)
-            return process.env[key]
+            if (checkPermission) checkPermission('env.read', `.env.local:${key}`)
+            const data = loadFile(dir, '.env.local', fileCache)
+            if (Object.hasOwn(data, key)) return data[key]
           } catch {}
-        }
-        try {
-          if (checkPermission) checkPermission('env.read', `.env:${key}`)
-          const data = loadFile(dir, '.env', fileCache)
+          try {
+            if (checkPermission) checkPermission('env.read', `.env:${key}`)
+            const data = loadFile(dir, '.env', fileCache)
+            if (Object.hasOwn(data, key)) return data[key]
+          } catch {}
+        } else {
+          try {
+            if (checkPermission) checkPermission('env.read', `${source}:${key}`)
+          } catch {
+            continue
+          }
+          const data = source === 'process' ? process.env : loadFile(dir, source, fileCache)
           if (Object.hasOwn(data, key)) return data[key]
-        } catch {}
-      } else {
-        try {
-          if (checkPermission) checkPermission('env.read', `${source}:${key}`)
-        } catch {
-          continue
         }
-        const data = source === 'process' ? process.env : loadFile(dir, source, fileCache)
-        if (Object.hasOwn(data, key)) return data[key]
       }
     }
     return undefined

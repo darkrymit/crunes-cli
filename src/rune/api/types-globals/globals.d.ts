@@ -270,7 +270,7 @@ declare namespace globals {
   }
 
   /**
-   * Makes an HTTP request. Requires `http.fetch:<METHOD>:<url>` permission.
+   * Makes an HTTP request. Requires `http.fetch:<METHOD>::<url>` permission.
    * Aligns with the Web Fetch API. Also available as `utils.http.fetch()`.
    *
    * @param input Request URL string or Request object.

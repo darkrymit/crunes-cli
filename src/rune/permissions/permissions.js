@@ -34,9 +34,10 @@ function normalizePermission(perm) {
     const cap      = perm.slice(0, colonIdx)
     const rest     = perm.slice(colonIdx + 1)
     if (rest.startsWith('@')) return perm
-    const sepIdx  = rest.lastIndexOf(':')
-    const rawLoc  = sepIdx === -1 ? rest : rest.slice(0, sepIdx)
-    const rawName = sepIdx !== -1 ? rest.slice(sepIdx + 1) : null
+    
+    const dColonIdx = rest.indexOf('::')
+    const rawLoc  = dColonIdx === -1 ? rest : rest.slice(0, dColonIdx)
+    const rawName = dColonIdx !== -1 ? rest.slice(dColonIdx + 2) : null
     let loc = rawLoc
     if (
       !loc.startsWith('./') &&
@@ -48,7 +49,7 @@ function normalizePermission(perm) {
       loc = './' + loc
     }
     if (rawName === null) return `${cap}:${loc}`
-    return `${cap}:${loc}:${rawName}`
+    return `${cap}:${loc}::${rawName}`
   }
   return perm
 }

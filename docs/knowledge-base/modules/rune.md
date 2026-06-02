@@ -70,8 +70,8 @@ export { md, tree }
 | `json` | `read`, `readPath`, `readPathAll`, `write`, `modify` | inherits `fs.read:` / `fs.write:` |
 | `yaml` | `read`, `write`, `modify` | inherits `fs.read:` / `fs.write:` |
 | `xml` | `read`, `write`, `modify` | inherits `fs.read:` / `fs.write:` |
-| `http.fetch` | `(url, opts)` | `http.fetch:<METHOD>:<url>` |
-| `env` | `read`, `has` | `env.read:<source>:<key-glob>` |
+| `http.fetch` | `(url, opts)` | `http.fetch:<METHOD>::<url>` |
+| `env` | `read`, `has` | `env.read:<source>::<key-glob>` |
 | `vars` | `read`, `has` | — |
 | `md` | Pure markdown builders | — |
 | `tree` | Pure tree builders | — |
@@ -172,7 +172,7 @@ The runner calls `args(builder)` before `use(parsedArgs)` and passes the schema 
 - **`@local-project-plugin-cache` / `@local-project-plugin-sqlite` require a plugin context:** Calling these from a project rune throws `Error: @local-project-plugin-cache requires a plugin context`. Use `@local-project-cache` / `@local-project-sqlite` for project runes without a plugin context.
 
 - **`env.read` only resolves keys that match a declared `env.read:` permission pattern.** A key not covered by any `allow` pattern returns `undefined` (or the fallback), even if the key exists in `process.env`. There is no "env access denied" error — it silently falls through to the fallback.
-- **`env.read:` permission source is a filename, not `process.env`:** `env.read:process:KEY` reads `process.env`. `env.read:.env:KEY` reads the project's `.env` file. Using `env.read:KEY` (missing the source segment) produces a pattern that never matches and silently returns undefined.
+- **`env.read:` permission source is a filename, not `process.env`:** `env.read:process::KEY` reads `process.env`. `env.read:.env::KEY` reads the project's `.env` file. Using `env.read:KEY` (missing the source segment) acts as a single-argument key pattern matched against any source.
 
 - **Lifecycle namespacing is mandatory in permissions:** A flat top-level `{ "allow": [...] }` in `plugin.json` is rejected at install time — `validatePluginJson` throws `plugin.json: rune "X" must have lifecycle-scoped permissions (e.g. permissions.use.allow)`. Project config overrides under `.crunes/config.json` are validated the same way on load and will fail CLI execution immediately with a descriptive error.
 

@@ -1,4 +1,4 @@
-﻿import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
@@ -226,7 +226,7 @@ describe('createSqliteUtils â€” permissions', () => {
   })
 
   it('sqlite.read granted allows query but not exec', async () => {
-    const checker = makePermissionChecker({ allow: ['sqlite.read:./data:mydb'], deny: [] })
+    const checker = makePermissionChecker({ allow: ['sqlite.read:./data::mydb'], deny: [] })
     sqlite = createSqliteUtils(tmp, checker)
     const h = await sqlite.openHandle('./data', 'mydb')
     expect(() => h.query('SELECT 1')).not.toThrow()

@@ -1,14 +1,21 @@
 import micromatch from 'micromatch'
 
 export function parseEnvPattern(pattern) {
-  const body       = pattern.slice(9)
-  const lastColon  = body.lastIndexOf(':')
-  if (lastColon === -1) {
-    return { source: '*', keyPattern: body }
+  const body = pattern.startsWith('env.read:') ? pattern.slice(9) : pattern
+  
+  const dColonIdx = body.indexOf('::')
+  
+  if (dColonIdx === -1) {
+    return { sources: ['*'], keyPatterns: [body] }
   }
-  const source     = body.slice(0, lastColon)
-  const keyPattern = body.slice(lastColon + 1)
-  return { source, keyPattern }
+  
+  const left = body.slice(0, dColonIdx)
+  const right = body.slice(dColonIdx + 2)
+  
+  return {
+    sources: left ? left.split(',').map(s => s.trim()) : ['process'],
+    keyPatterns: right.split(',').map(k => k.trim())
+  }
 }
 
 // value: 'source:key' e.g. 'process:TOKEN' or '.env:API_KEY'
@@ -16,9 +23,14 @@ export function matchEnvPermission(value, pattern) {
   if (!pattern.startsWith('env.read:')) return false
   const colonIdx = value.indexOf(':')
   if (colonIdx === -1) return false
-  const source = value.slice(0, colonIdx)
-  const key    = value.slice(colonIdx + 1)
-  const { source: patternSource, keyPattern } = parseEnvPattern(pattern)
-  const sourceOk = patternSource === '*' || patternSource === source
-  return sourceOk && micromatch.isMatch(key, keyPattern)
+  
+  const valueSource = value.slice(0, colonIdx)
+  const valueKey    = value.slice(colonIdx + 1)
+  
+  const { sources, keyPatterns } = parseEnvPattern(pattern)
+  
+  const sourceOk = sources.includes('*') || sources.includes(valueSource)
+  const keyOk = keyPatterns.some(pat => micromatch.isMatch(valueKey, pat))
+  
+  return sourceOk && keyOk
 }

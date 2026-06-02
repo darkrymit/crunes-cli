@@ -1,4 +1,4 @@
-﻿import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
@@ -173,7 +173,7 @@ describe('createCacheUtils', () => {
   })
 
   it('cache.read granted allows get but not set', async () => {
-    const checker = makePermissionChecker({ allow: ['cache.read:./my-dir:test'], deny: [] })
+    const checker = makePermissionChecker({ allow: ['cache.read:./my-dir::test'], deny: [] })
     const cache = createCacheUtils(tmp, checker)
     const h = await cache.openHandle('./my-dir', 'test')
     await expect(h.get('k')).resolves.toBe(null)

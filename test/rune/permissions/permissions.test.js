@@ -138,12 +138,12 @@ describe('normalizePermission — virtual root tokens', () => {
     expect(result.allow).toEqual(['fs.read:@plugin-sqlite/**'])
   })
 
-  it('sqlite.read with regular path still normalizes :name', () => {
+  it('sqlite.read with regular path still normalizes ::name', () => {
     const result = computeEffectivePermissions(
-      { use: { allow: ['sqlite.read:mydb:default'] } },
+      { use: { allow: ['sqlite.read:mydb::default'] } },
       undefined, 'use'
     )
-    expect(result.allow).toEqual(['sqlite.read:./mydb:default'])
+    expect(result.allow).toEqual(['sqlite.read:./mydb::default'])
   })
 
   it('@project-sqlite/** permission matches subpath token', () => {
@@ -171,9 +171,9 @@ describe('normalizePermission — virtual root tokens', () => {
     expect(() => check('sqlite.read', '@plugin-sqlite:test')).not.toThrow()
   })
 
-  it('cache.read:@project-cache:chat-session matches exact token', () => {
+  it('cache.read:@project-cache::chat-session matches exact token', () => {
     const check = makePermissionChecker({
-      allow: ['cache.read:@project-cache:chat-session'],
+      allow: ['cache.read:@project-cache::chat-session'],
       deny: [],
     })
     expect(() => check('cache.read', '@project-cache:chat-session')).not.toThrow()

@@ -10,30 +10,20 @@ export function matchFetchPermission(value, pattern) {
   const valueMethod = value.slice(0, vColon).toUpperCase()
   const valueUrl = value.slice(vColon + 1)
 
-  let patternMethods = []
-  let patternUrl = ''
+  let left = ''
+  let right = ''
 
   const doubleColonIndex = patternBody.indexOf('::')
-  if (doubleColonIndex !== -1) {
-    const left = patternBody.slice(0, doubleColonIndex)
-    const right = patternBody.slice(doubleColonIndex + 2)
-    patternMethods = left.split(',').map(m => m.trim().toUpperCase())
-    patternUrl = right
+  if (doubleColonIndex === -1) {
+    left = ''
+    right = patternBody
   } else {
-    const singleColonIndex = patternBody.indexOf(':')
-    if (singleColonIndex === -1) return false
-
-    const prefix = patternBody.slice(0, singleColonIndex).toUpperCase()
-    const remainder = patternBody.slice(singleColonIndex + 1)
-
-    if (prefix === 'HTTP' || prefix === 'HTTPS' || remainder.startsWith('//')) {
-      patternMethods = ['*']
-      patternUrl = patternBody
-    } else {
-      patternMethods = prefix.split(',').map(m => m.trim().toUpperCase())
-      patternUrl = remainder
-    }
+    left = patternBody.slice(0, doubleColonIndex)
+    right = patternBody.slice(doubleColonIndex + 2)
   }
+
+  const patternMethods = left ? left.split(',').map(m => m.trim().toUpperCase()) : ['GET']
+  const patternUrl = right
 
   const methodOk = patternMethods.includes('*') || patternMethods.includes(valueMethod)
   const urlOk = micromatch.isMatch(valueUrl, patternUrl)
