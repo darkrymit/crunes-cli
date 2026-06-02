@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2026-06-02
+
+### Added
+- **Web Fetch API Support**: `Headers`, `FormData`, `URLSearchParams`, `Request`, `Blob`, and `global fetch` are now available inside isolates with streaming request and response body support.
+- **Sandboxed Shell Streams**: Both `shell.exec` and `shell.execInSession` now support streaming. `exec` accepts a `ReadableStream` on `stdin` and can return stdout as raw `Uint8Array` via `opts.binary`. `execInSession` exposes `stdin` as a `HybridWritableStream` and `stdout`/`stderr` as `HybridReadableStream` handles for real-time interactive processes.
+- **WHATWG Streaming APIs**: `ReadableStream`, `WritableStream`, and `TransformStream` are now available inside isolates for `crypto`, `codec`, and `archive` operations.
+- **`fs` Web Streams Support**: `fs.readStream` and `fs.writeStream` expose WHATWG-compliant stream handles for piping file I/O inside isolates.
+- **`docs` Project-Relative File Paths**: `crunes docs` text output now includes project-relative file paths alongside module entries.
+- **`intro` AI Context Expansion**: `crunes docs intro` now includes missing import and config context to better orient AI models in new projects.
+
+### Changed
+- **`args.$command` / `args.$commands` (Breaking)**: Renamed `args.command` and `args.commands` to `args.$command` and `args.$commands`. Command tokens are now stripped from `args._` so positional arrays no longer include the sub-command string.
+- **`shell.exec` Strict Return Shape (Breaking)**: `shell.exec` now returns a strict plain `ShellResult` object (`{ stdout, stderr, exitCode, ok }`) instead of a mixed object with extra properties.
+- **Permissions Multi-Positional Standard**: Permission scopes with multiple positional segments now use the `capability:pos1::pos2` format — `::` separates each additional positional beyond the first (e.g. `cache.read:@project-cache::session-name`). Single-positional scopes like `fs.read:@project/**` are unchanged.
+- **Dependencies**: Bumped all dependencies to Node 22/24 compatibility. `better-sqlite3` is now an optional dependency.
+
+### Fixed
+- **Absolute FS Permission Paths**: Absolute filesystem paths in permission declarations are now relativized before pattern matching, resolving false-denial bugs when using absolute paths in `fs.read` / `fs.write` scopes.
+- **Ecosystem Defects (11 fixes)**: Resolved 11 cross-cutting defects across CLI commands with expanded test coverage.
+- **`doctor` PATH Warning**: Downgraded the missing global `PATH` check from an error to a warning to support local development environments without a globally installed CLI.
+- **HTTP Streaming**: Fixed `body()` returning empty on streaming-upload responses; fixed `Content-Type` boundary stripping when reconstructing `FormData` from multipart wire format.
+- **Stream Pipeline Stability**: Fixed async stream pipeline teardown, `--yes` flag propagation across nested commands, and type definition mismatches in `db` and `shell` result shapes.
+
+---
+
 ## [0.5.10] - 2026-05-31
 
 ### Added

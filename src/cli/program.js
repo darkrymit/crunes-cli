@@ -8,7 +8,7 @@ export function buildProgram() {
   program
     .name('crunes')
     .description('CLI tool for managing context runes')
-    .version('0.5.10', '-v, --version')
+    .version('0.6.0', '-v, --version')
     .enablePositionalOptions()
     .option('-y, --yes', 'assume yes to all prompts and skip interactive mode (also auto-detected in non-TTY environments)')
     .option('-p, --plain', 'plain output: no colors, no box-drawing, plain symbols — optimised for AI/pipe use')
