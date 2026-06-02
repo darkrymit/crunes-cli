@@ -1,4 +1,4 @@
-import { join } from 'node:path'
+import { join, relative } from 'node:path'
 import { loadConfig } from '../../core/config.js'
 import { getRune } from '../../rune/resolver.js'
 import { getArgsSchema } from '../../rune/isolation/runner.js'
@@ -27,6 +27,7 @@ export async function handler({ keys, format = 'text', projectRoot = process.cwd
     }
 
     const runeFile = join(configRoot, entry.path ?? `.crunes/runes/${key}.js`)
+    const relativePath = relative(projectRoot, runeFile).replace(/\\/g, '/')
     const basePerms = entry.permissions ?? { allow: [], deny: [] }
     const effective = computeEffectivePermissions(basePerms, config.permissions?.[key], 'args', projectRoot)
 
@@ -41,6 +42,7 @@ export async function handler({ keys, format = 'text', projectRoot = process.cwd
       key,
       name: entry.name ?? key,
       description: entry.description ?? null,
+      relativePath,
       schema,
     })
   }
@@ -48,7 +50,7 @@ export async function handler({ keys, format = 'text', projectRoot = process.cwd
   if (format === 'json') {
     process.stdout.write(JSON.stringify(results, null, 2) + '\n')
   } else {
-    const blocks = results.map(r => formatHelp(r.schema, { key: r.key, name: r.name, description: r.description }))
+    const blocks = results.map(r => formatHelp(r.schema, { key: r.key, name: r.name, description: r.description, relativePath: r.relativePath }))
     if (blocks.length > 0) process.stdout.write(blocks.join('\n\n') + '\n')
   }
 

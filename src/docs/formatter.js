@@ -42,6 +42,11 @@ export function formatHelp(schema, runeMeta) {
   const key  = runeMeta?.key ?? 'rune'
   const desc = runeMeta?.description ?? runeMeta?.name
 
+  if (runeMeta?.relativePath) {
+    lines.push(`File (project-relative): ${runeMeta.relativePath}`)
+    lines.push('')
+  }
+
   const hasCommands = (schema?.commands ?? []).length > 0
   lines.push(`Usage: crunes use ${key} ${hasCommands ? '<command> ' : ''}[options]`)
   if (desc) { lines.push(''); lines.push(`  ${desc}`) }
