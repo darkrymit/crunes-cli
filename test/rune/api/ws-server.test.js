@@ -71,6 +71,89 @@ describe('createWsUtils — server', () => {
     client.close()
   })
 
+  it('connection handler passes url to WsServerConnSession', async () => {
+    const wsUtils = createWsUtils(null)
+    const id = wsUtils.server(0)
+    const session = wsUtils._getWsServerSession(id)
+    openedServers.push(session)
+    let capturedConn = null
+    session.setConnectionHandler(fakeRef(async (connId) => {
+      capturedConn = wsUtils._getWsServerConn(connId)
+    }))
+    await session.open()
+    const port = session.port
+    const client = new WebSocket(`ws://127.0.0.1:${port}/chat/room1`)
+    await new Promise((res, rej) => { client.on('open', res); client.on('error', rej) })
+    await new Promise(r => setTimeout(r, 20))
+    expect(capturedConn.url).toBe(`ws://127.0.0.1:${port}/chat/room1`)
+    expect(capturedConn.pathname).toBe('/chat/room1')
+    expect(capturedConn.search).toBe('')
+    client.close()
+  })
+
+  it('connection handler captures search string from upgrade URL', async () => {
+    const wsUtils = createWsUtils(null)
+    const id = wsUtils.server(0)
+    const session = wsUtils._getWsServerSession(id)
+    openedServers.push(session)
+    let capturedConn = null
+    session.setConnectionHandler(fakeRef(async (connId) => {
+      capturedConn = wsUtils._getWsServerConn(connId)
+    }))
+    await session.open()
+    const port = session.port
+    const client = new WebSocket(`ws://127.0.0.1:${port}/logs/abc123?foo=bar`)
+    await new Promise((res, rej) => { client.on('open', res); client.on('error', rej) })
+    await new Promise(r => setTimeout(r, 20))
+    expect(capturedConn.pathname).toBe('/logs/abc123')
+    expect(capturedConn.search).toBe('?foo=bar')
+    client.close()
+  })
+
+  it('connection handler captures headers from upgrade request', async () => {
+    const wsUtils = createWsUtils(null)
+    const id = wsUtils.server(0)
+    const session = wsUtils._getWsServerSession(id)
+    openedServers.push(session)
+    let capturedConn = null
+    session.setConnectionHandler(fakeRef(async (connId) => {
+      capturedConn = wsUtils._getWsServerConn(connId)
+    }))
+    await session.open()
+    const port = session.port
+    const client = new WebSocket(`ws://127.0.0.1:${port}/`, { headers: { 'x-custom': 'test-value' } })
+    await new Promise((res, rej) => { client.on('open', res); client.on('error', rej) })
+    await new Promise(r => setTimeout(r, 20))
+    const headers = JSON.parse(capturedConn.headersJson)
+    expect(headers['x-custom']).toBe('test-value')
+    client.close()
+  })
+
+  it('connection handler invocation passes url, pathname, search, headersJson as args', async () => {
+    const wsUtils = createWsUtils(null)
+    const id = wsUtils.server(0)
+    const session = wsUtils._getWsServerSession(id)
+    openedServers.push(session)
+    const received = []
+    session.setConnectionHandler(fakeRef(async (connId, url, pathname, search, headersJson) => {
+      received.push({ connId, url, pathname, search, headersJson })
+    }))
+    await session.open()
+    const port = session.port
+    const client = new WebSocket(`ws://127.0.0.1:${port}/api/v2?token=xyz`, {
+      headers: { 'x-request-id': 'abc' }
+    })
+    await new Promise((res, rej) => { client.on('open', res); client.on('error', rej) })
+    await new Promise(r => setTimeout(r, 20))
+    expect(received).toHaveLength(1)
+    expect(received[0].url).toBe(`ws://127.0.0.1:${port}/api/v2?token=xyz`)
+    expect(received[0].pathname).toBe('/api/v2')
+    expect(received[0].search).toBe('?token=xyz')
+    const hdrs = JSON.parse(received[0].headersJson)
+    expect(hdrs['x-request-id']).toBe('abc')
+    client.close()
+  })
+
   it('dispose() closes all ws servers', async () => {
     const ws = createWsUtils(null)
     const id = ws.server(0)

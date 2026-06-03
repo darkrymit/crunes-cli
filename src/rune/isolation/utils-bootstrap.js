@@ -1399,10 +1399,16 @@ globalThis.utils = {
 
       const id = $__utils_ws_server_create.applySync(undefined, [portOrId, opts, isHttpSession], { arguments: { copy: true } })
 
-      function makeConnHandle(connId) {
+      function makeConnHandle(connId, url, pathname, search, headersJson) {
+        const searchParams = new URLSearchParams(search)
+        const headers      = new Headers(JSON.parse(headersJson))
         const connAbort = new AbortController()
         const connHandle = {
-          get id() { return connId },
+          get id()           { return connId },
+          get url()          { return url },
+          get pathname()     { return pathname },
+          get searchParams() { return searchParams },
+          get headers()      { return headers },
           get signal() { return connAbort.signal },
           on(event, handler) {
             const isolateHandler = event === 'error'
@@ -1437,8 +1443,8 @@ globalThis.utils = {
         get port() { return resolvedPort },
         on(event, handler) {
           if (event === 'connection') {
-            $__utils_ws_server_set_connection_handler.applySync(undefined, [id, async (connId) => {
-              handler(makeConnHandle(connId))
+            $__utils_ws_server_set_connection_handler.applySync(undefined, [id, async (connId, url, pathname, search, headersJson) => {
+              handler(makeConnHandle(connId, url, pathname, search, headersJson))
             }], { arguments: { reference: true } })
           } else if (event === 'error') {
             $__utils_ws_server_set_error_handler.applySync(undefined, [id, async (errJson) => {

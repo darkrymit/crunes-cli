@@ -101,8 +101,12 @@ class WsSession {
 }
 
 class WsServerConnSession {
-  constructor(socket, id) {
+  constructor(socket, id, url, pathname, search, headersJson) {
     this.id = id
+    this.url = url
+    this.pathname = pathname
+    this.search = search
+    this.headersJson = headersJson
     this._socket = socket
     this.handlers = new Map()
     this._closedResolve = null
@@ -228,13 +232,20 @@ class WsServerSession {
         resolve()
       })
 
-      this._wss.on('connection', async (socket) => {
+      this._wss.on('connection', async (socket, request) => {
+        const port     = this._httpSession ? this._httpSession._server.address().port : this._wss.address().port
+        const host     = this._httpSession ? this._httpSession.host : this._host
+        const parsed   = new URL(request.url, `ws://${host}:${port}`)
+        const url      = parsed.href
+        const pathname = parsed.pathname
+        const search   = parsed.search
+        const headersJson = JSON.stringify(Object.fromEntries(Object.entries(request.headers)))
         const connId = String(this._connIdCounter++)
-        const conn = new WsServerConnSession(socket, connId)
+        const conn   = new WsServerConnSession(socket, connId, url, pathname, search, headersJson)
         this._connSessions.set(connId, conn)
         socket.on('close', () => this._connSessions.delete(connId))
         if (this._connectionHandler) {
-          await this._connectionHandler.apply(undefined, [connId], { result: { promise: true } }).catch(() => {})
+          await this._connectionHandler.apply(undefined, [connId, url, pathname, search, headersJson], { result: { promise: true } }).catch(() => {})
         }
       })
 

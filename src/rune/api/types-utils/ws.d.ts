@@ -72,6 +72,14 @@ declare namespace ws {
   interface WsServerConnection extends WsConnection {
     /** Unique ID assigned by the server for this connection. */
     readonly id: string
+    /** Fully qualified WebSocket URL of the upgrade request, e.g. "ws://127.0.0.1:3700/logs/abc123?foo=bar". */
+    readonly url: string
+    /** Path portion of the upgrade URL, e.g. "/logs/abc123". */
+    readonly pathname: string
+    /** Parsed query parameters from the upgrade URL. Empty when no query string. */
+    readonly searchParams: URLSearchParams
+    /** HTTP Upgrade request headers as a Web API Headers object. */
+    readonly headers: Headers
   }
 
   interface WebSocketError extends Error {
