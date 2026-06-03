@@ -72,7 +72,7 @@ describe('createHttpUtils', () => {
     const check = vi.fn()
     const { fetch } = createHttpUtils(check)
     await fetch('https://example.com', { method: 'POST' })
-    expect(check).toHaveBeenCalledWith('http.fetch', 'POST:https://example.com')
+    expect(check).toHaveBeenCalledWith('http.fetch', 'POST::https://example.com')
   })
 
   it('skips checkPermission when null', async () => {
@@ -82,7 +82,7 @@ describe('createHttpUtils', () => {
   })
 
   it('propagates PermissionError from checkPermission', async () => {
-    const check = () => { throw new PermissionError('http.fetch', 'GET:https://example.com') }
+    const check = () => { throw new PermissionError('http.fetch', 'GET::https://example.com') }
     const { fetch } = createHttpUtils(check)
     await expect(fetch('https://example.com')).rejects.toThrow(PermissionError)
   })

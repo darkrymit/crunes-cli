@@ -4,10 +4,10 @@ export function matchStorePermission(value, pattern, cap) {
   const prefix  = cap + ':'
   const patBody = pattern.startsWith(prefix) ? pattern.slice(prefix.length) : pattern
 
-  // Split value into location and name at last ':'
-  const vColon    = value.lastIndexOf(':')
-  const valueLoc  = vColon >= 0 ? value.slice(0, vColon)  : value
-  const valueName = vColon >= 0 ? value.slice(vColon + 1) : null
+  // Split value into location and name at '::'
+  const vDColon   = value.indexOf('::')
+  const valueLoc  = vDColon >= 0 ? value.slice(0, vDColon)  : value
+  const valueName = vDColon >= 0 ? value.slice(vDColon + 2) : null
 
   // Split pattern into location and name at '::'
   const dColonIdx = patBody.indexOf('::')

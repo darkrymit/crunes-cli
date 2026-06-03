@@ -25,23 +25,23 @@ export function createEnvUtils(dir, checkPermission, permissions) {
         if (source === '*') {
           if (Object.hasOwn(process.env, key)) {
             try {
-              if (checkPermission) checkPermission('env.read', `process:${key}`)
+              if (checkPermission) checkPermission('env.read', `process::${key}`)
               return process.env[key]
             } catch {}
           }
           try {
-            if (checkPermission) checkPermission('env.read', `.env.local:${key}`)
+            if (checkPermission) checkPermission('env.read', `.env.local::${key}`)
             const data = loadFile(dir, '.env.local', fileCache)
             if (Object.hasOwn(data, key)) return data[key]
           } catch {}
           try {
-            if (checkPermission) checkPermission('env.read', `.env:${key}`)
+            if (checkPermission) checkPermission('env.read', `.env::${key}`)
             const data = loadFile(dir, '.env', fileCache)
             if (Object.hasOwn(data, key)) return data[key]
           } catch {}
         } else {
           try {
-            if (checkPermission) checkPermission('env.read', `${source}:${key}`)
+            if (checkPermission) checkPermission('env.read', `${source}::${key}`)
           } catch {
             continue
           }

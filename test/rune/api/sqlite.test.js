@@ -181,9 +181,9 @@ describe('createSqliteUtils â€” permissions', () => {
     sqlite = createSqliteUtils(tmp, spy, { pluginId: 'plug@1.0.0' })
     const h = await sqlite.openHandle('@global-plugin-sqlite', 'test')
     h.exec('CREATE TABLE t (id INTEGER PRIMARY KEY)')
-    expect(spy).toHaveBeenCalledWith('sqlite.write', '@global-plugin-sqlite:test')
+    expect(spy).toHaveBeenCalledWith('sqlite.write', '@global-plugin-sqlite::test')
     h.query('SELECT * FROM t')
-    expect(spy).toHaveBeenCalledWith('sqlite.read', '@global-plugin-sqlite:test')
+    expect(spy).toHaveBeenCalledWith('sqlite.read', '@global-plugin-sqlite::test')
     h.close()
   })
 
@@ -192,7 +192,7 @@ describe('createSqliteUtils â€” permissions', () => {
     sqlite = createSqliteUtils(tmp, spy)
     const h = await sqlite.openHandle('./data', 'mydb')
     try { h.exec('CREATE TABLE t (id INTEGER)') } catch {}
-    expect(spy).toHaveBeenCalledWith('sqlite.write', './data:mydb')
+    expect(spy).toHaveBeenCalledWith('sqlite.write', './data::mydb')
   })
 
   it('sqlite.read checked on query for arbitrary paths', async () => {
@@ -200,7 +200,7 @@ describe('createSqliteUtils â€” permissions', () => {
     sqlite = createSqliteUtils(tmp, spy)
     const h = await sqlite.openHandle('./data', 'mydb')
     try { h.query('SELECT 1') } catch {}
-    expect(spy).toHaveBeenCalledWith('sqlite.read', './data:mydb')
+    expect(spy).toHaveBeenCalledWith('sqlite.read', './data::mydb')
   })
 
   it('sqlite.read checked on get for arbitrary paths', async () => {
@@ -208,7 +208,7 @@ describe('createSqliteUtils â€” permissions', () => {
     sqlite = createSqliteUtils(tmp, spy)
     const h = await sqlite.openHandle('./data', 'mydb')
     try { h.get('SELECT 1') } catch {}
-    expect(spy).toHaveBeenCalledWith('sqlite.read', './data:mydb')
+    expect(spy).toHaveBeenCalledWith('sqlite.read', './data::mydb')
   })
 
   it('PermissionError thrown by exec when sqlite.write not granted', async () => {
@@ -238,7 +238,7 @@ describe('createSqliteUtils â€” permissions', () => {
     sqlite = createSqliteUtils(tmp, spy)
     const h = await sqlite.openHandle('./data')
     try { h.query('SELECT 1') } catch {}
-    expect(spy).toHaveBeenCalledWith('sqlite.read', './data:default')
+    expect(spy).toHaveBeenCalledWith('sqlite.read', './data::default')
   })
 
   it('@global-project-sqlite calls checkPermission with @global-project-sqlite:name token', async () => {
@@ -246,7 +246,7 @@ describe('createSqliteUtils â€” permissions', () => {
     sqlite = createSqliteUtils(tmp, spy)
     const h = await sqlite.openHandle('@global-project-sqlite', 'mydb')
     try { h.exec('CREATE TABLE t (id INTEGER)') } catch {}
-    expect(spy).toHaveBeenCalledWith('sqlite.write', '@global-project-sqlite:mydb')
+    expect(spy).toHaveBeenCalledWith('sqlite.write', '@global-project-sqlite::mydb')
   })
 
   it('@global-project-sqlite/data calls checkPermission with subpath token', async () => {
@@ -254,7 +254,7 @@ describe('createSqliteUtils â€” permissions', () => {
     sqlite = createSqliteUtils(tmp, spy)
     const h = await sqlite.openHandle('@global-project-sqlite/data', 'mydb')
     try { h.exec('CREATE TABLE t (id INTEGER)') } catch {}
-    expect(spy).toHaveBeenCalledWith('sqlite.write', '@global-project-sqlite/data:mydb')
+    expect(spy).toHaveBeenCalledWith('sqlite.write', '@global-project-sqlite/data::mydb')
   })
 
   it('@global-plugin-sqlite permission granted via allow pattern passes check', async () => {

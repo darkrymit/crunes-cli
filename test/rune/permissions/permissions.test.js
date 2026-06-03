@@ -152,8 +152,8 @@ describe('normalizePermission — virtual root tokens', () => {
       allow: ['sqlite.read:@project-sqlite/**'],
       deny: [],
     })
-    expect(() => check('sqlite.read', '@project-sqlite/data:mydb')).not.toThrow()
-    expect(() => check('sqlite.read', '@project-sqlite/a/b:mydb')).not.toThrow()
+    expect(() => check('sqlite.read', '@project-sqlite/data::mydb')).not.toThrow()
+    expect(() => check('sqlite.read', '@project-sqlite/a/b::mydb')).not.toThrow()
   })
 
   it('@project-sqlite/** permission matches root-level token', () => {
@@ -161,7 +161,7 @@ describe('normalizePermission — virtual root tokens', () => {
       allow: ['sqlite.read:@project-sqlite/**'],
       deny: [],
     })
-    expect(() => check('sqlite.read', '@project-sqlite:catalog')).not.toThrow()
+    expect(() => check('sqlite.read', '@project-sqlite::catalog')).not.toThrow()
   })
 
   it('@plugin-sqlite/** permission matches plugin-sqlite token', () => {
@@ -169,7 +169,7 @@ describe('normalizePermission — virtual root tokens', () => {
       allow: ['sqlite.read:@plugin-sqlite/**'],
       deny: [],
     })
-    expect(() => check('sqlite.read', '@plugin-sqlite:test')).not.toThrow()
+    expect(() => check('sqlite.read', '@plugin-sqlite::test')).not.toThrow()
   })
 
   it('cache.read:@project-cache::chat-session matches exact token', () => {
@@ -177,8 +177,8 @@ describe('normalizePermission — virtual root tokens', () => {
       allow: ['cache.read:@project-cache::chat-session'],
       deny: [],
     })
-    expect(() => check('cache.read', '@project-cache:chat-session')).not.toThrow()
-    expect(() => check('cache.read', '@project-cache:other-session')).toThrow(PermissionError)
+    expect(() => check('cache.read', '@project-cache::chat-session')).not.toThrow()
+    expect(() => check('cache.read', '@project-cache::other-session')).toThrow(PermissionError)
   })
 })
 

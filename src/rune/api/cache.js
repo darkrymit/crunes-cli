@@ -113,7 +113,7 @@ export function createCacheUtils(dir, checkPermission, { pluginId = null, storeD
       const ctx      = { dir, pluginId, storeDir, projectName, projectId }
       const cacheDir = path.join(resolvePath(location, ctx), name)
       const canon    = canonicalizeLocation(location, { dir })
-      const tokenValue = `${canon}:${name}`
+      const tokenValue = `${canon}::${name}`
       const checkRead  = checkPermission ? () => checkPermission('cache.read',  tokenValue) : null
       const checkWrite = checkPermission ? () => checkPermission('cache.write', tokenValue) : null
       if (scope !== null && GLOBAL_SCOPES.has(scope)) {

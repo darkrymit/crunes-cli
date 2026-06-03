@@ -3,12 +3,12 @@ import micromatch from 'micromatch'
 export function matchFetchPermission(value, pattern) {
   const patternBody = pattern.startsWith('http.fetch:') ? pattern.slice(11) : pattern
 
-  // Value is always formatted as "METHOD:URL"
-  const vColon = value.indexOf(':')
-  if (vColon === -1) return false
+  // Value is formatted as "METHOD::URL"
+  const vDoubleColon = value.indexOf('::')
+  if (vDoubleColon === -1) return false
 
-  const valueMethod = value.slice(0, vColon).toUpperCase()
-  const valueUrl = value.slice(vColon + 1)
+  const valueMethod = value.slice(0, vDoubleColon).toUpperCase()
+  const valueUrl = value.slice(vDoubleColon + 2)
 
   let left = ''
   let right = ''

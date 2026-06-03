@@ -18,14 +18,14 @@ export function parseEnvPattern(pattern) {
   }
 }
 
-// value: 'source:key' e.g. 'process:TOKEN' or '.env:API_KEY'
+// value: 'source::key' e.g. 'process::TOKEN' or '.env::API_KEY'
 export function matchEnvPermission(value, pattern) {
   if (!pattern.startsWith('env.read:')) return false
-  const colonIdx = value.indexOf(':')
-  if (colonIdx === -1) return false
-  
-  const valueSource = value.slice(0, colonIdx)
-  const valueKey    = value.slice(colonIdx + 1)
+  const dColonIdx = value.indexOf('::')
+  if (dColonIdx === -1) return false
+
+  const valueSource = value.slice(0, dColonIdx)
+  const valueKey    = value.slice(dColonIdx + 2)
   
   const { sources, keyPatterns } = parseEnvPattern(pattern)
   

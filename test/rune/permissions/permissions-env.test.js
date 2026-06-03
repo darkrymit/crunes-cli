@@ -48,61 +48,61 @@ describe('parseEnvPattern', () => {
 
 describe('matchEnvPermission', () => {
   it('matches when source and key both match', () => {
-    expect(matchEnvPermission('process:GITHUB_TOKEN', 'env.read:process::GITHUB_*')).toBe(true)
+    expect(matchEnvPermission('process::GITHUB_TOKEN', 'env.read:process::GITHUB_*')).toBe(true)
   })
 
   it('matches .env source', () => {
-    expect(matchEnvPermission('.env:API_KEY', 'env.read:.env::API_*')).toBe(true)
+    expect(matchEnvPermission('.env::API_KEY', 'env.read:.env::API_*')).toBe(true)
   })
 
   it('rejects when source does not match', () => {
-    expect(matchEnvPermission('.env.local:API_KEY', 'env.read:.env::API_*')).toBe(false)
+    expect(matchEnvPermission('.env.local::API_KEY', 'env.read:.env::API_*')).toBe(false)
   })
 
   it('rejects when key does not match glob', () => {
-    expect(matchEnvPermission('process:DB_HOST', 'env.read:process::API_*')).toBe(false)
+    expect(matchEnvPermission('process::DB_HOST', 'env.read:process::API_*')).toBe(false)
   })
 
   it('wildcard key pattern matches any key', () => {
-    expect(matchEnvPermission('process:ANY_KEY', 'env.read:process::*')).toBe(true)
+    expect(matchEnvPermission('process::ANY_KEY', 'env.read:process::*')).toBe(true)
   })
 
   it('supports env.read:* wildcard key matching on any source', () => {
-    expect(matchEnvPermission('process:API_KEY', 'env.read:*')).toBe(true)
-    expect(matchEnvPermission('.env:API_KEY', 'env.read:*')).toBe(true)
+    expect(matchEnvPermission('process::API_KEY', 'env.read:*')).toBe(true)
+    expect(matchEnvPermission('.env::API_KEY', 'env.read:*')).toBe(true)
   })
 
   it('supports env.read:KEY_NAME single-argument wildcard source matching for specific key', () => {
-    expect(matchEnvPermission('process:TOKEN', 'env.read:TOKEN')).toBe(true)
-    expect(matchEnvPermission('.env:TOKEN', 'env.read:TOKEN')).toBe(true)
-    expect(matchEnvPermission('.env:OTHER', 'env.read:TOKEN')).toBe(false)
+    expect(matchEnvPermission('process::TOKEN', 'env.read:TOKEN')).toBe(true)
+    expect(matchEnvPermission('.env::TOKEN', 'env.read:TOKEN')).toBe(true)
+    expect(matchEnvPermission('.env::OTHER', 'env.read:TOKEN')).toBe(false)
   })
 
   it('supports comma-separated sources and comma-separated keys with positional double-colon', () => {
-    expect(matchEnvPermission('process:PORT', 'env.read:process,.env::PORT,API_KEY')).toBe(true)
-    expect(matchEnvPermission('.env:API_KEY', 'env.read:process,.env::PORT,API_KEY')).toBe(true)
-    expect(matchEnvPermission('.env:OTHER', 'env.read:process,.env::PORT,API_KEY')).toBe(false)
+    expect(matchEnvPermission('process::PORT', 'env.read:process,.env::PORT,API_KEY')).toBe(true)
+    expect(matchEnvPermission('.env::API_KEY', 'env.read:process,.env::PORT,API_KEY')).toBe(true)
+    expect(matchEnvPermission('.env::OTHER', 'env.read:process,.env::PORT,API_KEY')).toBe(false)
   })
 
   it('rejects legacy single-colon patterns without double-colon', () => {
-    expect(matchEnvPermission('process:TOKEN', 'env.read:process:TOKEN')).toBe(false)
+    expect(matchEnvPermission('process::TOKEN', 'env.read:process:TOKEN')).toBe(false)
   })
 })
 
 describe('makePermissionChecker — env.read capability', () => {
   it('allows a matching env permission', () => {
     const check = makePermissionChecker({ allow: ['env.read:process::TOKEN'], deny: [] })
-    expect(() => check('env.read', 'process:TOKEN')).not.toThrow()
+    expect(() => check('env.read', 'process::TOKEN')).not.toThrow()
   })
 
   it('throws PermissionError for unlisted source', () => {
     const check = makePermissionChecker({ allow: ['env.read:process::TOKEN'], deny: [] })
-    expect(() => check('env.read', '.env:TOKEN')).toThrow(PermissionError)
+    expect(() => check('env.read', '.env::TOKEN')).toThrow(PermissionError)
   })
 
   it('throws PermissionError for unlisted key', () => {
     const check = makePermissionChecker({ allow: ['env.read:process::TOKEN'], deny: [] })
-    expect(() => check('env.read', 'process:OTHER')).toThrow(PermissionError)
+    expect(() => check('env.read', 'process::OTHER')).toThrow(PermissionError)
   })
 
   it('throws PermissionError when source:key is in deny list', () => {
@@ -110,15 +110,15 @@ describe('makePermissionChecker — env.read capability', () => {
       allow: ['env.read:process::SECRET'],
       deny:  ['env.read:process::SECRET'],
     })
-    expect(() => check('env.read', 'process:SECRET')).toThrow(PermissionError)
+    expect(() => check('env.read', 'process::SECRET')).toThrow(PermissionError)
   })
 
-  it('PermissionError carries env.read capability and source:key value', () => {
+  it('PermissionError carries env.read capability and source::key value', () => {
     const check = makePermissionChecker({ allow: [], deny: [] })
     let err
-    try { check('env.read', 'process:TOKEN') } catch (e) { err = e }
+    try { check('env.read', 'process::TOKEN') } catch (e) { err = e }
     expect(err).toBeInstanceOf(PermissionError)
     expect(err.capability).toBe('env.read')
-    expect(err.value).toBe('process:TOKEN')
+    expect(err.value).toBe('process::TOKEN')
   })
 })

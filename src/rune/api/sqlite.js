@@ -89,7 +89,7 @@ export function createSqliteUtils(dir, checkPermission, { pluginId = null, store
       const base   = resolvePath(location, ctx)
       const dbPath = path.join(base, resolveFileName(name))
       const canon  = canonicalizeLocation(location, { dir })
-      const tokenValue = `${canon}:${name}`
+      const tokenValue = `${canon}::${name}`
       const checkRead  = checkPermission ? () => checkPermission('sqlite.read',  tokenValue) : null
       const checkWrite = checkPermission ? () => checkPermission('sqlite.write', tokenValue) : null
       if (scope !== null && GLOBAL_SCOPES.has(scope)) {

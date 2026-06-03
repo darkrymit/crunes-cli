@@ -121,9 +121,9 @@ describe('createCacheUtils', () => {
     const cache = createCacheUtils(tmp, spy, { pluginId: 'plug@1.0.0' })
     const h = await cache.openHandle('@global-plugin-cache', 'test')
     await h.set('k', 'v')
-    expect(spy).toHaveBeenCalledWith('cache.write', '@global-plugin-cache:test')
+    expect(spy).toHaveBeenCalledWith('cache.write', '@global-plugin-cache::test')
     await h.get('k')
-    expect(spy).toHaveBeenCalledWith('cache.read', '@global-plugin-cache:test')
+    expect(spy).toHaveBeenCalledWith('cache.read', '@global-plugin-cache::test')
   })
 
   it('cache.write checked on set for arbitrary paths', async () => {
@@ -131,7 +131,7 @@ describe('createCacheUtils', () => {
     const cache = createCacheUtils(tmp, spy)
     const h = await cache.openHandle('./my-dir', 'test')
     try { await h.set('k', 'v') } catch {}
-    expect(spy).toHaveBeenCalledWith('cache.write', './my-dir:test')
+    expect(spy).toHaveBeenCalledWith('cache.write', './my-dir::test')
   })
 
   it('cache.read checked on get for arbitrary paths', async () => {
@@ -139,7 +139,7 @@ describe('createCacheUtils', () => {
     const cache = createCacheUtils(tmp, spy)
     const h = await cache.openHandle('./my-dir', 'test')
     try { await h.get('k') } catch {}
-    expect(spy).toHaveBeenCalledWith('cache.read', './my-dir:test')
+    expect(spy).toHaveBeenCalledWith('cache.read', './my-dir::test')
   })
 
   it('cache.write checked on delete for arbitrary paths', async () => {
@@ -147,7 +147,7 @@ describe('createCacheUtils', () => {
     const cache = createCacheUtils(tmp, spy)
     const h = await cache.openHandle('./my-dir', 'test')
     try { await h.delete('k') } catch {}
-    expect(spy).toHaveBeenCalledWith('cache.write', './my-dir:test')
+    expect(spy).toHaveBeenCalledWith('cache.write', './my-dir::test')
   })
 
   it('cache.write checked on clear for arbitrary paths', async () => {
@@ -155,7 +155,7 @@ describe('createCacheUtils', () => {
     const cache = createCacheUtils(tmp, spy)
     const h = await cache.openHandle('./my-dir', 'test')
     try { await h.clear() } catch {}
-    expect(spy).toHaveBeenCalledWith('cache.write', './my-dir:test')
+    expect(spy).toHaveBeenCalledWith('cache.write', './my-dir::test')
   })
 
   it('PermissionError thrown by get when cache.read not granted', async () => {
@@ -185,7 +185,7 @@ describe('createCacheUtils', () => {
     const cache = createCacheUtils(tmp, spy)
     const h = await cache.openHandle('./my-dir')
     try { await h.get('k') } catch {}
-    expect(spy).toHaveBeenCalledWith('cache.read', './my-dir:default')
+    expect(spy).toHaveBeenCalledWith('cache.read', './my-dir::default')
   })
 
   it('@global-project-cache calls checkPermission with @global-project-cache:name token', async () => {
@@ -193,7 +193,7 @@ describe('createCacheUtils', () => {
     const cache = createCacheUtils(tmp, spy)
     const h = await cache.openHandle('@global-project-cache', 'myns')
     try { await h.set('k', 'v') } catch {}
-    expect(spy).toHaveBeenCalledWith('cache.write', '@global-project-cache:myns')
+    expect(spy).toHaveBeenCalledWith('cache.write', '@global-project-cache::myns')
   })
 
   it('@global-project-cache/subdir calls checkPermission with subpath token', async () => {
@@ -201,7 +201,7 @@ describe('createCacheUtils', () => {
     const cache = createCacheUtils(tmp, spy)
     const h = await cache.openHandle('@global-project-cache/data', 'myns')
     try { await h.get('k') } catch {}
-    expect(spy).toHaveBeenCalledWith('cache.read', '@global-project-cache/data:myns')
+    expect(spy).toHaveBeenCalledWith('cache.read', '@global-project-cache/data::myns')
   })
 
   it('@global-project-cache/subdir stores and retrieves values', async () => {

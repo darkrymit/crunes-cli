@@ -115,7 +115,7 @@ class HttpServerSession {
 
 export function createHttpUtils(checkPermission) {
   async function fetch(url, { method = 'GET', headers = {}, body, signal, ...rest } = {}) {
-    if (checkPermission) checkPermission('http.fetch', `${method}:${url}`)
+    if (checkPermission) checkPermission('http.fetch', `${method}::${url}`)
 
     let finalBody = body
     if (Array.isArray(body)) {
