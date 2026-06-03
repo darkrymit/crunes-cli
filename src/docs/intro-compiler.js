@@ -1,8 +1,8 @@
 import utilsApiData from './generated/utils-api.json' assert { type: 'json' }
 import lifecycleApiData from './generated/lifecycle-api.json' assert { type: 'json' }
 import globalsApiData from './generated/globals-api.json' assert { type: 'json' }
-import { walkUtilsDocs } from './utils-walker.js'
-import { formatUtilsNamespace } from './utils-formatter.js'
+import { walk } from './ts-walker.js'
+import { formatNode, formatMembers } from './ts-formatter.js'
 import { getRune } from '../rune/resolver.js'
 import { getArgsSchema } from '../rune/isolation/runner.js'
 import { formatHelp } from './formatter.js'
@@ -143,139 +143,8 @@ export async function run() {
 \`\`\``
 }
 
-function formatLifecycleDocs(data) {
-  const lifecycleNs = walkUtilsDocs(data)[0]
-  if (!lifecycleNs) return ''
-
-  const lines = []
-  lines.push('### Core Entrypoints')
-  lines.push('')
-
-  for (const fn of lifecycleNs.functions) {
-    const isRun = fn.name === 'run'
-    const sigStr = isRun ? 'run(args)' : 'args(builder)'
-    lines.push(`#### \`export function ${sigStr}\``)
-    lines.push('')
-    if (fn.description) lines.push(fn.description)
-    lines.push('')
-    lines.push('**Parameters:**')
-    for (const p of fn.params) {
-      lines.push(`- **\`${p.name}\`** (\`${p.type}\`): ${p.description ?? ''}`)
-    }
-    lines.push('')
-    if (fn.returns && fn.returns !== 'void') {
-      lines.push(`**Returns:** \`${fn.returns}\``)
-      lines.push('')
-    }
-  }
-
-  lines.push('### Supporting Interfaces')
-  lines.push('')
-
-  for (const [typeName, typeDef] of Object.entries(lifecycleNs.types ?? {})) {
-    lines.push(`#### Interface: \`${typeName}\``)
-    lines.push('')
-    if (typeDef.description) lines.push(typeDef.description)
-    lines.push('')
-    
-    if (typeDef.properties?.length) {
-      lines.push('| Field | Type | Description |')
-      lines.push('| --- | --- | --- |')
-      for (const p of typeDef.properties) {
-        lines.push(`| \`${p.name}\` | \`${p.type}\` | ${p.description ?? ''} |`)
-      }
-      lines.push('')
-    }
-
-    if (typeDef.methods?.length) {
-      lines.push('| Method | Returns | Description |')
-      lines.push('| --- | --- | --- |')
-      for (const m of typeDef.methods) {
-        const params = (m.params ?? []).map(p => `${p.name}${p.optional ? '?' : ''}: ${p.type}`).join(', ')
-        lines.push(`| \`${m.name}(${params})\` | \`${m.returns}\` | ${m.description ?? ''} |`)
-      }
-      lines.push('')
-    }
-  }
-
-  return lines.join('\n')
-}
-
-function formatGlobalsDocs(data) {
-  const globalsNs = walkUtilsDocs(data)[0]
-  if (!globalsNs) return ''
-
-  const lines = []
-  lines.push('The sandbox environment provides standard global utility functions and classes directly on `globalThis`. These are backed by the host bridge and do not require importing from `@utils`:')
-  lines.push('')
-  lines.push('### Global Functions')
-  lines.push('')
-
-  const preferredOrder = ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval']
-  const sortedFunctions = [...globalsNs.functions].sort((a, b) => {
-    const idxA = preferredOrder.indexOf(a.name)
-    const idxB = preferredOrder.indexOf(b.name)
-    if (idxA !== -1 && idxB !== -1) return idxA - idxB
-    if (idxA !== -1) return -1
-    if (idxB !== -1) return 1
-    return a.name.localeCompare(b.name)
-  })
-
-  for (const fn of sortedFunctions) {
-    const paramsSig = fn.params.map(p => `${p.name}${p.optional ? '?' : ''}`).join(', ')
-    lines.push(`#### \`function ${fn.name}(${paramsSig})\``)
-    lines.push('')
-    if (fn.description) lines.push(fn.description)
-    lines.push('')
-    if (fn.params && fn.params.length > 0) {
-      lines.push('**Parameters:**')
-      for (const p of fn.params) {
-        lines.push(`- **\`${p.name}\`** (\`${p.type}\`): ${p.description ?? ''}`)
-      }
-      lines.push('')
-    }
-    if (fn.returns && fn.returns !== 'void') {
-      lines.push(`**Returns:** \`${fn.returns}\``)
-      lines.push('')
-    }
-  }
-
-  if (globalsNs.types && Object.keys(globalsNs.types).length > 0) {
-    lines.push('### Global Classes and Interfaces')
-    lines.push('')
-    const sortedTypes = Object.entries(globalsNs.types).sort((a, b) => a[0].localeCompare(b[0]))
-    for (const [typeName, typeDef] of sortedTypes) {
-      const label = typeDef.kind === 128 ? 'Class' : 'Interface'
-      lines.push(`#### ${label}: \`${typeName}\``)
-      lines.push('')
-      if (typeDef.description) lines.push(typeDef.description)
-      lines.push('')
-      if (typeDef.properties?.length) {
-        lines.push('| Property | Type | Description |')
-        lines.push('| --- | --- | --- |')
-        for (const p of typeDef.properties) {
-          lines.push(`| \`${p.name}\` | \`${p.type}\` | ${p.description ?? ''} |`)
-        }
-        lines.push('')
-      }
-      if (typeDef.methods?.length) {
-        lines.push('| Method | Returns | Description |')
-        lines.push('| --- | --- | --- |')
-        for (const m of typeDef.methods) {
-          const params = (m.params ?? []).map(p => `${p.name}${p.optional ? '?' : ''}: ${p.type}`).join(', ')
-          lines.push(`| \`${m.name}(${params})\` | \`${m.returns}\` | ${m.description ?? ''} |`)
-        }
-        lines.push('')
-      }
-    }
-  }
-
-  return lines.join('\n')
-}
-
 export async function compileIntro({ config, format, projectRoot, configRoot, hasProjectError }) {
-  const namespaces = walkUtilsDocs(utilsApiData)
-  const globalsTypes = walkUtilsDocs(globalsApiData)[0]?.types ?? {}
+  const namespaces = walk(utilsApiData)
 
   const activeRunes = []
   if (config && !hasProjectError) {
@@ -375,13 +244,15 @@ export async function compileIntro({ config, format, projectRoot, configRoot, ha
   lines.push('')
   lines.push('The sandboxed execution environment parses entrypoint exports to build schemas and run modules safely. Their dynamic type specification is detailed below:')
   lines.push('')
-  lines.push(formatLifecycleDocs(lifecycleApiData))
+  const [lifecycleNs] = walk(lifecycleApiData)
+  lines.push(formatMembers(lifecycleNs?.members ?? [], { indent: '' }))
   lines.push('')
 
   // Section 3: Global Sandbox APIs
   lines.push('## 3. Global Sandbox APIs')
   lines.push('')
-  lines.push(formatGlobalsDocs(globalsApiData))
+  const [globalsNs] = walk(globalsApiData)
+  lines.push(formatMembers(globalsNs?.members ?? [], { indent: '' }))
   lines.push('')
 
   // Section 4: CLI Calling & Argument Conventions
@@ -474,20 +345,20 @@ export async function compileIntro({ config, format, projectRoot, configRoot, ha
   lines.push('')
 
   for (const ns of namespaces) {
-    lines.push(`### \`${ns.namespace}\``)
+    lines.push(`### \`${ns.name}\``)
     lines.push('')
     if (ns.description) {
       lines.push(ns.description)
       lines.push('')
     }
 
-    if (NAMESPACE_RECIPES[ns.namespace]) {
+    if (NAMESPACE_RECIPES[ns.name]) {
       lines.push('**Usage Example:**')
-      lines.push(NAMESPACE_RECIPES[ns.namespace])
+      lines.push(NAMESPACE_RECIPES[ns.name])
       lines.push('')
     }
 
-    lines.push(formatUtilsNamespace(ns, globalsTypes))
+    lines.push(formatNode(ns))
     lines.push('')
     lines.push('---')
     lines.push('')

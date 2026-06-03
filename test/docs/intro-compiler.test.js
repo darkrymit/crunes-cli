@@ -31,7 +31,7 @@ describe('compileIntro compiler engine', () => {
 
     const parsed = JSON.parse(output)
     expect(parsed.ecosystem).toBeDefined()
-    expect(parsed.ecosystem.namespaces.some(n => n.namespace === 'fs')).toBe(true)
+    expect(parsed.ecosystem.namespaces.some(n => n.name === 'fs')).toBe(true)
     expect(parsed.workspace).toBeNull()
   })
 

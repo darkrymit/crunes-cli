@@ -79,6 +79,15 @@ export function buildProgram() {
     })
 
   helpGroup
+    .command('globals')
+    .description('Show injected sandbox globals and ES2020 builtins available in rune scripts')
+    .addOption(new Option('--format <format>', 'output format').choices(['text', 'json']).default('text'))
+    .action(async (opts) => {
+      const { handler } = await import('../docs/commands/globals.js')
+      await handler({ format: opts.format })
+    })
+
+  helpGroup
     .command('intro')
     .description('Generate a comprehensive introduction and context document for Crunes and the active project')
     .option('-g, --global', 'generate a global, pure-ecosystem guide (skip local project context)')

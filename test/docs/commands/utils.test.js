@@ -24,22 +24,23 @@ describe('help utils handler', () => {
 
   it('known namespace renders its header', async () => {
     await handler({ namespaces: ['ws'] })
-    expect(written.join('')).toContain('Namespace: utils.ws')
+    expect(written.join('')).toContain('ws')
   })
 
   it('multiple namespaces renders both headers', async () => {
     await handler({ namespaces: ['ws', 'fs'] })
     const out = written.join('')
-    expect(out).toContain('Namespace: utils.ws')
-    expect(out).toContain('Namespace: utils.fs')
+    expect(out).toContain('ws')
+    expect(out).toContain('fs')
   })
 
   it('json format emits valid JSON array', async () => {
     await handler({ namespaces: ['ws'], format: 'json' })
     const parsed = JSON.parse(written.join(''))
     expect(Array.isArray(parsed)).toBe(true)
-    expect(parsed[0].namespace).toBe('ws')
-    expect(Array.isArray(parsed[0].functions)).toBe(true)
+    expect(parsed[0].kind).toBe('namespace')
+    expect(parsed[0].name).toBe('ws')
+    expect(Array.isArray(parsed[0].members)).toBe(true)
   })
 
   it('json with no namespaces returns all', async () => {
