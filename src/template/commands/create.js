@@ -6,7 +6,7 @@ import { output } from '../../shared/output.js'
 export function templateStub(name) {
   return [
     `// permissions:`,
-    `//   use:`,
+    `//   run:`,
     `//     allow: []  — add patterns like fs.read:./** if you use utils.fs`,
     `//     deny:  []`,
     ``,
@@ -18,7 +18,7 @@ export function templateStub(name) {
     `//     .build()`,
     `// }`,
     ``,
-    `export async function use(args) {`,
+    `export async function run(args) {`,
     `  // args._         — data positionals (command tokens stripped)`,
     `  // args.verbose   — named flag (if args export is defined above)`,
     `  // utils.fs.cwd() — absolute path to the project root`,

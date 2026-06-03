@@ -42,7 +42,7 @@ crunes init
 crunes create fetch-status
 
 # Run the rune and output the markdown sections
-crunes use fetch-status
+crunes run fetch-status
 ```
 
 ---
@@ -53,7 +53,7 @@ crunes use fetch-status
 # Core Operations
 crunes init                          # Create .crunes/config.json in current project
 crunes create [key]                  # Scaffold a new rune and register it in config
-crunes use <key> [args...]           # Run a rune (use -b for batch execution)
+crunes run <key> [args...]           # Run a rune (use -b for batch execution)
 crunes check <key>                   # Execute a rune and validate its return schema
 crunes bench <key>                   # Profile execution time (fast/ok/slow)
 crunes list                          # List all registered local and plugin runes

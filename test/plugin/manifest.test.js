@@ -6,7 +6,7 @@ const VALID = {
   name: 'my-plugin',
   version: '1.0.0',
   runes: {
-    example: { permissions: { use: { allow: ['fs.read:**'], deny: [] } } },
+    example: { permissions: { run: { allow: ['fs.read:**'], deny: [] } } },
   },
 }
 
@@ -38,7 +38,7 @@ describe('validatePluginJson', () => {
   it('throws when permissions has no lifecycle with an allow array', () => {
     const json = {
       ...VALID,
-      runes: { example: { permissions: { use: { deny: [] } } } },
+      runes: { example: { permissions: { run: { deny: [] } } } },
     }
     expect(() => validatePluginJson(json)).toThrow('lifecycle-scoped permissions')
   })
@@ -51,8 +51,8 @@ describe('validatePluginJson', () => {
     const json = {
       ...VALID,
       runes: {
-        a: { permissions: { use: { allow: [], deny: [] } } },
-        b: { permissions: { use: { allow: ['shell:**'], deny: [] } } },
+        a: { permissions: { run: { allow: [], deny: [] } } },
+        b: { permissions: { run: { allow: ['shell:**'], deny: [] } } },
       },
     }
     expect(() => validatePluginJson(json)).not.toThrow()
@@ -84,12 +84,12 @@ describe('validatePluginJson', () => {
     expect(() => validatePluginJson(bad)).toThrow()
   })
 
-  it('passes and warns if plugin rune permissions.use is empty', () => {
+  it('passes and warns if plugin rune permissions.run is empty', () => {
     const spy = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const json = {
       format: '1',
       runes: {
-        myrune: { permissions: { use: {} } }
+        myrune: { permissions: { run: {} } }
       }
     }
     expect(() => validatePluginJson(json)).not.toThrow()

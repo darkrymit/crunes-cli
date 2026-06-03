@@ -1,7 +1,7 @@
 ---
 tags: [flow]
 ---
-# `crunes template use` Flow
+# `crunes template apply` Flow
 
 > A template is resolved from one of three sources (local config, shortcut alias, or installed plugin), copied into the project, and registered as a rune in `.crunes/config.json`.
 
@@ -9,12 +9,12 @@ tags: [flow]
 
 ## Overview
 
-`crunes template use [source:]template` parses the optional `source:` prefix, resolves the template through a priority chain (project config → plugin scan), copies the template file to `.crunes/runes/<key>.js`, and writes a rune config entry that merges template metadata with any CLI flag overrides. The result is a new locally-owned rune ready to run with `crunes use <key>`.
+`crunes template apply [source:]template` parses the optional `source:` prefix, resolves the template through a priority chain (project config → plugin scan), copies the template file to `.crunes/runes/<key>.js`, and writes a rune config entry that merges template metadata with any CLI flag overrides. The result is a new locally-owned rune ready to run with `crunes use <key>`.
 
 ## Walkthrough
 
 ```
-crunes template use [source:]template [--as <key>] [--path <path>] [--name] [--description]
+crunes template apply [source:]template [--as <key>] [--path <path>] [--name] [--description]
           │
           ▼
   commands/use.js: parse [source:]template

@@ -2,7 +2,7 @@
 
 exports[`template > markdown format matches snapshot 1`] = `
 "// permissions:
-//   use:
+//   run:
 //     allow: []  — add patterns like fs.read:./** if you use utils.fs
 //     deny:  []
 
@@ -14,7 +14,7 @@ import { md, section } from '@utils'
 //     .build()
 // }
 
-export async function use(args) {
+export async function run(args) {
   // args._         — data positionals (command tokens stripped)
   // args.verbose   — named flag (if args export is defined above)
   // utils.fs.cwd() — absolute path to the project root
@@ -30,7 +30,7 @@ export async function use(args) {
 
 exports[`template > tree format matches snapshot 1`] = `
 "// permissions:
-//   use:
+//   run:
 //     allow: []  — add patterns like fs.read:./** if you use utils.fs
 //     deny:  []
 
@@ -42,7 +42,7 @@ import { md, section, tree } from '@utils'
 //     .build()
 // }
 
-export async function use(args) {
+export async function run(args) {
   // args._         — data positionals (command tokens stripped)
   // args.verbose   — named flag (if args export is defined above)
   // utils.fs.cwd() — absolute path to the project root

@@ -230,7 +230,7 @@ describe('WebSocket sandboxed integration', () => {
     const runeFile = path.join(tmpDir, 'test-ws-binary-inline.js')
     const runeSrc = `
       import { ws } from '@utils'
-      export async function use() {
+      export async function run() {
         const client = ws.client('ws://localhost:${integrationServer.port}')
         const textPromise = new Promise(resolve => {
           client.on('message', (msg) => resolve(msg))

@@ -89,7 +89,7 @@ describe('sandboxed streaming hashing and ciphers', () => {
   it('hashStream matches whole-buffer hash digest', async () => {
     const script = `
       import { crypto, codec } from '@utils'
-      export async function use() {
+      export async function run() {
         const stream = new ReadableStream({
           start(c) {
             c.enqueue(codec.fromUtf8("hello world"))
@@ -115,7 +115,7 @@ describe('sandboxed streaming hashing and ciphers', () => {
   it('encryptStream and decryptStream roundtrip matches exactly', async () => {
     const script = `
       import { crypto, codec } from '@utils'
-      export async function use() {
+      export async function run() {
         const key = crypto.randomBytes(32)
         const iv = crypto.randomBytes(12)
         const plaintext = codec.fromUtf8("this is a super secret streaming payload of considerable size")

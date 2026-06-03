@@ -75,7 +75,7 @@ describe('shell utils', () => {
     it('execInSession stdout/stderr act as text streams by default', async () => {
       const script = `
         import { shell } from '@utils'
-        export async function use() {
+        export async function run() {
           const session = shell.execInSession("node -e \\"process.stdin.on('data', d => { process.stdout.write('echo:' + d.toString()) })\\"")
           const reader = session.stdout.getReader()
           const writer = session.stdin.getWriter()
@@ -100,7 +100,7 @@ describe('shell utils', () => {
     it('execInSession stdout/stderr act as binary streams when binary is true', async () => {
       const script = `
         import { shell } from '@utils'
-        export async function use() {
+        export async function run() {
           const session = shell.execInSession('node -e "process.stdout.write(Buffer.from([65, 66, 67]))"', { binary: true })
           const reader = session.stdout.getReader()
           const { value } = await reader.read()
@@ -131,7 +131,7 @@ describe('shell utils', () => {
     it('regular exec accepts stdin as a ReadableStream and trim: false returns full result', async () => {
       const script = `
         import { shell } from '@utils'
-        export async function use() {
+        export async function run() {
           const stream = new ReadableStream({
             start(c) {
               c.enqueue('piped standard input stream\\n')
@@ -155,7 +155,7 @@ describe('shell utils', () => {
     it('regular exec returns raw Uint8Array when binary is true', async () => {
       const script = `
         import { shell } from '@utils'
-        export async function use() {
+        export async function run() {
           const { stdout: res } = await shell.exec('node -e "process.stdout.write(Buffer.from([10, 20, 30]))"', { binary: true })
           return {
             isUint8: res instanceof Uint8Array,

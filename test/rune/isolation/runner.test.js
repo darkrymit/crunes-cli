@@ -80,7 +80,7 @@ describe('@utils virtual module', () => {
     const runeFile = join(tmp, 'rune.js')
     await writeFile(runeFile, [
       'import { section } from "@utils"',
-      'export async function use(args) {',
+      'export async function run(args) {',
       '  return [section.create("test", { type: "markdown", content: args._[0] ?? "hi" })]',
       '}',
     ].join('\n'))
@@ -93,7 +93,7 @@ describe('@utils virtual module', () => {
     const runeFile = join(tmp, 'rune.js')
     await writeFile(runeFile, [
       'import { fs, section } from "@utils"',
-      'export async function use(args) {',
+      'export async function run(args) {',
       '  return [section.create("cwd", { type: "markdown", content: fs.cwd() })]',
       '}',
     ].join('\n'))
@@ -110,7 +110,7 @@ describe('@utils virtual module', () => {
     const runeFile = join(tmp, 'rune.js')
     await writeFile(runeFile, [
       'import { json, section } from "@utils"',
-      'export async function use() {',
+      'export async function run() {',
       '  const data = await json.read(".crunes/state.json")',
       '  return [section.create("r", { type: "markdown", content: String(data.ok) })]',
       '}',
@@ -136,7 +136,7 @@ describe('rune.spawn / rune.kill / rune.exists permission enforcement', () => {
     const runeFile = join(tmp, 'rune.js')
     await writeFile(runeFile, [
       'import { rune, section } from "@utils"',
-      'export async function use(args) {',
+      'export async function run(args) {',
       '  await rune.spawn("worker", [])',
       '  return section.create("x", { type: "markdown", content: "ok" })',
       '}',
@@ -151,7 +151,7 @@ describe('rune.spawn / rune.kill / rune.exists permission enforcement', () => {
     const runeFile = join(tmp, 'rune.js')
     await writeFile(runeFile, [
       'import { rune, section } from "@utils"',
-      `export async function use(args) {`,
+      `export async function run(args) {`,
       `  await rune.kill(${JSON.stringify(id)})`,
       '  return section.create("x", { type: "markdown", content: "ok" })',
       '}',
@@ -166,7 +166,7 @@ describe('rune.spawn / rune.kill / rune.exists permission enforcement', () => {
     const runeFile = join(tmp, 'rune.js')
     await writeFile(runeFile, [
       'import { rune, section } from "@utils"',
-      `export async function use(args) {`,
+      `export async function run(args) {`,
       `  await rune.exists(${JSON.stringify(id)})`,
       '  return section.create("x", { type: "markdown", content: "ok" })',
       '}',
@@ -180,7 +180,7 @@ describe('rune.spawn / rune.kill / rune.exists permission enforcement', () => {
     const runeFile = join(tmp, 'rune.js')
     await writeFile(runeFile, [
       'import { rune, section } from "@utils"',
-      'export async function use(args) {',
+      'export async function run(args) {',
       '  const alive = await rune.exists("no-such-job")',
       '  return [section.create("x", { type: "markdown", content: String(alive) })]',
       '}',
@@ -198,7 +198,7 @@ describe('rune.spawn / rune.kill / rune.exists permission enforcement', () => {
     const runeFile = join(tmp, 'rune.js')
     await writeFile(runeFile, [
       'import { rune, section } from "@utils"',
-      'export async function use(args) {',
+      'export async function run(args) {',
       '  await rune.kill("no-such-job")',
       '  return [section.create("x", { type: "markdown", content: "ok" })]',
       '}',
@@ -213,7 +213,7 @@ describe('rune.spawn / rune.kill / rune.exists permission enforcement', () => {
     const runeFile = join(tmp, 'rune.js')
     await writeFile(runeFile, [
       'import { rune, section } from "@utils"',
-      `export async function use(args) {`,
+      `export async function run(args) {`,
       `  await rune.kill(${JSON.stringify(id)})`,
       '  return [section.create("x", { type: "markdown", content: "ok" })]',
       '}',
@@ -233,7 +233,7 @@ describe('getArgsSchema', () => {
     const runeFile = join(tmp, 'rune.js')
     await writeFile(runeFile, [
       'import { section } from "@utils"',
-      'export async function use(args) { return [] }',
+      'export async function run(args) { return [] }',
     ].join('\n'))
     expect(await getArgsSchema(runeFile, { allow: [], deny: [] }, tmp)).toBeNull()
   })
@@ -244,7 +244,7 @@ describe('getArgsSchema', () => {
       'export async function args(b) {',
       '  return b.option("--strict", "Strict mode", false).build()',
       '}',
-      'export async function use(args) { return [] }',
+      'export async function run(args) { return [] }',
     ].join('\n'))
     const schema = await getArgsSchema(runeFile, { allow: [], deny: [] }, tmp)
     expect(schema).toMatchObject({
@@ -259,7 +259,7 @@ describe('getArgsSchema', () => {
       'export async function args(b) {',
       '  return b.option("-c, --count <number>", "Count", 5).build()',
       '}',
-      'export async function use(args) { return [] }',
+      'export async function run(args) { return [] }',
     ].join('\n'))
     const schema = await getArgsSchema(runeFile, { allow: [], deny: [] }, tmp)
     expect(schema.options[0].def).toBe(5)
@@ -271,16 +271,16 @@ describe('getArgsSchema', () => {
       'export async function args(b) {',
       '  return b',
       '    .option("--strict", "Strict", false)',
-      '    .example("crunes use myrune foo", "Basic use")',
-      '    .example("crunes use myrune foo --strict")',
+      '    .example("crunes run myrune foo", "Basic use")',
+      '    .example("crunes run myrune foo --strict")',
       '    .build()',
       '}',
-      'export async function use(args) { return [] }',
+      'export async function run(args) { return [] }',
     ].join('\n'))
     const schema = await getArgsSchema(runeFile, { allow: [], deny: [] }, tmp)
     expect(schema.examples).toHaveLength(2)
-    expect(schema.examples[0]).toMatchObject({ usage: 'crunes use myrune foo', description: 'Basic use' })
-    expect(schema.examples[1]).toMatchObject({ usage: 'crunes use myrune foo --strict' })
+    expect(schema.examples[0]).toMatchObject({ usage: 'crunes run myrune foo', description: 'Basic use' })
+    expect(schema.examples[1]).toMatchObject({ usage: 'crunes run myrune foo --strict' })
   })
 })
 
@@ -294,7 +294,7 @@ describe('runRuneInIsolate — declarative args parsing', () => {
     const runeFile = join(tmp, 'rune.js')
     await writeFile(runeFile, [
       'import { section } from "@utils"',
-      'export async function use(args) {',
+      'export async function run(args) {',
       '  return [section.create("t", { type: "markdown", content: JSON.stringify({ pos: args._, raw: args.$raw }) })]',
       '}',
     ].join('\n'))
@@ -311,7 +311,7 @@ describe('runRuneInIsolate — declarative args parsing', () => {
       'export async function args(b) {',
       '  return b.option("-c, --count <number>", "Count", 0).build()',
       '}',
-      'export async function use(parsed) {',
+      'export async function run(parsed) {',
       '  return [section.create("t", { type: "markdown", content: String(parsed.count) })]',
       '}',
     ].join('\n'))
@@ -323,7 +323,7 @@ describe('runRuneInIsolate — declarative args parsing', () => {
     const runeFile = join(tmp, 'rune.js')
     await writeFile(runeFile, [
       'import { section } from "@utils"',
-      'export async function use(args) {',
+      'export async function run(args) {',
       '  return [section.create("t", { type: "markdown", content: JSON.stringify(args.$raw) })]',
       '}',
     ].join('\n'))
@@ -338,7 +338,7 @@ describe('runRuneInIsolate — declarative args parsing', () => {
       'export async function args(b) {',
       '  return b.option("--strict", "Strict", false).build()',
       '}',
-      'export async function use(parsed) {',
+      'export async function run(parsed) {',
       '  return [section.create("t", { type: "markdown", content: String(parsed.strict) })]',
       '}',
     ].join('\n'))
@@ -365,7 +365,7 @@ describe('runRuneInIsolate — ws integration', () => {
     const runeFile = join(tmp, 'rune.js')
     await writeFile(runeFile, `
 import { ws, section } from '@utils'
-export async function use() {
+export async function run() {
   const socket = ws.client('${echoServer.url}')
   let received = ''
   socket.on('message', async (msg) => {
@@ -391,7 +391,7 @@ export async function use() {
     const runeFile = join(tmp, 'rune.js')
     await writeFile(runeFile, `
 import { ws, section } from '@utils'
-export async function use() {
+export async function run() {
   const socket = ws.client('${echoServer.url}')
   await socket.open()
   return [section.create('r', { type: 'markdown', content: 'ok' })]
@@ -406,7 +406,7 @@ export async function use() {
     const runeFile = join(tmp, 'rune.js')
     await writeFile(runeFile, `
 import { ws, section } from '@utils'
-export async function use() {
+export async function run() {
   const socket = ws.client('${echoServer.url}')
   const msgs = []
   let count = 0
@@ -436,7 +436,7 @@ export async function use() {
     const runeFile = join(tmp, 'rune.js')
     await writeFile(runeFile, `
 import { ws, section } from '@utils'
-export async function use() {
+export async function run() {
   const socket = ws.client('${echoServer.url}')
   await socket.open()
   return [section.create('r', { type: 'markdown', content: 'done' })]
@@ -462,7 +462,7 @@ describe('TextEncoder, TextDecoder, AbortController, and AbortSignal sandbox int
     const runeFile = join(tmp, 'rune.js')
     await writeFile(runeFile, `
 import { section } from '@utils'
-export async function use() {
+export async function run() {
     const encoder = new TextEncoder()
     const decoder = new TextDecoder('utf-8')
     const encoded = encoder.encode('héllo 🚀')
@@ -478,7 +478,7 @@ export async function use() {
     const runeFile = join(tmp, 'rune.js')
     await writeFile(runeFile, `
 import { section } from '@utils'
-export async function use() {
+export async function run() {
     const controller = new AbortController()
     let aborted = false
     controller.signal.addEventListener('abort', () => {
@@ -504,7 +504,7 @@ describe('progressive section emission', () => {
     const runeFile = join(tmp, 'rune.js')
     await writeFile(runeFile, `
 import { section } from '@utils'
-export async function use() {
+export async function run() {
   section.emit(section.create('progressive-1', { type: 'markdown', content: 'hello from step 1' }))
   section.emit(section.create('progressive-2', { type: 'markdown', content: 'hello from step 2' }))
   return []
@@ -553,7 +553,7 @@ describe('spawn-like ShellSession sandbox integration', () => {
     const runeFile = join(tmp, 'rune.js')
     await writeFile(runeFile, `
 import { shell, section } from '@utils'
-export async function use() {
+export async function run() {
   const session = shell.execInSession('node ${scriptPath.replace(/\\/g, '\\\\')}', { binary: true })
   let stdoutStr = ''
   
@@ -589,7 +589,7 @@ export async function use() {
     const runeFile = join(tmp, 'rune.js')
     await writeFile(runeFile, `
 import { shell, section } from '@utils'
-export async function use() {
+export async function run() {
   const controller = new AbortController()
   const session = shell.execInSession('node ${scriptPath.replace(/\\/g, '\\\\')}', {
     signal: controller.signal
@@ -635,7 +635,7 @@ describe('runRuneInIsolate — db integration', () => {
     const runeFile = join(tmp, 'rune.js')
     await writeFile(runeFile, `
 import { db, section } from '@utils'
-export async function use() {
+export async function run() {
   const client = await db.connect('postgres://user:pass@mydb.com:5432/production')
   const rows = await client.query('SELECT * FROM users WHERE id = $1', [42])
   const first = await client.get('SELECT * FROM users WHERE id = $1', [42])
@@ -660,7 +660,7 @@ export async function use() {
     const runeFile = join(tmp, 'rune.js')
     await writeFile(runeFile, `
 import { db, section } from '@utils'
-export async function use() {
+export async function run() {
   const client = await db.connect('postgres://user:pass@mydb.com:5432/production')
   let txRun = false
   const res = await client.transaction(async (tx) => {
@@ -686,7 +686,7 @@ export async function use() {
     const runeFile = join(tmp, 'rune.js')
     await writeFile(runeFile, `
 import { db } from '@utils'
-export async function use() {
+export async function run() {
   await db.connect('postgres://user:pass@mydb.com:5432/production')
 }
 `)

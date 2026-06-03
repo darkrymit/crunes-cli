@@ -19,7 +19,7 @@ describe('Global Sandbox APIs', () => {
     const runeFile = join(tmp, 'rune.js')
     await writeFile(runeFile, [
       'import { section } from "@utils"',
-      'export async function use() {',
+      'export async function run() {',
       '  let called = false',
       '  let receivedArgs = []',
       '  setTimeout((arg1, arg2) => {',
@@ -44,7 +44,7 @@ describe('Global Sandbox APIs', () => {
     const runeFile = join(tmp, 'rune.js')
     await writeFile(runeFile, [
       'import { section } from "@utils"',
-      'export async function use() {',
+      'export async function run() {',
       '  let called = false',
       '  const id = setTimeout(() => {',
       '    called = true',
@@ -67,7 +67,7 @@ describe('Global Sandbox APIs', () => {
     const runeFile = join(tmp, 'rune.js')
     await writeFile(runeFile, [
       'import { section } from "@utils"',
-      'export async function use() {',
+      'export async function run() {',
       '  let count = 0',
       '  const id = setInterval(() => {',
       '    count++',
@@ -96,7 +96,7 @@ describe('Global Sandbox APIs', () => {
     const runeFile = join(tmp, 'rune.js')
     await writeFile(runeFile, [
       'import { section } from "@utils"',
-      'export async function use() {',
+      'export async function run() {',
       '  let called = false',
       '  setTimeout(() => {',
       '    called = true',
@@ -115,7 +115,7 @@ describe('Global Sandbox APIs', () => {
     const runeFile = join(tmp, 'rune.js')
     await writeFile(runeFile, [
       'import { section } from "@utils"',
-      'export async function use() {',
+      'export async function run() {',
       '  const encoder = new TextEncoder()',
       '  const decoder = new TextDecoder()',
       '  const original = "Hello Isolated-VM!"',

@@ -46,7 +46,7 @@ Example: crunes --cwd ./dir use --format json myrune --strict
   return { key, sections, runeArgs }
 }
 
-export function parseUseArgs(argv) {
+export function parseRunArgs(argv) {
   let format = 'text'
   let failFast = false
   let allowBatch = false

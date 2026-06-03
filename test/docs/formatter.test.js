@@ -4,7 +4,7 @@ import { formatHelp } from '../../src/docs/formatter.js'
 describe('formatHelp', () => {
   it('includes usage line with rune key', () => {
     const out = formatHelp(null, { key: 'myrune' })
-    expect(out).toContain('crunes use myrune')
+    expect(out).toContain('crunes run myrune')
   })
   it('includes option flags and description', () => {
     const schema = { options: [{ flags: '-c, --count <number>', description: 'Max results', def: 10 }], positionals: [] }
@@ -24,16 +24,16 @@ describe('formatHelp', () => {
     expect(out).toContain('Does stuff')
   })
   it('renders Examples block with usage and description', () => {
-    const schema = { options: [], positionals: [], examples: [{ usage: 'crunes use myrune foo', description: 'Basic use' }] }
+    const schema = { options: [], positionals: [], examples: [{ usage: 'crunes run myrune foo', description: 'Basic use' }] }
     const out = formatHelp(schema, { key: 'myrune' })
     expect(out).toContain('Examples:')
-    expect(out).toContain('crunes use myrune foo')
+    expect(out).toContain('crunes run myrune foo')
     expect(out).toContain('Basic use')
   })
   it('renders example without description', () => {
-    const schema = { options: [], positionals: [], examples: [{ usage: 'crunes use myrune foo' }] }
+    const schema = { options: [], positionals: [], examples: [{ usage: 'crunes run myrune foo' }] }
     const out = formatHelp(schema, { key: 'myrune' })
-    expect(out).toContain('crunes use myrune foo')
+    expect(out).toContain('crunes run myrune foo')
   })
   it('omits Examples block when no examples', () => {
     const schema = { options: [], positionals: [], examples: [] }
@@ -63,7 +63,7 @@ describe('formatHelp recursive', () => {
     }
 
     const output = formatHelp(schema, { key: 'git', description: 'Git helper' })
-    expect(output).toContain('Usage: crunes use git <command> [options]')
+    expect(output).toContain('Usage: crunes run git <command> [options]')
     expect(output).toContain('remote                         Git remotes')
     expect(output).toContain('add <name> <url>           Add remote')
     expect(output).toContain('--fetch                    Fetch first')

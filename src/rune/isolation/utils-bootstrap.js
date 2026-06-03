@@ -622,7 +622,7 @@ globalThis.utils = {
     selected: () => $__utils_section_selected.applySync(undefined, [], { result: { copy: true } }),
   },
   rune: {
-    use: (key, args) => $__utils_rune
+    run: (key, args) => $__utils_rune
       .apply(undefined, [key, args], { arguments: { copy: true }, result: { promise: true, copy: true } }),
     spawn: (key, args) => $__utils_rune_spawn
       .apply(undefined, [key, args], { arguments: { copy: true }, result: { promise: true, copy: true } }),

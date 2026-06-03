@@ -17,7 +17,7 @@ tags: [module]
 
 **Node 20+ re-spawn:** `cli.js` checks `parseInt(process.versions.node.split('.')[0], 10) >= 20 && !process.execArgv.includes('--no-node-snapshot')`. If true, it calls `spawnSync(process.execPath, ['--no-node-snapshot', ...process.argv.slice(1)], { stdio: 'inherit' })` and immediately exits with the child's status. This happens in the module body, before the lazy imports in action handlers would ever load `isolated-vm`.
 
-**`-v` disambiguation:** Commander registers `-v, --version` on the root program. `crunes use -v` should mean `--verbose`, not print the version. `cli.js` checks `process.argv.length > 2 && !process.argv[2].startsWith('-')` to detect a subcommand, then finds and replaces the first `-v` in `process.argv` with `--verbose` before `program.parseAsync`. This rewrite is in-place on the array.
+**`-v` disambiguation:** Commander registers `-v, --version` on the root program. `crunes run -v` should mean `--verbose`, not print the version. `cli.js` checks `process.argv.length > 2 && !process.argv[2].startsWith('-')` to detect a subcommand, then finds and replaces the first `-v` in `process.argv` with `--verbose` before `program.parseAsync`. This rewrite is in-place on the array.
 
 **`preAction` hook:** `program.hook('preAction', ...)` runs before every subcommand action and calls `configureOutput({ plain, verbose })`. This is the guaranteed path for applying `--plain` and `--verbose` globally — individual handlers do not need to check these flags directly.
 
@@ -37,7 +37,7 @@ tags: [module]
 
 - **The re-spawn shows as a double process:** On Node 20+, every `crunes` invocation creates a parent that immediately exits and a child that does the real work. Process monitors, `strace`, or `ps` will show two processes briefly. All logs and errors come from the child.
 
-- **`-v` is rewritten only when a command is present:** `crunes -v` (alone) does NOT rewrite `-v`, so Commander prints the version. `crunes use -v` rewrites it to `--verbose`. A command that starts with `-` (e.g., hypothetical `crunes --some-flag`) would have `process.argv[2].startsWith('-')` be true, so `hasCommand` is false and `-v` stays as `--version`.
+- **`-v` is rewritten only when a command is present:** `crunes -v` (alone) does NOT rewrite `-v`, so Commander prints the version. `crunes run -v` rewrites it to `--verbose`. A command that starts with `-` (e.g., hypothetical `crunes --some-flag`) would have `process.argv[2].startsWith('-')` be true, so `hasCommand` is false and `-v` stays as `--version`.
 
 - **`projectRoot()` returns `process.cwd()` if `--cwd` was not passed:** It does NOT cache `process.cwd()` at registration time. If something changes the working directory after Commander parses options but before the action handler fires (unusual but possible in tests), `projectRoot()` will return the new directory.
 

@@ -67,7 +67,7 @@ describe('sandboxed streaming codecs', () => {
   it('codec base64 encoder handles non-aligned chunk remainder boundaries', async () => {
     const script = `
       import { codec } from '@utils'
-      export async function use() {
+      export async function run() {
         const stream = new ReadableStream({
           start(c) {
             c.enqueue(codec.fromUtf8("he")) // 2 bytes
@@ -100,7 +100,7 @@ describe('sandboxed streaming codecs', () => {
   it('codec hex encoder and decoder stream roundtrip', async () => {
     const script = `
       import { codec } from '@utils'
-      export async function use() {
+      export async function run() {
         const stream = new ReadableStream({
           start(c) {
             c.enqueue(codec.fromUtf8("s"))

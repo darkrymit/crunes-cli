@@ -63,11 +63,11 @@ export function validateConfig(config, fileName = 'config.json') {
   if (config.permissions && typeof config.permissions === 'object') {
     for (const [runeKey, perms] of Object.entries(config.permissions)) {
       if (Array.isArray(perms)) {
-        throw new Error(`${fileName}: permissions for "${runeKey}" must be lifecycle-scoped (e.g. permissions["${runeKey}"].use.allow)`)
+        throw new Error(`${fileName}: permissions for "${runeKey}" must be lifecycle-scoped (e.g. permissions["${runeKey}"].run.allow)`)
       }
       if (perms && typeof perms === 'object') {
         if (Array.isArray(perms.allow) || Array.isArray(perms.deny)) {
-          throw new Error(`${fileName}: permissions for "${runeKey}" must be lifecycle-scoped (e.g. permissions["${runeKey}"].use.allow)`)
+          throw new Error(`${fileName}: permissions for "${runeKey}" must be lifecycle-scoped (e.g. permissions["${runeKey}"].run.allow)`)
         }
       }
     }
@@ -78,14 +78,14 @@ export function validateConfig(config, fileName = 'config.json') {
       if (entry && typeof entry === 'object' && entry.permissions) {
         const perms = entry.permissions
         if (Array.isArray(perms)) {
-          throw new Error(`${fileName}: runes["${runeKey}"].permissions must be lifecycle-scoped (e.g. permissions.use.allow)`)
+          throw new Error(`${fileName}: runes["${runeKey}"].permissions must be lifecycle-scoped (e.g. permissions.run.allow)`)
         }
         if (perms && typeof perms === 'object') {
           if (Array.isArray(perms.allow) || Array.isArray(perms.deny)) {
-            throw new Error(`${fileName}: runes["${runeKey}"].permissions must be lifecycle-scoped (e.g. permissions.use.allow)`)
+            throw new Error(`${fileName}: runes["${runeKey}"].permissions must be lifecycle-scoped (e.g. permissions.run.allow)`)
           }
-          if (perms.use && typeof perms.use === 'object' && Object.keys(perms.use).length === 0) {
-            console.warn(`[crunes:warn] ${fileName}: runes["${runeKey}"].permissions.use is empty. No extra permissions will be granted.`)
+          if (perms.run && typeof perms.run === 'object' && Object.keys(perms.run).length === 0) {
+            console.warn(`[crunes:warn] ${fileName}: runes["${runeKey}"].permissions.run is empty. No extra permissions will be granted.`)
           }
         }
       }

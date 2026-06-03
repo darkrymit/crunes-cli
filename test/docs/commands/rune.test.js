@@ -21,10 +21,10 @@ describe('help rune handler', () => {
       'export async function args(b) {',
       '  return b.positional("<who>", "Who to greet").build()',
       '}',
-      'export async function use() { return [] }',
+      'export async function run() { return [] }',
     ].join('\n'))
     await writeFile(join(tmp, '.crunes', 'runes', 'count.js'), [
-      'export async function use() { return [] }',
+      'export async function run() { return [] }',
     ].join('\n'))
     written = []
     vi.spyOn(process.stdout, 'write').mockImplementation((chunk) => { written.push(chunk); return true })
@@ -38,15 +38,15 @@ describe('help rune handler', () => {
   it('md output contains usage line and rune description', async () => {
     await handler({ keys: ['greet'], projectRoot: tmp, configRoot: tmp })
     const out = written.join('')
-    expect(out).toContain('crunes use greet')
+    expect(out).toContain('crunes run greet')
     expect(out).toContain('Says hello')
   })
 
   it('md output for multiple keys contains both usage lines', async () => {
     await handler({ keys: ['greet', 'count'], projectRoot: tmp, configRoot: tmp })
     const out = written.join('')
-    expect(out).toContain('crunes use greet')
-    expect(out).toContain('crunes use count')
+    expect(out).toContain('crunes run greet')
+    expect(out).toContain('crunes run count')
   })
 
   it('json output is valid JSON array with correct shape', async () => {

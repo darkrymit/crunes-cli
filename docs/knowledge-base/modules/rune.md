@@ -35,7 +35,7 @@ Each segment parsed by `parseSegment` in `commands/use.js` has the form `[--sect
 
 **Result normalisation:** `normaliseResult` ensures `runRune` always returns an array. `null` → `[]`, a single object → `[obj]`, an array → pass-through.
 
-**Circular call detection:** `_callStack` is an array of keys in the current call chain. If `_callStack.includes(key)`, `CircularRuneError` is thrown with the full chain. Child rune calls (via `rune.use`) pass `nextStack` recursively but reset `sections` to `null`.
+**Circular call detection:** `_callStack` is an array of keys in the current call chain. If `_callStack.includes(key)`, `CircularRuneError` is thrown with the full chain. Child rune calls (via `rune.run`) pass `nextStack` recursively but reset `sections` to `null`.
 
 **Reference bridge:** `utils` methods are async — they call back into the host via `isolated-vm` References (`$__utils_fs_read`, `$__utils_shell`, etc.). `ExternalCopy` cannot carry promises or callbacks, so References are the only option. Adding a new `utils` capability requires three changes: (1) implement in `src/rune/api/<module>.js`, (2) inject as a `$__utils_<name>` Reference in `injectUtils()` in `runner.js`, (3) expose it in `utils-bootstrap.js` inside the isolate. Missing any side silently fails.
 
@@ -79,7 +79,7 @@ export { md, tree }
 | `md` | Pure markdown builders | — |
 | `tree` | Pure tree builders | — |
 | `section` | `create`, `match`, `selected` | — |
-| `rune.use` | `(key, args?)` | inherits target rune's permissions |
+| `rune.run` | `(key, args?)` | inherits target rune's permissions |
 | `rune.spawn` | `(key, args?)` → `{ id }` | `rune.spawn` |
 | `rune.kill` | `(id, signal?)` | `rune.kill` |
 | `rune.exists` | `(id)` → `boolean` | `rune.exists` |
@@ -123,7 +123,7 @@ Every rune must export a `use` function with a **single `args` parameter** — t
 ```js
 import { md, section } from '@utils'
 
-export async function use(args) {
+export async function run(args) {
   // args._         — data positionals (command tokens stripped)
   // args.$command  — space-separated matched command path (e.g. 'remote add')
   // args.$commands — array of matched command levels (e.g. ['remote', 'add'])
@@ -142,7 +142,7 @@ export async function args(b) {
     .option('-v, --verbose', 'Verbose output', false)
     .option('-c, --count <number>', 'Max results', 10)
     .positional('<target>', 'Target path')
-    .example('crunes use myrune foo', 'Basic use')
+    .example('crunes run myrune foo', 'Basic use')
     .build()
 }
 ```
@@ -151,11 +151,11 @@ The runner calls `args(builder)` before `use(parsedArgs)` and passes the schema 
 
 ## Flows
 
-- [[flows/use]] — owns the full execution path from CLI input to section output
+- [[flows/run]] — owns the full execution path from CLI input to section output
 
 ## Gotchas & Debugging
 
-- **Command-level flags must precede the key:** `use`'s `--format`/`--fail-fast` and `bench`'s `--runs`/`--warmup` are consumed from the prefix of argv only — the parser stops at the first non-flag token. A rune can safely use `--format`, `--runs`, etc. as its own flags without conflict, as long as the command-level flags are placed before the key. `crunes use --format json mykey` → command gets json; `crunes use mykey --format json` → rune gets `--format json`.
+- **Command-level flags must precede the key:** `use`'s `--format`/`--fail-fast` and `bench`'s `--runs`/`--warmup` are consumed from the prefix of argv only — the parser stops at the first non-flag token. A rune can safely use `--format`, `--runs`, etc. as its own flags without conflict, as long as the command-level flags are placed before the key. `crunes run --format json mykey` → command gets json; `crunes run mykey --format json` → rune gets `--format json`.
 
 - **`section()` vs `section.create()`:** `section` is an object (`{ create, match, selected }`), not a function. Runes still calling `section(name, data)` or `utils.section(name, data)` will throw `TypeError: section is not a function` at runtime with no further context.
 
@@ -178,7 +178,7 @@ The runner calls `args(builder)` before `use(parsedArgs)` and passes the schema 
 - **`env.read` only resolves keys that match a declared `env.read:` permission pattern.** A key not covered by any `allow` pattern returns `undefined` (or the fallback), even if the key exists in `process.env`. There is no "env access denied" error — it silently falls through to the fallback.
 - **`env.read:` permission source is a filename, not `process.env`:** `env.read:process::KEY` reads `process.env`. `env.read:.env::KEY` reads the project's `.env` file. Using `env.read:KEY` (missing the source segment) acts as a single-argument key pattern matched against any source.
 
-- **Lifecycle namespacing is mandatory in permissions:** A flat top-level `{ "allow": [...] }` in `plugin.json` is rejected at install time — `validatePluginJson` throws `plugin.json: rune "X" must have lifecycle-scoped permissions (e.g. permissions.use.allow)`. Project config overrides under `.crunes/config.json` are validated the same way on load and will fail CLI execution immediately with a descriptive error.
+- **Lifecycle namespacing is mandatory in permissions:** A flat top-level `{ "allow": [...] }` in `plugin.json` is rejected at install time — `validatePluginJson` throws `plugin.json: rune "X" must have lifecycle-scoped permissions (e.g. permissions.run.allow)`. Project config overrides under `.crunes/config.json` are validated the same way on load and will fail CLI execution immediately with a descriptive error.
 
 - **`normalizePermission` prepends `./`:** `fs.read:package.json` is normalized to `fs.read:./package.json`. A permission declared as `fs.read:./package.json` and a check for `package.json` (without `./`) will NOT match. Always use the normalized path in permission tokens.
 

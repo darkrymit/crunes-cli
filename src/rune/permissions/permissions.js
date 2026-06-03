@@ -71,7 +71,7 @@ function normalizePermission(perm, dir) {
 
 /**
  * Compute effective allow/deny from plugin.json permissions + optional project override.
- * Must be namespaced under the requested lifecycle (e.g. `use`).
+ * Must be namespaced under the requested lifecycle (e.g. `run`).
  */
 export function computeEffectivePermissions(pluginPerms, projectPerms, lifecycle, dir) {
   const namespacePlugin = pluginPerms?.[lifecycle] || {}

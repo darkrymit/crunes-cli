@@ -857,7 +857,7 @@ export async function runRuneInIsolate(runeFile, effective, args, projectDir, {
   isolateTimeoutMs = process.env.CRUNES_NO_TIMEOUT ? undefined : 30_000,
   sections = null,
   vars = {},
-  lifecycle = 'use',
+  lifecycle = 'run',
   pluginId = null,
   runeKey = null,
   onEvent = null,
@@ -1131,7 +1131,7 @@ export async function getArgsSchema(runeFile, effective, projectDir, {
 /**
  * Compute effective permissions and run a plugin rune. Convenience wrapper for core.js.
  */
-export async function executePluginRune({ pluginDir, pluginCacheDir, runeKey, pluginJson, projectPerms, projectVars = {}, args, projectDir, opts, runeCallback, sections, lifecycle = 'use', onEvent = null, instanceId = '1', }) {
+export async function executePluginRune({ pluginDir, pluginCacheDir, runeKey, pluginJson, projectPerms, projectVars = {}, args, projectDir, opts, runeCallback, sections, lifecycle = 'run', onEvent = null, instanceId = '1', }) {
   const runePerms     = pluginJson.runes[runeKey]?.permissions ?? {}
   const effective     = computeEffectivePermissions(runePerms, projectPerms, lifecycle, projectDir)
   const runeVars      = pluginJson.runes[runeKey]?.vars ?? {}

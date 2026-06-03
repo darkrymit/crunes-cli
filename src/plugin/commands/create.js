@@ -51,7 +51,7 @@ export function exampleRune() {
 // Users activate it by adding your plugin to their project config.
 //
 // permissions (plugin.json):
-//   use:
+//   run:
 //     allow: []  — add patterns like fs.read:./** if you use utils.fs
 //     deny:  []
 
@@ -63,7 +63,7 @@ import { md, section } from '@utils'
 //     .build()
 // }
 
-export async function use(args) {
+export async function run(args) {
   // args._         — data positionals (command tokens stripped)
   // args.verbose   — named flag (if args export is defined above)
   // utils.fs.cwd() — absolute path to the user's project root
@@ -81,7 +81,7 @@ export function exampleTemplate() {
 // Edit this file to define what a new rune looks like when scaffolded from your plugin.
 //
 // permissions (plugin.json):
-//   use:
+//   run:
 //     allow: []  — add patterns like fs.read:./** if you use utils.fs
 //     deny:  []
 
@@ -93,7 +93,7 @@ import { md, section } from '@utils'
 //     .build()
 // }
 
-export async function use(args) {
+export async function run(args) {
   // args._         — data positionals (command tokens stripped)
   // args.verbose   — named flag (if args export is defined above)
   // utils.fs.cwd() — absolute path to the user's project root

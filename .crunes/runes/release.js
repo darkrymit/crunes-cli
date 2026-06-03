@@ -14,7 +14,7 @@ export async function args(b) {
     .command('git', 'Automatically stage, commit, and tag the current version in Git')
 }
 
-export async function use(args) {
+export async function run(args) {
   const command = args.$command || 'info'
 
   if (command === 'info') {
@@ -86,7 +86,7 @@ async function runInfo() {
   sections.push(section.create('process', {
     type: 'markdown',
     content: md.ol([
-      `Run ${md.code('crunes use release bump <type>')} where type is major, minor, or patch`,
+      `Run ${md.code('crunes run release bump <type>')} where type is major, minor, or patch`,
       'Publish CI fires on the tag automatically when pushed',
     ]),
   }, { title: 'Release Process' }))
@@ -221,7 +221,7 @@ async function runBump(args) {
   console.log('🎉 Successfully bumped version files and synced lockfile/bundles!')
   return section.create('bump-status', {
     type: 'markdown',
-    content: `🎉 **Successfully bumped version files and synced lockfile/bundles!**\n\nTo commit and tag automatically, run:\n${md.code('crunes use release git')}\n\nWhen ready to publish, run ${md.code('git push origin main --tags')}.`
+    content: `🎉 **Successfully bumped version files and synced lockfile/bundles!**\n\nTo commit and tag automatically, run:\n${md.code('crunes run release git')}\n\nWhen ready to publish, run ${md.code('git push origin main --tags')}.`
   }, { title: 'Version Bumped' })
 }
 

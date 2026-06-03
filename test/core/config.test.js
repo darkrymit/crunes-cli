@@ -6,7 +6,7 @@ describe('validateConfig', () => {
     const config = {
       permissions: {
         "my-rune": {
-          "use": {
+          "run": {
             "allow": ["fs.read:src/**"]
           },
           "args": {
@@ -27,7 +27,7 @@ describe('validateConfig', () => {
       }
     }
     expect(() => validateConfig(config)).toThrow(
-      'config.json: permissions for "my-rune" must be lifecycle-scoped (e.g. permissions["my-rune"].use.allow)'
+      'config.json: permissions for "my-rune" must be lifecycle-scoped (e.g. permissions["my-rune"].run.allow)'
     )
   })
 
@@ -40,7 +40,7 @@ describe('validateConfig', () => {
       }
     }
     expect(() => validateConfig(config)).toThrow(
-      'config.json: permissions for "my-rune" must be lifecycle-scoped (e.g. permissions["my-rune"].use.allow)'
+      'config.json: permissions for "my-rune" must be lifecycle-scoped (e.g. permissions["my-rune"].run.allow)'
     )
   })
 
@@ -51,7 +51,7 @@ describe('validateConfig', () => {
       }
     }
     expect(() => validateConfig(config))
-      .toThrow('config.json: permissions for "myrune" must be lifecycle-scoped (e.g. permissions["myrune"].use.allow)')
+      .toThrow('config.json: permissions for "myrune" must be lifecycle-scoped (e.g. permissions["myrune"].run.allow)')
   })
 
   it('throws error if local runes permissions block is flat (non-scoped)', () => {
@@ -67,7 +67,7 @@ describe('validateConfig', () => {
     const spy = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const config = {
       runes: {
-        myrune: { permissions: { use: {} } }
+        myrune: { permissions: { run: {} } }
       }
     }
     validateConfig(config)
@@ -163,7 +163,7 @@ describe('validateConfig with fileNames', () => {
       }
     }
     expect(() => validateConfig(config, 'config.local.json')).toThrow(
-      'config.local.json: permissions for "my-rune" must be lifecycle-scoped (e.g. permissions["my-rune"].use.allow)'
+      'config.local.json: permissions for "my-rune" must be lifecycle-scoped (e.g. permissions["my-rune"].run.allow)'
     )
   })
 })

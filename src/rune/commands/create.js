@@ -12,7 +12,7 @@ export function template(key, format) {
 
   const header = [
     `// permissions:`,
-    `//   use:`,
+    `//   run:`,
     `//     allow: []  — add patterns like fs.read:./** if you use utils.fs`,
     `//     deny:  []`,
     ``,
@@ -24,7 +24,7 @@ export function template(key, format) {
     `//     .build()`,
     `// }`,
     ``,
-    `export async function use(args) {`,
+    `export async function run(args) {`,
     `  // args._         — data positionals (command tokens stripped)`,
     `  // args.verbose   — named flag (if args export is defined above)`,
     `  // utils.fs.cwd() — absolute path to the project root`,
@@ -137,9 +137,9 @@ export async function handler({
   await rename(tmpPath, configPath)
 
   if (!isNonInteractive) {
-    outro(`Created ${runeRelPath}\nRun: crunes use ${key}`)
+    outro(`Created ${runeRelPath}\nRun: crunes run ${key}`)
   } else {
     output.success(`Created ${runeRelPath}`)
-    output.info(`Run: crunes use ${key}`)
+    output.info(`Run: crunes run ${key}`)
   }
 }

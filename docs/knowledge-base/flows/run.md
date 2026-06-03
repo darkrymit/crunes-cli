@@ -1,7 +1,7 @@
 ---
 tags: [flow]
 ---
-# `crunes use` Execution Flow
+# `crunes run` Execution Flow
 
 > A rune key is resolved, the rune file is executed in a sandbox, and sections are rendered to stdout.
 
@@ -14,7 +14,7 @@ The `use` command first strips its own flags (`--format`, `--fail-fast`) from th
 ## Walkthrough
 
 ```
-crunes use [--format md|json] [--fail-fast] [--section s1,s2] <key> [rune-args...] [+ ...]
+crunes run [--format md|json] [--fail-fast] [--section s1,s2] <key> [rune-args...] [+ ...]
           │
           │  parseUseArgs: consume --format/--fail-fast from prefix only (stops at first key)
           │  then split remainder on `+` → parseSegment per segment

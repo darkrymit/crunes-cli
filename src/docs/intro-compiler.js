@@ -13,7 +13,7 @@ const NAMESPACE_RECIPES = {
   fs: `\`\`\`javascript
 import { fs, section } from '@utils'
 
-export async function use() {
+export async function run() {
   // Read and write files relative to the project root
   const content = await fs.read('src/components/Button.jsx');
   await fs.write('dist/output.txt', 'Hello Sandbox!');
@@ -28,7 +28,7 @@ export async function use() {
   ws: `\`\`\`javascript
 import { http, ws, time, section } from '@utils'
 
-export async function use() {
+export async function run() {
   // --- Client usage ---
   const socket = ws.client('ws://localhost:8080')
   const messages = []
@@ -69,7 +69,7 @@ export async function use() {
   sqlite: `\`\`\`javascript
 import { sqlite, crypto, section } from '@utils'
 
-export async function use() {
+export async function run() {
   // Scoped SQLite operations
   const db = await sqlite.open('@local-project-sqlite', 'my-database');
   await db.exec('CREATE TABLE IF NOT EXISTS logs (id TEXT PRIMARY KEY, msg TEXT)');
@@ -88,7 +88,7 @@ export async function use() {
   http: `\`\`\`javascript
 import { http, section } from '@utils'
 
-export async function use() {
+export async function run() {
   // --- Client: fetch ---
   const res = await http.fetch('https://api.github.com/repos/darkrymit/crunes')
   const repo = await res.json()
@@ -115,7 +115,7 @@ export async function use() {
   cache: `\`\`\`javascript
 import { cache, section } from '@utils'
 
-export async function use() {
+export async function run() {
   const projectCache = await cache.open('@local-project-cache');
   await projectCache.set('last-run', Date.now(), 60); // 60s TTL
   const lastRun = await projectCache.get('last-run');
@@ -130,7 +130,7 @@ export async function use() {
   shell: `\`\`\`javascript
 import { shell, section } from '@utils'
 
-export async function use() {
+export async function run() {
   // Run command relative to the project directory
   const stdout = await shell.exec('git status --short');
   return [
@@ -152,8 +152,8 @@ function formatLifecycleDocs(data) {
   lines.push('')
 
   for (const fn of lifecycleNs.functions) {
-    const isUse = fn.name === 'use'
-    const sigStr = isUse ? 'use(args)' : 'args(builder)'
+    const isRun = fn.name === 'run'
+    const sigStr = isRun ? 'run(args)' : 'args(builder)'
     lines.push(`#### \`export function ${sigStr}\``)
     lines.push('')
     if (fn.description) lines.push(fn.description)
@@ -337,7 +337,7 @@ export async function compileIntro({ config, format, projectRoot, configRoot, ha
   // Section 1: Anatomy of a Rune
   lines.push('## 1. Anatomy of a Rune')
   lines.push('')
-  lines.push('Crunes execute inside an isolated sandbox (`isolated-vm`). Runes are ESM modules exporting a `use` method and an optional `args` method to declare schemas:')
+  lines.push('Crunes execute inside an isolated sandbox (`isolated-vm`). Runes are ESM modules exporting a `run` method and an optional `args` method to declare schemas:')
   lines.push('')
   lines.push('```javascript')
   lines.push('// Example Rune: git.js')
@@ -352,7 +352,7 @@ export async function compileIntro({ config, format, projectRoot, configRoot, ha
   lines.push('    })')
   lines.push('}')
   lines.push('')
-  lines.push('export async function use(args) {')
+  lines.push('export async function run(args) {')
   lines.push('  if (args.$command === \'remote add\') {')
   lines.push('    return `Adding remote ${args.name} at ${args.url}`;')
   lines.push('  }')
@@ -401,21 +401,21 @@ export async function compileIntro({ config, format, projectRoot, configRoot, ha
   lines.push('```')
   lines.push('')
   lines.push('> [!WARNING]')
-  lines.push('> Placing a global flag after `use` (e.g. `crunes use --cwd ./project`) causes an instant error.')
+  lines.push('> Placing a global flag after `run` (e.g. `crunes run --cwd ./project`) causes an instant error.')
   lines.push('')
   lines.push('### The Misplaced Flag Pitfall (Section Filters)')
   lines.push('Section filtering flags (`-s` or `--section`) belong to the segment prefix *before* the rune key. If placed *after* the key, they are intercepted and treated as raw positional arguments inside the rune!')
   lines.push('')
   lines.push('```bash')
   lines.push('# CORRECT: The filter is parsed successfully, outputting only the "endpoints" section')
-  lines.push('crunes use -s endpoints api v2')
+  lines.push('crunes run -s endpoints api v2')
   lines.push('')
   lines.push('# INCORRECT: Treated as positional args: args._ = ["--section", "endpoints"]')
-  lines.push('crunes use api v2 --section endpoints')
+  lines.push('crunes run api v2 --section endpoints')
   lines.push('```')
   lines.push('')
   lines.push('### Custom Commands & Nested Parameters Mapping')
-  lines.push('Runes can recursively nest commands using \`.command()\` on the builder. Inside \`use(args)\`, Crunes automatically exposes:')
+  lines.push('Runes can recursively nest commands using \`.command()\` on the builder. Inside \`run(args)\`, Crunes automatically exposes:')
   lines.push('- **\`args.$command\`**: The space-separated matched command path string (e.g. \`"remote add"\`).')
   lines.push('- **\`args.$commands\`**: The matched command path levels array (e.g. \`["remote", "add"]\`).')
   lines.push('- **\`args._\`**: Data positionals only — command tokens are stripped, so \`args._[0]\` is always the first user-supplied value after the matched command.')
@@ -424,7 +424,7 @@ export async function compileIntro({ config, format, projectRoot, configRoot, ha
   lines.push('### Batched Executions')
   lines.push('Multiple runes can be run sequentially in one invocation using the `+` operator (requires the `-b` / `--batch` command flag):')
   lines.push('```bash')
-  lines.push('crunes use -b -s endpoints api + greeting "World"')
+  lines.push('crunes run -b -s endpoints api + greeting "World"')
   lines.push('```')
   lines.push('')
   lines.push('### Hook Token Prompt Syntax')
@@ -454,7 +454,7 @@ export async function compileIntro({ config, format, projectRoot, configRoot, ha
   lines.push('  },')
   lines.push('  "permissions": {')
   lines.push('    "my-rune": {')
-  lines.push('      "use": { "allow": ["fs.read:src/**", "fs.write:dist/**", "shell.exec:git *"] }')
+  lines.push('      "run": { "allow": ["fs.read:src/**", "fs.write:dist/**", "shell.run:git *"] }')
   lines.push('    }')
   lines.push('  }')
   lines.push('}')
@@ -507,7 +507,7 @@ export async function compileIntro({ config, format, projectRoot, configRoot, ha
       lines.push('| Key | Name | Path | Permissions (Allow) |')
       lines.push('| --- | --- | --- | --- |')
       for (const r of activeRunes) {
-        const allow = (r.permissions?.use?.allow ?? r.permissions?.allow ?? []).join(', ') || '*none*'
+        const allow = (r.permissions?.run?.allow ?? r.permissions?.allow ?? []).join(', ') || '*none*'
         lines.push(`| \`${r.key}\` | ${r.name} | \`${r.path}\` | \`${allow}\` |`)
       }
       lines.push('')

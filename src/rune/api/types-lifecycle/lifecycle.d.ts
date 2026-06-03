@@ -18,7 +18,7 @@ declare namespace lifecycle {
    * @param args Parsed yargs-parser arguments.
    * @returns A single section, an array of sections, a plain string, or void.
    */
-  function use(args: ParsedArgs): Promise<RuneSection[] | RuneSection | string | void> | RuneSection[] | RuneSection | string | void
+  function run(args: ParsedArgs): Promise<RuneSection[] | RuneSection | string | void> | RuneSection[] | RuneSection | string | void
 
   /** Minimal section shape returned by rune execution */
   interface RuneSection {
@@ -50,7 +50,7 @@ declare namespace lifecycle {
     /**
      * Adds an example command showing how to call the rune.
      * 
-     * @param usage Usage example string (e.g. 'crunes use hello world').
+     * @param usage Usage example string (e.g. 'crunes run hello world').
      * @param description A brief description of the example.
      */
     example(usage: string, description: string): this
@@ -70,7 +70,7 @@ declare namespace lifecycle {
     build(): any
   }
 
-  /** Parsed yargs-parser arguments passed to the rune's use() function. */
+  /** Parsed yargs-parser arguments passed to the rune's run() function. */
   interface ParsedArgs extends Record<string, any> {
     /** Positional arguments in order. */
     _: string[]

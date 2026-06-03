@@ -16,7 +16,7 @@ The `docs` command family has four subcommands:
 - **`crunes docs rune <key...>`** — resolves a rune, runs its `args()` export in a throwaway isolate, and formats the schema as a Usage/Options/Examples block. Useful for discovering what arguments a specific rune accepts.
 - **`crunes docs utils [namespaces...]`** — walks the generated TypeDoc JSON (`src/docs/generated/utils-api.json`) and formats live function signatures, param types, return types, and referenced interfaces. **This is the authoritative API reference for `@utils` — always prefer it over reading source files.** Run `crunes docs utils` (no args) for the namespace index; `crunes docs utils ws http` for specific namespaces.
 - **`crunes docs intro`** — compiles a comprehensive workspace handbook: rune anatomy, global sandbox APIs, CLI conventions, config reference, all `@utils` signatures, and the active project's registered runes and permissions. Use `--out INTRO.md` to write to disk for AI context injection.
-- **`crunes docs args`** / **`crunes docs use`** — reference docs for the `args(builder)` and `use(args)` rune export contracts.
+- **`crunes docs args`** / **`crunes docs run`** — reference docs for the `args(builder)` and `run(args)` rune export contracts.
 
 ## Concepts
 

@@ -6,7 +6,7 @@ import { resolveCompletions } from '../../src/cli/commands/completions.js'
 import { buildProgram } from '../../src/cli/program.js'
 
 const program = buildProgram()
-const TOP = ['use','docs','version','doctor','check','bench','list','job','cache','sqlite','init','create','plugin','template','marketplace','completions']
+const TOP = ['run','docs','version','doctor','check','bench','list','job','cache','sqlite','init','create','plugin','template','marketplace','completions']
 
 describe('resolveCompletions — top level', () => {
   it('returns all subcommands when only crunes typed', () => {
@@ -18,7 +18,7 @@ describe('resolveCompletions — top level', () => {
   })
 
   it('filters subcommands by partial token', () => {
-    expect(resolveCompletions(['crunes', 'u'], program)).toEqual(['use'])
+    expect(resolveCompletions(['crunes', 'r'], program)).toEqual(['run'])
   })
 })
 
@@ -36,8 +36,8 @@ describe('resolveCompletions — rune key commands', () => {
 
   afterEach(() => fs.rmSync(dir, { recursive: true, force: true }))
 
-  it('completes rune keys for use', () => {
-    const result = resolveCompletions(['crunes', 'use', ''], program, { cwd: dir })
+  it('completes rune keys for run', () => {
+    const result = resolveCompletions(['crunes', 'run', ''], program, { cwd: dir })
     expect(result).toContain('release')
     expect(result).toContain('pkg-info')
   })
@@ -53,7 +53,7 @@ describe('resolveCompletions — rune key commands', () => {
   })
 
   it('returns empty when config missing', () => {
-    expect(resolveCompletions(['crunes', 'use', ''], program, { cwd: os.tmpdir() })).toEqual([])
+    expect(resolveCompletions(['crunes', 'run', ''], program, { cwd: os.tmpdir() })).toEqual([])
   })
 })
 
@@ -94,7 +94,7 @@ describe('resolveCompletions — plugin subcommands', () => {
 
 describe('resolveCompletions — other subcommands', () => {
   it('completes template subcommands', () => {
-    expect(resolveCompletions(['crunes', 'template', ''], program)).toEqual(['list', 'use', 'create'])
+    expect(resolveCompletions(['crunes', 'template', ''], program)).toEqual(['list', 'apply', 'create'])
   })
 
   it('completes marketplace subcommands', () => {
@@ -109,8 +109,8 @@ describe('resolveCompletions — other subcommands', () => {
     )
   })
 
-  it('completes --format value for use (text, jsonl)', () => {
-    expect(resolveCompletions(['crunes', 'use', 'release', '--format', ''], program)).toEqual(['text', 'jsonl'])
+  it('completes --format value for run (text, jsonl)', () => {
+    expect(resolveCompletions(['crunes', 'run', 'release', '--format', ''], program)).toEqual(['text', 'jsonl'])
   })
 
   it('completes --format value for create (tree, markdown)', () => {
@@ -118,7 +118,7 @@ describe('resolveCompletions — other subcommands', () => {
   })
 
   it('completes a partially-typed global flag', () => {
-    expect(resolveCompletions(['crunes', 'use', 'release', '--plain'], program)).toEqual(['--plain'])
+    expect(resolveCompletions(['crunes', 'run', 'release', '--plain'], program)).toEqual(['--plain'])
   })
 })
 
@@ -137,7 +137,7 @@ describe('resolveCompletions — --cwd flag', () => {
   afterEach(() => fs.rmSync(dir, { recursive: true, force: true }))
 
   it('resolves rune keys from --cwd path', () => {
-    const result = resolveCompletions(['crunes', '--cwd', dir, 'use', ''], program)
+    const result = resolveCompletions(['crunes', '--cwd', dir, 'run', ''], program)
     expect(result).toContain('mykey')
   })
 })

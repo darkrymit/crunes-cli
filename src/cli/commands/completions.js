@@ -95,7 +95,7 @@ export function resolveCompletions(tokens, program, { cwd } = {}) {
   }
 
   // 3a. Special-case: --format on rune passthrough commands (no longer registered as Commander option)
-  if (!activeOpt && prevWord === '--format' && ['use', 'check', 'bench'].includes(currentCmd.name())) {
+  if (!activeOpt && prevWord === '--format' && ['run', 'check', 'bench'].includes(currentCmd.name())) {
     return ['text', 'jsonl'].filter(c => c.startsWith(matchTarget))
   }
 
@@ -143,7 +143,7 @@ export function resolveCompletions(tokens, program, { cwd } = {}) {
     const argName = argDef.name()
 
     if (argName === 'rune') loadRuneKeys(resolvedCwd).forEach(k => candidates.add(k))
-    else if (argName === 'args' && positionalArgs.length === 0 && ['use', 'check', 'bench'].includes(currentCmd.name())) {
+    else if (argName === 'args' && positionalArgs.length === 0 && ['run', 'check', 'bench'].includes(currentCmd.name())) {
       loadRuneKeys(resolvedCwd).forEach(k => candidates.add(k))
     } else if (argName === 'plugin') loadPluginNames().forEach(p => candidates.add(p))
     else if (argName === 'template-source') {

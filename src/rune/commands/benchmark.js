@@ -2,7 +2,7 @@ import { performance } from 'node:perf_hooks'
 import chalk from 'chalk'
 import { loadConfig } from '../../core/config.js'
 import { runRune } from '../resolver.js'
-import { parseSegment } from './use.js'
+import { parseSegment } from './run.js'
 import { output } from '../../shared/output.js'
 
 const FAST_MS  = 200

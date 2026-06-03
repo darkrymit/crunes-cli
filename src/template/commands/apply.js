@@ -163,9 +163,9 @@ export async function handler({
   await fs.rename(tmp, configPath)
 
   if (!isNonInteractive) {
-    outro(`Created ${runeRelPath}\nRun: crunes use ${outputKey}`)
+    outro(`Created ${runeRelPath}\nRun: crunes run ${outputKey}`)
   } else {
     output.success(`Created ${runeRelPath}`)
-    output.info(`Run: crunes use ${outputKey}`)
+    output.info(`Run: crunes run ${outputKey}`)
   }
 }

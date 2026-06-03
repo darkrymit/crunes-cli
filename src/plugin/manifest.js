@@ -21,19 +21,19 @@ export function validatePluginJson(json) {
     }
     const perms = rune.permissions
     if (Array.isArray(perms)) {
-      throw new Error(`plugin.json: rune "${key}" permissions must be lifecycle-scoped (e.g. permissions.use.allow)`)
+      throw new Error(`plugin.json: rune "${key}" permissions must be lifecycle-scoped (e.g. permissions.run.allow)`)
     }
     if (perms.allow || perms.deny) {
-      throw new Error(`plugin.json: rune "${key}" permissions must be lifecycle-scoped (e.g. permissions.use.allow)`)
+      throw new Error(`plugin.json: rune "${key}" permissions must be lifecycle-scoped (e.g. permissions.run.allow)`)
     }
     const hasLifecycleScoped = Object.values(perms).some(v => v && Array.isArray(v.allow))
     if (!hasLifecycleScoped) {
-      const hasEmptyUse = perms.use && typeof perms.use === 'object' && Object.keys(perms.use).length === 0
-      if (hasEmptyUse) {
-        console.warn(`[crunes:warn] plugin.json: rune "${key}" permissions.use is empty.`)
+      const hasEmptyRun = perms.run && typeof perms.run === 'object' && Object.keys(perms.run).length === 0
+      if (hasEmptyRun) {
+        console.warn(`[crunes:warn] plugin.json: rune "${key}" permissions.run is empty.`)
         continue
       }
-      throw new Error(`plugin.json: rune "${key}" must have lifecycle-scoped permissions (e.g. permissions.use.allow)`)
+      throw new Error(`plugin.json: rune "${key}" must have lifecycle-scoped permissions (e.g. permissions.run.allow)`)
     }
   }
 }

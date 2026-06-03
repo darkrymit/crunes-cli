@@ -25,10 +25,10 @@ AI-first documentation vault. Start here for context before working on any modul
 
 | Flow | Note |
 |------|------|
-| crunes use | [[flows/use]] |
+| crunes run | [[flows/run]] |
 | crunes plugin install | [[flows/plugin-install]] |
 | crunes plugin create | [[flows/plugin-create]] |
-| crunes template use | [[flows/template-use]] |
+| crunes template apply | [[flows/template-apply]] |
 
 ## System
 

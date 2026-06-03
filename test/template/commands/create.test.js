@@ -19,9 +19,9 @@ describe('templateStub', () => {
     expect(out).not.toContain('use(dir, args')
   })
 
-  it('exports use(args) — single-argument modern signature', () => {
+  it('exports run(args) — single-argument modern signature', () => {
     const out = templateStub('mytemplate')
-    expect(out).toMatch(/export async function use\(args\)/)
+    expect(out).toMatch(/export async function run\(args\)/)
   })
 
   it('includes commented-out args export example', () => {
@@ -67,10 +67,10 @@ describe('handler (non-interactive)', () => {
       expect(existsSync(join(tmp, '.crunes', 'templates', 'mytemplate.js'))).toBe(true)
     })
 
-    it('creates template file with modern use(args) signature', async () => {
+    it('creates template file with modern run(args) signature', async () => {
       await handler({ name: 'mytemplate', yes: true, projectRoot: tmp, configRoot: tmp })
       const content = readFileSync(join(tmp, '.crunes', 'templates', 'mytemplate.js'), 'utf8')
-      expect(content).toMatch(/export async function use\(args\)/)
+      expect(content).toMatch(/export async function run\(args\)/)
       expect(content).toContain("from '@utils'")
     })
   })

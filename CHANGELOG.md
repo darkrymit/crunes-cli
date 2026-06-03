@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Breaking Changes
+- `crunes use` renamed to `crunes run`
+- `crunes template use` renamed to `crunes template apply`
+- `crunes docs use` renamed to `crunes docs run`
+- Rune export function renamed from `use(args)` to `run(args)`
+- `permissions.use` lifecycle key renamed to `permissions.run` in all configs and plugin.json files
+- `rune.use(key, args?)` utils API renamed to `rune.run(key, args?)`
+
 ## [0.6.0] - 2026-06-02
 
 ### Added

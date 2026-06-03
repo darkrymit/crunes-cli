@@ -125,7 +125,7 @@ describe('sandboxed streaming archives', () => {
     
     const script = `
       import { archive } from '@utils'
-      export async function use() {
+      export async function run() {
         const zipStream = archive.zipStream('scratch_test_zip_src')
         await zipStream.pipeTo(archive.unzipStream('scratch_test_zip_dest'))
         return "OK"

@@ -23,9 +23,9 @@ describe('template', () => {
     expect(out).not.toContain('use(dir, args')
   })
 
-  it('exports use(args) — single-argument modern signature', () => {
+  it('exports run(args) — single-argument modern signature', () => {
     const out = template('mykey', 'markdown')
-    expect(out).toMatch(/export async function use\(args\)/)
+    expect(out).toMatch(/export async function run\(args\)/)
   })
 
   it('includes commented-out args export example', () => {
@@ -39,7 +39,7 @@ describe('template', () => {
     expect(out).toContain("from '@utils'")
   })
 
-  it('outro references crunes use, not crunes query', () => {
+  it('outro references crunes run, not crunes query', () => {
     // The outro message is in the handler, but verify template has no such bug
     const out = template('mykey', 'markdown')
     expect(out).not.toContain('crunes query')
@@ -95,10 +95,10 @@ describe('handler (non-interactive)', () => {
       expect(existsSync(join(tmp, '.crunes', 'runes', 'myrune.js'))).toBe(true)
     })
 
-    it('creates rune file with modern use(args) signature', async () => {
+    it('creates rune file with modern run(args) signature', async () => {
       await handler({ key: 'myrune', format: 'markdown', yes: true, projectRoot: tmp, configRoot: tmp })
       const content = readFileSync(join(tmp, '.crunes', 'runes', 'myrune.js'), 'utf8')
-      expect(content).toMatch(/export async function use\(args\)/)
+      expect(content).toMatch(/export async function run\(args\)/)
       expect(content).toContain("from '@utils'")
     })
 
@@ -145,7 +145,7 @@ describe('handler (non-interactive)', () => {
   })
 
   describe('outro message', () => {
-    it('outputs crunes use, not crunes query', async () => {
+    it('outputs crunes run, not crunes query', async () => {
       const logs = []
       vi.spyOn(process.stdout, 'write').mockImplementation(s => { logs.push(s); return true })
       // capture output module calls

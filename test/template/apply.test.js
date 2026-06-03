@@ -11,7 +11,7 @@ vi.mock('../../src/plugin/manifest.js', () => ({
   loadPluginJson: vi.fn(),
 }))
 
-import { resolveTemplate } from '../../src/template/commands/use.js'
+import { resolveTemplate } from '../../src/template/commands/apply.js'
 import { loadRegistry } from '../../src/plugin/registry.js'
 import { loadPluginJson } from '../../src/plugin/manifest.js'
 

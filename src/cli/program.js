@@ -34,10 +34,10 @@ export function buildProgram() {
   }
 
   program
-    .command('use [args...]')
-    .description('Use one or more runes and output the result.')
+    .command('run [args...]')
+    .description('Run one or more runes and output the result.')
     .addHelpText('after',
-      '\nImportant: Global flags (e.g. --cwd) MUST appear before the "use" command.\n\n' +
+      '\nImportant: Global flags (e.g. --cwd) MUST appear before the "run" command.\n\n' +
       'Syntax:\n' +
       '  [-b] [--section s1,s2] <key> [rune-args...] [+ [--section s] <key> [rune-args...]]...\n\n' +
       'Command flags:\n' +
@@ -53,8 +53,8 @@ export function buildProgram() {
     .allowUnknownOption()
     .passThroughOptions()
     .action(async (args) => {
-      const { handler, parseUseArgs } = await import('../rune/commands/use.js')
-      const { segments, format, failFast } = parseUseArgs(args)
+      const { handler, parseRunArgs } = await import('../rune/commands/run.js')
+      const { segments, format, failFast } = parseRunArgs(args)
       await handler({ segments, format, failFast, projectRoot: projectRoot(), configRoot: configRoot() })
     })
 
@@ -104,10 +104,10 @@ export function buildProgram() {
     })
 
   helpGroup
-    .command('use')
-    .description('Show detailed documentation, conventions, and examples for the use(args) export')
+    .command('run')
+    .description('Show detailed documentation, conventions, and examples for the run(args) export')
     .action(async () => {
-      const { handler } = await import('../docs/commands/use.js')
+      const { handler } = await import('../docs/commands/run.js')
       await handler()
     })
 
@@ -135,7 +135,7 @@ export function buildProgram() {
     .allowUnknownOption()
     .passThroughOptions()
     .action(async (args) => {
-      const { parseSegment } = await import('../rune/commands/use.js')
+      const { parseSegment } = await import('../rune/commands/run.js')
       const { handler } = await import('../rune/commands/check.js')
       const { key, sections, runeArgs } = parseSegment(args)
       if (!key) {
@@ -366,7 +366,7 @@ export function buildProgram() {
     })
 
   template
-    .command('use <template>')
+    .command('apply <template>')
     .description('Copy a template into the project as a new rune and register it in config.')
     .addHelpText('after',
       '\nKey prefixes:\n' +
@@ -379,7 +379,7 @@ export function buildProgram() {
     .option('--name <name>', 'human-readable label shown in crunes list')
     .option('--description <description>', 'short description of what context this rune provides')
     .action(async (ref, opts) => {
-      const { handler } = await import('../template/commands/use.js')
+      const { handler } = await import('../template/commands/apply.js')
       await handler({ ref, key: opts.as, path: opts.path, name: opts.name, description: opts.description, yes: !!program.opts().yes, projectRoot: projectRoot() })
     })
 

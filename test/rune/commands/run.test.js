@@ -5,7 +5,7 @@ vi.mock('../../../src/rune/resolver.js', () => ({ runRune: vi.fn() }))
 
 import { loadConfig } from '../../../src/core/config.js'
 import { runRune } from '../../../src/rune/resolver.js'
-import { handler, parseSegment, parseUseArgs } from '../../../src/rune/commands/use.js'
+import { handler, parseSegment, parseRunArgs } from '../../../src/rune/commands/run.js'
 
 describe('parseSegment', () => {
   it('parses bare key', () => {
@@ -63,9 +63,9 @@ describe('parseSegment', () => {
   })
 })
 
-describe('parseUseArgs', () => {
+describe('parseRunArgs', () => {
   it('parses single bare key', () => {
-    expect(parseUseArgs(['api'])).toEqual({
+    expect(parseRunArgs(['api'])).toEqual({
       segments: [{ key: 'api', sections: null, runeArgs: [] }],
       format: 'text',
       failFast: false,
@@ -73,65 +73,65 @@ describe('parseUseArgs', () => {
   })
 
   it('extracts --format before key', () => {
-    const result = parseUseArgs(['--format', 'jsonl', 'api'])
+    const result = parseRunArgs(['--format', 'jsonl', 'api'])
     expect(result.format).toBe('jsonl')
     expect(result.segments[0]).toEqual({ key: 'api', sections: null, runeArgs: [] })
   })
 
   it('extracts --fail-fast', () => {
-    expect(parseUseArgs(['--fail-fast', 'api']).failFast).toBe(true)
+    expect(parseRunArgs(['--fail-fast', 'api']).failFast).toBe(true)
   })
 
   it('passes rune flags through after key', () => {
-    const result = parseUseArgs(['api', '--verbose', '--flag', 'val'])
+    const result = parseRunArgs(['api', '--verbose', '--flag', 'val'])
     expect(result.segments[0].runeArgs).toEqual(['--verbose', '--flag', 'val'])
   })
 
   it('requires -b to split on bare + into multiple segments', () => {
-    const result = parseUseArgs(['-b', 'api', '+', 'git', '+', 'env'])
+    const result = parseRunArgs(['-b', 'api', '+', 'git', '+', 'env'])
     expect(result.segments).toHaveLength(3)
     expect(result.segments.map(s => s.key)).toEqual(['api', 'git', 'env'])
   })
 
   it('treats + as literal argument when -b is missing', () => {
-    const result = parseUseArgs(['api', '+', 'git'])
+    const result = parseRunArgs(['api', '+', 'git'])
     expect(result.segments).toHaveLength(1)
     expect(result.segments[0].key).toBe('api')
     expect(result.segments[0].runeArgs).toEqual(['+', 'git'])
   })
 
   it('per-segment --section is isolated to its segment', () => {
-    const result = parseUseArgs(['-b', '--section', 'endpoints', 'api', '+', 'git'])
+    const result = parseRunArgs(['-b', '--section', 'endpoints', 'api', '+', 'git'])
     expect(result.segments[0].sections).toEqual(['endpoints'])
     expect(result.segments[1].sections).toBeNull()
   })
 
   it('rune args in first segment do not bleed into second', () => {
-    const result = parseUseArgs(['-b', 'api', '--rune-flag', '+', 'git'])
+    const result = parseRunArgs(['-b', 'api', '--rune-flag', '+', 'git'])
     expect(result.segments[0].runeArgs).toEqual(['--rune-flag'])
     expect(result.segments[1].runeArgs).toEqual([])
   })
 
   it('+ token inside rune args is treated as literal (not a separator)', () => {
-    const result = parseUseArgs(['api', '--tag=a+b'])
+    const result = parseRunArgs(['api', '--tag=a+b'])
     expect(result.segments).toHaveLength(1)
     expect(result.segments[0].runeArgs).toEqual(['--tag=a+b'])
   })
 
   it('defaults format to text and failFast to false', () => {
-    const result = parseUseArgs(['api'])
+    const result = parseRunArgs(['api'])
     expect(result.format).toBe('text')
     expect(result.failFast).toBe(false)
   })
 
   it('does not intercept --format after the key — passes it to runeArgs', () => {
-    const result = parseUseArgs(['api', '--format', 'jsonl'])
+    const result = parseRunArgs(['api', '--format', 'jsonl'])
     expect(result.format).toBe('text')
     expect(result.segments[0].runeArgs).toEqual(['--format', 'jsonl'])
   })
 
   it('does not intercept --fail-fast after the key — passes it to runeArgs', () => {
-    const result = parseUseArgs(['api', '--fail-fast'])
+    const result = parseRunArgs(['api', '--fail-fast'])
     expect(result.failFast).toBe(false)
     expect(result.segments[0].runeArgs).toEqual(['--fail-fast'])
   })

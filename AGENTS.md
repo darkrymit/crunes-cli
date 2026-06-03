@@ -73,7 +73,7 @@ npm test && npm run build && node dist/cli.js --help
 
 **Entry Point:** `src/cli/cli.js` — Process bootstrapper, Node.js snapshot workarounds, and command router.
 
-**Core Execution Path:** `crunes use <key>` → `src/rune/commands/use.js` → `src/rune/resolver.js` (`runRune`) → resolves local config vs. plugin → `src/rune/isolation/runner.js` (isolated-vm run) → returns `Section[]` → `src/shared/render.js` → stdout.
+**Core Execution Path:** `crunes run <key>` → `src/rune/commands/run.js` → `src/rune/resolver.js` (`runRune`) → resolves local config vs. plugin → `src/rune/isolation/runner.js` (isolated-vm run) → returns `Section[]` → `src/shared/render.js` → stdout.
 
 **Key Resolution Order** (for a bare key with no prefix):
 1. Project config (`.crunes/config.json` → `runes.<key>.path`)
@@ -100,13 +100,13 @@ Releases are semi-automated via the local `release` rune. Navigate to `crunes-cl
 ### View Current Release Context
 Displays active package versions, git branches/tags, last 10 commits, changelog state, and lockfile synchronization:
 ```bash
-crunes use release info
+crunes run release info
 ```
 
 ### Semi-Automated Release Bump (Keep-A-Changelog Automatic Prepend)
 Bumps the version, regenerates `package-lock.json`, and automatically formats and prepends additions to `CHANGELOG.md`:
 ```bash
-crunes use release bump patch \
+crunes run release bump patch \
   -a "**Recursively Nested Commands**: Sandboxed arguments parser supports command groups" \
   -f "**Sandbox setTimeout routing corrected**: Fixed globalThis.setTimeout inside isolates"
 ```
@@ -114,13 +114,13 @@ crunes use release bump patch \
 ### Standard Version Bump (Manual Changelog Pre-edited)
 If you have already hand-written the custom release notes directly inside `CHANGELOG.md` under the target version header:
 ```bash
-crunes use release bump minor
+crunes run release bump minor
 ```
 
 ### Semi-Automated Git Staging & Tagging
 Commits all modified release files (changelog, package.json, package-lock.json — **excluding `dist/`**) and sets the appropriate git tag:
 ```bash
-crunes use release git
+crunes run release git
 ```
 
 *Publish CI triggers automatically on tag push: `git push origin main --tags` (only do it if user asks and confirms that all is good!).*

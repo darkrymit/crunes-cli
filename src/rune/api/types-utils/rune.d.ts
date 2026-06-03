@@ -1,4 +1,4 @@
-/** Minimal section shape returned by rune.use() */
+/** Minimal section shape returned by rune.run() */
 interface RuneSection {
   name: string
   data: { type: string; content?: string; root?: object }
@@ -8,8 +8,8 @@ interface RuneSection {
 
 /** Inter-rune call utilities */
 declare namespace rune {
-  /** Calls another rune synchronously and returns its sections */
-  function use(key: string, args?: string[]): Promise<RuneSection[]>
+  /** Calls another rune and returns its sections */
+  function run(key: string, args?: string[]): Promise<RuneSection[]>
 
   /**
    * Starts a rune as a detached background job.
