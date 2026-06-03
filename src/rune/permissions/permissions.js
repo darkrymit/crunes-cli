@@ -137,6 +137,13 @@ export function makePermissionChecker(effective) {
       if (!allowed || denied) throw new PermissionError(capability, value)
       return
     }
+    if (value == null) {
+      const norm = capability.replace(/\\/g, '/')
+      const allowed = effective.allow.map(p => p.replace(/\\/g, '/')).includes(norm)
+      const denied  = effective.deny.length > 0 && effective.deny.map(p => p.replace(/\\/g, '/')).includes(norm)
+      if (!allowed || denied) throw new PermissionError(capability, '')
+      return
+    }
     const token   = `${capability}:${value}`.replace(/\\/g, '/')
     const normalizedAllow = effective.allow.map(p => p.replace(/\\/g, '/'))
     const normalizedDeny = effective.deny.map(p => p.replace(/\\/g, '/'))
