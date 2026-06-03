@@ -30,7 +30,7 @@ describe('shell utils', () => {
     await fs.writeFile(scriptPath, script);
 
     try {
-      const session = shellUtils.execInSession(`node ${scriptPath}`);
+      const session = shellUtils.spawn(`node ${scriptPath}`);
       let stdout = '';
       
       session.setHandler('stdout', 'data', (chunk) => {
@@ -55,7 +55,7 @@ describe('shell utils', () => {
 
   it('terminate clears handlers and kills the process', async () => {
     const shellUtils = createShellUtils(process.cwd());
-    const session = shellUtils.execInSession('node -e "setTimeout(() => {}, 10000)"');
+    const session = shellUtils.spawn('node -e "setTimeout(() => {}, 10000)"');
     
     let exitCalled = false;
     session.setHandler('session', 'exit', () => {
@@ -76,7 +76,7 @@ describe('shell utils', () => {
       const script = `
         import { shell } from '@utils'
         export async function run() {
-          const session = shell.execInSession("node -e \\"process.stdin.on('data', d => { process.stdout.write('echo:' + d.toString()) })\\"")
+          const session = shell.spawn("node -e \\"process.stdin.on('data', d => { process.stdout.write('echo:' + d.toString()) })\\"")
           const reader = session.stdout.getReader()
           const writer = session.stdin.getWriter()
           
@@ -90,7 +90,7 @@ describe('shell utils', () => {
       const scriptPath = path.join(process.cwd(), 'scratch_test_shell_text_stream.js')
       await fs.writeFile(scriptPath, script)
       try {
-        const result = await runRuneInIsolate(scriptPath, { allow: ['shell.exec:**'], deny: [] }, [], process.cwd())
+        const result = await runRuneInIsolate(scriptPath, { allow: ['shell.run:**'], deny: [] }, [], process.cwd())
         expect(result).toBe('echo:hello-crunes\n')
       } finally {
         await fs.rm(scriptPath, { force: true })
@@ -101,7 +101,7 @@ describe('shell utils', () => {
       const script = `
         import { shell } from '@utils'
         export async function run() {
-          const session = shell.execInSession('node -e "process.stdout.write(Buffer.from([65, 66, 67]))"', { binary: true })
+          const session = shell.spawn('node -e "process.stdout.write(Buffer.from([65, 66, 67]))"', { binary: true })
           const reader = session.stdout.getReader()
           const { value } = await reader.read()
           session.kill()
@@ -117,7 +117,7 @@ describe('shell utils', () => {
       const scriptPath = path.join(process.cwd(), 'scratch_test_shell_binary_stream.js')
       await fs.writeFile(scriptPath, script)
       try {
-        const result = await runRuneInIsolate(scriptPath, { allow: ['shell.exec:**'], deny: [] }, [], process.cwd())
+        const result = await runRuneInIsolate(scriptPath, { allow: ['shell.run:**'], deny: [] }, [], process.cwd())
         expect(result.isUint8).toBe(true)
         expect(result.len).toBe(3)
         expect(result.val0).toBe(65)
@@ -145,7 +145,7 @@ describe('shell utils', () => {
       const scriptPath = path.join(process.cwd(), 'scratch_test_shell_exec_stdin.js')
       await fs.writeFile(scriptPath, script)
       try {
-        const result = await runRuneInIsolate(scriptPath, { allow: ['shell.exec:**'], deny: [] }, [], process.cwd())
+        const result = await runRuneInIsolate(scriptPath, { allow: ['shell.run:**'], deny: [] }, [], process.cwd())
         expect(result).toBe('piped standard input stream\n')
       } finally {
         await fs.rm(scriptPath, { force: true })
@@ -169,7 +169,7 @@ describe('shell utils', () => {
       const scriptPath = path.join(process.cwd(), 'scratch_test_shell_exec_binary.js')
       await fs.writeFile(scriptPath, script)
       try {
-        const result = await runRuneInIsolate(scriptPath, { allow: ['shell.exec:**'], deny: [] }, [], process.cwd())
+        const result = await runRuneInIsolate(scriptPath, { allow: ['shell.run:**'], deny: [] }, [], process.cwd())
         expect(result.isUint8).toBe(true)
         expect(result.length).toBe(3)
         expect(result.val0).toBe(10)

@@ -120,7 +120,7 @@ describe('@utils virtual module', () => {
   })
 })
 
-describe('rune.spawn / rune.kill / rune.exists permission enforcement', () => {
+describe('rune.job.* permission enforcement', () => {
   let tmp
 
   beforeEach(async () => {
@@ -132,93 +132,93 @@ describe('rune.spawn / rune.kill / rune.exists permission enforcement', () => {
     await rm(tmp, { recursive: true, force: true })
   })
 
-  it('rune.spawn throws PermissionError when rune.spawn:<key> not in allow', async () => {
+  it('rune.job.start throws PermissionError when rune.job.start:<key> not in allow', async () => {
     const runeFile = join(tmp, 'rune.js')
     await writeFile(runeFile, [
       'import { rune, section } from "@utils"',
       'export async function run(args) {',
-      '  await rune.spawn("worker", [])',
+      '  await rune.job.start("worker", [])',
       '  return section.create("x", { type: "markdown", content: "ok" })',
       '}',
     ].join('\n'))
     await expect(
       runRuneInIsolate(runeFile, { allow: [], deny: [] }, [], tmp)
-    ).rejects.toThrow("'rune.spawn:worker' is not permitted.")
+    ).rejects.toThrow("'rune.job.start:worker' is not permitted.")
   })
 
-  it('rune.kill throws PermissionError when job exists but rune.kill:<runeKey> not in allow', async () => {
+  it('rune.job.kill throws PermissionError when rune.job.kill not in allow', async () => {
     const { id } = await createJob(process.pid, { spawnedBy: 'server', runeKey: 'worker', projectDir: tmp, args: [] })
     const runeFile = join(tmp, 'rune.js')
     await writeFile(runeFile, [
       'import { rune, section } from "@utils"',
       `export async function run(args) {`,
-      `  await rune.kill(${JSON.stringify(id)})`,
+      `  await rune.job.kill(${JSON.stringify(id)})`,
       '  return section.create("x", { type: "markdown", content: "ok" })',
       '}',
     ].join('\n'))
     await expect(
       runRuneInIsolate(runeFile, { allow: [], deny: [] }, [], tmp)
-    ).rejects.toThrow("'rune.kill:worker' is not permitted.")
+    ).rejects.toThrow("'rune.job.kill:' is not permitted.")
   })
 
-  it('rune.exists throws PermissionError when job exists but rune.exists:<runeKey> not in allow', async () => {
+  it('rune.job.exists throws PermissionError when rune.job.exists not in allow', async () => {
     const { id } = await createJob(process.pid, { spawnedBy: 'server', runeKey: 'worker', projectDir: tmp, args: [] })
     const runeFile = join(tmp, 'rune.js')
     await writeFile(runeFile, [
       'import { rune, section } from "@utils"',
       `export async function run(args) {`,
-      `  await rune.exists(${JSON.stringify(id)})`,
+      `  await rune.job.exists(${JSON.stringify(id)})`,
       '  return section.create("x", { type: "markdown", content: "ok" })',
       '}',
     ].join('\n'))
     await expect(
       runRuneInIsolate(runeFile, { allow: [], deny: [] }, [], tmp)
-    ).rejects.toThrow("'rune.exists:worker' is not permitted.")
+    ).rejects.toThrow("'rune.job.exists:' is not permitted.")
   })
 
-  it('rune.exists returns false for a nonexistent job id without checking permissions', async () => {
+  it('rune.job.exists returns false for a nonexistent job id', async () => {
     const runeFile = join(tmp, 'rune.js')
     await writeFile(runeFile, [
       'import { rune, section } from "@utils"',
       'export async function run(args) {',
-      '  const alive = await rune.exists("no-such-job")',
+      '  const alive = await rune.job.exists("no-such-job")',
       '  return [section.create("x", { type: "markdown", content: String(alive) })]',
       '}',
     ].join('\n'))
     const result = await runRuneInIsolate(
       runeFile,
-      { allow: [], deny: [] },
+      { allow: ['rune.job.exists'], deny: [] },
       [],
       tmp
     )
     expect(result[0].data.content).toBe('false')
   })
 
-  it('rune.kill is a no-op for a nonexistent job id', async () => {
+  it('rune.job.kill is a no-op for a nonexistent job id', async () => {
     const runeFile = join(tmp, 'rune.js')
     await writeFile(runeFile, [
       'import { rune, section } from "@utils"',
       'export async function run(args) {',
-      '  await rune.kill("no-such-job")',
+      '  await rune.job.kill("no-such-job")',
       '  return [section.create("x", { type: "markdown", content: "ok" })]',
       '}',
     ].join('\n'))
-    const result = await runRuneInIsolate(runeFile, { allow: [], deny: [] }, [], tmp)
+    const result = await runRuneInIsolate(runeFile, { allow: ['rune.job.kill'], deny: [] }, [], tmp)
     expect(result[0].data.content).toBe('ok')
   })
 
-  it('rune.kill is a no-op for a job from a different project (structural isolation)', async () => {
+  it('rune.job.kill is a no-op for a job from a different project (structural isolation)', async () => {
     const otherProject = join(tmp, 'other')
     const { id } = await createJob(process.pid, { spawnedBy: 'server', runeKey: 'worker', projectDir: otherProject, args: [] })
     const runeFile = join(tmp, 'rune.js')
     await writeFile(runeFile, [
       'import { rune, section } from "@utils"',
       `export async function run(args) {`,
-      `  await rune.kill(${JSON.stringify(id)})`,
+      `  await rune.job.kill(${JSON.stringify(id)})`,
       '  return [section.create("x", { type: "markdown", content: "ok" })]',
       '}',
     ].join('\n'))
-    const result = await runRuneInIsolate(runeFile, { allow: ['rune.kill:*'], deny: [] }, [], tmp)
+    const result = await runRuneInIsolate(runeFile, { allow: ['rune.job.kill'], deny: [] }, [], tmp)
     expect(result[0].data.content).toBe('ok')
   })
 })
@@ -554,7 +554,7 @@ describe('spawn-like ShellSession sandbox integration', () => {
     await writeFile(runeFile, `
 import { shell, section } from '@utils'
 export async function run() {
-  const session = shell.execInSession('node ${scriptPath.replace(/\\/g, '\\\\')}', { binary: true })
+  const session = shell.spawn('node ${scriptPath.replace(/\\/g, '\\\\')}', { binary: true })
   let stdoutStr = ''
   
   await new Promise((resolve, reject) => {
@@ -576,7 +576,7 @@ export async function run() {
 }
 `)
 
-    const result = await runRuneInIsolate(runeFile, { allow: ['shell.exec:**'], deny: [] }, [], tmp)
+    const result = await runRuneInIsolate(runeFile, { allow: ['shell.run:**'], deny: [] }, [], tmp)
     expect(result[0].data.content).toContain('Correct')
   })
 
@@ -591,7 +591,7 @@ export async function run() {
 import { shell, section } from '@utils'
 export async function run() {
   const controller = new AbortController()
-  const session = shell.execInSession('node ${scriptPath.replace(/\\/g, '\\\\')}', {
+  const session = shell.spawn('node ${scriptPath.replace(/\\/g, '\\\\')}', {
     signal: controller.signal
   })
   
@@ -615,7 +615,7 @@ export async function run() {
 }
 `)
 
-    const result = await runRuneInIsolate(runeFile, { allow: ['shell.exec:**'], deny: [] }, [], tmp)
+    const result = await runRuneInIsolate(runeFile, { allow: ['shell.run:**'], deny: [] }, [], tmp)
     expect(result[0].data.content).toBe('exited')
   })
 })

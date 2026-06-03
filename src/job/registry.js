@@ -8,6 +8,16 @@ function jobsBase()          { return join(getStorePath(), 'jobs') }
 function projectJobsDir(key) { return join(jobsBase(), 'project', key) }
 function jobPath(key, id)    { return join(projectJobsDir(key), `${id}.json`) }
 
+export function jobStdoutPath(key, id) { return join(projectJobsDir(key), `${id}.stdout.log`) }
+export function jobStderrPath(key, id) { return join(projectJobsDir(key), `${id}.stderr.log`) }
+
+export async function updateJobPid(key, id, pid) {
+  const record = await getJob(key, id)
+  if (!record) return
+  record.pid = pid
+  await writeFile(jobPath(key, id), JSON.stringify(record, null, 2), 'utf8')
+}
+
 export async function createJob(pid, { type = 'rune', spawnedBy, runeKey, projectDir, args = [] } = {}) {
   const { id: key } = await ensureProjectIdentity(projectDir)
   const id  = randomUUID()

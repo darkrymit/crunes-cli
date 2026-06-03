@@ -8,6 +8,8 @@ import { getAutoPermits } from '../api/utils.js'
 import { createModuleResolver } from './resolver.js'
 import { DENY_BUILTINS } from './builtins.js'
 import { createJob, getJob } from '../../job/index.js'
+import { updateJobPid, jobStdoutPath, jobStderrPath } from '../../job/registry.js'
+import fsSync from 'node:fs'
 import { ensureProjectIdentity } from '../../project/index.js'
 import { hash, hashAsHex, hashAsBase64, hmac, hmacAsHex, hmacAsBase64, encrypt, decrypt, uuid as cryptoUuid, randomHex as cryptoHex, randomBase64 as cryptoBase64, randomBytesFn } from '../api/crypto.js'
 import { computeEffectivePermissions, makePermissionChecker } from '../permissions/permissions.js'
@@ -44,7 +46,7 @@ async function compileStaticModule(isolate, key) {
  */
 const VALID_SIGNALS = new Set(['SIGTERM', 'SIGKILL', 'SIGINT', 'SIGHUP', 'SIGUSR1', 'SIGUSR2'])
 
-async function injectUtils(isolate, context, utils, runeCallback, vars, projectDir, checkPermission, currentRuneKey, sections, onEvent) {
+async function injectUtils(isolate, context, utils, _runeCallback, vars, projectDir, checkPermission, currentRuneKey, sections, onEvent) {
   const jail = context.global
 
   await jail.set('$__utils_fs_read', new ivm.Reference(async (relPath, opts) => {
@@ -206,13 +208,13 @@ async function injectUtils(isolate, context, utils, runeCallback, vars, projectD
     }
     return res
   }))
-  await jail.set('$__utils_shell_execInSession_open', new ivm.Reference((cmd, opts) => {
-    const session = utils.shell.execInSession(cmd, opts)
+  await jail.set('$__utils_shell_spawn_open', new ivm.Reference((cmd, opts) => {
+    const session = utils.shell.spawn(cmd, opts)
     const id = String(nextShellHandle++)
     shellHandles.set(id, session)
     return id
   }))
-  await jail.set('$__utils_shell_execInSession_write', new ivm.Reference((idRef, chunkRef) => {
+  await jail.set('$__utils_shell_spawn_write', new ivm.Reference((idRef, chunkRef) => {
     const id = typeof idRef === 'object' && idRef.copySync ? idRef.copySync() : idRef
     const chunk = typeof chunkRef === 'object' && chunkRef.copySync ? chunkRef.copySync() : chunkRef
     const handle = shellHandles.get(id)
@@ -224,13 +226,13 @@ async function injectUtils(isolate, context, utils, runeCallback, vars, projectD
       }
     }
   }))
-  await jail.set('$__utils_shell_execInSession_end', new ivm.Reference((id) => {
+  await jail.set('$__utils_shell_spawn_end', new ivm.Reference((id) => {
     const handle = shellHandles.get(id)
     if (handle) {
       handle.proc.stdin.end()
     }
   }))
-  await jail.set('$__utils_shell_execInSession_on', new ivm.Reference((idRef, typeRef, eventRef, callbackRef) => {
+  await jail.set('$__utils_shell_spawn_on', new ivm.Reference((idRef, typeRef, eventRef, callbackRef) => {
     const id = typeof idRef === 'object' && idRef.copySync ? idRef.copySync() : idRef
     const type = typeof typeRef === 'object' && typeRef.copySync ? typeRef.copySync() : typeRef
     const event = typeof eventRef === 'object' && eventRef.copySync ? eventRef.copySync() : eventRef
@@ -239,7 +241,7 @@ async function injectUtils(isolate, context, utils, runeCallback, vars, projectD
       handle.setHandler(type, event, callbackRef)
     }
   }))
-  await jail.set('$__utils_shell_execInSession_kill', new ivm.Reference((id, signal) => {
+  await jail.set('$__utils_shell_spawn_kill', new ivm.Reference((id, signal) => {
     const handle = shellHandles.get(id)
     if (handle) {
       handle.kill(signal ?? undefined)
@@ -247,7 +249,44 @@ async function injectUtils(isolate, context, utils, runeCallback, vars, projectD
     }
   }))
 
-
+  const { id: pKey } = await ensureProjectIdentity(projectDir)
+  await jail.set('$__utils_shell_job_start', new ivm.Reference(async (cmd, opts) => {
+    checkPermission('shell.job.start', cmd)
+    return utils.shell.createShellJob(cmd, opts, {
+      createJob, updateJobPid, jobStdoutPath, jobStderrPath,
+      spawnedBy: currentRuneKey, projectKey: pKey, projectDir,
+    })
+  }))
+  await jail.set('$__utils_shell_job_kill', new ivm.Reference(async (id, signal) => {
+    checkPermission('shell.job.kill', null)
+    const sig = signal ?? 'SIGTERM'
+    if (!VALID_SIGNALS.has(sig)) throw new Error(`Invalid signal: ${sig}`)
+    const record = await getJob(pKey, id)
+    if (!record) return
+    try { process.kill(record.pid, sig) } catch { /* already gone */ }
+  }))
+  await jail.set('$__utils_shell_job_exists', new ivm.Reference(async (id) => {
+    checkPermission('shell.job.exists', null)
+    const record = await getJob(pKey, id)
+    if (!record) return false
+    try { process.kill(record.pid, 0); return true } catch { return false }
+  }))
+  await jail.set('$__utils_shell_job_stdout', new ivm.Reference(async (id) => {
+    checkPermission('shell.job.read', null)
+    const record = await getJob(pKey, id)
+    if (!record) throw new Error(`Unknown job: ${id}`)
+    const logPath = jobStdoutPath(record.projectKey, id)
+    if (!fsSync.existsSync(logPath)) return ''
+    return fsSync.promises.readFile(logPath, 'utf8')
+  }))
+  await jail.set('$__utils_shell_job_stderr', new ivm.Reference(async (id) => {
+    checkPermission('shell.job.read', null)
+    const record = await getJob(pKey, id)
+    if (!record) throw new Error(`Unknown job: ${id}`)
+    const logPath = jobStderrPath(record.projectKey, id)
+    if (!fsSync.existsSync(logPath)) return ''
+    return fsSync.promises.readFile(logPath, 'utf8')
+  }))
 
   await jail.set('$__utils_section_emit', new ivm.Reference((section) => {
     if (sections) sections.push(section)
@@ -262,40 +301,142 @@ async function injectUtils(isolate, context, utils, runeCallback, vars, projectD
   await jail.set('$__utils_section_selected', new ivm.Reference(() => {
     return utils.section.selected() ?? undefined
   }))
-  await jail.set('$__utils_rune', new ivm.Reference(async (key, args) => {
-    return runeCallback(key, args || [])
-  }))
-  await jail.set('$__utils_rune_spawn', new ivm.Reference((key, args) => {
-    checkPermission('rune.spawn', key)
+  await jail.set('$__utils_rune_exec', new ivm.Reference(async (runeKey, args) => {
+    checkPermission('rune.run', runeKey)
     const cliPath = process.argv[1]
-    const spawnArgs = ['--cwd', projectDir, 'use', key, ...(args || [])]
-    // Pass --no-node-snapshot directly so cli.js skips its spawnSync re-exec,
-    // avoiding a second child process that would create a console window on Windows.
-    const child = spawnProcess(process.execPath, ['--no-node-snapshot', cliPath, ...spawnArgs], {
-      detached:           true,
-      stdio:              'ignore',
-      windowsHideConsole: true,
-      env:                { ...process.env, CRUNES_NO_TIMEOUT: '1' },
-    })
-    child.unref()
-    return createJob(child.pid, { spawnedBy: currentRuneKey, runeKey: key, projectDir, args: args || [] }).then(({ id, projectKey }) => ({ id, projectKey }))
+    const child = spawnProcess(
+      process.execPath,
+      ['--no-node-snapshot', cliPath, '--cwd', projectDir, 'run', runeKey, '--format', 'jsonl', ...(args ?? [])],
+      { stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, CRUNES_NO_TIMEOUT: '1' }, windowsHideConsole: true }
+    )
+    let stdout = '', stderr = ''
+    child.stdout.on('data', chunk => { stdout += chunk })
+    child.stderr.on('data', chunk => { stderr += chunk })
+    const exitCode = await new Promise(resolve => child.on('close', resolve))
+    const sections = []
+    for (const line of stdout.split('\n')) {
+      if (!line.trim()) continue
+      try {
+        const parsed = JSON.parse(line)
+        if (parsed.type === 'section') sections.push(parsed.section)
+      } catch {}
+    }
+    return { sections, stdout, stderr, exitCode, ok: exitCode === 0 }
   }))
-  const { id: pKey } = await ensureProjectIdentity(projectDir)
-  await jail.set('$__utils_rune_kill', new ivm.Reference((id, signal) => {
+  await jail.set('$__utils_rune_spawn_open', new ivm.Reference((runeKey, args) => {
+    checkPermission('rune.run', runeKey)
+    const cliPath = process.argv[1]
+    const child = spawnProcess(
+      process.execPath,
+      ['--no-node-snapshot', cliPath, '--cwd', projectDir, 'run', runeKey, '--format', 'jsonl', ...(args ?? [])],
+      { stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, CRUNES_NO_TIMEOUT: '1' }, windowsHideConsole: true }
+    )
+    const id = String(nextShellHandle++)
+    shellHandles.set(id, {
+      proc: child,
+      handlers: new Map(),
+      setHandler(type, event, callbackRef) { this.handlers.set(`${type}:${event}`, callbackRef) },
+      emit(type, event, arg) {
+        const h = this.handlers.get(`${type}:${event}`)
+        if (!h) return
+        const handleCatch = err => { if (err?.message !== 'Isolate is disposed') console.error('[crunes:debug] rune.spawn callback error:', err) }
+        if (event === 'data') {
+          const ab = arg.buffer.slice(arg.byteOffset, arg.byteOffset + arg.byteLength)
+          h.apply(undefined, [ab], { arguments: { copy: true } }).catch(handleCatch)
+        } else if (event === 'exit') {
+          h.apply(undefined, [arg], { arguments: { copy: true } }).catch(handleCatch)
+        } else if (event === 'error') {
+          const s = arg instanceof Error ? arg.message : String(arg)
+          h.apply(undefined, [s], { arguments: { copy: true } }).catch(handleCatch)
+        } else {
+          h.apply(undefined, [], {}).catch(handleCatch)
+        }
+      },
+      kill(signal) { try { child.kill(signal ?? 'SIGTERM') } catch {} },
+    })
+    const handle = shellHandles.get(id)
+    child.stdout.on('data', chunk => handle.emit('stdout', 'data', chunk))
+    child.stderr.on('data', chunk => handle.emit('stderr', 'data', chunk))
+    child.stdout.on('end', () => handle.emit('stdout', 'end'))
+    child.stderr.on('end', () => handle.emit('stderr', 'end'))
+    child.on('exit', code => handle.emit('session', 'exit', code ?? 0))
+    child.on('error', err => handle.emit('session', 'error', err))
+    return id
+  }))
+  await jail.set('$__utils_rune_spawn_on', new ivm.Reference((idRef, typeRef, eventRef, callbackRef) => {
+    const id = typeof idRef === 'object' && idRef.copySync ? idRef.copySync() : idRef
+    const type = typeof typeRef === 'object' && typeRef.copySync ? typeRef.copySync() : typeRef
+    const event = typeof eventRef === 'object' && eventRef.copySync ? eventRef.copySync() : eventRef
+    const handle = shellHandles.get(id)
+    if (handle) handle.setHandler(type, event, callbackRef)
+  }))
+  await jail.set('$__utils_rune_spawn_kill', new ivm.Reference((id, signal) => {
+    const handle = shellHandles.get(id)
+    if (handle) { handle.kill(signal ?? undefined); shellHandles.delete(id) }
+  }))
+  await jail.set('$__utils_rune_job_start', new ivm.Reference(async (runeKey, args) => {
+    checkPermission('rune.job.start', runeKey)
+    const cliPath = process.argv[1]
+    const { id } = await createJob(null, { type: 'rune', spawnedBy: currentRuneKey, runeKey, projectDir, args: args ?? [] })
+    const outFd = fsSync.openSync(jobStdoutPath(pKey, id), 'a')
+    const errFd = fsSync.openSync(jobStderrPath(pKey, id), 'a')
+    const child = spawnProcess(
+      process.execPath,
+      ['--no-node-snapshot', cliPath, '--cwd', projectDir, 'run', runeKey, '--format', 'jsonl', ...(args ?? [])],
+      { detached: true, stdio: ['ignore', outFd, errFd], env: { ...process.env, CRUNES_NO_TIMEOUT: '1' }, windowsHideConsole: true }
+    )
+    await updateJobPid(pKey, id, child.pid)
+    child.unref()
+    fsSync.closeSync(outFd)
+    fsSync.closeSync(errFd)
+    return { id }
+  }))
+  await jail.set('$__utils_rune_job_kill', new ivm.Reference(async (id, signal) => {
     const sig = signal ?? 'SIGTERM'
     if (!VALID_SIGNALS.has(sig)) throw new Error(`Invalid signal: ${sig}`)
-    return getJob(pKey, id).then(record => {
-      if (!record) return
-      checkPermission('rune.kill', record.runeKey)
-      try { process.kill(record.pid, sig) } catch { /* already gone */ }
-    })
+    checkPermission('rune.job.kill', null)
+    const record = await getJob(pKey, id)
+    if (!record) return
+    try { process.kill(record.pid, sig) } catch { /* already gone */ }
   }))
-  await jail.set('$__utils_rune_exists', new ivm.Reference((id) => {
-    return getJob(pKey, id).then(record => {
-      if (!record) return false
-      checkPermission('rune.exists', record.runeKey)
-      try { process.kill(record.pid, 0); return true } catch { return false }
-    })
+  await jail.set('$__utils_rune_job_exists', new ivm.Reference(async (id) => {
+    checkPermission('rune.job.exists', null)
+    const record = await getJob(pKey, id)
+    if (!record) return false
+    try { process.kill(record.pid, 0); return true } catch { return false }
+  }))
+  await jail.set('$__utils_rune_job_stdout', new ivm.Reference(async (id) => {
+    checkPermission('rune.job.read', null)
+    const record = await getJob(pKey, id)
+    if (!record) throw new Error(`Unknown job: ${id}`)
+    const logPath = jobStdoutPath(record.projectKey, id)
+    if (!fsSync.existsSync(logPath)) return ''
+    return fsSync.promises.readFile(logPath, 'utf8')
+  }))
+  await jail.set('$__utils_rune_job_stderr', new ivm.Reference(async (id) => {
+    checkPermission('rune.job.read', null)
+    const record = await getJob(pKey, id)
+    if (!record) throw new Error(`Unknown job: ${id}`)
+    const logPath = jobStderrPath(record.projectKey, id)
+    if (!fsSync.existsSync(logPath)) return ''
+    return fsSync.promises.readFile(logPath, 'utf8')
+  }))
+  await jail.set('$__utils_rune_job_sections', new ivm.Reference(async (id) => {
+    checkPermission('rune.job.read', null)
+    const record = await getJob(pKey, id)
+    if (!record) throw new Error(`Unknown job: ${id}`)
+    const logPath = jobStdoutPath(record.projectKey, id)
+    if (!fsSync.existsSync(logPath)) return []
+    const content = await fsSync.promises.readFile(logPath, 'utf8')
+    const sections = []
+    for (const line of content.split('\n')) {
+      if (!line.trim()) continue
+      try {
+        const parsed = JSON.parse(line)
+        if (parsed.type === 'section') sections.push(parsed.section)
+      } catch {}
+    }
+    return sections
   }))
   await jail.set('$__utils_time_after', new ivm.Reference((ms) => {
     return new Promise(resolve => setTimeout(resolve, ms).unref())
@@ -1020,7 +1161,7 @@ export async function runPluginRune(pluginDir, pluginCacheDir, runeKey, pluginJs
     isolateTimeoutMs: opts.isolateTimeoutMs,
     sections:         opts.sections ?? null,
     vars:             opts.vars ?? {},
-    lifecycle:        opts.lifecycle ?? 'use',
+    lifecycle:        opts.lifecycle ?? 'run',
     runeKey,
     onEvent:          opts.onEvent ?? null,
     instanceId:       opts.instanceId ?? '1',

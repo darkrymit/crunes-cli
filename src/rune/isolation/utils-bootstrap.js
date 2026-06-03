@@ -511,9 +511,9 @@ globalThis.utils = {
       }
       return res
     },
-    execInSession: (cmd, o) => {
+    spawn: (cmd, o) => {
       const binaryMode = !!(o && o.binary)
-      const id = $__utils_shell_execInSession_open.applySync(undefined, [cmd, o], { arguments: { copy: true } })
+      const id = $__utils_shell_spawn_open.applySync(undefined, [cmd, o], { arguments: { copy: true } })
       
       const createHybridReadable = (streamType) => {
         let controller
@@ -558,8 +558,8 @@ globalThis.utils = {
           }
         }
         
-        $__utils_shell_execInSession_on.applySync(undefined, [id, streamType, 'data', handleData], { arguments: { reference: true } })
-        $__utils_shell_execInSession_on.applySync(undefined, [id, streamType, 'end', handleEnd], { arguments: { reference: true } })
+        $__utils_shell_spawn_on.applySync(undefined, [id, streamType, 'data', handleData], { arguments: { reference: true } })
+        $__utils_shell_spawn_on.applySync(undefined, [id, streamType, 'end', handleEnd], { arguments: { reference: true } })
         
         return stream
       }
@@ -573,14 +573,14 @@ globalThis.utils = {
           if (rawChunk instanceof Uint8Array) {
             rawChunk = rawChunk.buffer
           }
-          await $__utils_shell_execInSession_write.apply(
+          await $__utils_shell_spawn_write.apply(
             undefined,
             [id, rawChunk],
             { arguments: { copy: true }, result: { promise: true } }
           )
         },
         async close() {
-          await $__utils_shell_execInSession_end.apply(
+          await $__utils_shell_spawn_end.apply(
             undefined,
             [id],
             { result: { promise: true } }
@@ -593,10 +593,10 @@ globalThis.utils = {
         if (rawChunk instanceof Uint8Array) {
           rawChunk = rawChunk.buffer
         }
-        $__utils_shell_execInSession_write.applySync(undefined, [id, rawChunk], { arguments: { copy: true } })
+        $__utils_shell_spawn_write.applySync(undefined, [id, rawChunk], { arguments: { copy: true } })
       }
       stdinStream.end = () => {
-        $__utils_shell_execInSession_end.applySync(undefined, [id])
+        $__utils_shell_spawn_end.applySync(undefined, [id])
       }
       
       const session = {
@@ -604,16 +604,23 @@ globalThis.utils = {
         stdout: stdoutStream,
         stderr: stderrStream,
         on(event, callback) {
-          $__utils_shell_execInSession_on.applySync(undefined, [id, 'session', event, callback], { arguments: { reference: true } })
+          $__utils_shell_spawn_on.applySync(undefined, [id, 'session', event, callback], { arguments: { reference: true } })
         },
-        kill: (signal) => $__utils_shell_execInSession_kill.applySync(undefined, [id, signal ?? null])
+        kill: (signal) => $__utils_shell_spawn_kill.applySync(undefined, [id, signal ?? null])
       }
       
       if (o && o.signal) {
         o.signal.addEventListener('abort', () => session.kill('SIGTERM'))
       }
       return session
-    }
+    },
+    job: {
+      start:  (cmd, opts) => $__utils_shell_job_start.apply(undefined, [cmd, opts], { arguments: { copy: true }, result: { promise: true, copy: true } }),
+      kill:   (id, signal) => $__utils_shell_job_kill.apply(undefined, [id, signal ?? null], { arguments: { copy: true }, result: { promise: true } }),
+      exists: (id) => $__utils_shell_job_exists.apply(undefined, [id], { result: { promise: true, copy: true } }),
+      stdout: (id) => $__utils_shell_job_stdout.apply(undefined, [id], { result: { promise: true, copy: true } }),
+      stderr: (id) => $__utils_shell_job_stderr.apply(undefined, [id], { result: { promise: true, copy: true } }),
+    },
   },
   section: {
     create: (name, data, o) => $__utils_section_create.applySync(undefined, [name, data, o], { arguments: { copy: true }, result: { copy: true } }),
@@ -622,14 +629,47 @@ globalThis.utils = {
     selected: () => $__utils_section_selected.applySync(undefined, [], { result: { copy: true } }),
   },
   rune: {
-    run: (key, args) => $__utils_rune
+    exec: (key, args) => $__utils_rune_exec
       .apply(undefined, [key, args], { arguments: { copy: true }, result: { promise: true, copy: true } }),
-    spawn: (key, args) => $__utils_rune_spawn
-      .apply(undefined, [key, args], { arguments: { copy: true }, result: { promise: true, copy: true } }),
-    kill: (id, signal) => $__utils_rune_kill
-      .apply(undefined, [id, signal ?? null], { result: { promise: true } }),
-    exists: (id) => $__utils_rune_exists
-      .apply(undefined, [id], { result: { promise: true } }),
+    spawn: (key, args) => {
+      const id = $__utils_rune_spawn_open.applySync(undefined, [key, args], { arguments: { copy: true } })
+
+      const createHybridReadable = (streamType) => {
+        let controller
+        const listeners = []
+        const stream = new ReadableStream({ start(c) { controller = c } })
+        stream.on = (event, callback) => { listeners.push({ event, callback }) }
+        const handleData = (ab) => {
+          const chunk = new TextDecoder().decode(ab)
+          try { if (controller) controller.enqueue(chunk) } catch {}
+          for (const l of listeners) { if (l.event === 'data') l.callback(chunk) }
+        }
+        const handleEnd = () => {
+          try { if (controller) controller.close() } catch {}
+          for (const l of listeners) { if (l.event === 'end') l.callback() }
+        }
+        $__utils_rune_spawn_on.applySync(undefined, [id, streamType, 'data', handleData], { arguments: { reference: true } })
+        $__utils_rune_spawn_on.applySync(undefined, [id, streamType, 'end', handleEnd], { arguments: { reference: true } })
+        return stream
+      }
+
+      return {
+        stdout: createHybridReadable('stdout'),
+        stderr: createHybridReadable('stderr'),
+        on(event, callback) {
+          $__utils_rune_spawn_on.applySync(undefined, [id, 'session', event, callback], { arguments: { reference: true } })
+        },
+        kill: (signal) => $__utils_rune_spawn_kill.applySync(undefined, [id, signal ?? null]),
+      }
+    },
+    job: {
+      start:    (key, args)  => $__utils_rune_job_start.apply(undefined, [key, args], { arguments: { copy: true }, result: { promise: true, copy: true } }),
+      kill:     (id, signal) => $__utils_rune_job_kill.apply(undefined, [id, signal ?? null], { arguments: { copy: true }, result: { promise: true } }),
+      exists:   (id)         => $__utils_rune_job_exists.apply(undefined, [id], { result: { promise: true, copy: true } }),
+      stdout:   (id)         => $__utils_rune_job_stdout.apply(undefined, [id], { result: { promise: true, copy: true } }),
+      stderr:   (id)         => $__utils_rune_job_stderr.apply(undefined, [id], { result: { promise: true, copy: true } }),
+      sections: (id)         => $__utils_rune_job_sections.apply(undefined, [id], { result: { promise: true, copy: true } }),
+    },
   },
   json: {
     read:        (p, o) => $__utils_json_read.apply(undefined, [p, o], { arguments: { copy: true }, result: { promise: true, copy: true } }),

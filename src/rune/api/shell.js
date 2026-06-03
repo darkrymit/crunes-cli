@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process'
+import fs from 'node:fs'
 
 const ANSI_RE = /\x1b\[[0-9;]*m/g
 
@@ -108,7 +109,7 @@ export function createShellUtils(dir, checkPermission) {
   const activeSessions = new Set()
 
   async function exec(cmd, { throw: shouldThrow = true, trim = true, timeout = 30000, env, stdin, binary = false } = {}) {
-    if (checkPermission) checkPermission('shell.exec', cmd)
+    if (checkPermission) checkPermission('shell.run', cmd)
 
     const result = await new Promise((resolve, reject) => {
       const proc = spawn(cmd, [], {
@@ -200,13 +201,35 @@ export function createShellUtils(dir, checkPermission) {
   }
 
   function execInSession(cmd, opts = {}) {
-    if (checkPermission) checkPermission('shell.exec', cmd)
+    if (checkPermission) checkPermission('shell.run', cmd)
     return new ShellSession(cmd, { dir, ...opts, activeSessions })
+  }
+
+  async function createShellJob(cmd, opts, { createJob, updateJobPid, jobStdoutPath, jobStderrPath, spawnedBy, projectKey, projectDir: jobProjectDir }) {
+    const { id } = await createJob(null, {
+      type: 'shell', spawnedBy, runeKey: null, projectDir: jobProjectDir, args: [cmd],
+    })
+    const outFd = fs.openSync(jobStdoutPath(projectKey, id), 'a')
+    const errFd = fs.openSync(jobStderrPath(projectKey, id), 'a')
+    const child = spawn(cmd, [], {
+      shell:   true,
+      detached: true,
+      stdio:   ['ignore', outFd, errFd],
+      cwd:     jobProjectDir,
+      env:     opts?.env ? { ...process.env, ...opts.env } : process.env,
+      windowsHideConsole: true,
+    })
+    await updateJobPid(projectKey, id, child.pid)
+    child.unref()
+    fs.closeSync(outFd)
+    fs.closeSync(errFd)
+    return { id }
   }
 
   return {
     exec,
-    execInSession,
+    spawn: execInSession,
+    createShellJob,
     dispose() {
       for (const session of activeSessions) {
         try {

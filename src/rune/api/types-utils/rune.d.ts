@@ -1,4 +1,4 @@
-/** Minimal section shape returned by rune.run() */
+/** Minimal section shape returned by rune.exec() */
 interface RuneSection {
   name: string
   data: { type: string; content?: string; root?: object }
@@ -6,30 +6,81 @@ interface RuneSection {
   attrs?: Record<string, string>
 }
 
+/** Result returned by rune.exec() */
+interface RuneResult {
+  sections: RuneSection[]
+  stdout: string
+  stderr: string
+  exitCode: number
+  ok: boolean
+}
+
+interface RuneSessionReadableStream extends ReadableStream<string> {
+  on(event: 'data', callback: (chunk: string) => void): void
+  on(event: 'end', callback: () => void): void
+}
+
+/** Streaming session returned by rune.spawn() */
+interface RuneSession {
+  readonly stdout: RuneSessionReadableStream
+  readonly stderr: RuneSessionReadableStream
+  on(event: 'exit', callback: (code: number) => void): void
+  on(event: 'error', callback: (err: string) => void): void
+  kill(signal?: string): void
+}
+
 /** Inter-rune call utilities */
 declare namespace rune {
-  /** Calls another rune and returns its sections */
-  function run(key: string, args?: string[]): Promise<RuneSection[]>
+  /**
+   * Calls another rune as a subprocess and awaits completion.
+   * Hard process boundary — safe for cross-author/plugin rune composition.
+   * Requires `rune.run:<key>` permission.
+   */
+  function exec(key: string, args?: string[]): Promise<RuneResult>
 
   /**
-   * Starts a rune as a detached background job.
-   * Returns immediately with a stable job id.
-   * Requires `rune.spawn:<key>` permission.
+   * Spawns a rune as a streaming subprocess session.
+   * Returns immediately with live stdout/stderr streams.
+   * Requires `rune.run:<key>` permission.
    */
-  function spawn(key: string, args?: string[]): Promise<{ id: string }>
+  function spawn(key: string, args?: string[]): RuneSession
 
-  /**
-   * Sends a signal to a background job (default: SIGTERM).
-   * No-op if the job is already stopped.
-   * Requires `rune.kill:<runeKey>` permission; only jobs from the same project can be targeted.
-   * Valid signals: SIGTERM, SIGKILL, SIGINT, SIGHUP, SIGUSR1, SIGUSR2.
-   */
-  function kill(id: string, signal?: 'SIGTERM' | 'SIGKILL' | 'SIGINT' | 'SIGHUP' | 'SIGUSR1' | 'SIGUSR2'): Promise<void>
+  namespace job {
+    /**
+     * Starts a rune as a detached background job with log-backed stdout/stderr.
+     * Survives parent process exit. Requires `rune.job.start:<key>` permission.
+     */
+    function start(key: string, args?: string[]): Promise<{ id: string }>
 
-  /**
-   * Returns true if the background job is still running.
-   * Requires `rune.exists:<runeKey>` permission; only jobs from the same project can be checked.
-   */
-  function exists(id: string): Promise<boolean>
+    /**
+     * Sends a signal to a background rune job.
+     * Requires `rune.job.kill` permission.
+     */
+    function kill(id: string, signal?: 'SIGTERM' | 'SIGKILL' | 'SIGINT' | 'SIGHUP' | 'SIGUSR1' | 'SIGUSR2'): Promise<void>
 
+    /**
+     * Returns true if the background rune job is still running.
+     * Requires `rune.job.exists` permission.
+     */
+    function exists(id: string): Promise<boolean>
+
+    /**
+     * Reads raw stdout log file content as written so far (live, works while running).
+     * Requires `rune.job.read` permission.
+     */
+    function stdout(id: string): Promise<string>
+
+    /**
+     * Reads raw stderr log file content as written so far.
+     * Requires `rune.job.read` permission.
+     */
+    function stderr(id: string): Promise<string>
+
+    /**
+     * Parses stdout JSONL log and returns sections emitted so far.
+     * Works while running — returns whatever has been written.
+     * Requires `rune.job.read` permission.
+     */
+    function sections(id: string): Promise<RuneSection[]>
+  }
 }

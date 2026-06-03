@@ -2,7 +2,7 @@
 declare namespace shell {
   /**
    * Runs a shell command asynchronously and returns its output.
-   * Requires `shell.exec:<command>` permission.
+   * Requires `shell.run:<command>` permission.
    *
    * @param cmd Shell command to execute
    * @param opts Option object to configure shell execution
@@ -14,8 +14,8 @@ declare namespace shell {
    * @param opts.binary Return stdout as raw Uint8Array instead of string (default: false).
    */
   export function exec(
-    cmd: string, 
-    opts?: { 
+    cmd: string,
+    opts?: {
       throw?: boolean
       trim?: boolean
       timeout?: number
@@ -26,8 +26,8 @@ declare namespace shell {
   ): Promise<ShellResult>
 
   interface ShellResult {
-    /** 
-     * The standard output (stdout) of the process. 
+    /**
+     * The standard output (stdout) of the process.
      * If `opts.binary` is true, this is a `Uint8Array`; otherwise, a string.
      */
     stdout: string | Uint8Array
@@ -41,7 +41,7 @@ declare namespace shell {
 
   /**
    * Spawns an interactive shell session, allowing progressive streaming and real-time stdin/stdout interaction.
-   * Requires `shell.exec:<command>` permission.
+   * Requires `shell.run:<command>` permission.
    *
    * @param cmd Shell command to spawn
    * @param opts Option object to configure interactive execution
@@ -49,9 +49,9 @@ declare namespace shell {
    * @param opts.signal AbortSignal to kill the session and its child process tree.
    * @param opts.binary Stream stdout/stderr chunks as Uint8Array instead of string (default: false).
    */
-  export function execInSession(
-    cmd: string, 
-    opts?: { 
+  export function spawn(
+    cmd: string,
+    opts?: {
       env?: Record<string, string>
       signal?: AbortSignal
       binary?: boolean
@@ -59,24 +59,36 @@ declare namespace shell {
   ): ShellSession
 
   interface ShellSession {
-    readonly stdin: HybridWritableStream
-    readonly stdout: HybridReadableStream
-    readonly stderr: HybridReadableStream
-    
+    readonly stdin: ShellSessionWritableStream
+    readonly stdout: ShellSessionReadableStream
+    readonly stderr: ShellSessionReadableStream
+
     on(event: 'exit', callback: (code: number) => void): void
     on(event: 'error', callback: (err: string) => void): void
-    
+
     kill(signal?: string): void
   }
 
-  interface HybridWritableStream extends WritableStream<Uint8Array | string> {
+  interface ShellSessionWritableStream extends WritableStream<Uint8Array | string> {
     write(text: string | Uint8Array): void
     end(): void
   }
 
-  interface HybridReadableStream extends ReadableStream<Uint8Array | string> {
+  interface ShellSessionReadableStream extends ReadableStream<Uint8Array | string> {
     on(event: 'data', callback: (chunk: string | Uint8Array) => void): void
     on(event: 'end', callback: () => void): void
   }
-}
 
+  namespace job {
+    /** Starts a detached background shell job with log-backed stdout/stderr. Requires `shell.job.start:<command>` permission. */
+    function start(cmd: string, opts?: { env?: Record<string, string> }): Promise<{ id: string }>
+    /** Sends a signal to a background shell job. Requires `shell.job.kill` permission. */
+    function kill(id: string, signal?: 'SIGTERM' | 'SIGKILL' | 'SIGINT' | 'SIGHUP' | 'SIGUSR1' | 'SIGUSR2'): Promise<void>
+    /** Returns true if the background shell job is still running. Requires `shell.job.exists` permission. */
+    function exists(id: string): Promise<boolean>
+    /** Reads raw stdout log content as written so far. Requires `shell.job.read` permission. */
+    function stdout(id: string): Promise<string>
+    /** Reads raw stderr log content as written so far. Requires `shell.job.read` permission. */
+    function stderr(id: string): Promise<string>
+  }
+}
