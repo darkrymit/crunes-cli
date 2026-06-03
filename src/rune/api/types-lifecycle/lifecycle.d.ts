@@ -20,14 +20,6 @@ declare namespace lifecycle {
    */
   function run(args: ParsedArgs): Promise<RuneSection[] | RuneSection | string | void> | RuneSection[] | RuneSection | string | void
 
-  /** Minimal section shape returned by rune execution */
-  interface RuneSection {
-    name: string
-    data: { type: string; content?: string; root?: object }
-    title?: string
-    attrs?: Record<string, string>
-  }
-
   /** Fluent builder for defining rune options, positionals, and examples. */
   interface ArgBuilder {
     /**
@@ -78,10 +70,10 @@ declare namespace lifecycle {
     /** Original raw arguments passed to the rune. */
     $raw: string[]
 
-    /** Space-separated matched command path string (e.g. 'remote add') */
-    command?: string
+    /** Space-separated matched command path string (e.g. 'remote add'). Only present when a subcommand matched. */
+    $command?: string
 
-    /** Array of matched command path levels (e.g. ['remote', 'add']) */
-    commands?: string[]
+    /** Array of matched command path levels (e.g. ['remote', 'add']). Only present when a subcommand matched. */
+    $commands?: string[]
   }
 }

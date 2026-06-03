@@ -2,6 +2,7 @@
 declare namespace yaml {
   /**
    * Reads and parses a YAML file.
+   * Requires `fs.read:<path>` permission.
    * @param path Relative file path
    * @param opts Options
    */
@@ -9,6 +10,7 @@ declare namespace yaml {
 
   /**
    * Serializes and writes a value to a YAML file.
+   * Requires `fs.write:<path>` permission.
    * @param path Relative file path
    * @param data Value to serialize
    * @param opts Options
@@ -17,6 +19,7 @@ declare namespace yaml {
 
   /**
    * Reads a YAML file, passes parsed data to callback, writes the result back.
+   * Requires `fs.read:<path>` and `fs.write:<path>` permissions.
    * @param path Relative file path
    * @param callback Receives (data, { exists }) and returns modified data
    * @param opts Options

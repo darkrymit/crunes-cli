@@ -1,11 +1,3 @@
-/** Minimal section shape returned by rune.exec() */
-interface RuneSection {
-  name: string
-  data: { type: string; content?: string; root?: object }
-  title?: string
-  attrs?: Record<string, string>
-}
-
 /** Result returned by rune.exec() */
 interface RuneResult {
   sections: RuneSection[]

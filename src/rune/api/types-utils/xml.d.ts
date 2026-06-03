@@ -2,6 +2,7 @@
 declare namespace xml {
   /**
    * Reads and parses an XML file to a JS object.
+   * Requires `fs.read:<path>` permission.
    * @param path Relative file path
    * @param opts Options
    */
@@ -9,6 +10,7 @@ declare namespace xml {
 
   /**
    * Serializes a JS object to XML and writes it to a file.
+   * Requires `fs.write:<path>` permission.
    * @param path Relative file path
    * @param data JS object to serialize
    * @param opts Options
@@ -17,6 +19,7 @@ declare namespace xml {
 
   /**
    * Reads an XML file, passes parsed data to callback, writes the result back.
+   * Requires `fs.read:<path>` and `fs.write:<path>` permissions.
    * @param path Relative file path
    * @param callback Receives (data, { exists }) and returns modified data
    * @param opts Options

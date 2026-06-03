@@ -2,6 +2,7 @@
 declare namespace json {
   /**
    * Reads and parses a JSON file.
+   * Requires `fs.read:<path>` permission.
    * @param path Relative file path
    * @param opts Options
    */
@@ -9,6 +10,7 @@ declare namespace json {
 
   /**
    * Returns the first value matching a JSONPath query.
+   * Requires `fs.read:<path>` permission.
    * @param path Relative file path
    * @param jsonPath JSONPath expression (e.g. $.name)
    * @param defaultValue Returned if path not found
@@ -17,6 +19,7 @@ declare namespace json {
 
   /**
    * Returns all values matching a JSONPath query.
+   * Requires `fs.read:<path>` permission.
    * @param path Relative file path
    * @param jsonPath JSONPath expression
    * @param defaultValue Returned if no matches
@@ -25,6 +28,7 @@ declare namespace json {
 
   /**
    * Serializes and writes a value to a JSON file.
+   * Requires `fs.write:<path>` permission.
    * @param path Relative file path
    * @param data Value to serialize
    * @param opts Options
@@ -33,6 +37,7 @@ declare namespace json {
 
   /**
    * Reads a JSON file, passes parsed data to callback, writes the result back.
+   * Requires `fs.read:<path>` and `fs.write:<path>` permissions.
    * @param path Relative file path
    * @param callback Receives (data, { exists }) and returns modified data
    * @param opts Options

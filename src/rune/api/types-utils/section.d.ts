@@ -36,11 +36,4 @@ declare namespace section {
    */
   export function selected(): string | undefined
 
-  /** Minimal section shape created by `section.create` and accepted by `section.emit`. */
-  interface RuneSection {
-    name: string
-    data: { type: string; content?: string; root?: object }
-    title?: string
-    attrs?: Record<string, string>
-  }
 }

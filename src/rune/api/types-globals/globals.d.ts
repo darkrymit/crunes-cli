@@ -133,7 +133,8 @@ declare namespace globals {
     write(chunk: W): Promise<void>
   }
 
-  interface ReadableStream<R = any> {
+  class ReadableStream<R = any> {
+    constructor(underlyingSource?: object, strategy?: object)
     readonly locked: boolean
     cancel(reason?: any): Promise<void>
     getReader(): ReadableStreamDefaultReader<R>
@@ -142,14 +143,16 @@ declare namespace globals {
     [Symbol.asyncIterator](): AsyncIterableIterator<R>
   }
 
-  interface WritableStream<W = any> {
+  class WritableStream<W = any> {
+    constructor(underlyingSink?: object, strategy?: object)
     readonly locked: boolean
     abort(reason?: any): Promise<void>
     close(): Promise<void>
     getWriter(): WritableStreamDefaultWriter<W>
   }
 
-  interface TransformStream<I = any, O = any> {
+  class TransformStream<I = any, O = any> {
+    constructor(transformer?: object, writableStrategy?: object, readableStrategy?: object)
     readonly readable: ReadableStream<O>
     readonly writable: WritableStream<I>
   }
@@ -279,6 +282,14 @@ declare namespace globals {
    * @param init Request options.
    */
   function fetch(input: string | Request, init?: RequestInit): Promise<Response>
+
+  /** Minimal section shape created by section.create() and returned or accepted by rune APIs. */
+  interface RuneSection {
+    name: string
+    data: { type: string; content?: string; root?: object }
+    title?: string
+    attrs?: Record<string, string>
+  }
 }
 
 // Top-level type aliases so rune API .d.ts files can reference these types
@@ -298,3 +309,4 @@ type Request = globals.Request
 type ReadableStreamDefaultReader<R = any> = globals.ReadableStreamDefaultReader<R>
 type WritableStreamDefaultWriter<W = any> = globals.WritableStreamDefaultWriter<W>
 type Response = globals.Response
+type RuneSection = globals.RuneSection

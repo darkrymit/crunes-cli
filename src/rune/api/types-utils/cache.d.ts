@@ -1,9 +1,23 @@
 /** Persistent key-value cache backed by JSON files, scoped to a location and name */
 declare namespace cache {
   /**
-   * Opens (or creates) a named cache. Returns a handle with set/get/delete/clear.
-   * @param location Storage scope: "@local-project-cache", "@global-project-cache", "@global-plugin-cache", "@local-project-plugin-cache", "@global-project-plugin-cache", or a relative path
-   * @param name Cache name (default: "default")
+   * Opens (or creates) a named cache. Returns a handle with set/get/delete/clear/has.
+   *
+   * The `location` controls where the cache data is stored. Use a `@`-prefixed scope alias
+   * (recommended) or a relative path for a custom location inside the project.
+   *
+   * The permission token format is `cache.read:<location>::<name>` for reads and
+   * `cache.write:<location>::<name>` for writes. Use `/**` as a wildcard name when
+   * declaring permissions in `config.json` (e.g. `cache.read:@local-project-cache/**`).
+   *
+   * @param location Storage scope:
+   *   - `@local-project-cache` — stored per-project under the local project directory. **Most common choice for project runes.**
+   *   - `@local-project-plugin-cache` — stored per-project, namespaced to the current plugin. Use when the rune is distributed as a plugin.
+   *   - `@global-project-cache` — stored globally, keyed by project identity. Persists across working directory changes.
+   *   - `@global-plugin-cache` — stored globally, shared across all projects for this plugin.
+   *   - `@global-project-plugin-cache` — stored globally, per-project per-plugin combination.
+   *   - A relative path string — stored at a custom path inside the project directory.
+   * @param name Cache name within the scope (default: "default")
    */
   function open(location: string, name?: string): Promise<CacheHandle>
 
