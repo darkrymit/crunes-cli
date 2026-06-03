@@ -1,15 +1,17 @@
 # rune/permissions
 
-Permission model for sandboxed rune execution. Determines what each rune is allowed to do: filesystem reads, shell commands, HTTP requests, and env var access. Full docs: `docs/knowledge-base/modules/rune.md`
+Permission enforcement for all sandboxed rune capabilities. `permissions.js` merges plugin and project permission sets and exposes a `checkPermission` function; each capability (http fetch, env, store, ws client, ws server, http server) has its own pattern-matching module. Full docs: `docs/knowledge-base/modules/rune.md`
 
-## Key Files
+## Files
 
-- **permissions.js** — `computeEffectivePermissions(base, project, lifecycle)` — merges base and project-level allow/deny lists; `makePermissionChecker(perms)` — returns per-operation check functions consumed by `rune/api` utils.
-- **permissions-http.js** — `fetch:` permission pattern parsing and URL matching.
-- **permissions-env.js** — `env:` permission pattern parsing (source + key glob matching via micromatch).
-- **permissions-store.js** — `matchStorePermission(value, pattern, cap)` — permission matcher for `cache.*` and `sqlite.*` tokens. Handles virtual root patterns (`@project-cache/**`), bare virtual roots, and path+name two-segment patterns.
+- **permissions.js** — `computeEffectivePermissions(pluginPerms, projectPerms, lifecycle, dir)` — merges plugin and project permissions with normalization. `makePermissionChecker(effective)` — returns `checkPermission(capability, value)` that validates access against effective permissions. `PermissionError` — thrown on denied access with `capability` and `value` properties.
+- **permissions-http.js** — `matchFetchPermission(value, pattern)` — matches an HTTP fetch access value (`METHOD::URL`) against an allow/deny pattern with method and URL matching.
+- **permissions-env.js** — `parseEnvPattern(pattern)` — parses an `env.read` pattern into `{ sources, keyPatterns }`. `matchEnvPermission(value, pattern)` — matches an env access value (`source::key`) against a pattern.
+- **permissions-store.js** — `matchStorePermission(value, pattern, cap)` — matches a cache or sqlite store access value (`location::name`) against a pattern, with capability-aware parsing.
+- **permissions-http-server.js** — `matchHttpServerPermission(value, pattern)` — matches an HTTP server bind value against a pattern. `isLoopbackHost(host)` — returns true for loopback addresses (`127.0.0.1`, `localhost`, `::1`).
+- **permissions-ws.js** — `matchWsPermission(url, pattern)` — matches a WebSocket client URL against a pattern. `matchWsServerPermission(value, pattern)` — matches a WebSocket server bind value (`host:port:path`) against a pattern.
 
 ## Related Modules
 
-- `rune/isolation` — Calls `computeEffectivePermissions` and `makePermissionChecker` before each isolate run.
-- `rune/api` — `fs`, `shell`, `fetch`, and `env` utils delegate all permission checks here.
+- `rune/api` — All API modules call `checkPermission` at construction time via `makePermissionChecker`.
+- `rune/resolver` — `computeEffectivePermissions` is called before running any rune to merge project and plugin permission sets.

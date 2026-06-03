@@ -2,25 +2,28 @@
 
 The `utils` object injected into every rune at runtime. `index.js` assembles the full object from its constituent modules. Full docs: `docs/knowledge-base/modules/rune.md`
 
-## Key Files
+## Files
 
-- **index.js** — `createUtils(context)` — assembles and returns the full utils object; each property corresponds to one of the modules below.
-- **md.js** — Markdown string builders: `h1`–`h3`, `p`, `bold`, `italic`, `code`, `codeBlock`, `ul`, `ol`, `link`, `table`. Embedded at build time as a source string; runs entirely inside the isolate.
-- **tree.js** — Tree node builders and formatters (`node`, `format`). Embedded at build time as a source string; runs entirely inside the isolate.
-- **fs.js** — Permission-gated filesystem access: `read`, `exists`, `glob`, `write`, `copy`. (`replace` is a composite implemented in `utils-bootstrap.js`.)
-- **shell.js** — Permission-gated shell execution + `ShellError`. `exec(cmd, opts?)` runs fire-and-forget commands. `execInSession(cmd, opts?)` returns a `ShellSession` with Node-like spawn streams: `stdin.write/end`, `stdout/stderr.on('data'/'end')`, `on('exit'/'error')`, `kill(signal?)`, and optional `signal: AbortSignal` for programmatic termination.
-- **json.js** — JSON file access with JSONPath: `read`, `get`, `getAll`, `write`, `modify`. (`modify` is implemented in `utils-bootstrap.js`.)
-- **yaml.js** — YAML file access with comment-preserving round-trips: `read`, `write`, `modify`. (`modify` is implemented in `utils-bootstrap.js`.)
-- **xml.js** — XML file access (`@_` attribute prefix, `#comment` comments): `read`, `write`, `modify`. (`modify` is implemented in `utils-bootstrap.js`.)
-- **http.js** — Permission-gated HTTP client (mirrors Web Fetch API). Exposed as `utils.http.fetch(input, init?)`. The same function is also available as the global `fetch()` inside every rune.
-- **env.js** — Permission-gated env var access from `process.env` or `.env` files: `get`, `has`.
-- **vars.js** — Static key/value vars injected per-rune from project config: `get`, `has`.
-- **archive.js** — Compression: `unzip`, `zip`, `untar`, `tar`.
+- **index.js** — re-exports `createUtils` and `createSectionUtils` from `utils.js`.
+- **utils.js** — `createUtils(dir, checkPermission, pluginDir, permissions, vars, requestedSections, pluginId, projectName)` — assembles and returns `{ utils, dispose }` containing all utility namespaces. `createSectionUtils(patterns)` — returns `{ create, match, selected }` for section filtering.
+- **md.js** — Markdown string builders: `h1`–`h3`, `p`, `bold`, `italic`, `code`, `codeBlock`, `ul`, `ol`, `link`, `table`, `blockquote`. Embedded at build time as a source string; runs entirely inside the isolate.
+- **tree.js** — Tree node builders and formatters: `node(name, description, children)`, `format(root, options)`. Embedded at build time as a source string; runs entirely inside the isolate.
+- **fs.js** — Permission-gated filesystem access: `read`, `resolve`, `exists`, `glob`, `write`, `copy`, `remove`, `move`, `stat`, `mkdir`, `readAsBytes`, `writeAsBytes`, `append`, `appendAsBytes`, `chmod`, `readStreamIter`, `writeStreamRef`.
+- **shell.js** — Permission-gated shell execution. `exec(cmd, opts?)` runs a command and returns `{ stdout, stderr, exitCode, ok }`. `spawn(cmd, opts?)` returns a `ShellSession` with Node-like streams: `write`, `kill`, `terminate` and event handlers for stdout/stderr/exit/error. `createShellJob(cmd, opts, jobContext)` spawns a detached background job.
+- **json.js** — JSON file access with JSONPath: `read`, `readPath`, `readPathAll`, `write`, `modify`.
+- **yaml.js** — YAML file access with comment-preserving round-trips: `read`, `write`, `modify`.
+- **xml.js** — XML file access (`@_` attribute prefix, `#comment` comments): `read`, `write`, `modify`.
+- **http.js** — Permission-gated HTTP client and server. `fetch(url, opts?)` mirrors the Web Fetch API (also available as global `fetch()` inside runes). `server(port, opts?)` creates an `HttpServerSession` with `open`, `close`, `setHandler`, `_registerWsSession`, `_handleUpgrade`. `compilePath(path)` compiles a path pattern to a named-group regex.
+- **ws.js** — Permission-gated WebSocket client and server. `client(url, options)` creates a `WsSession` (open, sendText, sendBinary, close, terminate). `server(portOrHttpSession, opts)` creates a `WsServerSession` with `open`, `getConn`, `close`, `terminate`; each connection is a `WsServerConnSession`. `dispose()` closes all sessions.
+- **env.js** — Permission-gated env var access from `process.env` or `.env` files: `read(key, fallback)`, `has(key)`.
+- **vars.js** — Static key/value vars injected per-rune from project config: `read(key, fallback)`, `has(key)`.
+- **archive.js** — Compression: `unzip`, `zip`, `untar`, `tar`, `zipStream`, `unzipStream`, `tarStream`, `untarStream`.
 - **cache.js** — Persistent key-value cache (JSON files on disk): `openHandle(location, name)` → `{ set, get, delete, clear }`. Exposed to runes as `cache.open(...)`.
-- **sqlite.js** — SQLite databases via `better-sqlite3`: `openHandle(location, name)` → `{ query, get, exec, close }`. Exposed to runes as `sqlite.open(...)`.
-- **crypto.js** — Cryptographic utilities: `hashHex`, `hashBase64`, `uuid`, `hex`, `base64`.
-- **utils.js** — Internal helpers: `resolvePath`, `canonicalizeLocation`, `getAutoPermits`, `getProjectKey`. Handles virtual location tokens (`@project/`, `@plugin/`, `@project-cache`, `@project-sqlite`, etc.).
-- **args-parser.js** — `parseArgs(rawArgs, schema)`, `buildYargsConfig(schema)`, `parseFlags(flagStr)` — converts the schema produced by a rune's `args()` export into a yargs-parser config and runs the parser. Called by `isolation/runner.js` before invoking `use(parsedArgs)`.
+- **sqlite.js** — SQLite databases via `better-sqlite3`: `openHandle(location, name)` → `{ query, get, exec, close }`. `dispose()` closes all open handles. Exposed to runes as `sqlite.open(...)`.
+- **db.js** — Permission-gated external database client: `connect(connectionString)` → driver with `query`, `get`, `exec`, `close`. Supports PostgreSQL (`PostgresDriver`) and MySQL (`MySqlDriver`). `dispose()` closes all connections. Exposed to runes as `db.connect(...)`.
+- **codec.js** — Encoding/decoding utilities: `toHex`, `fromHex`, `toBase64`, `fromBase64`, `fromUtf8`, `toUtf8`. Exposed to runes as `codec`.
+- **crypto.js** — Cryptographic utilities: `hash`, `hashAsHex`, `hashAsBase64`, `hmac`, `hmacAsHex`, `hmacAsBase64`, `encrypt`, `decrypt`, `uuid`, `randomHex`, `randomBase64`, `randomBytesFn`.
+- **args-parser.js** — `parseArgs(rawArgs, schema)`, `buildYargsConfig(schema)`, `mapPositionals(parsed, positionals, offset)`, `parseFlags(flagStr)` — converts a rune's `args()` schema into a yargs-parser config and runs the parser. Called by `isolation/runner.js` before invoking `run(parsedArgs)`.
 
 **Sandbox globals:** `setTimeout`, `clearTimeout`, `setInterval`, `clearInterval`, `TextEncoder`, `TextDecoder`, `TextEncoderStream`, `TextDecoderStream`, `AbortController`, `AbortSignal`, `Blob`, `Headers`, `FormData`, `URLSearchParams`, `Request`, `ReadableStream`, `WritableStream`, `TransformStream`, and `fetch` are available on `globalThis` inside every rune without any import.
 

@@ -6,43 +6,40 @@ tags: [module]
 > Cross-cutting output utilities: `render.js` converts Section data to CLI strings; `output.js` is the global logger with plain/color modes.
 
 **Source:** `src/shared/`
-**Submodules:** none (flat module)
 **Related:** all modules (no domain coupling)
 
 ## Overview
 
-`shared` has no domain knowledge — it knows nothing about runes, plugins, or config. It provides two utilities: a renderer for Section data and a global logger. All feature modules can import it without creating cycles.
+The shared module provides two utilities with no domain knowledge. It does not understand runes, plugins, or projects — it knows only about rendering and logging. A module imports from shared to produce output and log messages. Because shared has no domain knowledge, no other module needs to avoid importing it, preventing circular dependencies.
 
-`render.js` has two public functions: `render(data)` converts a raw data object (`{ type, ... }`) to a plain string; `renderSection(section)` formats a full Section (header + attrs + fenced content) as CLI output. `output.js` provides `configure({ plain, verbose })` and the `output` object (`success`, `error`, `info`, `warn`, `header`).
+The renderer converts structured data (trees, markdown) into CLI-displayable strings. The logger provides a global output sink that respects plain/color mode configuration. Both are invoked by the CLI framework for every rune execution.
 
 ## Concepts
 
-**Section rendering format:** `renderSection` produces:
-```
-## {section.title or section.name}
-[attr: value] [attr: value]
-```md
-{content}
-```
-```
-The `## ` header uses `section.title` if present, falls back to `section.name`, falls back to `## (no title)`. Attrs are emitted on one line as `[key: value]` pairs only if `section.attrs` is non-empty. Markdown content is always wrapped in triple-backtick `md` fences.
+**Section rendering format:** When a rune returns data, it wraps it in a Section — a container with a title, optional attributes, and the data itself. The renderer produces a specific format: a markdown heading, an optional attribute line, and the data wrapped in markdown fences. The fence wrapper is intentional — it signals to readers and AI tools that the content is markdown source, not prose.
 
-**`renderTree` column alignment:** `renderTree` formats tree nodes as `root.name.padEnd(12) + root.description`, then appends children with box-drawing connectors (`├── `, `└── `, `│   `, `    `). The name column is always 12 characters wide.
+**Global configuration affects all chalk calls:** The plain/color mode is set once at startup and affects every colored output in the entire process. This is implemented by setting the chalk singleton's level globally. Any module that uses chalk automatically respects the setting without needing to know about it. The alternative — threading a configuration object through every logging call — would be more explicit but much more cumbersome.
 
-**`configure()` is global:** `configure({ plain, verbose })` sets two module-level variables (`_plain`, `isVerbose`) and, if `plain` is true, sets `chalk.level = 0` on the chalk singleton. This affects every chalk call in the entire process — not just in `output.js`. It is called once per CLI invocation from the `preAction` hook in `program.js`.
+**Tree rendering with column alignment:** Trees are rendered with box-drawing characters (├──, └──, │) to show hierarchy. Node names are padded to a fixed width so that descriptions align vertically. Names longer than the fixed width push the description column out of alignment — this is cosmetic but affects output readability.
+
+**Sections with no content are dropped:** If a section has no title and no renderable data, it produces an empty string. The run handler filters out empty sections from the output. A rune can return a section with no title and no data, and it silently disappears. This is sometimes intentional (conditional output) and sometimes a bug (missing data field).
 
 ## Key Decisions
 
-- **Markdown content wrapped in ` ```md ` fences, always:** When `section.data.type === 'markdown'`, `renderSection` wraps the content in ` ```md\n...\n``` `. This is intentional — it tells AI/pipe consumers that the enclosed text is markdown source, not prose output. The fence does not change in `--plain` mode (chalk is disabled, but the fence remains).
+**Markdown fences are always present:** Even in plain mode (no colors), the triple-backtick markdown fences are included. The fences are not a formatting decoration — they are semantic content that tells downstream consumers the material is markdown source. Removing them would lose information. So the fences stay in plain mode.
 
-- **`chalk.level = 0` instead of a plain-mode guard on each call:** Setting `chalk.level = 0` globally is simpler than threading a `plain` boolean through every logging call site. The trade-off is that any chalk usage introduced in a new module automatically respects `--plain` without any additional code.
+**Global chalk configuration instead of per-call parameters:** Setting chalk level globally is simpler than threading a configuration object through every logging call site. The trade-off is that new code automatically respects the mode without any additional work. This is a worthwhile trade-off for simplicity.
+
+**Mutable export binding for verbosity flag:** The verbosity setting is exported as a mutable binding, not a getter function. Code that captures it at import time gets the initial value (false) before configuration runs. This is a real source of bugs — code must re-read the binding at runtime, not cache it at import. Using a mutable binding makes the issue visible (the variable is reassigned, so static analysis can detect captured-at-import-time bindings).
 
 ## Gotchas & Debugging
 
-- **`render(data)` returns `null` for unknown data types:** If `data.type` is neither `'tree'` nor `'markdown'`, `render` returns `null` silently. `renderSection` will produce a section with a header and attrs but no body. Check `section.data.type` if a section renders empty.
+**Unknown data types render silently:** If a section's data type is neither `tree` nor `markdown`, the renderer returns null. The section then produces only a header with no body. Debugging this requires checking the data type — the section rendering function gives no warning.
 
-- **`renderSection` returns `null` for fully empty sections:** If a section has no title/name AND no renderable data, `parts.filter(Boolean).join('\n')` produces an empty string (falsy). The `use.js` handler filters these with `.filter(Boolean)`. This means a rune can return a Section with no title and no data and it silently disappears from output.
+**Empty sections disappear from output:** A section with no title, no name, and no renderable data produces an empty string. The run handler filters these out. If a rune returns such a section intentionally (to suppress output conditionally), that is fine. If it is unintentional, the output simply vanishes — there is no error or warning.
 
-- **`renderTree` pads node names to exactly 12 characters:** Names longer than 12 characters push the description column — description alignment breaks for long module names. This is cosmetic but affects the layout output of the `m` rune.
+**Verbosity flag must be read at runtime:** Modules that import the verbosity flag and capture it in a local constant at the top of the file will see the initial value (false) forever, even after configuration runs. The flag must be re-read at each use, not cached. This is not enforced by the language — developers must remember to do it.
 
-- **`isVerbose` is exported as a mutable binding:** `import { isVerbose } from '../../shared/output.js'`. Callers that capture `isVerbose` at import time into a local `const` will see the initial value (`false`), not the value after `configure()` runs. Always read `isVerbose` as a live import reference, not a cached local.
+**Tree column alignment breaks with long names:** The tree renderer pads node names to a fixed width. Names longer than that width push the description column rightward, breaking alignment. This is cosmetic but affects the readability of module structure output. There is no overflow handling — the alignment assumption is that node names fit.
+
+**Plain mode does not strip markdown fences:** The markdown fences in section output are preserved in plain mode. The chalk calls are suppressed (no colors), but the fences stay. This is intentional — the fences carry semantic meaning about the content type. If they were removed in plain mode, piped or captured output would lose information.

@@ -2,20 +2,20 @@
 
 Everything related to executing context runes: key resolution, sandboxed execution, and the utils API exposed to rune code. Full docs: `docs/knowledge-base/modules/rune.md`
 
-## Key Files
+## Files
 
-- **resolver.js** — `runRune(dir, config, key, args, opts)` — resolves a rune key (local, plugin-prefixed, or auto-discovered from enabled plugins) and dispatches to the appropriate runner. Handles circular call detection.
+- **resolver.js** — `runRune(dir, config, key, args, opts, callStack?)` — resolves a rune key (local, plugin-prefixed, or auto-discovered from enabled plugins) and dispatches to the appropriate runner. `getRune(config, key)` — retrieves a rune entry from config. `normaliseRune(entry)` — normalizes a rune entry object. Handles circular call detection via `CircularRuneError`.
 
 ## Submodules
 
-- **api/** — The `utils` object injected into every rune at runtime: `md`, `tree`, `fs`, `shell`, `json`, `fetch`, `env`, `vars`, `yaml`, `xml`, `archive`, `cache`, `sqlite`, `crypto`.
+- **api/** — The `utils` object injected into every rune at runtime: `md`, `tree`, `fs`, `shell`, `json`, `yaml`, `xml`, `http`, `ws`, `env`, `vars`, `archive`, `cache`, `sqlite`, `db`, `codec`, `crypto`.
 - **isolation/** — Sandboxed VM lifecycle via `isolated-vm`; in-isolate bootstrap stubs and ESM resolver.
-- **permissions/** — Effective permission computation and per-operation checkers (fs, http, env, shell).
-- **commands/** — CLI handlers: `use`, `list`, `create`, `check`, `bench`.
+- **permissions/** — Effective permission computation and per-operation checkers (http fetch, env, store, http server, ws client, ws server).
+- **commands/** — CLI handlers: `run`, `list`, `create`, `check`, `benchmark`.
 
 ## Related Modules
 
 - `core` — Provides `loadConfig` and `CircularRuneError`.
 - `plugin` — Plugin runes are resolved via `loadRegistry` / `loadPluginJson` and executed via `executePluginRune`.
 - `shared` — `render` formats `Section[]` output to stdout; `output` is used for error reporting.
-- `help` — `rune.js` handler calls `getArgsSchema` from `isolation/runner.js` to render rune help text.
+- `docs` — `rune.js` handler calls `getArgsSchema` from `isolation/runner.js` to render rune help text.

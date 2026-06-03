@@ -3,39 +3,43 @@ tags: [module]
 ---
 # docs
 
-> Dynamic documentation engine: compiles API references, rune schemas, and ecosystem handbooks directly from live TypeScript declarations and project config.
+> Dynamic documentation engine: compiles API references, rune schemas, globals docs, and ecosystem handbooks from live TypeScript declarations and project config.
 
 **Source:** `src/docs/`
-**Submodules:** `commands/` (rune, utils, intro, args, use), `utils-walker.js`, `utils-formatter.js`, `intro-compiler.js`, `formatter.js`
+**Submodules:** `commands/` (rune, utils, globals, intro, args, run), `ts-walker.js`, `ts-formatter.js`, `intro-compiler.js`, `formatter.js`
 **Related:** [[modules/rune]], [[modules/cli]]
 
 ## Overview
 
-The `docs` command family has four subcommands:
+The docs module compiles documentation from live sources rather than serving static text. It has six subcommands, each targeting a different documentation audience. `crunes docs utils` is the authoritative `@utils` API reference and should always be preferred over reading source files — it reads a TypeDoc JSON file generated at build time and formats function signatures, parameter types, return types, and referenced interfaces. `crunes docs rune <key>` boots a real isolated sandbox, evaluates the rune's `args()` export, and formats the resulting schema as a Usage/Options/Examples block. `crunes docs globals` documents the sandbox globals and ES2020 builtins visible inside every rune. `crunes docs intro` assembles a comprehensive ecosystem handbook — rune anatomy, API conventions, config reference, all `@utils` signatures, and the active project's registered runes — and can write it to disk via `--out INTRO.md` for AI context injection.
 
-- **`crunes docs rune <key...>`** — resolves a rune, runs its `args()` export in a throwaway isolate, and formats the schema as a Usage/Options/Examples block. Useful for discovering what arguments a specific rune accepts.
-- **`crunes docs utils [namespaces...]`** — walks the generated TypeDoc JSON (`src/docs/generated/utils-api.json`) and formats live function signatures, param types, return types, and referenced interfaces. **This is the authoritative API reference for `@utils` — always prefer it over reading source files.** Run `crunes docs utils` (no args) for the namespace index; `crunes docs utils ws http` for specific namespaces.
-- **`crunes docs intro`** — compiles a comprehensive workspace handbook: rune anatomy, global sandbox APIs, CLI conventions, config reference, all `@utils` signatures, and the active project's registered runes and permissions. Use `--out INTRO.md` to write to disk for AI context injection.
-- **`crunes docs args`** / **`crunes docs run`** — reference docs for the `args(builder)` and `run(args)` rune export contracts.
+The remaining two subcommands document export contracts: `crunes docs args` explains the `args(builder)` export that runes use to declare their CLI schema; `crunes docs run` explains the `run(args)` export — the main rune function. This naming is a persistent source of confusion: `crunes docs run` is about the `run(args)` function rune authors write, not about the `crunes run` CLI command.
+
+## Submodules
+
+- **`ts-walker.js`** — walks the TypeDoc JSON AST and produces a normalized representation of each namespace: what functions it contains, what types they reference, and how overloads relate. This is the source of truth for `docs utils` output.
+- **`ts-formatter.js`** — takes the walker's output and renders it as human-readable text, grouping overloads together and collecting all referenced types into a single block at the bottom.
+- **`intro-compiler.js`** — assembles the full ecosystem handbook by pulling from multiple documentation sources: lifecycle API, globals, all `@utils` namespaces, and the current project's workspace context.
+- **`formatter.js`** — formats a rune's args schema into CLI-style help text (Usage/Options/Commands/Examples) for the `docs rune` subcommand.
 
 ## Concepts
 
-**`utils-walker.js`:** Walks the TypeDoc JSON AST and produces a structured `{ namespace, description, functions[], types{} }` object per namespace. Each element in `functions[]` is one call signature — overloaded functions (multiple signatures) emit one entry per overload. Types referenced in params or returns are collected into `types{}` for the formatter's Referenced Types block.
+**`crunes docs rune` boots a real isolate:** When `docs rune` formats a rune's argument schema, it creates a throwaway isolated-vm sandbox, evaluates the full rune module, and calls the `args()` export. This means permissions are checked, module-level side effects run, and the full isolate lifecycle executes — just for documentation purposes. The schema returned by `args(builder)` is then passed to `formatter.js` for display.
 
-**`utils-formatter.js`:** Takes the walker output and produces human-readable text. `formatUtilsIndex` renders the namespace list. `formatUtilsNamespace` renders one namespace: function blocks in declaration order, then a single Referenced Types section at the bottom collecting all types encountered across all function entries in the namespace.
+**`crunes docs utils` is a build artifact:** The TypeDoc JSON that powers `docs utils` is generated by `npm run build` and is not regenerated on demand. If a new method is added to a `.d.ts` file, `docs utils` will not reflect it until the next build. This is a deliberate performance trade-off — loading and walking TypeDoc JSON is fast, while running TypeDoc on demand would be slow.
 
-**`intro-compiler.js`:** Assembles the full intro document. Pulls lifecycle API docs, globals API docs, utils API docs (all namespaces), the active project's rune schemas, and the workspace context (registered runes, permissions, enabled plugins).
+**`docs intro --global`:** When `--global` is passed, the intro handler skips loading the project config. This allows the handbook to be generated in CI or fresh environments where no `.crunes/config.json` exists. The output covers the ecosystem but omits project-specific sections like registered runes and enabled plugins.
 
-**`getArgsSchema(runePath, perms, dir, opts)`:** Defined in `rune/isolation/runner.js`. Creates a throwaway isolate, evaluates the rune module, calls `args(builder)` if exported, and returns the schema object. Used by both `docs rune` and by `runRuneInIsolate` before calling `use(parsedArgs)`.
+## Key Decisions
 
-**Output formats:** `--format md` (default) — human-readable text. `--format json` — machine-readable JSON; consumed by tooling and the ACI hook.
+- **`docs utils` reads pre-generated JSON, not live source files:** The TypeDoc JSON is a build artifact, not regenerated on demand. This keeps doc lookup fast — the JSON is already structured for querying — and decouples documentation from the TypeScript compiler. The cost is a one-build-cycle lag when source changes.
+
+- **`docs rune` evaluates in a real sandbox:** Rather than parsing the rune's AST statically, `docs rune` runs the rune in an actual isolate. This guarantees that the schema shown matches exactly what the rune would use at runtime, including any dynamic schema construction. The trade-off is that side effects in the rune's module body run during doc generation.
 
 ## Gotchas & Debugging
 
-- **`crunes docs utils` reads pre-generated JSON, not source files:** `utils-api.json` is generated by TypeDoc at build time (`npm run build`). If you add a new method to a `.d.ts` file, run `npm run build` before `docs utils` reflects the change.
+- **`getArgsSchema` runs the full rune, not just the `args()` function:** Even a rune that only documents its schema will execute its entire module body during `docs rune`. If a rune makes network calls or writes files at module load time, those operations run and permission checks apply. Guard side-effectful module code or wrap it in the `run()` function where it belongs.
 
-- **`getArgsSchema` runs the rune in a sandboxed isolate:** Even for a simple `args()` export, the rune file is fully evaluated. If the rune has a side-effectful module body, those side effects run during `docs rune`. Permission checks apply.
+- **Unknown namespace or rune key exits 1 after processing all valid inputs:** `crunes docs utils http unknown` prints the `http` namespace, warns about `unknown`, then exits 1. This allows batch documentation generation where partial success is still useful — but callers must check the exit code if they need to detect failures.
 
-- **Unknown namespace logs a warning and exits 1:** `crunes docs utils unknown` prints a warning and exits 1. Multiple valid namespaces are processed before exit.
-
-- **Unknown key logs a warning and exits 1:** `crunes docs rune unknown-key` prints a warning per missing key and exits 1 at the end, processing all other keys first.
+- **`docs run` is about the export, not the command:** `crunes docs run` documents the `run(args)` function contract — the structure of `parsedArgs`, the `$command` / `$commands` / `_` / `$raw` fields, positional mapping. It is not documentation for the `crunes run` CLI command. The naming matches the export name, not the command name.

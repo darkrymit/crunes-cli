@@ -10,9 +10,11 @@ tags: [module]
 
 ## Overview
 
-The plugin system has two storage layers: a **global registry** (`~/.crunes/plugins.json`) tracking every installed plugin across all projects, and a **project config** (`.crunes/config.json → plugins[]`) listing which plugins are enabled for a specific project. Installing adds to both; uninstalling removes from both.
+The plugin system maintains two storage layers that serve different purposes. The global registry (`~/.crunes/plugins.json`) is the machine-wide record of every installed plugin — it tracks where each plugin's files live, what version is installed, and what permissions the user consented to. The project config (`config.json → plugins[]`) records which of those globally-installed plugins are enabled for a specific project. Installing a plugin writes to both; uninstalling removes from both. This separation means a plugin installed once on the machine can be independently enabled or disabled per project, and a project can override or restrict its permissions without affecting any other project that uses the same plugin.
 
-Plugin sources can be: local path, `github:owner/repo`, `https://...` git URL, or npm package name. All non-local sources are downloaded to a temp dir, validated, then copied to `~/.crunes/plugins/<marketplace>/<name>@<version>/`.
+Registry keys follow the format `marketplace@name` (e.g. `crunes-hub@my-plugin`). This composite key allows two plugins with the same name from different marketplaces to coexist without shadowing. When a bare name is used — without the marketplace prefix — the resolver checks for ambiguity and throws rather than silently picking one. This is a deliberate design choice: silent shadowing would make it impossible to audit which plugin is actually running.
+
+Consent is snapshotted at install time. Every permission pattern the user approves is stored in the registry as `consentedPermissions`. On update, a diff against the old snapshot finds only new or escalated patterns — those are the only ones shown to the user. Already-approved patterns are never re-prompted. This prevents consent fatigue for minor updates while maintaining visibility into capability changes.
 
 ## Flows
 
@@ -21,16 +23,16 @@ Plugin sources can be: local path, `github:owner/repo`, `https://...` git URL, o
 
 ## Key Decisions
 
-- **Consent snapshotting at install time:** The set of permissions a user approves is frozen as `consentedPermissions` in the registry entry. On update, `diffPermissions` computes only the delta (new or escalated permissions). The user is re-prompted only for the delta — not the full list again. This prevents prompt fatigue for minor updates while maintaining security for new capabilities.
+- **Local installs go through a local marketplace:** There is no direct `./path` install. Local plugins must first be registered as a marketplace source (`crunes marketplace add ./path`), then installed via `crunes plugin install <marketplace>@<plugin>`. For local-type marketplace sources, the plugin source directory is used as-is — no copy is made — so changes to the plugin files take effect immediately without reinstall. This unifies the resolution contract: all installs go through marketplace resolution regardless of source.
 
-- **`marketplace@plugin` as the registry key:** The key format `<marketplace>@<name>` (e.g. `crunes-hub@my-plugin`) allows the same plugin name to coexist from different marketplaces. Bare name resolution (`resolvePluginKey`) errors on ambiguity.
+- **Composite `marketplace@name` registry keys prevent silent shadowing:** If two plugins from different marketplaces share a bare name, bare-name resolution throws rather than guessing. The user is shown all matching full keys and instructed to use the qualified form. This keeps plugin resolution deterministic and auditable.
 
-- **Local installs use the source dir directly:** For `crunes plugin install ./path`, the plugin cache dir IS the source dir — no copy is made. Changes to source files take effect immediately without reinstall. Remote installs are always copied.
+- **`consentedPermissions` is per-rune, not per-plugin:** The consent snapshot is keyed by rune name inside the plugin. Adding a new rune to a plugin's manifest counts as a new permission boundary — it triggers re-consent even if all existing runes are unchanged. This reflects the security model: each rune's capability set is independently approved.
 
 ## Gotchas & Debugging
 
-- **`plugin.json` lives at `.crunes-plugin/plugin.json`, not the repo root:** The manifest validator looks for it at that specific subpath. A `plugin.json` at the root will not be found.
+- **`plugin.json` must live at `.crunes-plugin/plugin.json`, not the repo root:** The manifest validator looks for it at that specific subpath. A `plugin.json` at the root is silently ignored — the install will fail with "manifest not found" rather than using the wrong file.
 
-- **`@plugin/**` auto-grant in permissions:** Plugin runes always get `fs.read:@plugin/**` injected automatically. This resolves to the plugin cache dir, not the project dir. Plugin runes that try to read project files must explicitly declare `fs.read:./**` in their permissions.
+- **`@plugin/**` auto-grant resolves to the plugin cache dir, not the project dir:** Plugin runes always receive read access to their own installation directory without declaring it. A plugin rune that tries to read project files fails unless it explicitly declares `fs.read:./**`. Debugging this is subtle — the rune runs without error, but reads from project paths silently return nothing.
 
-- **`consentedPermissions` per-rune, not per-plugin:** The consent map is keyed by rune name inside the plugin. Adding a new rune to a plugin's `plugin.json` counts as a new permission grant and triggers re-consent even if no existing rune changed.
+- **Plugin rune lifecycle must export `run(args)`, not `use(args)`:** The runtime checks for the `run` export. Any rune still using the old `use` signature fails at execution time with "Rune does not export a run() function." This is not detected at install time — only when the rune is actually invoked.
