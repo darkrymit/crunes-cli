@@ -188,3 +188,267 @@ describe('createWsUtils — server', () => {
     client.close()
   })
 })
+
+describe('createWsUtils — path routing', () => {
+  it('named param extracted from pathname', async () => {
+    const http = createHttpUtils(null)
+    const httpId = http.server(0)
+    const httpSession = http._getServerSession(httpId)
+    openedServers.push(httpSession)
+    await httpSession.open()
+
+    const ws = createWsUtils(null)
+    const wsId = ws.server(httpSession, { path: '/logs/:jobId' })
+    const session = ws._getWsServerSession(wsId)
+    openedServers.push(session)
+
+    let capturedParams = null
+    session.setConnectionHandler(fakeRef(async (connId, url, pathname, search, headersJson, pathParamsJson) => {
+      capturedParams = JSON.parse(pathParamsJson)
+    }))
+    await session.open()
+
+    const client = new WebSocket(`ws://127.0.0.1:${httpSession.port}/logs/abc123`)
+    await new Promise((res, rej) => { client.on('open', res); client.on('error', rej) })
+    await new Promise(r => setTimeout(r, 20))
+    expect(capturedParams).toEqual({ jobId: 'abc123' })
+    client.close()
+  })
+
+  it('specificity: literal segment beats named param', async () => {
+    const http = createHttpUtils(null)
+    const httpId = http.server(0)
+    const httpSession = http._getServerSession(httpId)
+    openedServers.push(httpSession)
+    await httpSession.open()
+
+    const ws = createWsUtils(null)
+
+    const paramId = ws.server(httpSession, { path: '/logs/:jobId' })
+    const paramSession = ws._getWsServerSession(paramId)
+    openedServers.push(paramSession)
+
+    const literalId = ws.server(httpSession, { path: '/logs/special' })
+    const literalSession = ws._getWsServerSession(literalId)
+    openedServers.push(literalSession)
+
+    const hits = { param: 0, literal: 0 }
+    paramSession.setConnectionHandler(fakeRef(async () => { hits.param++ }))
+    literalSession.setConnectionHandler(fakeRef(async () => { hits.literal++ }))
+
+    await paramSession.open()
+    await literalSession.open()
+
+    const c1 = new WebSocket(`ws://127.0.0.1:${httpSession.port}/logs/special`)
+    await new Promise((res, rej) => { c1.on('open', res); c1.on('error', rej) })
+    await new Promise(r => setTimeout(r, 20))
+    c1.close()
+
+    expect(hits).toEqual({ param: 0, literal: 1 })
+  })
+
+  it('specificity: param session catches non-literal paths', async () => {
+    const http = createHttpUtils(null)
+    const httpId = http.server(0)
+    const httpSession = http._getServerSession(httpId)
+    openedServers.push(httpSession)
+    await httpSession.open()
+
+    const ws = createWsUtils(null)
+
+    const paramId = ws.server(httpSession, { path: '/logs/:jobId' })
+    const paramSession = ws._getWsServerSession(paramId)
+    openedServers.push(paramSession)
+
+    const literalId = ws.server(httpSession, { path: '/logs/special' })
+    const literalSession = ws._getWsServerSession(literalId)
+    openedServers.push(literalSession)
+
+    const hits = { param: 0, literal: 0 }
+    paramSession.setConnectionHandler(fakeRef(async () => { hits.param++ }))
+    literalSession.setConnectionHandler(fakeRef(async () => { hits.literal++ }))
+
+    await paramSession.open()
+    await literalSession.open()
+
+    const c2 = new WebSocket(`ws://127.0.0.1:${httpSession.port}/logs/other`)
+    await new Promise((res, rej) => { c2.on('open', res); c2.on('error', rej) })
+    await new Promise(r => setTimeout(r, 20))
+    c2.close()
+
+    expect(hits).toEqual({ param: 1, literal: 0 })
+  })
+
+  it('catch-all (no path) receives unmatched connections', async () => {
+    const http = createHttpUtils(null)
+    const httpId = http.server(0)
+    const httpSession = http._getServerSession(httpId)
+    openedServers.push(httpSession)
+    await httpSession.open()
+
+    const ws = createWsUtils(null)
+
+    const catchAllId = ws.server(httpSession)
+    const catchAllSession = ws._getWsServerSession(catchAllId)
+    openedServers.push(catchAllSession)
+
+    let connected = false
+    catchAllSession.setConnectionHandler(fakeRef(async () => { connected = true }))
+    await catchAllSession.open()
+
+    const client = new WebSocket(`ws://127.0.0.1:${httpSession.port}/anything/goes`)
+    await new Promise((res, rej) => { client.on('open', res); client.on('error', rej) })
+    await new Promise(r => setTimeout(r, 20))
+    expect(connected).toBe(true)
+    client.close()
+  })
+
+  it('404 when no session matches upgrade path', async () => {
+    const http = createHttpUtils(null)
+    const httpId = http.server(0)
+    const httpSession = http._getServerSession(httpId)
+    openedServers.push(httpSession)
+    await httpSession.open()
+
+    const ws = createWsUtils(null)
+    const wsId = ws.server(httpSession, { path: '/jobs' })
+    const session = ws._getWsServerSession(wsId)
+    openedServers.push(session)
+    session.setConnectionHandler(fakeRef(async () => {}))
+    await session.open()
+
+    await expect(new Promise((res, rej) => {
+      const c = new WebSocket(`ws://127.0.0.1:${httpSession.port}/unregistered`)
+      c.on('open', res)
+      c.on('error', rej)
+    })).rejects.toThrow()
+  })
+
+  it('empty pathParams when path has no named segments', async () => {
+    const http = createHttpUtils(null)
+    const httpId = http.server(0)
+    const httpSession = http._getServerSession(httpId)
+    openedServers.push(httpSession)
+    await httpSession.open()
+
+    const ws = createWsUtils(null)
+    const wsId = ws.server(httpSession, { path: '/jobs' })
+    const session = ws._getWsServerSession(wsId)
+    openedServers.push(session)
+
+    let capturedParams = null
+    session.setConnectionHandler(fakeRef(async (connId, url, pathname, search, headersJson, pathParamsJson) => {
+      capturedParams = JSON.parse(pathParamsJson)
+    }))
+    await session.open()
+
+    const client = new WebSocket(`ws://127.0.0.1:${httpSession.port}/jobs`)
+    await new Promise((res, rej) => { client.on('open', res); client.on('error', rej) })
+    await new Promise(r => setTimeout(r, 20))
+    expect(capturedParams).toEqual({})
+    client.close()
+  })
+
+  it('standalone server with named param extracts pathParams', async () => {
+    const ws = createWsUtils(null)
+    const wsId = ws.server(0, { path: '/logs/:jobId' })
+    const session = ws._getWsServerSession(wsId)
+    openedServers.push(session)
+
+    let capturedParams = null
+    session.setConnectionHandler(fakeRef(async (connId, url, pathname, search, headersJson, pathParamsJson) => {
+      capturedParams = JSON.parse(pathParamsJson)
+    }))
+    await session.open()
+
+    const client = new WebSocket(`ws://127.0.0.1:${session.port}/logs/xyz789`)
+    await new Promise((res, rej) => { client.on('open', res); client.on('error', rej) })
+    await new Promise(r => setTimeout(r, 20))
+    expect(capturedParams).toEqual({ jobId: 'xyz789' })
+    client.close()
+  })
+
+  it('multiple named params all extracted', async () => {
+    const http = createHttpUtils(null)
+    const httpId = http.server(0)
+    const httpSession = http._getServerSession(httpId)
+    openedServers.push(httpSession)
+    await httpSession.open()
+
+    const ws = createWsUtils(null)
+    const wsId = ws.server(httpSession, { path: '/a/:x/b/:y' })
+    const session = ws._getWsServerSession(wsId)
+    openedServers.push(session)
+
+    let capturedParams = null
+    session.setConnectionHandler(fakeRef(async (connId, url, pathname, search, headersJson, pathParamsJson) => {
+      capturedParams = JSON.parse(pathParamsJson)
+    }))
+    await session.open()
+
+    const client = new WebSocket(`ws://127.0.0.1:${httpSession.port}/a/hello/b/world`)
+    await new Promise((res, rej) => { client.on('open', res); client.on('error', rej) })
+    await new Promise(r => setTimeout(r, 20))
+    expect(capturedParams).toEqual({ x: 'hello', y: 'world' })
+    client.close()
+  })
+})
+
+describe('createWsUtils — session lifecycle fixes', () => {
+  it('close() resolves closed() on standalone server (bug #1)', async () => {
+    const ws = createWsUtils(null)
+    const id = ws.server(0)
+    const session = ws._getWsServerSession(id)
+    await session.open()
+    await session.close()
+    await expect(session.closed()).resolves.toBeUndefined()
+  })
+
+  it('close() resolves closed() on piggybacked server (bug #1)', async () => {
+    const http = createHttpUtils(null)
+    const httpId = http.server(0)
+    const httpSession = http._getServerSession(httpId)
+    await httpSession.open()
+
+    const ws = createWsUtils(null)
+    const wsId = ws.server(httpSession)
+    const session = ws._getWsServerSession(wsId)
+    await session.open()
+    await session.close()
+    await expect(session.closed()).resolves.toBeUndefined()
+  })
+
+  it('wsSession.open() before httpSession.open() still accepts connections (bug #2)', async () => {
+    const http = createHttpUtils(null)
+    const httpId = http.server(0)
+    const httpSession = http._getServerSession(httpId)
+
+    const ws = createWsUtils(null)
+    const wsId = ws.server(httpSession)
+    const session = ws._getWsServerSession(wsId)
+    openedServers.push(session)
+
+    // WS opens BEFORE HTTP — this is the bug scenario
+    await session.open()
+    await httpSession.open()
+    openedServers.push(httpSession)
+
+    let connected = false
+    session.setConnectionHandler(fakeRef(async () => { connected = true }))
+
+    const client = new WebSocket(`ws://127.0.0.1:${httpSession.port}`)
+    await new Promise((res, rej) => { client.on('open', res); client.on('error', rej) })
+    await new Promise(r => setTimeout(r, 20))
+    expect(connected).toBe(true)
+    client.close()
+  })
+
+  it('close() before open() resolves cleanly without throwing (bug #5)', async () => {
+    const ws = createWsUtils(null)
+    const id = ws.server(0)
+    const session = ws._getWsServerSession(id)
+    // Never called open() — calling close() in CREATED state
+    await expect(session.close()).resolves.toBeUndefined()
+    await expect(session.closed()).resolves.toBeUndefined()
+  })
+})

@@ -68,6 +68,13 @@ declare namespace ws {
     open(): Promise<void>
   }
 
+  /** Read-only path parameter map extracted from named segments in the server's path pattern. */
+  interface WsPathParams {
+    get(key: string): string | null
+    has(key: string): boolean
+    keys(): string[]
+  }
+
   /** Server-side connection handle received in the 'connection' event callback. */
   interface WsServerConnection extends WsConnection {
     /** Unique ID assigned by the server for this connection. */
@@ -80,6 +87,8 @@ declare namespace ws {
     readonly searchParams: URLSearchParams
     /** HTTP Upgrade request headers as a Web API Headers object. */
     readonly headers: Headers
+    /** Named path parameters extracted from the server's path pattern, e.g. { jobId: 'abc123' } for path '/logs/:jobId'. Empty when no pattern or no named segments. */
+    readonly pathParams: WsPathParams
   }
 
   interface WebSocketError extends Error {

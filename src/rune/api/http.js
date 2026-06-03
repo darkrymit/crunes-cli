@@ -8,6 +8,25 @@ export class FetchError extends Error {
   }
 }
 
+export function compilePath(path) {
+  if (!path) return { regex: null, paramNames: [], score: -1 }
+  const segments = path.split('/').filter(Boolean)
+  let score = 0
+  const parts = segments.map(seg => {
+    if (seg.startsWith(':')) {
+      score += 1
+      return `(?<${seg.slice(1)}>[^/]+)`
+    }
+    score += 10
+    return seg.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  })
+  return {
+    regex: new RegExp(`^/${parts.join('/')}$`),
+    paramNames: segments.filter(s => s.startsWith(':')).map(s => s.slice(1)),
+    score,
+  }
+}
+
 class HttpServerSession {
   constructor(port, host) {
     this.port = port
@@ -19,6 +38,9 @@ class HttpServerSession {
     this._closedPromise = new Promise(r => { this._closedResolve = r })
     this._reqIdCounter = 0
     this._requestAborts = new Map()
+    this._wsRoutes = []
+    this._pendingWsRoutes = []
+    this._upgradeListenerAttached = false
   }
 
   getRequestAbort(reqId) {
@@ -27,6 +49,33 @@ class HttpServerSession {
 
   setHandler(handlerRef) {
     this._handler = handlerRef
+  }
+
+  _registerWsSession(wsSession, regex, score) {
+    this._wsRoutes.push({ session: wsSession, regex, score })
+    this._wsRoutes.sort((a, b) => b.score - a.score)
+    if (this._server) {
+      if (!this._upgradeListenerAttached) {
+        this._server.on('upgrade', (req, socket, head) => this._handleUpgrade(req, socket, head))
+        this._upgradeListenerAttached = true
+      }
+    } else {
+      this._pendingWsRoutes.push({ wsSession, regex, score })
+    }
+  }
+
+  _handleUpgrade(req, socket, head) {
+    const pathname = req.url.split('?')[0]
+    for (const route of this._wsRoutes) {
+      const m = route.regex ? pathname.match(route.regex) : true
+      if (m) {
+        const params = route.regex ? (m.groups ?? {}) : {}
+        route.session.handleUpgrade(req, socket, head, params)
+        return
+      }
+    }
+    socket.write('HTTP/1.1 404 Not Found\r\n\r\n')
+    socket.destroy()
   }
 
   async open() {
@@ -86,6 +135,11 @@ class HttpServerSession {
         this.port = this._server.address().port
         this._state = 'OPEN'
         this._server.removeListener('error', reject)
+        if (this._pendingWsRoutes.length > 0) {
+          this._pendingWsRoutes = []
+          this._server.on('upgrade', (req, socket, head) => this._handleUpgrade(req, socket, head))
+          this._upgradeListenerAttached = true
+        }
         resolve()
       })
 

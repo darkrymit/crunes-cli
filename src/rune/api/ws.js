@@ -1,4 +1,6 @@
+import { createServer as createHttpServer } from 'node:http'
 import { WebSocket, WebSocketServer } from 'ws'
+import { compilePath } from './http.js'
 
 class WsSession {
   constructor(url, options) {
@@ -182,8 +184,9 @@ class WsServerSession {
       : null
     this._port = typeof portOrHttpSession === 'number' ? portOrHttpSession : 0
     this._host = opts.host ?? '127.0.0.1'
-    this._path = opts.path ?? null
+    this._compiled = compilePath(opts.path ?? null)
     this._wss = null
+    this._netServer = null
     this._state = 'CREATED'
     this._connectionHandler = null
     this._errorHandler = null
@@ -206,46 +209,39 @@ class WsServerSession {
     this._errorHandler = handlerRef
   }
 
+  handleUpgrade(req, socket, head, params) {
+    this._wss.handleUpgrade(req, socket, head, (ws) => {
+      this._wss.emit('connection', ws, req, params)
+    })
+  }
+
   open() {
     if (this._state !== 'CREATED') return Promise.reject(new Error('WS server already open'))
     return new Promise((resolve, reject) => {
-      const wssOpts = this._httpSession
-        ? { server: this._httpSession._server, ...(this._path ? { path: this._path } : {}) }
-        : { port: this._port, host: this._host, ...(this._path ? { path: this._path } : {}) }
-
-      this._wss = new WebSocketServer(wssOpts)
+      this._wss = new WebSocketServer({ noServer: true })
 
       this._wss.on('error', (err) => {
-        if (this._state === 'CREATED') {
-          reject(err)
-        } else if (this._errorHandler) {
+        if (this._errorHandler) {
           const errData = JSON.stringify({ message: err.message, code: err.code ?? null })
           this._errorHandler.apply(undefined, [errData], { result: { promise: true } }).catch(() => {})
         }
       })
 
-      this._wss.on('listening', () => {
-        if (!this._httpSession) {
-          this._port = this._wss.address().port
-        }
-        this._state = 'OPEN'
-        resolve()
-      })
-
-      this._wss.on('connection', async (socket, request) => {
-        const port     = this._httpSession ? this._httpSession._server.address().port : this._wss.address().port
+      this._wss.on('connection', async (socket, request, params) => {
+        const port     = this._httpSession ? this._httpSession._server.address().port : this._port
         const host     = this._httpSession ? this._httpSession.host : this._host
         const parsed   = new URL(request.url, `ws://${host}:${port}`)
         const url      = parsed.href
         const pathname = parsed.pathname
         const search   = parsed.search
-        const headersJson = JSON.stringify(Object.fromEntries(Object.entries(request.headers)))
+        const headersJson    = JSON.stringify(Object.fromEntries(Object.entries(request.headers)))
+        const pathParamsJson = JSON.stringify(params ?? {})
         const connId = String(this._connIdCounter++)
         const conn   = new WsServerConnSession(socket, connId, url, pathname, search, headersJson)
         this._connSessions.set(connId, conn)
         socket.on('close', () => this._connSessions.delete(connId))
         if (this._connectionHandler) {
-          await this._connectionHandler.apply(undefined, [connId, url, pathname, search, headersJson], { result: { promise: true } }).catch(() => {})
+          await this._connectionHandler.apply(undefined, [connId, url, pathname, search, headersJson, pathParamsJson], { result: { promise: true } }).catch(() => {})
         }
       })
 
@@ -254,11 +250,32 @@ class WsServerSession {
         this._closedResolve()
       })
 
-      // When piggybacking, WebSocketServer on an already-listening http.Server
-      // won't emit 'listening'. Resolve immediately.
-      if (this._httpSession && this._httpSession._state === 'OPEN') {
+      if (this._httpSession) {
+        this._httpSession._registerWsSession(this, this._compiled.regex, this._compiled.score)
         this._state = 'OPEN'
         resolve()
+      } else {
+        this._netServer = createHttpServer()
+        this._netServer.on('error', reject)
+
+        this._netServer.on('upgrade', (req, socket, head) => {
+          const pathname = req.url.split('?')[0]
+          const m = this._compiled.regex ? pathname.match(this._compiled.regex) : true
+          if (m) {
+            const params = this._compiled.regex ? (m.groups ?? {}) : {}
+            this.handleUpgrade(req, socket, head, params)
+          } else {
+            socket.write('HTTP/1.1 404 Not Found\r\n\r\n')
+            socket.destroy()
+          }
+        })
+
+        this._netServer.listen(this._port, this._host, () => {
+          this._port = this._netServer.address().port
+          this._state = 'OPEN'
+          this._netServer.removeListener('error', reject)
+          resolve()
+        })
       }
     })
   }
@@ -271,9 +288,27 @@ class WsServerSession {
 
   close() {
     if (this._state === 'CLOSED') return this._closedPromise
+    if (this._state === 'CREATED') {
+      this._state = 'CLOSED'
+      this._closedResolve()
+      return this._closedPromise
+    }
     return new Promise((resolve, reject) => {
       for (const conn of this._connSessions.values()) conn.terminate()
-      this._wss.close((err) => err ? reject(err) : resolve())
+      const closeWss = (cb) => this._wss.close((err) => {
+        if (err) return cb(err)
+        this._state = 'CLOSED'
+        this._closedResolve()
+        cb(null)
+      })
+      if (this._netServer) {
+        this._netServer.close((err) => {
+          if (err) return reject(err)
+          closeWss((e) => e ? reject(e) : resolve())
+        })
+      } else {
+        closeWss((e) => e ? reject(e) : resolve())
+      }
     })
   }
 
@@ -285,6 +320,7 @@ class WsServerSession {
     if (this._state !== 'CLOSED') {
       for (const conn of this._connSessions.values()) conn.terminate()
       if (this._wss) this._wss.close(() => {})
+      if (this._netServer) this._netServer.close(() => {})
       this._state = 'CLOSED'
       this._closedResolve()
     }
