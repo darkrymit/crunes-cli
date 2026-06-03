@@ -26,30 +26,44 @@ export async function use() {
 }
 \`\`\``,
   ws: `\`\`\`javascript
-import { ws, time, section } from '@utils'
+import { http, ws, time, section } from '@utils'
 
 export async function use() {
-  const socket = ws.client('ws://localhost:8080');
-  const messages = [];
+  // --- Client usage ---
+  const socket = ws.client('ws://localhost:8080')
+  const messages = []
+  socket.on('message', (msg) => { messages.push(msg) })
+  await socket.open()
+  await socket.sendText(JSON.stringify({ type: 'PING' }))
+  await time.after(500)
+  await socket.close()
 
-  // Register event listeners BEFORE opening
-  socket.on('message', (msg) => {
-    messages.push(msg);
-  });
+  // --- Server usage (piggyback on http.server) ---
+  const srv = http.server(0)                              // OS-assigned port, loopback only
+  srv.on('request', (req) => new Response('ok'))
 
-  await socket.open();
-  await socket.sendText(JSON.stringify({ type: 'PING' }));
-  
-  // Wait a moment for replies, then close
-  await time.after(500);
-  await socket.close();
+  const jobs = ws.server(srv, { path: '/jobs' })          // path routing
+  const logs = ws.server(srv, { path: '/logs/:jobId' })   // named path param
 
-  return [
-    section.create('ws-replies', {
-      type: 'markdown',
-      content: messages.map(m => \`- \${m}\`).join('\\n')
-    })
-  ];
+  jobs.on('connection', (conn) => {
+    conn.on('message', (msg) => conn.sendText(\`echo: \${msg}\`))
+  })
+
+  logs.on('connection', (conn) => {
+    const jobId = conn.pathParams.get('jobId')            // named param extraction
+    conn.sendText(\`streaming logs for job \${jobId}\`)
+    conn.on('close', () => {})
+  })
+
+  await srv.open()
+  await jobs.open()
+  await logs.open()
+  await time.after(5_000)
+  await logs.close()
+  await jobs.close()
+  await srv.close()
+
+  return [section.create('ws-result', { type: 'markdown', content: messages.join('\\n') })]
 }
 \`\`\``,
   sqlite: `\`\`\`javascript
@@ -75,27 +89,27 @@ export async function use() {
 import { http, section } from '@utils'
 
 export async function use() {
-  // Buffered fetch — reads the full body at once
-  const res = await http.fetch('https://api.github.com/repos/darkrymit/crunes');
-  const repo = await res.json();
+  // --- Client: fetch ---
+  const res = await http.fetch('https://api.github.com/repos/darkrymit/crunes')
+  const repo = await res.json()
 
-  // Streaming fetch — consume body chunk-by-chunk
-  const stream = await http.fetch('https://httpbin.org/stream/3');
-  const reader = stream.body().getReader();
-  const decoder = new TextDecoder();
-  const chunks = [];
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    chunks.push(decoder.decode(value, { stream: true }));
-  }
+  // --- Server: loopback HTTP + WebSocket piggyback ---
+  const srv = http.server(0)   // loopback, OS-assigned port — no permission needed
+  srv.on('request', (req) => {
+    if (req.method === 'GET' && req.pathname === '/health')
+      return new Response(JSON.stringify({ ok: true }), { headers: { 'content-type': 'application/json' } })
+    return new Response('Not Found', { status: 404 })
+  })
+  await srv.open()
+  // use srv.port here ...
+  await srv.close()
 
   return [
     section.create('result', {
       type: 'markdown',
-      content: \`**Repo**: \${repo.description}\\n\\n**Stream chunks**: \${chunks.length}\`
+      content: \`**Repo**: \${repo.description}\\n**Server port was**: \${srv.port}\`
     })
-  ];
+  ]
 }
 \`\`\``,
   cache: `\`\`\`javascript

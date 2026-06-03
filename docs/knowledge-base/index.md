@@ -9,6 +9,7 @@ AI-first documentation vault. Start here for context before working on any modul
 | CLI | [[modules/cli]] | `src/cli/` |
 | Help | [[modules/help]] | `src/help/` |
 | Core | [[modules/core]] | `src/core/` |
+| Docs | [[modules/docs]] | `src/docs/` |
 | Job | [[modules/job]] | `src/job/` |
 | Marketplace | [[modules/marketplace]] | `src/marketplace/` |
 | Plugin | [[modules/plugin]] | `src/plugin/` |

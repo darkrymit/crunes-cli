@@ -120,6 +120,41 @@ describe('walkUtilsDocs', () => {
     expect(ns.types.WsHandle.methods[0].returns).toBe('Promise<void>')
   })
 
+  it('emits one entry per overload for functions with multiple signatures', () => {
+    const fixture = {
+      id: 0, name: 'utils', kind: 1,
+      children: [{
+        id: 1, name: 'ws', kind: 4,
+        comment: { summary: [{ text: 'WS' }] },
+        children: [{
+          id: 2, name: 'server', kind: 64,
+          signatures: [
+            {
+              id: 3, name: 'server', kind: 4096,
+              comment: { summary: [{ text: 'Standalone server.' }] },
+              parameters: [{ id: 4, name: 'port', kind: 32768, type: { type: 'intrinsic', name: 'number' } }],
+              type: { type: 'reference', name: 'WsServer' },
+            },
+            {
+              id: 5, name: 'server', kind: 4096,
+              comment: { summary: [{ text: 'Piggybacked server.' }] },
+              parameters: [{ id: 6, name: 'httpServer', kind: 32768, type: { type: 'reference', name: 'HttpServer' } }],
+              type: { type: 'reference', name: 'WsServer' },
+            },
+          ],
+        }],
+      }],
+    }
+    const [ns] = walkUtilsDocs(fixture)
+    expect(ns.functions).toHaveLength(2)
+    expect(ns.functions[0].name).toBe('server')
+    expect(ns.functions[0].description).toBe('Standalone server.')
+    expect(ns.functions[0].params[0].name).toBe('port')
+    expect(ns.functions[1].name).toBe('server')
+    expect(ns.functions[1].description).toBe('Piggybacked server.')
+    expect(ns.functions[1].params[0].name).toBe('httpServer')
+  })
+
   it('walks recursively and flattens sub-namespace functions', () => {
     const fixture = {
       id: 0,

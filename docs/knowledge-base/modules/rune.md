@@ -71,6 +71,9 @@ export { md, tree }
 | `yaml` | `read`, `write`, `modify` | inherits `fs.read:` / `fs.write:` |
 | `xml` | `read`, `write`, `modify` | inherits `fs.read:` / `fs.write:` |
 | `http.fetch` | `(url, opts)` | `http.fetch:<METHOD>::<url>` |
+| `http.server` | `server(port, opts?)` → `HttpServer` — `on('request', handler)`, `open()`, `close()`, `closed()` | Loopback: no permission. External: `http.server:<host>::<port>` |
+| `ws.client` | `client(url, opts?)` → `WsClientConnection` — `open()`, `on('message')`, `sendText()`, `close()` | `ws.client:<url>` |
+| `ws.server` | `server(port, opts?)` or `server(httpServer, opts?)` → `WsServer` — `path` supports named params (`:jobId`), specificity routing. `conn.pathParams.get(key)` | Loopback standalone: no permission. External or piggybacked: `ws.server:<host>::<port>[:<path>]` |
 | `env` | `read`, `has` | `env.read:<source>::<key-glob>` |
 | `vars` | `read`, `has` | — |
 | `md` | Pure markdown builders | — |
@@ -85,7 +88,6 @@ export { md, tree }
 | `cache` | `open(location, name?)` → handle | `cache.read:`, `cache.write:` |
 | `sqlite` | `open(location, name?)` → db | `sqlite.read:`, `sqlite.write:` |
 | `crypto` | `hash`, `hashAsHex`, `hashAsBase64`, `uuid`, `randomHex`, `randomBase64`, `hmac`, `hmacAsHex`, `hmacAsBase64`, `encrypt`, `decrypt`, converters | — |
-| `ws` | `client(url, opts?) → session` | `ws.client:<url>` |
 | `time` | `after(ms)` | — |
 
 **`fs.replace`** is implemented in `utils-bootstrap.js`, not `api/fs.js` — it's a read+write composite: reads the file, runs `String.replace(regex, replacement)`, writes back.
@@ -185,3 +187,11 @@ The runner calls `args(builder)` before `use(parsedArgs)` and passes the schema 
 - **Shell permission matching is exact-prefix:** `shell:git log *` allows `git log --oneline -10` but not `git status`. The pattern is matched as a prefix against the full command string.
 
 - **Plugin runes execute from the plugin cache dir, not the project dir:** `dir` passed to the rune is still the project root. `pluginDir` (used for permission resolution) is the plugin's cache directory. Confusing these is a common source of permission errors for plugin authors.
+
+- **`ws.server(httpServer)` registers with the HTTP server at `open()` time:** If `ws.open()` is called before `http.open()`, the WS session buffers its upgrade route and flushes it when the HTTP server opens. Both orderings work; no manual sequencing is needed.
+
+- **`ws.server` with `noServer: true` never emits a `'close'` event on the underlying wss:** `closed()` resolves only after `close()` is explicitly called and its callback fires — it will not resolve on its own. Always `await session.close()` before `await session.closed()`.
+
+- **`ws.server` path patterns use `:paramName` syntax:** `/logs/:jobId` matches `/logs/abc123` and extracts `{ jobId: 'abc123' }` via `conn.pathParams.get('jobId')`. Literal segments beat named params at the same depth (specificity routing). A catch-all server (no `path`) receives all unmatched upgrades.
+
+- **`http.server` and `ws.server` permissions are checked at construction, not at `open()`:** Passing a non-loopback host without the matching `http.server:<host>::<port>` permission throws immediately when the handle is created, before any port is bound.

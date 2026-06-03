@@ -120,15 +120,17 @@ function walkInterface(child) {
 }
 
 function walkFunction(child) {
-  const sig = child.signatures?.[0]
-  if (!sig) return null
-  const { params, returns } = walkSignature(sig)
-  return {
-    name:        child.name,
-    description: commentText(sig.comment),
-    params,
-    returns,
-  }
+  const sigs = child.signatures ?? []
+  if (sigs.length === 0) return []
+  return sigs.map(sig => {
+    const { params, returns } = walkSignature(sig)
+    return {
+      name:        child.name,
+      description: commentText(sig.comment),
+      params,
+      returns,
+    }
+  })
 }
 
 function walkNamespace(child, prefix = '') {
@@ -136,11 +138,9 @@ function walkNamespace(child, prefix = '') {
   const types = {}
   for (const c of (child.children ?? [])) {
     if (c.kind === KIND_FUNCTION) {
-      const fn = walkFunction(c)
-      if (fn) {
-        if (prefix) {
-          fn.name = `${prefix}.${fn.name}`
-        }
+      const fns = walkFunction(c)
+      for (const fn of fns) {
+        if (prefix) fn.name = `${prefix}.${fn.name}`
         functions.push(fn)
       }
     } else if (c.kind === KIND_INTERFACE || c.kind === KIND_CLASS) {

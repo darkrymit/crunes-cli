@@ -104,6 +104,44 @@ describe('formatUtilsNamespace', () => {
     expect(out).toContain('close()')
   })
 
+  it('renders two separate blocks when the same function name appears twice (overloads)', () => {
+    const ns = {
+      namespace: 'ws',
+      description: 'WS',
+      functions: [
+        {
+          name: 'server',
+          description: 'Standalone server.',
+          params: [{ name: 'port', type: 'number', description: 'Port to listen on.' }],
+          returns: 'WsServer',
+        },
+        {
+          name: 'server',
+          description: 'Piggybacked server.',
+          params: [{ name: 'httpServer', type: 'HttpServer', description: 'Existing HTTP server.' }],
+          returns: 'WsServer',
+        },
+      ],
+      types: {
+        WsServer: {
+          description: 'WS server handle',
+          properties: [{ name: 'port', type: 'number', description: 'Bound port.' }],
+          methods: [{ name: 'open', description: 'Start server.', returns: 'Promise<void>' }],
+        },
+      },
+    }
+    const out = formatUtilsNamespace(ns)
+    // Both overloads appear
+    expect(out).toContain('server(port)')
+    expect(out).toContain('Standalone server.')
+    expect(out).toContain('server(httpServer)')
+    expect(out).toContain('Piggybacked server.')
+    // WsServer referenced only once at the bottom
+    expect(out.indexOf('WsServer')).not.toBe(out.lastIndexOf('WsServer'))
+    expect(out).toContain('Referenced Types:')
+    expect((out.match(/Referenced Types:/g) ?? []).length).toBe(1)
+  })
+
   it('snapshot', () => {
     expect(formatUtilsNamespace(WS_NS)).toMatchSnapshot()
   })

@@ -11,7 +11,7 @@ Crunes allows developers and AI coding agents to write and run secure, sandboxed
 * **V8 Sandbox Isolation:** Runes are evaluated inside secure `isolated-vm` sandboxes with zero direct access to Node.js builtins.
 * **Capability-Based Security:** Fine-grained whitelist and blacklist rules (e.g. `fs.read:src/**`, `http.fetch:GET::https://api.github.com/*`) configured at the project level.
 * **Premium Developer Experience:** Modern modular scripting (`import { fs, section } from '@utils'`) with native TypeScript types and autocompletion.
-* **Interactive Tooling:** Shell sessions, background daemon jobs, built-in SQLite/JSON/YAML parsers, and custom templates.
+* **Interactive Tooling:** Shell sessions, background daemon jobs, built-in SQLite/JSON/YAML parsers, custom templates, and loopback HTTP/WebSocket servers with path-param routing.
 * **AI-First Design:** Outputs cleanly formatted Markdown structures optimised for AI context window ingestion and pipe/CLI pipelines.
 
 ---

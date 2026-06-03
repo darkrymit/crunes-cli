@@ -9,7 +9,9 @@
 Before brainstorming, planning, or touching any code:
 
 1. **Get Live Codebase Context via Context Runes** — Scope the `m` rune to the modules relevant to the task and the `kb` rune to matching entries; avoid loading all modules unless the task spans the full codebase. Re-run crunes at any point if exploration reveals additional dependencies.
-   * *Batch with context (requires -b and -p flags):* `crunes -p use -b m <module> + kb -m <module>`
+   * *Structural map + KB in one shot:* `crunes -p use -b m rune + kb rune`
+   * *`@utils` API reference (always prefer over reading source):* `crunes -p docs utils <ns>` e.g. `crunes -p docs utils ws http`
+   * *Full ecosystem handbook (for broad context):* `crunes -p docs intro`
 2. **Read the Self-Contained CLI Instructions** — Familiarize yourself with the sandboxed environment constraints, module mapping, and local testing workflows described in this file.
 3. **Then brainstorm, plan, and code** — in that order.
 
