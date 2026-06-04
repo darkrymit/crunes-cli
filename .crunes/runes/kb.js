@@ -14,7 +14,7 @@ export async function args(b) {
     .build()
 }
 
-export async function use(args) {
+export async function run(args) {
   if (!await fs.exists(KB_ROOT)) return null
 
   const hasNames = args._.length > 0

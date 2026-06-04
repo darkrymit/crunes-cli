@@ -8,7 +8,7 @@ export async function args(b) {
     .build()
 }
 
-export async function use(args) {
+export async function run(args) {
   if (!await fs.exists(SRC_ROOT)) return null
 
   if (args._.length === 0) {
