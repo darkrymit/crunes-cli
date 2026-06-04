@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.7.0] - 2026-06-05
 
 ### Breaking Changes
 - `crunes use` renamed to `crunes run`
@@ -14,6 +14,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rune export function renamed from `use(args)` to `run(args)`
 - `permissions.use` lifecycle key renamed to `permissions.run` in all configs and plugin.json files
 - `rune.use(key, args?)` utils API renamed to `rune.run(key, args?)`
+- `shell.spawn` and `rune.spawn` sessions now require an explicit `.open()` call before sending data; previously the session opened implicitly on first write
+- `http.fetch` timeout option removed; use `AbortSignal.timeout(ms)` instead
+
+### Added
+- **`http.server` and `ws.server`**: Loopback HTTP and WebSocket servers with path-param routing, piggyback support, sandbox bridge, and permissions
+- **WebSocket path routing**: Named path params, specificity-based dispatch, and `pathParams` access on connections
+- **`WsServerConnection` request metadata**: `url`, `pathname`, `searchParams`, and `headers` now available on incoming connections
+- **`rune.exec` subprocess**: Call another rune as a subprocess and get its `RuneResult` directly
+- **`rune.job.*` and `shell.job.*`**: Launch runes and shell commands as background jobs; access stdout/stderr/sections by job ID
+- **`shell.spawn` deferred open**: Sessions buffer pending writes until `.open()` is called, allowing handler registration before the process starts
+- **`AbortSignal.timeout`**: Available inside isolates for cancellable fetch and shell operations
+- **Boolean capability tokens**: Permission declarations now support null-value boolean flags as capability tokens
+
+### Changed
+- **Docs system rewrite**: Unified TypeScript walker and formatter for `crunes docs utils` and `crunes docs rune`; overload rendering now produces accurate multi-signature output
+- **Permissions double-colon format**: Fixed multi-positional permission scope separator to use `::` for `http.fetch`, `env.read`, `cache`, and `sqlite` (e.g. `cache.read:@project-cache::session-name`)
+- **CLI startup performance**: Removed double-spawn re-exec; enabled esbuild code splitting for faster cold starts
+
+### Fixed
+- **`fs.glob` virtual-path prefixes**: Glob patterns using virtual roots (`@plugin/`, `@project/`) now resolve correctly
+- **Type definitions**: Corrected globals, stream types, and permission doc annotations; removed incorrectly exposed V8 builtins from sandbox type declarations
+- **`shell.spawn` isolate-side `open()`**: `open()` is now correctly exposed on the isolate-side session handle
+
+---
 
 ## [0.6.0] - 2026-06-02
 
