@@ -8,7 +8,7 @@ Everything related to executing context runes: key resolution, sandboxed executi
 
 ## Submodules
 
-- **api/** — The `utils` object injected into every rune at runtime: `md`, `tree`, `fs`, `shell`, `json`, `yaml`, `xml`, `http`, `ws`, `env`, `vars`, `archive`, `cache`, `sqlite`, `db`, `codec`, `crypto`.
+- **api/** — The `utils` object injected into every rune at runtime: `md`, `tree`, `section`, `fs`, `shell`, `json`, `yaml`, `xml`, `http`, `ws`, `env`, `vars`, `archive`, `cache`, `sqlite`, `db`. Additional namespaces (`codec`, `crypto`, `time`, `rune`) are injected directly by the runner via host References and exposed through the bootstrap. `rune.js` and `shell.js` also export the host-side `RuneSession`/`ShellSession` classes used by the runner to manage subprocess lifecycle with deferred `open()`.
 - **isolation/** — Sandboxed VM lifecycle via `isolated-vm`; in-isolate bootstrap stubs and ESM resolver.
 - **permissions/** — Effective permission computation and per-operation checkers (http fetch, env, store, http server, ws client, ws server).
 - **commands/** — CLI handlers: `run`, `list`, `create`, `check`, `benchmark`.

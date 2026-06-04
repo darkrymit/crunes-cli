@@ -1,26 +1,3 @@
-/** Result returned by rune.exec() */
-interface RuneResult {
-  sections: RuneSection[]
-  stdout: string
-  stderr: string
-  exitCode: number
-  ok: boolean
-}
-
-interface RuneSessionReadableStream extends ReadableStream<string> {
-  on(event: 'data', callback: (chunk: string) => void): void
-  on(event: 'end', callback: () => void): void
-}
-
-/** Streaming session returned by rune.spawn() */
-interface RuneSession {
-  readonly stdout: RuneSessionReadableStream
-  readonly stderr: RuneSessionReadableStream
-  on(event: 'exit', callback: (code: number) => void): void
-  on(event: 'error', callback: (err: string) => void): void
-  kill(signal?: string): void
-}
-
 /** Inter-rune call utilities */
 declare namespace rune {
   /**
@@ -36,6 +13,32 @@ declare namespace rune {
    * Requires `rune.run:<key>` permission.
    */
   function spawn(key: string, args?: string[]): RuneSession
+
+  /** Result returned by rune.exec() */
+  interface RuneResult {
+    sections: RuneSection[]
+    stdout: string
+    stderr: string
+    exitCode: number
+    ok: boolean
+  }
+
+  interface RuneSessionReadableStream extends ReadableStream<string> {
+    on(event: 'data', callback: (chunk: string) => void): void
+    on(event: 'end', callback: () => void): void
+  }
+
+  /** Streaming session returned by rune.spawn() */
+  interface RuneSession {
+    readonly stdout: RuneSessionReadableStream
+    readonly stderr: RuneSessionReadableStream
+    on(event: 'exit', callback: (code: number) => void): void
+    on(event: 'error', callback: (err: string) => void): void
+    /** Start the subprocess. Handlers registered before open() are guaranteed to receive all output. */
+    open(): void
+    kill(signal?: string): void
+  }
+
 
   namespace job {
     /**

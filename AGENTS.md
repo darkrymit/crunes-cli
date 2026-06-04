@@ -9,7 +9,7 @@
 Before brainstorming, planning, or touching any code:
 
 1. **Get Live Codebase Context via Context Runes** — Scope the `m` rune to the modules relevant to the task and the `kb` rune to matching entries; avoid loading all modules unless the task spans the full codebase. Re-run crunes at any point if exploration reveals additional dependencies.
-   * *Structural map + KB in one shot:* `crunes -p use -b m rune + kb rune`
+   * *Structural map + KB in one shot:* `crunes -p run -b m rune + kb rune`
    * *`@utils` API reference (always prefer over reading source):* `crunes -p docs utils <ns>` e.g. `crunes -p docs utils ws http`
    * *Full ecosystem handbook (for broad context):* `crunes -p docs intro`
 2. **Read the Self-Contained CLI Instructions** — Familiarize yourself with the sandboxed environment constraints, module mapping, and local testing workflows described in this file.
@@ -23,9 +23,10 @@ Before brainstorming, planning, or touching any code:
 - **ALWAYS SYNC `package-lock.json`** — After changing packages or bumping the version in `package.json`, always run `npm install` to regenerate the lockfile before committing. The `release` rune will flag any mismatch with a ⚠ indicator.
 - **RUNES AND SRC ARE STRICT ESM** — All files under `.crunes/runes/` and `src/` must use ES module imports and exports. Never use `require()`.
 - **LOCAL RUNES RUN INSIDE `isolated-vm`** — Local runes run in a sandboxed V8 isolate and cannot access standard Node.js built-ins directly. All I/O operations must go through the provided `utils` API (`utils.fs`, `utils.shell`, `utils.json`, `utils.fetch`, `utils.env`, `utils.archive`, and `utils.cache`).
-- **TEST RUNES BEFORE COMMITTING** — Verify rune output by running `node dist/cli.js -p use <rune>` before staging any changes.
+- **TEST RUNES BEFORE COMMITTING** — Verify rune output by running `node dist/cli.js -p run <rune>` before staging any changes.
 - **PREFER CONTEXT RUNES OVER FS TOOLS** — Use context runes like `m` and `kb` to search and understand the codebase. Only fall back to `grep` or `ls` when crunes is unable to answer the question.
 - **ONLY READ FILES THAT IMPACT IMPLEMENTATION** — Ask "will this file's contents change my implementation approach?" before reading any file to avoid cluttering context.
+- **CHECK EXAMPLES AFTER API CHANGES** — After any change to `src/rune/isolation/utils-bootstrap.js` or `src/rune/api/*.js`, grep `examples/` for usages of the changed API and verify they still work correctly.
 
 ## Coding Principles
 
@@ -60,7 +61,7 @@ npx vitest
 npx vitest -u
 
 # Run a built rune locally against the current project
-node dist/cli.js -p use release info
+node dist/cli.js -p run release info
 node dist/cli.js list
 
 # Full local CI verification check (matches Github Actions)
@@ -82,15 +83,15 @@ npm test && npm run build && node dist/cli.js --help
 **Prefixes:** `local:<key>` forces local config resolution. `<plugin>:<key>` forces a specific plugin resolver.
 
 ### Module Map
-*Prefer using `crunes -p use m` for live directory maps; this is a static fallback.*
+*Prefer using `crunes -p run m` for live directory maps; this is a static fallback.*
 
 - `cli` • `core` • `job` • `marketplace` • `plugin` • `project` • `rune` • `shared` • `store` • `cache` • `sqlite` • `docs` • `template`
 
 ### Live Codebase Documentation
 Our primary documentation lives inside our Obsidian Knowledge Base vault (`docs/knowledge-base/`).
-- **Retrieve structural map:** `crunes -p use m <module>` (e.g., `m rune`)
-- **Retrieve KB entries:** `crunes -p use kb -m <module>` (e.g., `kb -m rune.isolation`)
-- **Batch both context maps in one shot:** `crunes -p use -b m rune + kb -m rune`
+- **Retrieve structural map:** `crunes -p run m <module>` (e.g., `m rune`)
+- **Retrieve KB entries:** `crunes -p run kb -m <module>` (e.g., `kb -m rune.isolation`)
+- **Batch both context maps in one shot:** `crunes -p run -b m rune + kb -m rune`
 - **Fallback (Crunes offline):** Refer to `docs/knowledge-base/index.md` manually.
 
 ## Release Process

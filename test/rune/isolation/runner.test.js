@@ -570,6 +570,7 @@ export async function run() {
       else reject(new Error('exit ' + code))
     })
     session.on('error', reject)
+    session.open()
   })
 
   return [section.create('r', { type: 'markdown', content: stdoutStr })]
@@ -602,7 +603,8 @@ export async function run() {
       resolve()
     })
   })
-  
+  session.open()
+
   setTimeout(() => {
     controller.abort()
   }, 100)

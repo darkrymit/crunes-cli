@@ -138,3 +138,7 @@ The runner calls `args(builder)` before `run(parsedArgs)`. Without an `args` exp
 - **`ws.server` path patterns use `:paramName` syntax:** Patterns like `/logs/:jobId` extract captured segments. Specificity routing applies: literal segments beat named params.
 
 - **`http.server` and `ws.server` permissions are checked at construction:** If a non-loopback host is missing required permissions, handle creation throws immediately, not at `open()` time.
+
+- **`shell.spawn` and `rune.spawn` require an explicit `open()` call:** Both return a session object immediately without starting the subprocess. Register all handlers (`session.stdout.on`, `session.on('exit', ...)`, etc.) first, then call `session.open()` to start the process. Skipping `open()` means the process never starts and all reads hang indefinitely.
+
+- **All `fs.*` operations support virtual-path prefixes:** Paths starting with `@` (e.g. `@local-project-cache/vault/file.enc`) are resolved through the virtual location scheme via `resolvePath`. `fs.glob` additionally reconstructs results with the original `@prefix/...` form so callers get back virtual paths, not real absolute ones.

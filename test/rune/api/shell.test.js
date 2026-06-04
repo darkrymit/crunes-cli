@@ -81,7 +81,8 @@ describe('shell utils', () => {
           const session = shell.spawn("node -e \\"process.stdin.on('data', d => { process.stdout.write('echo:' + d.toString()) })\\"")
           const reader = session.stdout.getReader()
           const writer = session.stdin.getWriter()
-          
+          session.open()
+
           await writer.write('hello-crunes\\n')
           const { value } = await reader.read()
           
@@ -105,6 +106,7 @@ describe('shell utils', () => {
         export async function run() {
           const session = shell.spawn('node -e "process.stdout.write(Buffer.from([65, 66, 67]))"', { binary: true })
           const reader = session.stdout.getReader()
+          session.open()
           const { value } = await reader.read()
           session.kill()
           return {
