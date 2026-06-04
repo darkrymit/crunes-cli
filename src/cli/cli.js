@@ -1,12 +1,5 @@
 #!/usr/bin/env node
-import path from 'node:path'
-import { spawnSync } from 'node:child_process'
 
-const majorVersion = parseInt(process.versions.node.split('.')[0], 10)
-if (majorVersion >= 20 && !process.execArgv.includes('--no-node-snapshot')) {
-  const result = spawnSync(process.execPath, ['--no-node-snapshot', ...process.argv.slice(1)], { stdio: 'inherit' })
-  process.exit(result.status ?? 1)
-}
 
 if (process.env.CRUNES_NO_TIMEOUT === '1') {
   const useIdx = process.argv.indexOf('use')

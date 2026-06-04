@@ -13,7 +13,7 @@ export class RuneSession {
     this._pending = []
     this.proc = spawn(
       process.execPath,
-      ['--no-node-snapshot', cliPath, '--cwd', projectDir, 'run', runeKey, '--format', 'jsonl', ...(args ?? [])],
+      [cliPath, '--cwd', projectDir, 'run', runeKey, '--format', 'jsonl', ...(args ?? [])],
       {
         stdio: ['ignore', 'pipe', 'pipe'],
         env: { ...process.env, CRUNES_NO_TIMEOUT: '1' },
