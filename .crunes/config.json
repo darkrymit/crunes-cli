@@ -14,18 +14,18 @@
             "fs.write:package.json",
             "fs.write:src/cli/program.js",
             "fs.write:CHANGELOG.md",
-            "shell.exec:git log *",
-            "shell.exec:git rev-parse *",
-            "shell.exec:git describe *",
-            "shell.exec:git rev-list *",
-            "shell.exec:npm install",
-            "shell.exec:npm run build",
-            "shell.exec:git add package.json",
-            "shell.exec:git add package-lock.json",
-            "shell.exec:git add CHANGELOG.md",
-            "shell.exec:git add src/cli/program.js",
-            "shell.exec:git commit *",
-            "shell.exec:git tag *"
+            "shell.run:git log *",
+            "shell.run:git rev-parse *",
+            "shell.run:git describe *",
+            "shell.run:git rev-list *",
+            "shell.run:npm install",
+            "shell.run:npm run build",
+            "shell.run:git add package.json",
+            "shell.run:git add package-lock.json",
+            "shell.run:git add CHANGELOG.md",
+            "shell.run:git add src/cli/program.js",
+            "shell.run:git commit *",
+            "shell.run:git tag *"
           ]
         }
       }
