@@ -18,6 +18,13 @@ export class ShellSession {
     this.handlers = new Map()
     this.binary = binary
     this.activeSessions = activeSessions
+    this._spawnArgs = { cmd, dir, env }
+    this.proc = null
+  }
+
+  open() {
+    const { cmd, dir, env } = this._spawnArgs
+    this._pending = []
     this.proc = spawn(cmd, [], {
       shell:              true,
       cwd:                dir,
@@ -25,17 +32,18 @@ export class ShellSession {
       env: env ? { ...process.env, ...env } : process.env,
     })
 
-    if (activeSessions) {
-      activeSessions.add(this)
+    if (this.activeSessions) {
+      this.activeSessions.add(this)
     }
 
     this.proc.stdout.on('data', chunk => this.emit('stdout', 'data', chunk))
     this.proc.stderr.on('data', chunk => this.emit('stderr', 'data', chunk))
     this.proc.stdout.on('end', () => this.emit('stdout', 'end'))
     this.proc.stderr.on('end', () => this.emit('stderr', 'end'))
-    
-    this.proc.on('exit', code => {
-      if (activeSessions) activeSessions.delete(this)
+
+    this.proc.on('exit', async code => {
+      if (this._pending.length > 0) await Promise.allSettled(this._pending)
+      if (this.activeSessions) this.activeSessions.delete(this)
       this.emit('session', 'exit', code ?? 0)
     })
     this.proc.on('error', err => this.emit('session', 'error', err))
@@ -60,7 +68,12 @@ export class ShellSession {
 
       if (event === 'data') {
         const arrayBuffer = arg.buffer.slice(arg.byteOffset, arg.byteOffset + arg.byteLength)
-        h.apply(undefined, [arrayBuffer], { arguments: { copy: true } }).catch(handleCatch)
+        const p = h.apply(undefined, [arrayBuffer], { arguments: { copy: true } })
+        if (this._pending) {
+          this._pending.push(p)
+          p.then(() => { const i = this._pending.indexOf(p); if (i !== -1) this._pending.splice(i, 1) }, () => {})
+        }
+        p.catch(handleCatch)
       } else if (event === 'error') {
         const errStr = arg instanceof Error ? arg.message : String(arg)
         h.apply(undefined, [errStr], { arguments: { copy: true } }).catch(handleCatch)
@@ -75,6 +88,7 @@ export class ShellSession {
   }
 
   write(chunk) {
+    if (!this.proc) return
     if (chunk && typeof chunk === 'object' && chunk.type === 'Buffer') {
       this.proc.stdin.write(Buffer.from(chunk.data))
     } else if (Buffer.isBuffer(chunk) || chunk instanceof Uint8Array) {
@@ -90,6 +104,7 @@ export class ShellSession {
   }
 
   kill(signal) {
+    if (!this.proc) return
     if (this.activeSessions) {
       this.activeSessions.delete(this)
     }

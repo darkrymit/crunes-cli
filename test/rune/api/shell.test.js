@@ -32,7 +32,7 @@ describe('shell utils', () => {
     try {
       const session = shellUtils.spawn(`node ${scriptPath}`);
       let stdout = '';
-      
+
       session.setHandler('stdout', 'data', (chunk) => {
         stdout += chunk.toString();
         if (stdout.includes('Question:')) {
@@ -43,6 +43,8 @@ describe('shell utils', () => {
       const exitPromise = new Promise((resolve) => {
         session.setHandler('session', 'exit', resolve);
       });
+
+      session.open();
 
       const exitCode = await exitPromise;
       

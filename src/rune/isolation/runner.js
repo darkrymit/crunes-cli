@@ -16,6 +16,7 @@ import { computeEffectivePermissions, makePermissionChecker } from '../permissio
 import { isVerbose } from '../../shared/output.js'
 import * as EMBEDDED from './embedded.js'
 import { parseArgs } from '../api/args-parser.js'
+import { RuneSession } from '../api/rune.js'
 
 const __isolationDir = path.dirname(fileURLToPath(import.meta.url))
 
@@ -48,6 +49,14 @@ const VALID_SIGNALS = new Set(['SIGTERM', 'SIGKILL', 'SIGINT', 'SIGHUP', 'SIGUSR
 
 async function injectUtils(isolate, context, utils, _runeCallback, vars, projectDir, checkPermission, currentRuneKey, sections, onEvent) {
   const jail = context.global
+  // Wrap async Reference callbacks so their rejected promises are caught on the
+  // host side, preventing Node unhandledRejection events. ivm still receives the
+  // rejection via its own internal .then() chain and propagates it into the isolate.
+  const asyncRef = (fn) => new ivm.Reference((...args) => {
+    const p = fn(...args)
+    if (p && typeof p.catch === 'function') p.catch(() => {})
+    return p
+  })
 
   await jail.set('$__utils_fs_read', new ivm.Reference(async (relPath, opts) => {
     return utils.fs.read(relPath, opts)
@@ -144,7 +153,7 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
   const shellHandles = new Map()
   let nextShellHandle = 0
 
-  await jail.set('$__utils_shell_exec', new ivm.Reference(async (cmd, opts, stdinStreamId) => {
+  await jail.set('$__utils_shell_exec', asyncRef(async (cmd, opts, stdinStreamId) => {
     let stdinStream
     if (stdinStreamId !== undefined && stdinStreamId !== null) {
       const { PassThrough } = await import('node:stream')
@@ -214,6 +223,10 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
     shellHandles.set(id, session)
     return id
   }))
+  await jail.set('$__utils_shell_spawn_start', new ivm.Reference((id) => {
+    const handle = shellHandles.get(id)
+    if (handle) handle.open()
+  }))
   await jail.set('$__utils_shell_spawn_write', new ivm.Reference((idRef, chunkRef) => {
     const id = typeof idRef === 'object' && idRef.copySync ? idRef.copySync() : idRef
     const chunk = typeof chunkRef === 'object' && chunkRef.copySync ? chunkRef.copySync() : chunkRef
@@ -250,14 +263,14 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
   }))
 
   const { id: pKey } = await ensureProjectIdentity(projectDir)
-  await jail.set('$__utils_shell_job_start', new ivm.Reference(async (cmd, opts) => {
+  await jail.set('$__utils_shell_job_start', asyncRef(async (cmd, opts) => {
     checkPermission('shell.job.start', cmd)
     return utils.shell.createShellJob(cmd, opts, {
       createJob, updateJobPid, jobStdoutPath, jobStderrPath,
       spawnedBy: currentRuneKey, projectKey: pKey, projectDir,
     })
   }))
-  await jail.set('$__utils_shell_job_kill', new ivm.Reference(async (id, signal) => {
+  await jail.set('$__utils_shell_job_kill', asyncRef(async (id, signal) => {
     checkPermission('shell.job.kill', null)
     const sig = signal ?? 'SIGTERM'
     if (!VALID_SIGNALS.has(sig)) throw new Error(`Invalid signal: ${sig}`)
@@ -265,13 +278,13 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
     if (!record) return
     try { process.kill(record.pid, sig) } catch { /* already gone */ }
   }))
-  await jail.set('$__utils_shell_job_exists', new ivm.Reference(async (id) => {
+  await jail.set('$__utils_shell_job_exists', asyncRef(async (id) => {
     checkPermission('shell.job.exists', null)
     const record = await getJob(pKey, id)
     if (!record) return false
     try { process.kill(record.pid, 0); return true } catch { return false }
   }))
-  await jail.set('$__utils_shell_job_stdout', new ivm.Reference(async (id) => {
+  await jail.set('$__utils_shell_job_stdout', asyncRef(async (id) => {
     checkPermission('shell.job.read', null)
     const record = await getJob(pKey, id)
     if (!record) throw new Error(`Unknown job: ${id}`)
@@ -279,7 +292,7 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
     if (!fsSync.existsSync(logPath)) return ''
     return fsSync.promises.readFile(logPath, 'utf8')
   }))
-  await jail.set('$__utils_shell_job_stderr', new ivm.Reference(async (id) => {
+  await jail.set('$__utils_shell_job_stderr', asyncRef(async (id) => {
     checkPermission('shell.job.read', null)
     const record = await getJob(pKey, id)
     if (!record) throw new Error(`Unknown job: ${id}`)
@@ -301,7 +314,7 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
   await jail.set('$__utils_section_selected', new ivm.Reference(() => {
     return utils.section.selected() ?? undefined
   }))
-  await jail.set('$__utils_rune_exec', new ivm.Reference(async (runeKey, args) => {
+  await jail.set('$__utils_rune_exec', asyncRef(async (runeKey, args) => {
     checkPermission('rune.run', runeKey)
     const cliPath = process.argv[1]
     const child = spawnProcess(
@@ -325,43 +338,14 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
   }))
   await jail.set('$__utils_rune_spawn_open', new ivm.Reference((runeKey, args) => {
     checkPermission('rune.run', runeKey)
-    const cliPath = process.argv[1]
-    const child = spawnProcess(
-      process.execPath,
-      ['--no-node-snapshot', cliPath, '--cwd', projectDir, 'run', runeKey, '--format', 'jsonl', ...(args ?? [])],
-      { stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, CRUNES_NO_TIMEOUT: '1' }, windowsHideConsole: true }
-    )
+    const session = new RuneSession(runeKey, args, { cliPath: process.argv[1], projectDir })
     const id = String(nextShellHandle++)
-    shellHandles.set(id, {
-      proc: child,
-      handlers: new Map(),
-      setHandler(type, event, callbackRef) { this.handlers.set(`${type}:${event}`, callbackRef) },
-      emit(type, event, arg) {
-        const h = this.handlers.get(`${type}:${event}`)
-        if (!h) return
-        const handleCatch = err => { if (err?.message !== 'Isolate is disposed') console.error('[crunes:debug] rune.spawn callback error:', err) }
-        if (event === 'data') {
-          const ab = arg.buffer.slice(arg.byteOffset, arg.byteOffset + arg.byteLength)
-          h.apply(undefined, [ab], { arguments: { copy: true } }).catch(handleCatch)
-        } else if (event === 'exit') {
-          h.apply(undefined, [arg], { arguments: { copy: true } }).catch(handleCatch)
-        } else if (event === 'error') {
-          const s = arg instanceof Error ? arg.message : String(arg)
-          h.apply(undefined, [s], { arguments: { copy: true } }).catch(handleCatch)
-        } else {
-          h.apply(undefined, [], {}).catch(handleCatch)
-        }
-      },
-      kill(signal) { try { child.kill(signal ?? 'SIGTERM') } catch {} },
-    })
-    const handle = shellHandles.get(id)
-    child.stdout.on('data', chunk => handle.emit('stdout', 'data', chunk))
-    child.stderr.on('data', chunk => handle.emit('stderr', 'data', chunk))
-    child.stdout.on('end', () => handle.emit('stdout', 'end'))
-    child.stderr.on('end', () => handle.emit('stderr', 'end'))
-    child.on('exit', code => handle.emit('session', 'exit', code ?? 0))
-    child.on('error', err => handle.emit('session', 'error', err))
+    shellHandles.set(id, session)
     return id
+  }))
+  await jail.set('$__utils_rune_spawn_start', new ivm.Reference((id) => {
+    const handle = shellHandles.get(id)
+    if (handle) handle.open()
   }))
   await jail.set('$__utils_rune_spawn_on', new ivm.Reference((idRef, typeRef, eventRef, callbackRef) => {
     const id = typeof idRef === 'object' && idRef.copySync ? idRef.copySync() : idRef
@@ -374,7 +358,7 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
     const handle = shellHandles.get(id)
     if (handle) { handle.kill(signal ?? undefined); shellHandles.delete(id) }
   }))
-  await jail.set('$__utils_rune_job_start', new ivm.Reference(async (runeKey, args) => {
+  await jail.set('$__utils_rune_job_start', asyncRef(async (runeKey, args) => {
     checkPermission('rune.job.start', runeKey)
     const cliPath = process.argv[1]
     const { id } = await createJob(null, { type: 'rune', spawnedBy: currentRuneKey, runeKey, projectDir, args: args ?? [] })
@@ -391,7 +375,7 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
     fsSync.closeSync(errFd)
     return { id }
   }))
-  await jail.set('$__utils_rune_job_kill', new ivm.Reference(async (id, signal) => {
+  await jail.set('$__utils_rune_job_kill', asyncRef(async (id, signal) => {
     const sig = signal ?? 'SIGTERM'
     if (!VALID_SIGNALS.has(sig)) throw new Error(`Invalid signal: ${sig}`)
     checkPermission('rune.job.kill', null)
@@ -399,13 +383,13 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
     if (!record) return
     try { process.kill(record.pid, sig) } catch { /* already gone */ }
   }))
-  await jail.set('$__utils_rune_job_exists', new ivm.Reference(async (id) => {
+  await jail.set('$__utils_rune_job_exists', asyncRef(async (id) => {
     checkPermission('rune.job.exists', null)
     const record = await getJob(pKey, id)
     if (!record) return false
     try { process.kill(record.pid, 0); return true } catch { return false }
   }))
-  await jail.set('$__utils_rune_job_stdout', new ivm.Reference(async (id) => {
+  await jail.set('$__utils_rune_job_stdout', asyncRef(async (id) => {
     checkPermission('rune.job.read', null)
     const record = await getJob(pKey, id)
     if (!record) throw new Error(`Unknown job: ${id}`)
@@ -413,7 +397,7 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
     if (!fsSync.existsSync(logPath)) return ''
     return fsSync.promises.readFile(logPath, 'utf8')
   }))
-  await jail.set('$__utils_rune_job_stderr', new ivm.Reference(async (id) => {
+  await jail.set('$__utils_rune_job_stderr', asyncRef(async (id) => {
     checkPermission('rune.job.read', null)
     const record = await getJob(pKey, id)
     if (!record) throw new Error(`Unknown job: ${id}`)
@@ -421,7 +405,7 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
     if (!fsSync.existsSync(logPath)) return ''
     return fsSync.promises.readFile(logPath, 'utf8')
   }))
-  await jail.set('$__utils_rune_job_sections', new ivm.Reference(async (id) => {
+  await jail.set('$__utils_rune_job_sections', asyncRef(async (id) => {
     checkPermission('rune.job.read', null)
     const record = await getJob(pKey, id)
     if (!record) throw new Error(`Unknown job: ${id}`)

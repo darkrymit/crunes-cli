@@ -66,6 +66,8 @@ declare namespace shell {
     on(event: 'exit', callback: (code: number) => void): void
     on(event: 'error', callback: (err: string) => void): void
 
+    /** Start the subprocess. Handlers registered before open() are guaranteed to receive all output. */
+    open(): void
     kill(signal?: string): void
   }
 

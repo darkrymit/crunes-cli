@@ -566,7 +566,9 @@ globalThis.utils = {
       
       const stdoutStream = createHybridReadable('stdout')
       const stderrStream = createHybridReadable('stderr')
-      
+
+      $__utils_shell_spawn_start.applySync(undefined, [id])
+
       const stdinStream = new WritableStream({
         async write(chunk) {
           let rawChunk = chunk
@@ -653,9 +655,14 @@ globalThis.utils = {
         return stream
       }
 
+      const stdoutStream = createHybridReadable('stdout')
+      const stderrStream = createHybridReadable('stderr')
+
+      $__utils_rune_spawn_start.applySync(undefined, [id])
+
       return {
-        stdout: createHybridReadable('stdout'),
-        stderr: createHybridReadable('stderr'),
+        stdout: stdoutStream,
+        stderr: stderrStream,
         on(event, callback) {
           $__utils_rune_spawn_on.applySync(undefined, [id, 'session', event, callback], { arguments: { reference: true } })
         },
