@@ -69,7 +69,7 @@ crunes job kill <id>                 # Forcefully terminate a running background
 
 # Templates, Plugins, and Markets
 crunes template list                 # List available rune templates
-crunes template use <name>           # Copy a template as a new local rune
+crunes template apply <name>         # Copy a template as a new local rune
 crunes plugin install <pkg>          # Install a secure plugin from marketplace
 crunes plugin list                   # List active marketplace plugins
 crunes marketplace add <url>         # Register a marketplace source

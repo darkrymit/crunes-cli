@@ -77,7 +77,7 @@ export async function run(args) {
 }
 
 export function exampleTemplate() {
-  return `// Template rune — copied into the user's project by \`crunes template use\`.
+  return `// Template rune — copied into the user's project by \`crunes template apply\`.
 // Edit this file to define what a new rune looks like when scaffolded from your plugin.
 //
 // permissions (plugin.json):

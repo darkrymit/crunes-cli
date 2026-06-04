@@ -100,9 +100,9 @@ export async function handler({
   await rename(tmpPath, configPath)
 
   if (!isNonInteractive) {
-    outro(`Created ${templateRelPath}\nUse it with: crunes template use ${name}`)
+    outro(`Created ${templateRelPath}\nUse it with: crunes template apply ${name}`)
   } else {
     output.success(`Created ${templateRelPath}`)
-    output.info(`Use it with: crunes template use ${name}`)
+    output.info(`Use it with: crunes template apply ${name}`)
   }
 }

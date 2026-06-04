@@ -268,7 +268,7 @@ export async function compileIntro({ config, format, projectRoot, configRoot, ha
   lines.push('')
   lines.push('```bash')
   lines.push('# Correct Flag Placement')
-  lines.push('crunes --cwd ./project -p use --format json greeting "Alice"')
+  lines.push('crunes --cwd ./project -p run --format json greeting "Alice"')
   lines.push('```')
   lines.push('')
   lines.push('> [!WARNING]')

@@ -5,7 +5,7 @@
       "name": "Release Automator",
       "description": "Bump package versions, update changelogs, synchronize lockfiles, compile bundles, and tag Git releases automatically.",
       "permissions": {
-        "use": {
+        "run": {
           "allow": [
             "fs.read:package.json",
             "fs.read:package-lock.json",
@@ -35,7 +35,7 @@
       "name": "Module Structural Context",
       "description": "Live structural context (README and file tree) for modules.",
       "permissions": {
-        "use": {
+        "run": {
           "allow": [
             "fs.read:src/**",
             "fs.glob:src/**",
@@ -49,7 +49,7 @@
       "name": "Knowledge Base Context",
       "description": "Deep narrative context (Key Decisions, Gotchas) from the docs/knowledge-base.",
       "permissions": {
-        "use": {
+        "run": {
           "allow": [
             "fs.read:docs/knowledge-base/**",
             "fs.glob:docs/knowledge-base/**",
