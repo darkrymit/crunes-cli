@@ -8,7 +8,7 @@ The entrypoint \`export async function run(args)\` executes the rune's main scri
 Inside \`run(args)\`, the \`args\` parameter contains:
 - **\`args.$command\`** *(string)*: The space-separated matched command path (e.g. \`"remote add"\` or \`""\` for the root).
 - **\`args.$commands\`** *(string[])*: The array of matched command levels (e.g. \`["remote", "add"]\` or \`[]\` for the root).
-- **\`args._\`** *(string[])*: Remaining positional arguments that were NOT mapped to named parameters or subcommands.
+- **\`args._\`** *(string[])*: All data positionals (command tokens are stripped, so \`args._[0]\` is always the first positional argument after the matched command path).
 - **\`args.$raw\`** *(string[])*: The exact raw string array before parsing.
 - **Named Options/Positionals**: Automatically mapped values from flags and positionals.
 
@@ -33,7 +33,7 @@ The parsed \`args\` object will look like this:
   "url": "https://github.com/foo/bar.git",
   "fetch": true,
   "verbose": false,
-  "_": [],
+  "_": ["origin", "https://github.com/foo/bar.git"],
   "$raw": ["remote", "add", "origin", "https://github.com/foo/bar.git", "--fetch"]
 }
 \`\`\`
