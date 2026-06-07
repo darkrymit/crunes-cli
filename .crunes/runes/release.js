@@ -100,6 +100,9 @@ async function runBump(args) {
     throw new Error('⚠ Missing required positional argument: <type> (major, minor, patch, or explicit version)')
   }
 
+  console.log('⚡ Running test suite before release bump...')
+  await shell.exec('npm test')
+
   const currentVersion = await json.readPath('package.json', '$.version', '')
   if (!currentVersion) {
     throw new Error('⚠ Could not read current version from package.json')
