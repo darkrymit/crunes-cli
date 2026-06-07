@@ -86,4 +86,12 @@ describe('help rune handler', () => {
     expect(parsed[0].key).toBe('greet')
     expect(exitSpy).toHaveBeenCalledWith(1)
   })
+
+  it('unknown key suggesting commands displays correct Tip', async () => {
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {})
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    await handler({ keys: ['run'], projectRoot: tmp, configRoot: tmp })
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('Unknown rune: "run". (Tip: Did you mean "crunes docs run"?)'))
+    expect(exitSpy).toHaveBeenCalledWith(1)
+  })
 })

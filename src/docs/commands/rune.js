@@ -6,6 +6,14 @@ import { formatHelp } from '../formatter.js'
 import { computeEffectivePermissions } from '../../rune/permissions/permissions.js'
 import { output } from '../../shared/output.js'
 
+const SUGGESTIONS = {
+  run: 'crunes docs run',
+  args: 'crunes docs args',
+  intro: 'crunes docs intro',
+  utils: 'crunes docs utils',
+  globals: 'crunes docs globals',
+}
+
 export async function handler({ keys, format = 'text', projectRoot = process.cwd(), configRoot = projectRoot }) {
   let config
   try {
@@ -21,7 +29,11 @@ export async function handler({ keys, format = 'text', projectRoot = process.cwd
   for (const key of keys) {
     const entry = getRune(config, key)
     if (!entry) {
-      output.warn(`Unknown rune: "${key}"`)
+      if (SUGGESTIONS[key]) {
+        output.warn(`Unknown rune: "${key}". (Tip: Did you mean "${SUGGESTIONS[key]}"?)`)
+      } else {
+        output.warn(`Unknown rune: "${key}"`)
+      }
       anyFailed = true
       continue
     }
