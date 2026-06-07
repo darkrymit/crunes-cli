@@ -34,7 +34,7 @@ declare namespace lifecycle {
     /**
      * Declares a positional argument.
      * 
-     * @param spec Positional argument specification (e.g., '<name>' for required, '[name]' for optional).
+     * @param spec Positional argument specification (e.g., '<name>' for required, '[name]' for optional, '<targets...>' or '[targets...]' for variadic rest arrays).
      * @param description A brief description of this positional argument.
      */
     positional(spec: string, description: string): this
@@ -66,6 +66,9 @@ declare namespace lifecycle {
   interface ParsedArgs extends Record<string, any> {
     /** Positional arguments in order. */
     _: string[]
+
+    /** Positional arguments not mapped to any named parameters. */
+    $rest: string[]
 
     /** Original raw arguments passed to the rune. */
     $raw: string[]

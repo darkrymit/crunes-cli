@@ -9,6 +9,7 @@ Runes declare options, positionals, examples, and nested commands using \`export
   - *Example*: \`b.option('-v, --verbose', 'Verbose output', false)\`
 - **\`.positional(spec, description)\`**: Declares a descriptive positional parameter.
   - *Example*: \`b.positional('<target>', 'Target path')\`
+  - *Variadic (Rest) Example*: \`b.positional('<targets...>', 'One or more target paths')\` (collects all remaining positional arguments into \`args.targets\` as an array)
 - **\`.example(usage, description)\`**: Adds a CLI calling example.
   - *Example*: \`b.example('crunes run my-rune hello', 'Basic call')\`
 - **\`.command(name, description, callback?)\`**: Declares a recursively nested command.

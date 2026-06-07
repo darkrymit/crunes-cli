@@ -188,4 +188,49 @@ describe('parseArgs nested commands', () => {
     expect(parsed.subcommand).toBeUndefined()
     expect(parsed.subcommands).toBeUndefined()
   })
+
+  it('maps variadic positionals to named array properties', () => {
+    const customSchema = {
+      options: [],
+      positionals: [],
+      commands: [
+        {
+          name: 'audit',
+          description: 'Audit files',
+          positionals: [{ spec: '<targets...>', description: 'Files to audit' }]
+        }
+      ]
+    }
+    const parsed = parseArgs(['audit', 'file1.txt', 'file2.txt'], customSchema)
+    expect(parsed.$command).toBe('audit')
+    expect(parsed.targets).toEqual(['file1.txt', 'file2.txt'])
+    expect(parsed.$rest).toEqual([])
+  })
+
+  it('populates $rest with unmapped positional arguments', () => {
+    const customSchema = {
+      options: [],
+      positionals: [{ spec: '<first>', description: 'First arg' }],
+    }
+    const parsed = parseArgs(['alice', 'bob', 'charlie'], customSchema)
+    expect(parsed.first).toBe('alice')
+    expect(parsed.$rest).toEqual(['bob', 'charlie'])
+  })
+
+  it('populates $rest with all positionals when no positional schema exists', () => {
+    const customSchema = { options: [], positionals: [] }
+    const parsed = parseArgs(['hello', 'world'], customSchema)
+    expect(parsed.$rest).toEqual(['hello', 'world'])
+  })
+
+  it('sets empty array for $rest when all positionals are mapped', () => {
+    const customSchema = {
+      options: [],
+      positionals: [{ spec: '<first>', description: 'First' }, { spec: '<second>', description: 'Second' }],
+    }
+    const parsed = parseArgs(['hello', 'world'], customSchema)
+    expect(parsed.first).toBe('hello')
+    expect(parsed.second).toBe('world')
+    expect(parsed.$rest).toEqual([])
+  })
 })

@@ -42,18 +42,37 @@ export function buildYargsConfig(schema) {
 }
 
 export function mapPositionals(parsed, positionals, offset = 0) {
-  if (!positionals) return
-  for (let i = 0; i < positionals.length; i++) {
-    const spec = positionals[i].spec
-    const match = spec.match(/^[<\[]([a-zA-Z0-9_-]+)[>\]]$/)
-    if (match) {
-      const key = match[1]
-      const val = parsed._[i + offset]
-      if (val !== undefined) {
-        parsed[key] = val
+  let consumedCount = 0
+  parsed.$rest = []
+
+  if (positionals && positionals.length > 0) {
+    for (let i = 0; i < positionals.length; i++) {
+      const spec = positionals[i].spec
+      
+      // 1. Check for variadic positional spec: e.g. <targets...> or [targets...]
+      const varMatch = spec.match(/^[<\[]([a-zA-Z0-9_-]+)\.\.\.[>\]]$/)
+      if (varMatch) {
+        const key = varMatch[1]
+        parsed[key] = parsed._.slice(i + offset)
+        consumedCount = parsed._.length // Consumes all remaining positionals
+        break
+      }
+      
+      // 2. Standard positional spec: e.g. <name> or [name]
+      const match = spec.match(/^[<\[]([a-zA-Z0-9_-]+)[>\]]$/)
+      if (match) {
+        const key = match[1]
+        const val = parsed._[i + offset]
+        if (val !== undefined) {
+          parsed[key] = val
+          consumedCount = i + 1
+        }
       }
     }
   }
+
+  // 3. Any unconsumed positionals go to $rest
+  parsed.$rest = parsed._.slice(offset + consumedCount)
 }
 
 export function parseArgs(rawArgs, schema) {

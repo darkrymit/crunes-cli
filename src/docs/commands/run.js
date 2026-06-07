@@ -9,6 +9,7 @@ Inside \`run(args)\`, the \`args\` parameter contains:
 - **\`args.$command\`** *(string)*: The space-separated matched command path (e.g. \`"remote add"\` or \`""\` for the root).
 - **\`args.$commands\`** *(string[])*: The array of matched command levels (e.g. \`["remote", "add"]\` or \`[]\` for the root).
 - **\`args._\`** *(string[])*: All data positionals (command tokens are stripped, so \`args._[0]\` is always the first positional argument after the matched command path).
+- **\`args.$rest\`** *(string[])*: Unmapped positional arguments that were not bound to named positionals.
 - **\`args.$raw\`** *(string[])*: The exact raw string array before parsing.
 - **Named Options/Positionals**: Automatically mapped values from flags and positionals.
 
@@ -34,6 +35,7 @@ The parsed \`args\` object will look like this:
   "fetch": true,
   "verbose": false,
   "_": ["origin", "https://github.com/foo/bar.git"],
+  "$rest": [],
   "$raw": ["remote", "add", "origin", "https://github.com/foo/bar.git", "--fetch"]
 }
 \`\`\`
