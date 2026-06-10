@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.2] - 2026-06-10
+
+### Added
+- **Nested Command Positionals**: Subcommand help output now prints positional argument descriptions
+- **Auto Test on Release**: Runs test suite automatically before release bump is applied
+
+### Fixed
+- **TypeDoc Section Mapping**: Corrected TypeDoc configuration for sections
+
+---
+
 ## [0.7.1] - 2026-06-07
 
 ### Added
