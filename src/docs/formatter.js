@@ -9,6 +9,14 @@ function formatCommands(commands, depth = 0) {
     const cmdStr = `${cmd.name}${posSpecs ? ' ' + posSpecs : ''}`
     lines.push(`${indent}${cmdStr.padEnd(30 - depth * 2)} ${cmd.description ?? ''}`.trimEnd())
 
+    const cmdPos = cmd.positionals ?? []
+    if (cmdPos.length > 0) {
+      lines.push(`${childIndent}Positionals:`)
+      for (const p of cmdPos) {
+        lines.push(`${detailIndent}${p.spec.padEnd(26)} ${p.description ?? ''}`.trimEnd())
+      }
+    }
+
     const cmdOpts = cmd.options ?? []
     if (cmdOpts.length > 0) {
       lines.push(`${childIndent}Options:`)

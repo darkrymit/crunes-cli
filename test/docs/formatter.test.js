@@ -68,4 +68,20 @@ describe('formatHelp recursive', () => {
     expect(output).toContain('add <name> <url>           Add remote')
     expect(output).toContain('--fetch                    Fetch first')
   })
+
+  it('outputs nested command positional parameter descriptions under Positionals:', () => {
+    const schema = {
+      commands: [
+        {
+          name: 'bump',
+          description: 'Bump version',
+          positionals: [{ spec: '<type>', description: 'major, minor, or patch' }]
+        }
+      ]
+    }
+    const output = formatHelp(schema, { key: 'release' })
+    expect(output).toContain('Positionals:')
+    expect(output).toContain('<type>                     major, minor, or patch')
+  })
 })
+
