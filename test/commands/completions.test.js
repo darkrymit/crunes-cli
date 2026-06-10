@@ -6,7 +6,7 @@ import { resolveCompletions } from '../../src/cli/commands/completions.js'
 import { buildProgram } from '../../src/cli/program.js'
 
 const program = buildProgram()
-const TOP = ['run','docs','version','doctor','check','bench','list','job','cache','sqlite','init','create','plugin','template','marketplace','completions']
+const TOP = ['run','run-repl','docs','version','doctor','check','bench','list','job','cache','sqlite','init','create','plugin','template','marketplace','completions']
 
 describe('resolveCompletions — top level', () => {
   it('returns all subcommands when only crunes typed', () => {
@@ -18,7 +18,7 @@ describe('resolveCompletions — top level', () => {
   })
 
   it('filters subcommands by partial token', () => {
-    expect(resolveCompletions(['crunes', 'r'], program)).toEqual(['run'])
+    expect(resolveCompletions(['crunes', 'r'], program)).toEqual(['run', 'run-repl'])
   })
 })
 
