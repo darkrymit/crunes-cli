@@ -625,7 +625,7 @@ globalThis.utils = {
   },
   section: {
     create: (name, data, o) => $__utils_section_create.applySync(undefined, [name, data, o], { arguments: { copy: true }, result: { copy: true } }),
-    emit: (sect) => $__utils_section_emit.applySync(undefined, [sect], { arguments: { copy: true } }),
+    emit: (sectionOrArray) => $__utils_section_emit.applySync(undefined, [sectionOrArray], { arguments: { copy: true } }),
     match: (sectionName, patterns) => $__utils_section_match.applySync(undefined, [sectionName, patterns], { arguments: { copy: true }, result: { copy: true } }),
     selected: () => $__utils_section_selected.applySync(undefined, [], { result: { copy: true } }),
   },

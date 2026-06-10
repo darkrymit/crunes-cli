@@ -301,9 +301,12 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
     return fsSync.promises.readFile(logPath, 'utf8')
   }))
 
-  await jail.set('$__utils_section_emit', new ivm.Reference((section) => {
-    if (sections) sections.push(section)
-    if (onEvent) onEvent({ type: 'section', section })
+  await jail.set('$__utils_section_emit', new ivm.Reference((sectionOrArray) => {
+    const items = Array.isArray(sectionOrArray) ? sectionOrArray : [sectionOrArray]
+    for (const section of items) {
+      if (sections) sections.push(section)
+      if (onEvent) onEvent({ type: 'section', section })
+    }
   }))
   await jail.set('$__utils_section_create', new ivm.Reference((name, data, opts) => {
     return utils.section.create(name, data, opts)
