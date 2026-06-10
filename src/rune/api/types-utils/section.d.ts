@@ -32,8 +32,8 @@ declare namespace section {
   export function match(sectionName: string, patterns: string[]): boolean
 
   /**
-   * Returns the active section filter passed via `--section` (or `-s`), or `undefined` if none.
+   * Returns the active section filter passed via `--section` (or `-s`), or `null` if none.
    */
-  export function selected(): string | undefined
+  export function selected(): string[] | null
 
 }
