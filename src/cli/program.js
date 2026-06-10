@@ -58,6 +58,25 @@ export function buildProgram() {
       await handler({ segments, format, failFast, projectRoot: projectRoot(), configRoot: configRoot() })
     })
 
+  program
+    .command('run-repl [args...]')
+    .description('Run a rune in interactive REPL mode (keeps isolate alive across inputs).')
+    .addHelpText('after',
+      '\nImportant: Global flags (e.g. --cwd) MUST appear before the "run-repl" command.\n\n' +
+      'Syntax:\n' +
+      '  [--format text|jsonl] [--section s1,s2] <key> [rune-args...]\n\n' +
+      'The rune must export a runRepl(args, input) function.\n' +
+      'Output via console.log() and utils.section.emit().\n' +
+      'End session with Ctrl+D or by returning { type: "done" } from runRepl.'
+    )
+    .allowUnknownOption()
+    .passThroughOptions()
+    .action(async (args) => {
+      const { handler, parseReplArgs } = await import('../rune/commands/run-repl.js')
+      const { key, runeArgs, sections, format } = parseReplArgs(args)
+      await handler({ key, runeArgs, sections, format, projectRoot: projectRoot(), configRoot: configRoot() })
+    })
+
   const helpGroup = program.command('docs').description('Show documentation for runes and other resources')
 
   helpGroup

@@ -301,9 +301,12 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
     return fsSync.promises.readFile(logPath, 'utf8')
   }))
 
-  await jail.set('$__utils_section_emit', new ivm.Reference((section) => {
-    if (sections) sections.push(section)
-    if (onEvent) onEvent({ type: 'section', section })
+  await jail.set('$__utils_section_emit', new ivm.Reference((sectionOrArray) => {
+    const items = Array.isArray(sectionOrArray) ? sectionOrArray : [sectionOrArray]
+    for (const section of items) {
+      if (sections) sections.push(section)
+      if (onEvent) onEvent({ type: 'section', section })
+    }
   }))
   await jail.set('$__utils_section_create', new ivm.Reference((name, data, opts) => {
     return utils.section.create(name, data, opts)
@@ -1271,4 +1274,135 @@ export async function executePluginRune({ pluginDir, pluginCacheDir, runeKey, pl
     onEvent,
     instanceId,
   })
+}
+
+/**
+ * Boot a rune isolate for interactive REPL use. The isolate stays alive
+ * across calls. Returns { step, dispose }.
+ *
+ * step(input)  — calls runRepl(parsedArgs, input) inside the isolate,
+ *                collects onEvent events, returns the raw return value.
+ * dispose()    — tears down the isolate and cleans up utils resources.
+ */
+export async function runRuneInReplSession(runeFile, effective, args, projectDir, {
+  nodeModulesDir = null,
+  pluginDeps = {},
+  pluginDir = null,
+  isolateMemoryMb = 128,
+  vars = {},
+  pluginId = null,
+  runeKey = null,
+  onEvent = null,
+  instanceId = '1',
+} = {}) {
+  const wrappedOnEvent = onEvent ? (event) => onEvent({ ...event, instanceId, rune: runeKey }) : null
+  const augmented = {
+    allow: [...effective.allow, ...getAutoPermits({ pluginId, pluginDir })],
+    deny: effective.deny,
+  }
+  const checkPermission = makePermissionChecker(augmented)
+  const { utils, dispose: disposeUtils } = createUtils(projectDir, checkPermission, pluginDir ?? null, augmented, vars, null, pluginId)
+
+  const isolate = new ivm.Isolate({ memoryLimit: isolateMemoryMb })
+  const context = await isolate.createContext()
+
+  await context.global.set('$__hostRequire', new ivm.Reference((spec) => {
+    const msg = DENY_BUILTINS.get(spec) ?? `Sandbox escape blocked. Cannot require '${spec}' on host.`
+    throw new Error(`PermissionError: ${msg}`)
+  }))
+
+  const utilsMod = await injectUtils(isolate, context, utils, null, vars, projectDir, checkPermission, runeKey, null, wrappedOnEvent)
+  await injectConsole(isolate, context, wrappedOnEvent)
+
+  if (pluginDir != null) await context.global.set('CRUNES_PLUGIN_ROOT', pluginDir)
+
+  const runeSrc = await fs.readFile(runeFile, 'utf8')
+  const patchedSrc = runeSrc +
+    '\nif (typeof runRepl !== "undefined") globalThis.__crunes_runRepl = runRepl;\n' +
+    '\nif (typeof argsRepl !== "undefined") globalThis.__crunes_argsRepl = argsRepl;\n'
+
+  const runeMod = await isolate.compileModule(patchedSrc, { filename: runeFile })
+  const resolver = createModuleResolver(
+    isolate,
+    path.dirname(runeFile),
+    nodeModulesDir ?? path.join(path.dirname(runeFile), 'node_modules'),
+    pluginDeps,
+    effective.allow,
+    effective.deny,
+    projectDir,
+    pluginDir ?? null,
+    new Map([['@utils', utilsMod]])
+  )
+  await runeMod.instantiate(context, resolver)
+  await runeMod.evaluate()
+  await context.eval('delete globalThis.$__hostRequire')
+
+  if (!await context.eval('typeof __crunes_runRepl !== "undefined"')) {
+    await disposeUtils()
+    isolate.dispose()
+    throw new Error(`Rune "${runeFile}" does not export a runRepl() function.`)
+  }
+
+  // Parse argsRepl schema if exported, else no schema
+  let parsedArgs
+  if (await context.eval('typeof __crunes_argsRepl !== "undefined"')) {
+    const schema = await context.evalClosure(
+      `return (async () => {
+        const b = (() => {
+          const opts = [], pos = [], exs = [], cmds = []
+          const createBuilder = (subName, subDesc) => {
+            const sOpts = [], sPos = [], sExs = [], sCmds = []
+            const subBuilder = {
+              option(flags, description, def) { sOpts.push({ flags, description, def }); return subBuilder },
+              positional(spec, description)   { sPos.push({ spec, description }); return subBuilder },
+              example(usage, description)     { sExs.push({ usage, description }); return subBuilder },
+              command(name, description, callback) {
+                const nestedBuilder = createBuilder(name, description)
+                if (typeof callback === 'function') callback(nestedBuilder)
+                sCmds.push(nestedBuilder.build())
+                return subBuilder
+              },
+              build() { return { name: subName, description: subDesc, options: sOpts, positionals: sPos, examples: sExs, commands: sCmds } }
+            }
+            return subBuilder
+          }
+          const rootBuilder = {
+            option(flags, description, def) { opts.push({ flags, description, def }); return rootBuilder },
+            positional(spec, description)   { pos.push({ spec, description }); return rootBuilder },
+            example(usage, description)     { exs.push({ usage, description }); return rootBuilder },
+            command(name, description, callback) {
+              const subBuilder = createBuilder(name, description)
+              if (typeof callback === 'function') callback(subBuilder)
+              cmds.push(subBuilder.build())
+              return rootBuilder
+            },
+            build() { return { options: opts, positionals: pos, examples: exs, commands: cmds } }
+          }
+          return rootBuilder
+        })()
+        const res = await __crunes_argsRepl(b)
+        return (res && typeof res.build === 'function') ? res.build() : res
+      })()`,
+      [],
+      { timeout: 30_000, result: { promise: true, copy: true } }
+    )
+    parsedArgs = parseArgs(args, schema)
+  } else {
+    parsedArgs = parseArgs(args, null)
+  }
+
+  async function step(input) {
+    return context.evalClosure(
+      `return (async () => { return await __crunes_runRepl($0, $1) })()`,
+      [parsedArgs, input],
+      { arguments: { copy: true }, result: { promise: true, copy: true } }
+    )
+  }
+
+  async function dispose() {
+    await disposeUtils()
+    isolate.dispose()
+  }
+
+  return { step, dispose }
 }

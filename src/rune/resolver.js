@@ -1,7 +1,7 @@
 import { join } from 'node:path'
 import { loadRegistry, resolvePluginKey } from '../plugin/registry.js'
 import { loadPluginJson } from '../plugin/manifest.js'
-import { executePluginRune, runRuneInIsolate } from './isolation/runner.js'
+import { executePluginRune, runRuneInIsolate, runRuneInReplSession, getPluginRunePath } from './isolation/runner.js'
 import { computeEffectivePermissions } from './permissions/permissions.js'
 import { CircularRuneError } from '../core/errors.js'
 
@@ -171,4 +171,91 @@ function normaliseResult(result) {
   if (result == null) return []
   if (Array.isArray(result)) return result
   return [result]
+}
+
+/**
+ * Resolve a rune key to an entry object with a createReplSession() method.
+ * Throws if the key cannot be resolved.
+ */
+export async function resolveRuneEntry(projectDir, config, key, configDir = projectDir) {
+  // Plugin-prefixed key (e.g. "myplugin:myrune")
+  const pluginMatch = await resolvePluginRune(config, key)
+  if (pluginMatch) {
+    const { pluginKey, runeKey, pluginDir, pluginCacheDir } = pluginMatch
+    const pluginJson = await loadPluginJson(pluginDir)
+    const projectPerms = config.permissions?.[`${pluginKey}:${runeKey}`]
+    const effective = computeEffectivePermissions(
+      pluginJson.runes[runeKey]?.permissions ?? {},
+      projectPerms ?? {},
+      'runRepl',
+      projectDir
+    )
+    const vars = { ...(pluginJson.runes[runeKey]?.vars ?? {}), ...(config.vars?.[`${pluginKey}:${runeKey}`] ?? {}) }
+    return {
+      createReplSession(args, opts = {}) {
+        const runeFile = getPluginRunePath(pluginDir, runeKey, pluginJson)
+        const nodeModulesDir = join(pluginCacheDir, 'node_modules')
+        return runRuneInReplSession(runeFile, effective, args, projectDir, {
+          nodeModulesDir,
+          pluginDeps: pluginJson.dependencies ?? {},
+          pluginDir,
+          pluginId: `${pluginJson.name}@${pluginJson.version}`,
+          vars,
+          runeKey,
+          onEvent: opts.onEvent ?? null,
+          instanceId: opts.instanceId ?? '1',
+        })
+      }
+    }
+  }
+
+  // Local config rune
+  const entry = getRune(config, key)
+  if (entry && !entry.plugin) {
+    const runeFile = join(configDir, entry.path ?? `.crunes/runes/${key}.js`)
+    const effective = computeEffectivePermissions(entry.permissions ?? {}, config.permissions?.[key], 'runRepl', projectDir)
+    const vars = entry.vars ?? {}
+    return {
+      createReplSession(args, opts = {}) {
+        return runRuneInReplSession(runeFile, effective, args, projectDir, {
+          vars,
+          runeKey: key,
+          onEvent: opts.onEvent ?? null,
+          instanceId: opts.instanceId ?? '1',
+        })
+      }
+    }
+  }
+
+  // Auto-discover from enabled plugins (bare key, no prefix)
+  const autoMatch = await resolveRuneFromPlugins(config, key)
+  if (autoMatch) {
+    const { pluginKey, runeKey, pluginDir, pluginCacheDir, pluginJson } = autoMatch
+    const projectPerms = config.permissions?.[`${pluginKey}:${runeKey}`]
+    const effective = computeEffectivePermissions(
+      pluginJson.runes[runeKey]?.permissions ?? {},
+      projectPerms ?? {},
+      'runRepl',
+      projectDir
+    )
+    const vars = { ...(pluginJson.runes[runeKey]?.vars ?? {}), ...(config.vars?.[`${pluginKey}:${runeKey}`] ?? {}) }
+    return {
+      createReplSession(args, opts = {}) {
+        const runeFile = getPluginRunePath(pluginDir, runeKey, pluginJson)
+        const nodeModulesDir = join(pluginCacheDir, 'node_modules')
+        return runRuneInReplSession(runeFile, effective, args, projectDir, {
+          nodeModulesDir,
+          pluginDeps: pluginJson.dependencies ?? {},
+          pluginDir,
+          pluginId: `${pluginJson.name}@${pluginJson.version}`,
+          vars,
+          runeKey,
+          onEvent: opts.onEvent ?? null,
+          instanceId: opts.instanceId ?? '1',
+        })
+      }
+    }
+  }
+
+  throw new Error(`Unknown key: "${key}"`)
 }

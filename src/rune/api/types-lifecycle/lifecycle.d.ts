@@ -14,11 +14,37 @@ declare namespace lifecycle {
 
   /**
    * The main execution lifecycle function of the rune.
-   * 
+   *
    * @param args Parsed yargs-parser arguments.
    * @returns A single section, an array of sections, a plain string, or void.
    */
   function run(args: ParsedArgs): Promise<RuneSection[] | RuneSection | string | void> | RuneSection[] | RuneSection | string | void
+
+  /**
+   * Defines the argument and option schema for the runRepl lifecycle.
+   * If absent, runRepl(args, input) receives an empty args object.
+   * Does NOT fall back to args() — the two lifecycles are independent.
+   *
+   * @param builder The schema builder to declare options, positionals, and examples.
+   */
+  function argsRepl(builder: ArgBuilder): void | ArgBuilder | any | Promise<void | ArgBuilder | any>
+
+  /**
+   * The interactive REPL lifecycle function. Called once per input line.
+   * The isolate stays alive across calls — JS closures are the state store.
+   *
+   * Output via console.log() and utils.section.emit().
+   *
+   * @param args  Parsed args from argsRepl() schema (built once at session start).
+   * @param input The raw string the user typed this turn.
+   * @returns A ReplSignal to control the prompt or end the session, or void to continue.
+   */
+  function runRepl(args: ParsedArgs, input: string): Promise<ReplSignal | string | void> | ReplSignal | string | void
+
+  /** Controls the REPL session from inside runRepl(). */
+  type ReplSignal =
+    | { type: 'prompt'; value?: string }   // continue with optional custom prompt
+    | { type: 'done'; message?: string }   // end the session
 
   /** Fluent builder for defining rune options, positionals, and examples. */
   interface ArgBuilder {
