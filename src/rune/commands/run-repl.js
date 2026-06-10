@@ -111,6 +111,10 @@ export async function handler({
   }
 
   let currentPrompt = '> '
+  let sessionEnded = false
+  // Resolves when the session should end (set by close event)
+  let eofResolve = null
+  const eofPromise = new Promise(resolve => { eofResolve = resolve })
 
   const rl = readline.createInterface({ input: process.stdin, output: process.stderr, terminal: process.stdin.isTTY })
 
@@ -119,51 +123,67 @@ export async function handler({
     rl.prompt()
   }
 
-  rl.on('line', async (input) => {
-    rl.pause()
-    let result
-    try {
-      result = await session.step(input)
-    } catch (err) {
-      const msg = isVerbose ? (err.stack || err.message) : err.message
+  async function endSession(message) {
+    if (sessionEnded) return
+    sessionEnded = true
+    if (message) {
       if (format === 'jsonl') {
-        process.stdout.write(JSON.stringify({ type: 'error', rune: key, instance: instanceId, message: msg }) + '\n')
+        process.stdout.write(JSON.stringify({ type: 'session-end', rune: key, instance: instanceId, message }) + '\n')
       } else {
-        process.stderr.write(`Error: ${msg}\n`)
+        process.stderr.write(message + '\n')
       }
-      rl.resume()
-      prompt()
-      return
-    }
-
-    const signal = parseReplReturn(result)
-
-    if (signal.type === 'done') {
-      if (signal.message) {
-        if (format === 'jsonl') {
-          process.stdout.write(JSON.stringify({ type: 'session-end', rune: key, instance: instanceId, message: signal.message }) + '\n')
-        } else {
-          process.stderr.write(signal.message + '\n')
-        }
-      } else if (format === 'jsonl') {
-        process.stdout.write(JSON.stringify({ type: 'session-end', rune: key, instance: instanceId }) + '\n')
-      }
-      rl.close()
-      await session.dispose()
-      return
-    }
-
-    if (signal.prompt !== null) currentPrompt = signal.prompt
-    rl.resume()
-    prompt()
-  })
-
-  rl.on('close', async () => {
-    if (format === 'jsonl') {
+    } else if (format === 'jsonl') {
       process.stdout.write(JSON.stringify({ type: 'session-end', rune: key, instance: instanceId }) + '\n')
     }
+    rl.close()
     await session.dispose()
+  }
+
+  // Process lines sequentially using an async queue to avoid race conditions
+  // in piped (non-TTY) mode where readline fires all line events synchronously
+  // before any async handler resolves.
+  let queue = Promise.resolve()
+
+  rl.on('line', (input) => {
+    queue = queue.then(async () => {
+      if (sessionEnded) return
+      let result
+      try {
+        result = await session.step(input)
+      } catch (err) {
+        if (sessionEnded) return
+        const msg = isVerbose ? (err.stack || err.message) : err.message
+        if (format === 'jsonl') {
+          process.stdout.write(JSON.stringify({ type: 'error', rune: key, instance: instanceId, message: msg }) + '\n')
+        } else {
+          process.stderr.write(`Error: ${msg}\n`)
+        }
+        prompt()
+        return
+      }
+
+      const signal = parseReplReturn(result)
+
+      if (signal.type === 'done') {
+        await endSession(signal.message)
+        eofResolve()
+        return
+      }
+
+      if (signal.prompt !== null) currentPrompt = signal.prompt
+      prompt()
+    })
+  })
+
+  rl.on('close', () => {
+    // Wait for the queue to drain, then end session if not already done
+    queue.then(async () => {
+      eofResolve()
+      await endSession(null)
+    })
   })
 
   prompt()
+  await eofPromise
+  await queue
 }
