@@ -123,11 +123,11 @@ The runner calls `args(builder)` before `run(parsedArgs)`. Without an `args` exp
 
 - **Lifecycle namespacing is mandatory in permissions:** Permissions declared in a flat `{ "allow": [...] }` structure (not nested under a lifecycle key) are silently ignored at runtime.
 
-- **`normalizePermission` prepends `./`:** Check `fs.read:package.json` is normalized to `fs.read:./package.json`. If you declared `fs.read:./package.json`, a check for the un-prefixed form will NOT match.
+- **`normalizePattern` prepends `./`:** `fs.read:package.json` is normalized to `fs.read:./package.json`. Both bare and `./`-prefixed forms in config produce the same pattern, so they match interchangeably.
 
 - **`http.fetch:` and `env.read:` use custom matchers, not micromatch:** These patterns are checked by custom logic before the standard micromatch pass, so they use different matching rules.
 
-- **Shell permission matching is exact-prefix:** `shell.run:git log *` allows `git log --oneline` but not `git status`.
+- **Shell/rune permission matching uses startsWith then micromatch:** `shell.run:**` and `shell.run:*` patterns use a `startsWith` check because micromatch can't match Windows drive letters (`C:/`) in glob tokens; all other patterns fall back to micromatch. `shell.run:git log *` allows `git log --oneline` but not `git status`.
 
 - **Plugin runes execute with `dir` = project root, not plugin dir:** The `dir` parameter points to the project root. The plugin cache directory is used only for permission resolution.
 

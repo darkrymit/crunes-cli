@@ -16,6 +16,7 @@ export class PermissionError extends Error {
 }
 
 const HOME = os.homedir().replace(/\\/g, '/')
+const MM_OPTS = { dot: true, noextglob: true, nonegate: true, nobrace: true, nobracket: true }
 
 function normalizeGitBashPath(p) {
   if (process.platform === 'win32') {
@@ -100,12 +101,12 @@ export function makePermissionChecker(effective) {
         const token = `${capability}:${v}`
         check(capability, value, p => {
           const [pc, pv = ''] = p.split(/:(.*)/)
-          return micromatch.isMatch(token, `${pc}:${pv.replace(/^~\//, `${HOME}/`)}`, { dot: true })
+          return micromatch.isMatch(token, `${pc}:${pv.replace(/^~\//, `${HOME}/`)}`, MM_OPTS)
         })
         return
       }
       // Capabilities whose values may contain special chars (e.g. Windows short paths with ~1)
-      // that break micromatch — :** / :* patterns use startsWith before falling back to micromatch.
+      // :** / :* use startsWith because micromatch can't match Windows drive letters (C:/) in tokens.
       case 'shell.run':
       case 'shell.job.start':
       case 'rune.run':
@@ -118,7 +119,7 @@ export function makePermissionChecker(effective) {
         check(capability, value, p => {
           if (p.endsWith(':**') && token.startsWith(p.slice(0, -2))) return true
           if (p.endsWith(':*')  && token.startsWith(p.slice(0, -1))) return true
-          return micromatch.isMatch(token, p, { dot: true })
+          return micromatch.isMatch(token, p, MM_OPTS)
         })
         return
       }

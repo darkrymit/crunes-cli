@@ -20,9 +20,9 @@ export function matchStorePermission(value, pattern, cap) {
   if (patLoc.startsWith('@')) {
     if (patLoc.endsWith('/**')) {
       const bare = patLoc.slice(0, -3)
-      const locOk = micromatch.isMatch(valueLoc, [patLoc, bare], { dot: true })
+      const locOk = micromatch.isMatch(valueLoc, [patLoc, bare], { dot: true, noextglob: true, nonegate: true, nobrace: true, nobracket: true })
       const nameOk = patName === '*' || patName == null ||
-        (valueName != null && micromatch.isMatch(valueName, patName, { dot: true }))
+        (valueName != null && micromatch.isMatch(valueName, patName, { dot: true, noextglob: true, nonegate: true, nobrace: true, nobracket: true }))
       return locOk && nameOk
     }
   }
@@ -30,9 +30,9 @@ export function matchStorePermission(value, pattern, cap) {
   const locOk  = micromatch.isMatch(
     valueLoc.startsWith('~/') ? HOME + valueLoc.slice(1) : valueLoc,
     patLoc.startsWith('~/') ? HOME + patLoc.slice(1) : patLoc,
-    { dot: true }
+    { dot: true, noextglob: true, nonegate: true, nobrace: true, nobracket: true }
   )
   const nameOk = patName === '*' || patName == null ||
-    (valueName != null && micromatch.isMatch(valueName, patName, { dot: true }))
+    (valueName != null && micromatch.isMatch(valueName, patName, { dot: true, noextglob: true, nonegate: true, nobrace: true, nobracket: true }))
   return locOk && nameOk
 }
