@@ -4,10 +4,10 @@ Permission enforcement for all sandboxed rune capabilities. `permissions.js` mer
 
 ## Files
 
-- **permissions.js** — `computeEffectivePermissions(pluginPerms, projectPerms, lifecycle)` — merges plugin and project permissions with normalization. `makePermissionChecker(effective)` — returns `checkPermission(capability, value)` that validates access against effective permissions. `PermissionError` — thrown on denied access with `capability` and `value` properties.
+- **permissions.js** — `computeEffectivePermissions(pluginPerms, projectPerms, lifecycle)` — merges plugin and project permissions with syntactic normalization (no dir). `makePermissionChecker(effective, ctx?)` — builds per-capability pattern buckets; when `ctx = { dir, pluginId?, pluginDir?, projectId? }` is provided, `fs.*`, `cache.*`, and `sqlite.*` patterns are expanded at build time into all sibling forms (relative ↔ bare ↔ absolute ↔ `@project/` ↔ virtual token) so runtime path values match regardless of the form the rune author passes. `PermissionError` — thrown on denied access with `capability` and `value` properties.
 - **permissions-http.js** — `matchFetchPermission(value, pattern)` — matches an HTTP fetch access value (`METHOD::URL`) against an allow/deny pattern with method and URL matching.
 - **permissions-env.js** — `parseEnvPattern(pattern)` — parses an `env.read` pattern into `{ sources, keyPatterns }`. `matchEnvPermission(value, pattern)` — matches an env access value (`source::key`) against a pattern.
-- **permissions-store.js** — `matchStorePermission(value, pattern, cap)` — matches a cache or sqlite store access value (`location::name`) against a pattern, with capability-aware parsing.
+- **permissions-store.js** — `matchStorePermission(value, pattern)` — matches a cache or sqlite store access value (`location::name`) against a pattern.
 - **permissions-http-server.js** — `matchHttpServerPermission(value, pattern)` — matches an HTTP server bind value against a pattern. `isLoopbackHost(host)` — returns true for loopback addresses (`127.0.0.1`, `localhost`, `::1`).
 - **permissions-ws.js** — `matchWsPermission(url, pattern)` — matches a WebSocket client URL against a pattern. `matchWsServerPermission(value, pattern)` — matches a WebSocket server bind value (`host:port:path`) against a pattern.
 

@@ -19,7 +19,7 @@ function checkerFor(allow, deny = []) {
   return makePermissionChecker({ allow, deny })
 }
 
-describe('createFsUtils — canonical permission tokens', () => {
+describe('createFsUtils — raw permission tokens (pass-through)', () => {
   let dir
 
   beforeEach(async () => {
@@ -28,44 +28,44 @@ describe('createFsUtils — canonical permission tokens', () => {
     await writeFile(dir, 'src/utils/foo.ts', 'export {}')
   })
 
-  it('relative path without ./ normalizes to ./ prefix', async () => {
+  it('bare relative path passed as-is (no ./ normalization)', async () => {
     const spy = vi.fn()
     await createFsUtils(dir, spy).read('package.json').catch(() => {})
-    expect(spy).toHaveBeenCalledWith('fs.read', './package.json')
+    expect(spy).toHaveBeenCalledWith('fs.read', 'package.json')
   })
 
-  it('./ prefix is kept as-is', async () => {
+  it('./ prefix kept as-is', async () => {
     const spy = vi.fn()
     await createFsUtils(dir, spy).read('./package.json').catch(() => {})
     expect(spy).toHaveBeenCalledWith('fs.read', './package.json')
   })
 
-  it('resolves ../ segments in relative paths', async () => {
+  it('unresolved path with ../ segments passed as-is', async () => {
     const spy = vi.fn()
     await createFsUtils(dir, spy).read('./src/../package.json').catch(() => {})
-    expect(spy).toHaveBeenCalledWith('fs.read', './package.json')
+    expect(spy).toHaveBeenCalledWith('fs.read', './src/../package.json')
   })
 
-  it('absolute path token is relativized when inside project dir', async () => {
+  it('absolute path passed as-is (no relativization)', async () => {
     const spy = vi.fn()
     const abs = path.join(dir, 'package.json')
     await createFsUtils(dir, spy).read(abs).catch(() => {})
-    expect(spy).toHaveBeenCalledWith('fs.read', './package.json')
+    expect(spy).toHaveBeenCalledWith('fs.read', abs)
   })
 
-  it('~ prefix is kept as canonical token', async () => {
+  it('~ prefix passed as-is', async () => {
     const spy = vi.fn()
     await createFsUtils(dir, spy).read('~/.npmrc').catch(() => {})
     expect(spy).toHaveBeenCalledWith('fs.read', '~/.npmrc')
   })
 
-  it('traversal path keeps ../ canonical form', async () => {
+  it('traversal path passed as-is', async () => {
     const spy = vi.fn()
     await createFsUtils(dir, spy).read('../outside/file.txt').catch(() => {})
     expect(spy).toHaveBeenCalledWith('fs.read', '../outside/file.txt')
   })
 
-  it('@plugin/ path produces @plugin/ token', async () => {
+  it('@plugin/ path passed as-is', async () => {
     const spy = vi.fn()
     const pluginDir = await makeTempDir()
     await writeFile(pluginDir, 'assets/schema.json', '{}')
@@ -73,7 +73,7 @@ describe('createFsUtils — canonical permission tokens', () => {
     expect(spy).toHaveBeenCalledWith('fs.read', '@plugin/assets/schema.json')
   })
 
-  it('exists() uses same canonical token', async () => {
+  it('exists() passes raw value', async () => {
     const spy = vi.fn()
     await createFsUtils(dir, spy).exists('./package.json').catch(() => {})
     expect(spy).toHaveBeenCalledWith('fs.read', './package.json')
@@ -193,11 +193,11 @@ describe('createFsUtils — glob', () => {
     const fsUtils = createFsUtils(dir, null)
     await expect(fsUtils.glob('/etc/**')).rejects.toThrow('absolute')
   })
-  it('canonicalizes glob pattern for permission check', async () => {
+  it('passes raw glob pattern to permission check', async () => {
     const spy = vi.fn()
     const fsUtils = createFsUtils(dir, spy)
     await fsUtils.glob('src/*.ts')
-    expect(spy).toHaveBeenCalledWith('fs.glob', './src/*.ts')
+    expect(spy).toHaveBeenCalledWith('fs.glob', 'src/*.ts')
   })
 })
 
@@ -235,10 +235,10 @@ describe('createFsUtils — @project/ paths', () => {
     await writeFile(dir, 'src/utils/foo.ts', 'export {}')
   })
 
-  it('@project/ token normalizes to ./relative path', async () => {
+  it('@project/ path passed as-is to checkPermission', async () => {
     const spy = vi.fn()
     await createFsUtils(dir, spy).read('@project/src/utils/foo.ts').catch(() => {})
-    expect(spy).toHaveBeenCalledWith('fs.read', './src/utils/foo.ts')
+    expect(spy).toHaveBeenCalledWith('fs.read', '@project/src/utils/foo.ts')
   })
 
   it('@project/ resolves to project root and reads file content', async () => {
@@ -253,16 +253,16 @@ describe('createFsUtils — @project/ paths', () => {
       .rejects.toThrow()
   })
 
-  it('@project/ exists checks correct path', async () => {
+  it('@project/ exists passes raw token', async () => {
     const spy = vi.fn().mockReturnValue(undefined)
     await createFsUtils(dir, spy).exists('@project/src/utils/foo.ts').catch(() => {})
-    expect(spy).toHaveBeenCalledWith('fs.read', './src/utils/foo.ts')
+    expect(spy).toHaveBeenCalledWith('fs.read', '@project/src/utils/foo.ts')
   })
 
-  it('@project/ write normalizes token to ./relative path', async () => {
+  it('@project/ write passes raw token', async () => {
     const spy = vi.fn()
     await createFsUtils(dir, spy).write('@project/out/result.txt', 'hi').catch(() => {})
-    expect(spy).toHaveBeenCalledWith('fs.write', './out/result.txt')
+    expect(spy).toHaveBeenCalledWith('fs.write', '@project/out/result.txt')
   })
 })
 
@@ -285,10 +285,10 @@ describe('createFsUtils — store path resolution', () => {
     expect(result).toBe('hello')
   })
 
-  it('@project/ canonical token strips to ./subpath', async () => {
+  it('@project/ passed as raw token', async () => {
     const spy = vi.fn()
     await createFsUtils(dir, spy).read('@project/foo.txt').catch(() => {})
-    expect(spy).toHaveBeenCalledWith('fs.read', './foo.txt')
+    expect(spy).toHaveBeenCalledWith('fs.read', '@project/foo.txt')
   })
 
   it('@plugin-sqlite/ produces verbatim canonical token', async () => {
@@ -469,8 +469,8 @@ describe('createFsUtils — remove, move, stat, mkdir, readAsBytes, writeAsBytes
     const spy = vi.fn()
     const fsUtils = createFsUtils(dir, spy)
     await fsUtils.move('src/a.txt', 'dst/b.txt').catch(() => {})
-    expect(spy).toHaveBeenCalledWith('fs.read', './src/a.txt')
-    expect(spy).toHaveBeenCalledWith('fs.write', './dst/b.txt')
+    expect(spy).toHaveBeenCalledWith('fs.read', 'src/a.txt')
+    expect(spy).toHaveBeenCalledWith('fs.write', 'dst/b.txt')
   })
 
   it('fs.stat returns accurate metadata', async () => {
@@ -489,7 +489,7 @@ describe('createFsUtils — remove, move, stat, mkdir, readAsBytes, writeAsBytes
     const spy = vi.fn()
     const fsUtils = createFsUtils(dir, spy)
     await fsUtils.stat('a.txt').catch(() => {})
-    expect(spy).toHaveBeenCalledWith('fs.read', './a.txt')
+    expect(spy).toHaveBeenCalledWith('fs.read', 'a.txt')
   })
 
   it('fs.mkdir creates empty folder structures', async () => {
@@ -520,10 +520,10 @@ describe('createFsUtils — remove, move, stat, mkdir, readAsBytes, writeAsBytes
     const bytes = new Uint8Array([1, 2, 3])
     
     await fsUtils.writeAsBytes('bin.dat', bytes).catch(() => {})
-    expect(spy).toHaveBeenCalledWith('fs.write', './bin.dat')
-    
+    expect(spy).toHaveBeenCalledWith('fs.write', 'bin.dat')
+
     await fsUtils.readAsBytes('bin.dat').catch(() => {})
-    expect(spy).toHaveBeenCalledWith('fs.read', './bin.dat')
+    expect(spy).toHaveBeenCalledWith('fs.read', 'bin.dat')
   })
 })
 

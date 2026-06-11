@@ -1,6 +1,6 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
-import { resolvePath, canonicalizeLocation } from './utils.js'
+import { resolvePath } from './utils.js'
 import { upsertCacheBucket } from '../../cache/index.js'
 import { upsertProject, ensureProjectIdentity } from '../../project/index.js'
 
@@ -112,8 +112,7 @@ export function createCacheUtils(dir, checkPermission, { pluginId = null, storeD
       }
       const ctx      = { dir, pluginId, storeDir, projectName, projectId }
       const cacheDir = path.join(resolvePath(location, ctx), name)
-      const canon    = canonicalizeLocation(location, { dir })
-      const tokenValue = `${canon}::${name}`
+      const tokenValue = `${location}::${name}`
       const checkRead  = checkPermission ? () => checkPermission('cache.read',  tokenValue) : null
       const checkWrite = checkPermission ? () => checkPermission('cache.write', tokenValue) : null
       if (scope !== null && GLOBAL_SCOPES.has(scope)) {

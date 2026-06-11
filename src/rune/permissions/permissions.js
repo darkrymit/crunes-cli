@@ -1,5 +1,6 @@
 import os from 'node:os'
 import { isMatch } from '../../shared/match.js'
+import { resolvePath } from '../api/utils.js'
 import { matchFetchPermission } from './permissions-http.js'
 import { matchEnvPermission } from './permissions-env.js'
 import { matchStorePermission } from './permissions-store.js'
@@ -17,6 +18,84 @@ export class PermissionError extends Error {
 
 const HOME = os.homedir().replace(/\\/g, '/')
 
+// @local-project-* tokens resolve inside dir, so their absolute also gets relative siblings.
+const LOCAL_VIRTUAL_PREFIXES = new Set([
+  '@local-project-cache', '@local-project-plugin-cache',
+  '@local-project-sqlite', '@local-project-plugin-sqlite',
+])
+
+const ALL_VIRTUAL_PREFIXES = [
+  '@global-plugin-cache', '@global-project-plugin-cache', '@global-project-cache',
+  '@global-plugin-sqlite', '@global-project-plugin-sqlite', '@global-project-sqlite',
+  '@local-project-cache', '@local-project-plugin-cache',
+  '@local-project-sqlite', '@local-project-plugin-sqlite',
+  '@plugin',
+]
+
+/**
+ * Expand a full "cap:value" permission string into all equivalent sibling forms.
+ * Handles fs.*, cache.*, and sqlite.* caps. All others return [perm].
+ *
+ * ctx = { dir, pluginId?, pluginDir?, projectId? }
+ */
+function expandPattern(perm, ctx) {
+  const colonIdx = perm.indexOf(':')
+  if (colonIdx === -1) return [perm]
+  const cap = perm.slice(0, colonIdx)
+  const isFs    = cap === 'fs.read' || cap === 'fs.write' || cap === 'fs.exists' || cap === 'fs.glob'
+  const isStore = cap === 'cache.read' || cap === 'cache.write' || cap === 'sqlite.read' || cap === 'sqlite.write'
+  if (!isFs && !isStore) return [perm]
+  if (!ctx?.dir) return [perm]
+  const { dir, pluginId = null, pluginDir = null, projectId = null } = ctx
+  const absDir = dir.replace(/\\/g, '/')
+
+  if (isStore) {
+    const rest = perm.slice(colonIdx + 1)
+    const dColonIdx = rest.indexOf('::')
+    const loc  = dColonIdx === -1 ? rest : rest.slice(0, dColonIdx)
+    const name = dColonIdx === -1 ? '' : '::' + rest.slice(dColonIdx + 2)
+    return expandLocValue(loc, absDir, { pluginId, pluginDir, projectId })
+      .map(expandedLoc => `${cap}:${expandedLoc}${name}`)
+  }
+
+  const value = perm.slice(colonIdx + 1)
+  return expandLocValue(value, absDir, { pluginId, pluginDir, projectId })
+    .map(v => `${cap}:${v}`)
+}
+
+function expandLocValue(value, absDir, { pluginId, pluginDir, projectId }) {
+  const v = value.replace(/\\/g, '/')
+  if (v.startsWith('~/')) return [v, HOME + v.slice(1)]
+  if (v.startsWith('../')) return [v]
+  const isAbsolute = v.startsWith('/') || /^[a-zA-Z]:/.test(v)
+  if (isAbsolute) {
+    if (v.startsWith(absDir + '/')) {
+      const rel = v.slice(absDir.length + 1)
+      return [v, `./${rel}`, rel, `@project/${rel}`]
+    }
+    return [v]
+  }
+  if (v.startsWith('@project/')) {
+    const rel = v.slice('@project/'.length)
+    return [v, `./${rel}`, rel, absDir + '/' + rel]
+  }
+  const matchedPrefix = ALL_VIRTUAL_PREFIXES.find(p => v === p || v.startsWith(p + '/'))
+  if (matchedPrefix) {
+    const suffix = v.slice(matchedPrefix.length)
+    try {
+      const base = resolvePath(matchedPrefix, { dir: absDir, pluginId, pluginDir, projectId }).replace(/\\/g, '/')
+      const absResolved = base + suffix
+      if (LOCAL_VIRTUAL_PREFIXES.has(matchedPrefix)) {
+        const rel = absResolved.slice(absDir.length + 1)
+        return [v, absResolved, `./${rel}`, rel, `@project/${rel}`]
+      }
+      return [v, absResolved]
+    } catch { return [v] }
+  }
+  const rel = v.startsWith('./') ? v.slice(2) : v
+  return [`./${rel}`, rel, absDir + '/' + rel, `@project/${rel}`]
+}
+
 function normalizeGitBashPath(p) {
   if (process.platform === 'win32') {
     const m = p.match(/^\/([a-zA-Z])(\/|$)/)
@@ -28,12 +107,15 @@ function normalizeGitBashPath(p) {
 function normalizePattern(perm) {
   if (perm.startsWith('fs.read:') || perm.startsWith('fs.write:') || perm.startsWith('fs.exists:') || perm.startsWith('fs.glob:')) {
     const [cap, ...rest] = perm.split(':')
-    const val = normalizeGitBashPath(rest.join(':').replace(/\\/g, '/'))
+    const raw = normalizeGitBashPath(rest.join(':').replace(/\\/g, '/'))
+    // @project/foo is an alias for ./foo (purely syntactic)
+    const val = raw.startsWith('@project/') ? './' + raw.slice('@project/'.length) : raw
     const isAbsolute = val.startsWith('/') || /^[a-zA-Z]:/.test(val)
-    if (!val.startsWith('./') && !val.startsWith('../') && !val.startsWith('@') && !val.startsWith('~/') && !isAbsolute) {
-      return `${cap}:./${val}`
-    }
-    return `${cap}:${val}`
+    // Bare names (no prefix) get ./ so the checker can strip it for micromatch.
+    const v = (!val.startsWith('./') && !val.startsWith('../') && !val.startsWith('@') && !val.startsWith('~/') && !isAbsolute)
+      ? `./${val}`
+      : val
+    return `${cap}:${v}`
   }
   if (perm.startsWith('cache.read:') || perm.startsWith('cache.write:') ||
       perm.startsWith('sqlite.read:') || perm.startsWith('sqlite.write:')) {
@@ -41,7 +123,7 @@ function normalizePattern(perm) {
     const cap      = perm.slice(0, colonIdx)
     const rest     = perm.slice(colonIdx + 1)
     if (rest.startsWith('@')) return perm
-    
+
     const dColonIdx = rest.indexOf('::')
     const rawLoc  = dColonIdx === -1 ? rest : rest.slice(0, dColonIdx)
     const rawName = dColonIdx !== -1 ? rest.slice(dColonIdx + 2) : null
@@ -68,30 +150,36 @@ function normalizePattern(perm) {
 export function computeEffectivePermissions(pluginPerms, projectPerms, lifecycle) {
   const namespacePlugin = pluginPerms?.[lifecycle] || {}
   const namespaceProject = projectPerms?.[lifecycle]
-  const norm = normalizePattern
 
-  const pluginAllow = (namespacePlugin.allow ?? []).map(norm)
-  const pluginDeny  = (namespacePlugin.deny ?? []).map(norm)
+  const pluginAllow = (namespacePlugin.allow ?? []).map(normalizePattern)
+  const pluginDeny  = (namespacePlugin.deny ?? []).map(normalizePattern)
 
   return {
-    allow: namespaceProject?.allow ? namespaceProject.allow.map(norm) : pluginAllow,
-    deny:  [...pluginDeny, ...(namespaceProject?.deny ?? []).map(norm)],
+    allow: namespaceProject?.allow ? namespaceProject.allow.map(normalizePattern) : pluginAllow,
+    deny:  [...pluginDeny, ...(namespaceProject?.deny ?? []).map(normalizePattern)],
   }
 }
 
 /**
  * Returns a checkPermission(capability, value) function that throws PermissionError
  * if the request is not in effective.allow or is in effective.deny.
+ *
+ * ctx = { dir, pluginId?, pluginDir?, projectId? } — used to expand fs/cache/sqlite pattern
+ * siblings at build time so runtime path values match regardless of their form.
  */
-export function makePermissionChecker(effective) {
+export function makePermissionChecker(effective, ctx = null) {
   const buckets = new Map()
   const getBucket = cap => {
     if (!buckets.has(cap)) buckets.set(cap, { allow: [], deny: [] })
     return buckets.get(cap)
   }
   const capOf = p => { const i = p.indexOf(':'); return i === -1 ? p : p.slice(0, i) }
-  for (const p of effective.allow) getBucket(capOf(p)).allow.push(p)
-  for (const p of effective.deny)  getBucket(capOf(p)).deny.push(p)
+  for (const p of effective.allow) {
+    for (const expanded of expandPattern(p, ctx)) getBucket(capOf(expanded)).allow.push(expanded)
+  }
+  for (const p of effective.deny) {
+    for (const expanded of expandPattern(p, ctx)) getBucket(capOf(expanded)).deny.push(expanded)
+  }
 
   const checkAndThrow = (capability, value, matchFn) => {
     const b = buckets.get(capability) ?? { allow: [], deny: [] }
@@ -108,9 +196,9 @@ export function makePermissionChecker(effective) {
       case 'fs.write':
       case 'fs.exists':
       case 'fs.glob': {
-        const strip = s => s.replace(/^~\//, `${HOME}/`).replace(/^\.\//, '')
-        const v = strip(value.replace(/\\/g, '/'))
-        checkAndThrow(capability, value, pv => isMatch(v, strip(pv)))
+        const normalize = s => s.replace(/\\/g, '/').replace(/^@project\//, '').replace(/^\.\//, '')
+        const v = normalize(value)
+        checkAndThrow(capability, value, pv => isMatch(v, normalize(pv)))
         return
       }
       case 'shell.run':

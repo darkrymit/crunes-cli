@@ -998,7 +998,8 @@ export async function runRuneInIsolate(runeFile, effective, args, projectDir, {
     allow: [...effective.allow, ...getAutoPermits({ pluginId, pluginDir })],
     deny: effective.deny,
   }
-  const checkPermission = makePermissionChecker(augmented)
+  const { id: projectId } = await ensureProjectIdentity(projectDir)
+  const checkPermission = makePermissionChecker(augmented, { dir: projectDir, pluginId, pluginDir, projectId })
   const { utils, dispose } = createUtils(projectDir, checkPermission, pluginDir ?? null, augmented, vars, sections, pluginId)
 
   if (isVerbose) console.error(`[crunes:debug] creating Isolate...`)
@@ -1173,7 +1174,7 @@ export async function getArgsSchema(runeFile, effective, projectDir, {
     allow: [...effective.allow, ...getAutoPermits({ pluginId: null, pluginDir })],
     deny: effective.deny,
   }
-  const checkPermission = makePermissionChecker(augmented)
+  const checkPermission = makePermissionChecker(augmented, { dir: projectDir })
   const { utils, dispose } = createUtils(projectDir, checkPermission, pluginDir ?? null, augmented, vars, null, null)
   const isolate = new ivm.Isolate({ memoryLimit: isolateMemoryMb })
   try {
@@ -1270,7 +1271,7 @@ export async function getReplSchema(runeFile, effective, args, projectDir, {
     allow: [...effective.allow, ...getAutoPermits({ pluginId: null, pluginDir })],
     deny: effective.deny,
   }
-  const checkPermission = makePermissionChecker(augmented)
+  const checkPermission = makePermissionChecker(augmented, { dir: projectDir })
   const { utils, dispose } = createUtils(projectDir, checkPermission, pluginDir ?? null, augmented, vars, null, null)
   const isolate = new ivm.Isolate({ memoryLimit: isolateMemoryMb })
   try {
@@ -1444,7 +1445,8 @@ export async function runRuneInReplSession(runeFile, effective, args, projectDir
     allow: [...effective.allow, ...getAutoPermits({ pluginId, pluginDir })],
     deny: effective.deny,
   }
-  const checkPermission = makePermissionChecker(augmented)
+  const { id: projectId } = await ensureProjectIdentity(projectDir)
+  const checkPermission = makePermissionChecker(augmented, { dir: projectDir, pluginId, pluginDir, projectId })
   const { utils, dispose: disposeUtils } = createUtils(projectDir, checkPermission, pluginDir ?? null, augmented, vars, null, pluginId)
 
   const isolate = new ivm.Isolate({ memoryLimit: isolateMemoryMb })
