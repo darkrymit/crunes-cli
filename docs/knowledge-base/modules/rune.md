@@ -125,11 +125,11 @@ The runner calls `args(builder)` before `run(parsedArgs)`. Without an `args` exp
 
 - **`normalizePattern` prepends `./`:** `fs.read:package.json` is normalized to `fs.read:./package.json`. Both bare and `./`-prefixed forms in config produce the same pattern, so they match interchangeably.
 
-- **`http.fetch:` and `env.read:` use custom matchers, not micromatch:** These patterns are checked by custom logic before the standard micromatch pass, so they use different matching rules.
+- **`http.fetch:` and `env.read:` parse values before matching:** These capabilities split the value into structured parts (method, URL, source, key) before calling `isMatch`. The glob matching itself still uses the shared `match.js` — only the pre-match parsing is custom.
 
 - **Shell/rune permission matching uses startsWith then micromatch:** `shell.run:**` and `shell.run:*` patterns use a `startsWith` check because micromatch can't match Windows drive letters (`C:/`) in glob tokens; all other patterns fall back to micromatch. `shell.run:git log *` allows `git log --oneline` but not `git status`.
 
-- **Plugin runes execute with `dir` = project root, not plugin dir:** The `dir` parameter points to the project root. The plugin cache directory is used only for permission resolution.
+- **Plugin runes execute in the project root context:** The project root is used as the working directory for plugin rune execution. The plugin cache directory is used only for resolving the rune file path and node_modules.
 
 - **`ws.server(httpServer)` registers at `open()` time:** The WebSocket registration happens when `open()` is called. Both orderings (before/after HTTP server opens) work because registration is buffered.
 
