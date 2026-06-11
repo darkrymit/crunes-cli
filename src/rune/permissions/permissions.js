@@ -68,7 +68,7 @@ function normalizePattern(perm) {
 export function computeEffectivePermissions(pluginPerms, projectPerms, lifecycle) {
   const namespacePlugin = pluginPerms?.[lifecycle] || {}
   const namespaceProject = projectPerms?.[lifecycle]
-  const norm = p => normalizePattern(p)
+  const norm = normalizePattern
 
   const pluginAllow = (namespacePlugin.allow ?? []).map(norm)
   const pluginDeny  = (namespacePlugin.deny ?? []).map(norm)
@@ -84,9 +84,21 @@ export function computeEffectivePermissions(pluginPerms, projectPerms, lifecycle
  * if the request is not in effective.allow or is in effective.deny.
  */
 export function makePermissionChecker(effective) {
-  const check = (capability, value, matchFn) => {
-    const allowed = effective.allow.some(p => matchFn(p))
-    const denied  = effective.deny.length > 0 && effective.deny.some(p => matchFn(p))
+  const buckets = new Map()
+  const getBucket = cap => {
+    if (!buckets.has(cap)) buckets.set(cap, { allow: [], deny: [] })
+    return buckets.get(cap)
+  }
+  const capOf = p => { const i = p.indexOf(':'); return i === -1 ? p : p.slice(0, i) }
+  for (const p of effective.allow) getBucket(capOf(p)).allow.push(p)
+  for (const p of effective.deny)  getBucket(capOf(p)).deny.push(p)
+
+  const checkAndThrow = (capability, value, matchFn) => {
+    const b = buckets.get(capability) ?? { allow: [], deny: [] }
+    const n = capability.length + 1
+    const pv = p => p.length > n ? p.slice(n) : null
+    const allowed = b.allow.some(p => { const v = pv(p); return v !== null && matchFn(v) })
+    const denied  = b.deny.length > 0 && b.deny.some(p => { const v = pv(p); return v !== null && matchFn(v) })
     if (!allowed || denied) throw new PermissionError(capability, value)
   }
 
@@ -97,15 +109,9 @@ export function makePermissionChecker(effective) {
       case 'fs.exists':
       case 'fs.glob': {
         const v = value.replace(/\\/g, '/').replace(/^~\//, `${HOME}/`)
-        const token = `${capability}:${v}`
-        check(capability, value, p => {
-          const [pc, pv = ''] = p.split(/:(.*)/)
-          return isMatch(token, `${pc}:${pv.replace(/^~\//, `${HOME}/`)}`)
-        })
+        checkAndThrow(capability, value, pv => isMatch(v, pv.replace(/^~\//, `${HOME}/`)))
         return
       }
-      // Capabilities whose values may contain special chars (e.g. Windows short paths with ~1)
-      // :** / :* use startsWith because micromatch can't match Windows drive letters (C:/) in tokens.
       case 'shell.run':
       case 'shell.job.start':
       case 'rune.run':
@@ -114,12 +120,8 @@ export function makePermissionChecker(effective) {
       case 'rune.kill':
       case 'rune.exists':
       case 'db.connect': {
-        const token = `${capability}:${value}`.replace(/\\/g, '/')
-        check(capability, value, p => {
-          if (p.endsWith(':**') && token.startsWith(p.slice(0, -2))) return true
-          if (p.endsWith(':*')  && token.startsWith(p.slice(0, -1))) return true
-          return isMatch(token, p)
-        })
+        const v = value.replace(/\\/g, '/')
+        checkAndThrow(capability, value, pv => isMatch(v, pv))
         return
       }
       // Capabilities whose value is always null — permission declared as bare capability name.
@@ -128,38 +130,38 @@ export function makePermissionChecker(effective) {
       case 'rune.job.read':
       case 'shell.job.kill':
       case 'shell.job.exists':
-      case 'shell.job.read':
-        if (!effective.allow.includes(capability) || effective.deny.includes(capability)) {
-          throw new PermissionError(capability, '')
-        }
+      case 'shell.job.read': {
+        const b = buckets.get(capability)
+        if (!b?.allow.length || b.deny.length > 0) throw new PermissionError(capability, '')
         return
+      }
       case 'http.fetch':
-        check(capability, value, p => matchFetchPermission(value, p))
+        checkAndThrow(capability, value, pv => matchFetchPermission(value, pv))
         return
       case 'env.read':
-        check(capability, value, p => matchEnvPermission(value, p))
+        checkAndThrow(capability, value, pv => matchEnvPermission(value, pv))
         return
       case 'sqlite.read':
       case 'sqlite.write':
       case 'cache.read':
       case 'cache.write':
-        check(capability, value, p => matchStorePermission(value, p, capability))
+        checkAndThrow(capability, value, pv => matchStorePermission(value, pv))
         return
       case 'ws.client':
-        check(capability, value, p => matchWsPermission(value, p))
+        checkAndThrow(capability, value, pv => matchWsPermission(value, pv))
         return
       case 'http.server': {
         const colonIdx = value.lastIndexOf(':')
         const host = colonIdx !== -1 ? value.slice(0, colonIdx) : value
         if (isLoopbackHost(host)) return
-        check(capability, value, p => matchHttpServerPermission(value, p))
+        checkAndThrow(capability, value, pv => matchHttpServerPermission(value, pv))
         return
       }
       case 'ws.server': {
         const firstColon = value.indexOf(':')
         const host = firstColon !== -1 ? value.slice(0, firstColon) : value
         if (isLoopbackHost(host)) return
-        check(capability, value, p => matchWsServerPermission(value, p))
+        checkAndThrow(capability, value, pv => matchWsServerPermission(value, pv))
         return
       }
       default:

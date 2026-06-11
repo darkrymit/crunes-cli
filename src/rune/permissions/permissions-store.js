@@ -3,19 +3,16 @@ import { isMatch } from '../../shared/match.js'
 
 const HOME = os.homedir().replace(/\\/g, '/')
 
-export function matchStorePermission(value, pattern, cap) {
-  const prefix  = cap + ':'
-  const patBody = pattern.startsWith(prefix) ? pattern.slice(prefix.length) : pattern
-
+export function matchStorePermission(value, pattern) {
   // Split value into location and name at '::'
   const vDColon   = value.indexOf('::')
   const valueLoc  = vDColon >= 0 ? value.slice(0, vDColon)  : value
   const valueName = vDColon >= 0 ? value.slice(vDColon + 2) : null
 
   // Split pattern into location and name at '::'
-  const dColonIdx = patBody.indexOf('::')
-  const patLoc = dColonIdx !== -1 ? patBody.slice(0, dColonIdx) : patBody
-  const patName = dColonIdx !== -1 ? patBody.slice(dColonIdx + 2) : null
+  const dColonIdx = pattern.indexOf('::')
+  const patLoc = dColonIdx !== -1 ? pattern.slice(0, dColonIdx) : pattern
+  const patName = dColonIdx !== -1 ? pattern.slice(dColonIdx + 2) : null
 
   if (patLoc.startsWith('@')) {
     if (patLoc.endsWith('/**')) {
