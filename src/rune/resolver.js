@@ -154,7 +154,7 @@ export async function runRune(dir, config, key, args, opts = {}, _callStack = []
 
   const fullPath = join(configDir, entry.path ?? `.crunes/runes/${key}.js`)
   const basePerms = entry.permissions ?? { allow: [], deny: [] }
-  const effective = computeEffectivePermissions(basePerms, config.permissions?.[key], 'run', dir)
+  const effective = computeEffectivePermissions(basePerms, config.permissions?.[key], 'run')
   const result = await runRuneInIsolate(fullPath, effective, args, dir, {
     runeCallback,
     sections: opts.sections ?? null,
@@ -187,8 +187,7 @@ export async function resolveRuneEntry(projectDir, config, key, configDir = proj
     const effective = computeEffectivePermissions(
       pluginJson.runes[runeKey]?.permissions ?? {},
       projectPerms ?? {},
-      'runRepl',
-      projectDir
+      'runRepl'
     )
     const vars = { ...(pluginJson.runes[runeKey]?.vars ?? {}), ...(config.vars?.[`${pluginKey}:${runeKey}`] ?? {}) }
     return {
@@ -213,7 +212,7 @@ export async function resolveRuneEntry(projectDir, config, key, configDir = proj
   const entry = getRune(config, key)
   if (entry && !entry.plugin) {
     const runeFile = join(configDir, entry.path ?? `.crunes/runes/${key}.js`)
-    const effective = computeEffectivePermissions(entry.permissions ?? {}, config.permissions?.[key], 'runRepl', projectDir)
+    const effective = computeEffectivePermissions(entry.permissions ?? {}, config.permissions?.[key], 'runRepl')
     const vars = entry.vars ?? {}
     return {
       createReplSession(args, opts = {}) {
@@ -235,8 +234,7 @@ export async function resolveRuneEntry(projectDir, config, key, configDir = proj
     const effective = computeEffectivePermissions(
       pluginJson.runes[runeKey]?.permissions ?? {},
       projectPerms ?? {},
-      'runRepl',
-      projectDir
+      'runRepl'
     )
     const vars = { ...(pluginJson.runes[runeKey]?.vars ?? {}), ...(config.vars?.[`${pluginKey}:${runeKey}`] ?? {}) }
     return {

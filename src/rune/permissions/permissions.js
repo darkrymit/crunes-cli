@@ -1,5 +1,5 @@
-import path from 'node:path'
-import micromatch from 'micromatch'
+import os from 'node:os'
+import { isMatch } from '../../shared/match.js'
 import { matchFetchPermission } from './permissions-http.js'
 import { matchEnvPermission } from './permissions-env.js'
 import { matchStorePermission } from './permissions-store.js'
@@ -15,6 +15,8 @@ export class PermissionError extends Error {
   }
 }
 
+const HOME = os.homedir().replace(/\\/g, '/')
+
 function normalizeGitBashPath(p) {
   if (process.platform === 'win32') {
     const m = p.match(/^\/([a-zA-Z])(\/|$)/)
@@ -23,25 +25,15 @@ function normalizeGitBashPath(p) {
   return p
 }
 
-function normalizePermission(perm, dir) {
+function normalizePattern(perm) {
   if (perm.startsWith('fs.read:') || perm.startsWith('fs.write:') || perm.startsWith('fs.exists:') || perm.startsWith('fs.glob:')) {
     const [cap, ...rest] = perm.split(':')
-    const rawVal = rest.join(':')
-    const val = normalizeGitBashPath(rawVal.replace(/\\/g, '/'))
+    const val = normalizeGitBashPath(rest.join(':').replace(/\\/g, '/'))
     const isAbsolute = val.startsWith('/') || /^[a-zA-Z]:/.test(val)
-    if (isAbsolute && dir) {
-      const rel = path.relative(dir, val).replace(/\\/g, '/')
-      if (!rel.startsWith('..')) return `${cap}:./${rel}`
-    }
-    if (
-      !val.startsWith('./') &&
-      !val.startsWith('../') &&
-      !val.startsWith('@') &&
-      !val.startsWith('~/') &&
-      !isAbsolute
-    ) {
+    if (!val.startsWith('./') && !val.startsWith('../') && !val.startsWith('@') && !val.startsWith('~/') && !isAbsolute) {
       return `${cap}:./${val}`
     }
+    return `${cap}:${val}`
   }
   if (perm.startsWith('cache.read:') || perm.startsWith('cache.write:') ||
       perm.startsWith('sqlite.read:') || perm.startsWith('sqlite.write:')) {
@@ -73,16 +65,16 @@ function normalizePermission(perm, dir) {
  * Compute effective allow/deny from plugin.json permissions + optional project override.
  * Must be namespaced under the requested lifecycle (e.g. `run`).
  */
-export function computeEffectivePermissions(pluginPerms, projectPerms, lifecycle, dir) {
+export function computeEffectivePermissions(pluginPerms, projectPerms, lifecycle) {
   const namespacePlugin = pluginPerms?.[lifecycle] || {}
   const namespaceProject = projectPerms?.[lifecycle]
-  const norm = p => normalizePermission(p, dir)
+  const norm = normalizePattern
 
   const pluginAllow = (namespacePlugin.allow ?? []).map(norm)
   const pluginDeny  = (namespacePlugin.deny ?? []).map(norm)
 
   return {
-    allow: (namespaceProject?.allow ?? pluginAllow).map(norm),
+    allow: namespaceProject?.allow ? namespaceProject.allow.map(norm) : pluginAllow,
     deny:  [...pluginDeny, ...(namespaceProject?.deny ?? []).map(norm)],
   }
 }
@@ -92,80 +84,89 @@ export function computeEffectivePermissions(pluginPerms, projectPerms, lifecycle
  * if the request is not in effective.allow or is in effective.deny.
  */
 export function makePermissionChecker(effective) {
-  return function checkPermission(capability, value) {
-    if (capability === 'ws.client') {
-      const allowed = effective.allow.some(p => matchWsPermission(value, p))
-      const denied  = effective.deny.length > 0 && effective.deny.some(p => matchWsPermission(value, p))
-      if (!allowed || denied) throw new PermissionError(capability, value)
-      return
-    }
-    if (capability === 'http.server') {
-      const colonIdx = value.lastIndexOf(':')
-      const host = colonIdx !== -1 ? value.slice(0, colonIdx) : value
-      if (isLoopbackHost(host)) return
-      const allowed = effective.allow.some(p => matchHttpServerPermission(value, p))
-      const denied  = effective.deny.length > 0 && effective.deny.some(p => matchHttpServerPermission(value, p))
-      if (!allowed || denied) throw new PermissionError(capability, value)
-      return
-    }
-    if (capability === 'ws.server') {
-      const firstColon = value.indexOf(':')
-      const host = firstColon !== -1 ? value.slice(0, firstColon) : value
-      if (isLoopbackHost(host)) return
-      const allowed = effective.allow.some(p => matchWsServerPermission(value, p))
-      const denied  = effective.deny.length > 0 && effective.deny.some(p => matchWsServerPermission(value, p))
-      if (!allowed || denied) throw new PermissionError(capability, value)
-      return
-    }
-    if (capability === 'http.fetch') {
-      const allowed = effective.allow.some(p => matchFetchPermission(value, p))
-      const denied  = effective.deny.length > 0 && effective.deny.some(p => matchFetchPermission(value, p))
-      if (!allowed || denied) throw new PermissionError(capability, value)
-      return
-    }
-    if (capability === 'env.read') {
-      const allowed = effective.allow.some(p => matchEnvPermission(value, p))
-      const denied  = effective.deny.length > 0 && effective.deny.some(p => matchEnvPermission(value, p))
-      if (!allowed || denied) throw new PermissionError(capability, value)
-      return
-    }
-    if (capability === 'sqlite.read' || capability === 'sqlite.write' ||
-        capability === 'cache.read'  || capability === 'cache.write') {
-      const allowed = effective.allow.some(p => matchStorePermission(value, p, capability))
-      const denied  = effective.deny.length > 0 &&
-                      effective.deny.some(p => matchStorePermission(value, p, capability))
-      if (!allowed || denied) throw new PermissionError(capability, value)
-      return
-    }
-    if (value == null) {
-      const norm = capability.replace(/\\/g, '/')
-      const allowed = effective.allow.map(p => p.replace(/\\/g, '/')).includes(norm)
-      const denied  = effective.deny.length > 0 && effective.deny.map(p => p.replace(/\\/g, '/')).includes(norm)
-      if (!allowed || denied) throw new PermissionError(capability, '')
-      return
-    }
-    const token   = `${capability}:${value}`.replace(/\\/g, '/')
-    const normalizedAllow = effective.allow.map(p => p.replace(/\\/g, '/'))
-    const normalizedDeny = effective.deny.map(p => p.replace(/\\/g, '/'))
-    const matchToken = (tok, patterns) => {
-      return patterns.some(pattern => {
-        if (pattern.endsWith('/**')) {
-          const prefix = pattern.slice(0, -2)
-          if (tok.startsWith(prefix)) return true
-        }
-        if (pattern.endsWith(':**')) {
-          const prefix = pattern.slice(0, -2)
-          if (tok.startsWith(prefix)) return true
-        }
-        if (pattern.endsWith(':*')) {
-          const prefix = pattern.slice(0, -1)
-          if (tok.startsWith(prefix)) return true
-        }
-        return micromatch.isMatch(tok, pattern, { dot: true })
-      })
-    }
-    const allowed = matchToken(token, normalizedAllow)
-    const denied  = effective.deny.length > 0 && matchToken(token, normalizedDeny)
+  const buckets = new Map()
+  const getBucket = cap => {
+    if (!buckets.has(cap)) buckets.set(cap, { allow: [], deny: [] })
+    return buckets.get(cap)
+  }
+  const capOf = p => { const i = p.indexOf(':'); return i === -1 ? p : p.slice(0, i) }
+  for (const p of effective.allow) getBucket(capOf(p)).allow.push(p)
+  for (const p of effective.deny)  getBucket(capOf(p)).deny.push(p)
+
+  const checkAndThrow = (capability, value, matchFn) => {
+    const b = buckets.get(capability) ?? { allow: [], deny: [] }
+    const n = capability.length + 1
+    const pv = p => p.length > n ? p.slice(n) : null
+    const allowed = b.allow.some(p => { const v = pv(p); return v !== null && matchFn(v) })
+    const denied  = b.deny.length > 0 && b.deny.some(p => { const v = pv(p); return v !== null && matchFn(v) })
     if (!allowed || denied) throw new PermissionError(capability, value)
+  }
+
+  return function checkPermission(capability, value) {
+    switch (capability) {
+      case 'fs.read':
+      case 'fs.write':
+      case 'fs.exists':
+      case 'fs.glob': {
+        const strip = s => s.replace(/^~\//, `${HOME}/`).replace(/^\.\//, '')
+        const v = strip(value.replace(/\\/g, '/'))
+        checkAndThrow(capability, value, pv => isMatch(v, strip(pv)))
+        return
+      }
+      case 'shell.run':
+      case 'shell.job.start':
+      case 'rune.run':
+      case 'rune.job.start':
+      case 'rune.spawn':
+      case 'rune.kill':
+      case 'rune.exists':
+      case 'db.connect': {
+        const v = value.replace(/\\/g, '/')
+        checkAndThrow(capability, value, pv => isMatch(v, pv))
+        return
+      }
+      // Capabilities whose value is always null — permission declared as bare capability name.
+      case 'rune.job.kill':
+      case 'rune.job.exists':
+      case 'rune.job.read':
+      case 'shell.job.kill':
+      case 'shell.job.exists':
+      case 'shell.job.read': {
+        const b = buckets.get(capability)
+        if (!b?.allow.length || b.deny.length > 0) throw new PermissionError(capability, '')
+        return
+      }
+      case 'http.fetch':
+        checkAndThrow(capability, value, pv => matchFetchPermission(value, pv))
+        return
+      case 'env.read':
+        checkAndThrow(capability, value, pv => matchEnvPermission(value, pv))
+        return
+      case 'sqlite.read':
+      case 'sqlite.write':
+      case 'cache.read':
+      case 'cache.write':
+        checkAndThrow(capability, value, pv => matchStorePermission(value, pv))
+        return
+      case 'ws.client':
+        checkAndThrow(capability, value, pv => matchWsPermission(value, pv))
+        return
+      case 'http.server': {
+        const colonIdx = value.lastIndexOf(':')
+        const host = colonIdx !== -1 ? value.slice(0, colonIdx) : value
+        if (isLoopbackHost(host)) return
+        checkAndThrow(capability, value, pv => matchHttpServerPermission(value, pv))
+        return
+      }
+      case 'ws.server': {
+        const firstColon = value.indexOf(':')
+        const host = firstColon !== -1 ? value.slice(0, firstColon) : value
+        if (isLoopbackHost(host)) return
+        checkAndThrow(capability, value, pv => matchWsServerPermission(value, pv))
+        return
+      }
+      default:
+        throw new PermissionError(capability, value ?? '')
+    }
   }
 }

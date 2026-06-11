@@ -5,46 +5,46 @@ describe('matchWsPermission', () => {
   it('matches exact ws URL with ws: prefix on pattern', () => {
     expect(matchWsPermission(
       'ws://localhost:3000/chat',
-      'ws.client:ws://localhost:3000/**',
+      'ws://localhost:3000/**',
     )).toBe(true)
   })
 
   it('matches wss URL', () => {
     expect(matchWsPermission(
       'wss://api.example.com/stream',
-      'ws.client:wss://api.example.com/**',
+      'wss://api.example.com/**',
     )).toBe(true)
   })
 
   it('rejects URL not matching pattern', () => {
     expect(matchWsPermission(
       'ws://evil.com/data',
-      'ws.client:ws://localhost:3000/**',
+      'ws://localhost:3000/**',
     )).toBe(false)
   })
 
   it('wildcard ws:** matches any URL', () => {
     expect(matchWsPermission(
       'ws://localhost:9229/json',
-      'ws.client:**',
+      '**',
     )).toBe(true)
   })
 
   it('* matches single path segment only', () => {
     expect(matchWsPermission(
       'ws://localhost:3000/chat',
-      'ws.client:ws://localhost:3000/*',
+      'ws://localhost:3000/*',
     )).toBe(true)
     expect(matchWsPermission(
       'ws://localhost:3000/chat/room/1',
-      'ws.client:ws://localhost:3000/*',
+      'ws://localhost:3000/*',
     )).toBe(false)
   })
 
   it('** matches multiple path segments', () => {
     expect(matchWsPermission(
       'ws://localhost:3000/chat/room/1',
-      'ws.client:ws://localhost:3000/**',
+      'ws://localhost:3000/**',
     )).toBe(true)
   })
 

@@ -4,7 +4,7 @@ Permission enforcement for all sandboxed rune capabilities. `permissions.js` mer
 
 ## Files
 
-- **permissions.js** — `computeEffectivePermissions(pluginPerms, projectPerms, lifecycle, dir)` — merges plugin and project permissions with normalization. `makePermissionChecker(effective)` — returns `checkPermission(capability, value)` that validates access against effective permissions. `PermissionError` — thrown on denied access with `capability` and `value` properties.
+- **permissions.js** — `computeEffectivePermissions(pluginPerms, projectPerms, lifecycle)` — merges plugin and project permissions with normalization. `makePermissionChecker(effective)` — returns `checkPermission(capability, value)` that validates access against effective permissions. `PermissionError` — thrown on denied access with `capability` and `value` properties.
 - **permissions-http.js** — `matchFetchPermission(value, pattern)` — matches an HTTP fetch access value (`METHOD::URL`) against an allow/deny pattern with method and URL matching.
 - **permissions-env.js** — `parseEnvPattern(pattern)` — parses an `env.read` pattern into `{ sources, keyPatterns }`. `matchEnvPermission(value, pattern)` — matches an env access value (`source::key`) against a pattern.
 - **permissions-store.js** — `matchStorePermission(value, pattern, cap)` — matches a cache or sqlite store access value (`location::name`) against a pattern, with capability-aware parsing.

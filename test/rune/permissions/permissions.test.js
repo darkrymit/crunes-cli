@@ -295,66 +295,6 @@ describe('rune.spawn / rune.kill / rune.exists permissions', () => {
   })
 })
 
-describe('normalizePermission — absolute fs paths with dir', () => {
-  const dir = '/project/root'
-
-  it('absolute fs.read path inside dir is relativized', () => {
-    const abs = join(dir, 'dev/test-ref/**').replace(/\\/g, '/')
-    const result = computeEffectivePermissions(
-      { use: { allow: [`fs.read:${abs}`] } },
-      undefined, 'use', dir
-    )
-    expect(result.allow).toEqual(['fs.read:./dev/test-ref/**'])
-  })
-
-  it('absolute fs.read path outside dir is kept absolute', () => {
-    const result = computeEffectivePermissions(
-      { use: { allow: ['fs.read:/etc/passwd'] } },
-      undefined, 'use', dir
-    )
-    expect(result.allow).toEqual(['fs.read:/etc/passwd'])
-  })
-
-  it('absolute path in project allow is relativized', () => {
-    const abs = join(dir, 'src/**').replace(/\\/g, '/')
-    const result = computeEffectivePermissions(
-      { use: { allow: [] } },
-      { use: { allow: [`fs.read:${abs}`] } },
-      'use', dir
-    )
-    expect(result.allow).toEqual(['fs.read:./src/**'])
-  })
-
-  it('absolute path in deny inside dir is relativized', () => {
-    const abs = join(dir, 'secrets/**').replace(/\\/g, '/')
-    const result = computeEffectivePermissions(
-      { use: { allow: [], deny: [`fs.read:${abs}`] } },
-      undefined, 'use', dir
-    )
-    expect(result.deny).toEqual(['fs.read:./secrets/**'])
-  })
-
-  it('without dir absolute path is kept as-is', () => {
-    const result = computeEffectivePermissions(
-      { use: { allow: ['fs.read:/etc/**'] } },
-      undefined, 'use'
-    )
-    expect(result.allow).toEqual(['fs.read:/etc/**'])
-  })
-
-  it('absolute glob in config + absolute file token both relativized — permission passes', () => {
-    // Simulates: config has abs glob, canonicalizeLocation produces relative token
-    const absGlob = join(dir, 'dev/test-ref/**').replace(/\\/g, '/')
-    const effective = computeEffectivePermissions(
-      { use: { allow: [`fs.read:${absGlob}`] } },
-      undefined, 'use', dir
-    )
-    // effective.allow is now ['fs.read:./dev/test-ref/**']
-    const check = makePermissionChecker(effective)
-    // canonicalizeLocation would produce './dev/test-ref/img/photo.webp' for the abs file path
-    expect(() => check('fs.read', './dev/test-ref/img/photo.webp')).not.toThrow()
-  })
-})
 
 describe('makePermissionChecker — db.connect capability', () => {
   it('allows db.connect when matched by allowance pattern', () => {

@@ -1405,7 +1405,7 @@ export async function getReplSchema(runeFile, effective, args, projectDir, {
  */
 export async function executePluginRune({ pluginDir, pluginCacheDir, runeKey, pluginJson, projectPerms, projectVars = {}, args, projectDir, opts, runeCallback, sections, lifecycle = 'run', onEvent = null, instanceId = '1', }) {
   const runePerms     = pluginJson.runes[runeKey]?.permissions ?? {}
-  const effective     = computeEffectivePermissions(runePerms, projectPerms, lifecycle, projectDir)
+  const effective     = computeEffectivePermissions(runePerms, projectPerms, lifecycle)
   const runeVars      = pluginJson.runes[runeKey]?.vars ?? {}
   const effectiveVars = { ...runeVars, ...projectVars }
   return runPluginRune(pluginDir, pluginCacheDir, runeKey, pluginJson, effective, args, projectDir, {

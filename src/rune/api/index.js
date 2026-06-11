@@ -13,7 +13,7 @@ import { createCacheUtils } from './cache.js'
 import { createSqliteUtils } from './sqlite.js'
 import { createWsUtils } from './ws.js'
 import { createDbUtils } from './db.js'
-import micromatch from 'micromatch'
+import { isMatch } from '../../shared/match.js'
 
 export function createSectionUtils(patterns) {
   return {
@@ -23,7 +23,7 @@ export function createSectionUtils(patterns) {
     match(sectionName, overridePatterns) {
       const p = overridePatterns !== undefined ? overridePatterns : patterns;
       if (p == null) return true
-      return micromatch.isMatch(sectionName, p)
+      return isMatch(sectionName, p)
     },
     selected() {
       return patterns
