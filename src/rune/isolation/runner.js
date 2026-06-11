@@ -1321,7 +1321,11 @@ export async function runRuneInReplSession(runeFile, effective, args, projectDir
   const runeSrc = await fs.readFile(runeFile, 'utf8')
   const patchedSrc = runeSrc +
     '\nif (typeof runRepl !== "undefined") globalThis.__crunes_runRepl = runRepl;\n' +
-    '\nif (typeof argsRepl !== "undefined") globalThis.__crunes_argsRepl = argsRepl;\n'
+    '\nif (typeof argsRepl !== "undefined") globalThis.__crunes_argsRepl = argsRepl;\n' +
+    '\nif (typeof inputRepl !== "undefined") globalThis.__crunes_inputRepl = inputRepl;\n' +
+    '\nif (typeof bannerRepl !== "undefined") globalThis.__crunes_bannerRepl = bannerRepl;\n' +
+    '\nif (typeof commandsRepl !== "undefined") globalThis.__crunes_commandsRepl = commandsRepl;\n' +
+    '\nif (typeof completeInputRepl !== "undefined") globalThis.__crunes_completeInputRepl = completeInputRepl;\n'
 
   const runeMod = await isolate.compileModule(patchedSrc, { filename: runeFile })
   const resolver = createModuleResolver(
@@ -1339,10 +1343,12 @@ export async function runRuneInReplSession(runeFile, effective, args, projectDir
   await runeMod.evaluate()
   await context.eval('delete globalThis.$__hostRequire')
 
-  if (!await context.eval('typeof __crunes_runRepl !== "undefined"')) {
+  const hasRunRepl   = await context.eval('typeof __crunes_runRepl !== "undefined"')
+  const hasInputRepl = await context.eval('typeof __crunes_inputRepl !== "undefined"')
+  if (!hasRunRepl && !hasInputRepl) {
     await disposeUtils()
     isolate.dispose()
-    throw new Error(`Rune "${runeFile}" does not export a runRepl() function.`)
+    throw new Error(`Rune "${runeFile}" must export runRepl() or inputRepl() (or both).`)
   }
 
   // Parse argsRepl schema if exported, else no schema
@@ -1393,10 +1399,87 @@ export async function runRuneInReplSession(runeFile, effective, args, projectDir
     parsedArgs = parseArgs(args, null)
   }
 
+  // Call runRepl(args) once as session initializer — captures initial prompt
+  let initialPrompt = null
+  if (hasRunRepl) {
+    const initResult = await context.evalClosure(
+      `return (async () => { return await __crunes_runRepl($0) })()`,
+      [parsedArgs],
+      { arguments: { copy: true }, result: { promise: true, copy: true } }
+    )
+    if (typeof initResult === 'string') initialPrompt = initResult
+  }
+
+  // Call bannerRepl(args) once after runRepl — captures banner text
+  let banner = null
+  if (await context.eval('typeof __crunes_bannerRepl !== "undefined"')) {
+    const bannerResult = await context.evalClosure(
+      `return (async () => { return await __crunes_bannerRepl($0) })()`,
+      [parsedArgs],
+      { arguments: { copy: true }, result: { promise: true, copy: true } }
+    )
+    if (typeof bannerResult === 'string') banner = bannerResult
+  }
+
+  // Extract commandsRepl schema (same inline builder pattern as argsRepl)
+  let commandsSchema = null
+  if (await context.eval('typeof __crunes_commandsRepl !== "undefined"')) {
+    commandsSchema = await context.evalClosure(
+      `return (async () => {
+        const b = (() => {
+          const cmds = []
+          const createBuilder = (subName, subDesc) => {
+            const sOpts = [], sPos = [], sExs = [], sCmds = []
+            const subBuilder = {
+              option(flags, description, def) { sOpts.push({ flags, description, def }); return subBuilder },
+              positional(spec, description)   { sPos.push({ spec, description }); return subBuilder },
+              example(usage, description)     { sExs.push({ usage, description }); return subBuilder },
+              command(name, description, callback) {
+                const nestedBuilder = createBuilder(name, description)
+                if (typeof callback === 'function') callback(nestedBuilder)
+                sCmds.push(nestedBuilder.build())
+                return subBuilder
+              },
+              build() { return { name: subName, description: subDesc, options: sOpts, positionals: sPos, examples: sExs, commands: sCmds } }
+            }
+            return subBuilder
+          }
+          const rootBuilder = {
+            option() { return rootBuilder },
+            positional() { return rootBuilder },
+            example() { return rootBuilder },
+            command(name, description, callback) {
+              const subBuilder = createBuilder(name, description)
+              if (typeof callback === 'function') callback(subBuilder)
+              cmds.push(subBuilder.build())
+              return rootBuilder
+            },
+            build() { return { commands: cmds } }
+          }
+          return rootBuilder
+        })()
+        const res = await __crunes_commandsRepl(b)
+        return (res && typeof res.build === 'function') ? res.build() : res
+      })()`,
+      [],
+      { timeout: 30_000, result: { promise: true, copy: true } }
+    )
+  }
+
+  const hasComplete = await context.eval('typeof __crunes_completeInputRepl !== "undefined"')
+
   async function step(input) {
     return context.evalClosure(
-      `return (async () => { return await __crunes_runRepl($0, $1) })()`,
-      [parsedArgs, input],
+      `return (async () => { return await __crunes_inputRepl($0) })()`,
+      [input],
+      { arguments: { copy: true }, result: { promise: true, copy: true } }
+    )
+  }
+
+  async function complete(tokens) {
+    return context.evalClosure(
+      `return (async () => { return await __crunes_completeInputRepl($0) })()`,
+      [tokens],
       { arguments: { copy: true }, result: { promise: true, copy: true } }
     )
   }
@@ -1406,5 +1489,5 @@ export async function runRuneInReplSession(runeFile, effective, args, projectDir
     isolate.dispose()
   }
 
-  return { step, dispose }
+  return { initialPrompt, banner, commandsSchema, step, complete: hasComplete ? complete : null, dispose }
 }

@@ -1,13 +1,13 @@
 /**
  * Rune Lifecycle Entrypoint Methods
- * 
+ *
  * These are the standard ES module exports required or supported by the Crunes execution engine.
  */
 declare namespace lifecycle {
   /**
    * Defines the argument and option schema for the rune.
    * Called by the runner in a minimal bootstrap isolate to compile usage specifications.
-   * 
+   *
    * @param builder The schema builder to declare options, positionals, and examples.
    */
   function args(builder: ArgBuilder): void | ArgBuilder | any | Promise<void | ArgBuilder | any>
@@ -21,29 +21,70 @@ declare namespace lifecycle {
   function run(args: ParsedArgs): Promise<RuneSection[] | RuneSection | string | void> | RuneSection[] | RuneSection | string | void
 
   /**
-   * Defines the argument and option schema for the runRepl lifecycle.
-   * If absent, runRepl(args, input) receives an empty args object.
-   * Does NOT fall back to args() — the two lifecycles are independent.
+   * Defines the argument and option schema for the REPL session.
+   * If absent, runRepl(args) receives an empty args object — it does NOT fall back to args().
    *
    * @param builder The schema builder to declare options, positionals, and examples.
-   * If this export is absent, runRepl(args, input) receives an empty args object — it does NOT fall back to args().
    */
   function argsRepl(builder: ArgBuilder): void | ArgBuilder | any | Promise<void | ArgBuilder | any>
 
   /**
-   * The interactive REPL lifecycle function. Called once per input line.
-   * The isolate stays alive across calls — JS closures are the state store.
+   * REPL session initializer. Called once at session start before the first prompt.
+   * The right place to open connections and set up module-level state.
+   * Returns the initial prompt string, or void for the default "> ".
+   * Requires a separate "runRepl" permission block in config.json — does not inherit from "run".
    *
+   * @param args Parsed args from argsRepl() schema.
+   * @returns Initial prompt string, or void to use "> ".
+   */
+  function runRepl(args: ParsedArgs): Promise<string | void> | string | void
+
+  /**
+   * Welcome banner. Called once after runRepl() resolves, before the first prompt.
+   * Printed to stderr in text mode; emitted as { type: "banner" } in JSONL mode.
+   *
+   * @param args Parsed args from argsRepl() schema.
+   * @returns Banner string, or void for no banner.
+   */
+  function bannerRepl(args: ParsedArgs): Promise<string | void> | string | void
+
+  /**
+   * Declares slash commands available in the REPL session.
+   * Only .command() declarations at the root level are used — .option() and .positional() at root are ignored.
+   * Matched commands are dispatched to inputRepl() as { type: "command", args: ParsedArgs }.
+   *
+   * @param builder The schema builder — use only .command() at root level.
+   */
+  function commandsRepl(builder: ArgBuilder): void | ArgBuilder | any | Promise<void | ArgBuilder | any>
+
+  /**
+   * Per-input handler. Called once per InputEvent for the lifetime of the REPL session.
+   * The isolate stays alive across calls — JS module-level variables are session state.
    * Output via console.log() and utils.section.emit().
    *
-   * @param args  Parsed args from argsRepl() schema (built once at session start).
-   * @param input The raw string the user typed this turn.
+   * @param input The input event for this turn.
    * @returns A ReplSignal to control the prompt or end the session, or void to continue.
-   * Requires a separate "runRepl" permission block in config.json — does not inherit from "run".
    */
-  function runRepl(args: ParsedArgs, input: string): Promise<ReplSignal | string | void> | ReplSignal | string | void
+  function inputRepl(input: InputEvent): Promise<ReplSignal | string | void> | ReplSignal | string | void
 
-  /** Controls the REPL session from inside runRepl(). */
+  /**
+   * Tab completion. Called on Tab key with the current input tokenized.
+   * Last element of tokens is the partial word being typed — same convention as resolveCompletions().
+   * Returns candidate strings; host filters by prefix and passes to readline.
+   *
+   * @param tokens Current input split on whitespace; last element is the partial word.
+   * @returns Array of completion candidates.
+   */
+  function completeInputRepl(tokens: string[]): Promise<string[]> | string[]
+
+  /** Input event passed to inputRepl() each turn. */
+  type InputEvent =
+    | { type: 'line';      text: string }     // normal input line (raw, untrimmed)
+    | { type: 'interrupt'; text: '' }         // Ctrl+C on empty prompt
+    | { type: 'eof';       text: '' }         // Ctrl+D or stdin closed
+    | { type: 'command';   args: ParsedArgs } // matched slash command
+
+  /** Controls the REPL session from inside inputRepl(). */
   type ReplSignal =
     | { type: 'prompt'; value?: string }   // continue with optional custom prompt
     | { type: 'done'; message?: string }   // end the session
@@ -52,7 +93,7 @@ declare namespace lifecycle {
   interface ArgBuilder {
     /**
      * Declares a named option/flag.
-     * 
+     *
      * @param flags Flag specification (e.g., '--verbose' or '-n, --name <name>').
      * @param description A brief description of this option.
      * @param defaultValue Optional default value for the option.
@@ -61,7 +102,7 @@ declare namespace lifecycle {
 
     /**
      * Declares a positional argument.
-     * 
+     *
      * @param spec Positional argument specification (e.g., '<name>' for required, '[name]' for optional, '<targets...>' or '[targets...]' for variadic rest arrays).
      * @param description A brief description of this positional argument.
      */
@@ -69,7 +110,7 @@ declare namespace lifecycle {
 
     /**
      * Adds an example command showing how to call the rune.
-     * 
+     *
      * @param usage Usage example string (e.g. 'crunes run hello world').
      * @param description A brief description of the example.
      */
@@ -77,7 +118,7 @@ declare namespace lifecycle {
 
     /**
      * Declares a nested command under the current command.
-     * 
+     *
      * @param name Command name (e.g. 'create').
      * @param description Command description.
      * @param callback Callback configured with a subcommand ArgBuilder.
