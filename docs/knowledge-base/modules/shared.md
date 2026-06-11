@@ -3,14 +3,14 @@ tags: [module]
 ---
 # shared
 
-> Cross-cutting output utilities: `render.js` converts Section data to CLI strings; `output.js` is the global logger with plain/color modes.
+> Cross-cutting utilities: `render.js` converts Section data to CLI strings; `output.js` is the global logger with plain/color modes; `match.js` is the single micromatch wrapper used everywhere.
 
 **Source:** `src/shared/`
 **Related:** all modules (no domain coupling)
 
 ## Overview
 
-The shared module provides two utilities with no domain knowledge. It does not understand runes, plugins, or projects — it knows only about rendering and logging. A module imports from shared to produce output and log messages. Because shared has no domain knowledge, no other module needs to avoid importing it, preventing circular dependencies.
+The shared module provides three utilities with no domain knowledge. It does not understand runes, plugins, or projects — it knows only about rendering, logging, and glob matching. A module imports from shared to produce output and log messages. Because shared has no domain knowledge, no other module needs to avoid importing it, preventing circular dependencies.
 
 The renderer converts structured data (trees, markdown) into CLI-displayable strings. The logger provides a global output sink that respects plain/color mode configuration. Both are invoked by the CLI framework for every rune execution.
 
@@ -23,6 +23,8 @@ The renderer converts structured data (trees, markdown) into CLI-displayable str
 **Tree rendering with column alignment:** Trees are rendered with box-drawing characters (├──, └──, │) to show hierarchy. Node names are padded to a fixed width so that descriptions align vertically. Names longer than the fixed width push the description column out of alignment — this is cosmetic but affects output readability.
 
 **Sections with no content are dropped:** If a section has no title and no renderable data, it produces an empty string. The run handler filters out empty sections from the output. A rune can return a section with no title and no data, and it silently disappears. This is sometimes intentional (conditional output) and sometimes a bug (missing data field).
+
+**Centralized glob matching:** All micromatch calls go through `match.js` with a fixed option set: `dot` (hidden files match), `noextglob`, `nonegate`, `nobrace`, `nobracket` (disable special syntax that can misfire on values containing `!`, `{`, `[`, etc.). The `startsWith` bypass for `:**`/`:*` patterns exists because micromatch cannot match strings containing `:` (Windows drive letters) against `**` globs.
 
 ## Key Decisions
 

@@ -6,6 +6,7 @@ General-purpose utilities with no domain coupling. Consumed by multiple feature 
 
 - **output.js** — `output` logger with `header`, `success`, `error`, `warn`, `info` methods. `configure({ plain, verbose })` — sets global output mode (colored vs plain, verbose flag). `isVerbose` — exported boolean for verbose-mode checks.
 - **render.js** — `render(data)` — renders a single data object (tree or markdown) to a plain string. `renderSection(section)` — renders a `Section` object to CLI markdown format with title, attributes, and rendered data.
+- **match.js** — `isMatch(value, pattern)` — single micromatch wrapper with consistent options (`dot`, `noextglob`, `nonegate`, `nobrace`, `nobracket`) used everywhere glob matching occurs in the codebase.
 
 ## Related Modules
 
