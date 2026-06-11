@@ -95,6 +95,40 @@ describe('help rune handler', () => {
     expect(exitSpy).toHaveBeenCalledWith(1)
   })
 
+  describe('batch field in docs output', () => {
+    beforeEach(async () => {
+      const cfg = JSON.parse(await import('node:fs').then(m => m.promises.readFile(join(tmp, '.crunes', 'config.json'), 'utf8')))
+      cfg.runes.greet.batch = { allow: ['*'] }
+      await import('node:fs').then(m => m.promises.writeFile(join(tmp, '.crunes', 'config.json'), JSON.stringify(cfg)))
+    })
+
+    it('text output includes Batch: section when batch block declared', async () => {
+      await handler({ keys: ['greet'], projectRoot: tmp, configRoot: tmp })
+      const out = written.join('')
+      expect(out).toContain('Batch:')
+      expect(out).toContain('allow: *')
+    })
+
+    it('text output shows not permitted when no batch block', async () => {
+      await handler({ keys: ['count'], projectRoot: tmp, configRoot: tmp })
+      const out = written.join('')
+      expect(out).toContain('Batch:')
+      expect(out).toContain('not permitted')
+    })
+
+    it('json output includes batch field with allow/deny arrays', async () => {
+      await handler({ keys: ['greet'], format: 'json', projectRoot: tmp, configRoot: tmp })
+      const parsed = JSON.parse(written.join(''))
+      expect(parsed[0].batch).toEqual({ allow: ['*'], deny: [] })
+    })
+
+    it('json output batch is null when no batch block declared', async () => {
+      await handler({ keys: ['count'], format: 'json', projectRoot: tmp, configRoot: tmp })
+      const parsed = JSON.parse(written.join(''))
+      expect(parsed[0].batch).toBeNull()
+    })
+  })
+
   // REPL schema extension tests
   describe('REPL schema display', () => {
     beforeEach(async () => {

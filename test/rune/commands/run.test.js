@@ -69,6 +69,7 @@ describe('parseRunArgs', () => {
       segments: [{ key: 'api', sections: null, runeArgs: [] }],
       format: 'text',
       failFast: false,
+      isBatch: false,
     })
   })
 
@@ -122,6 +123,12 @@ describe('parseRunArgs', () => {
     const result = parseRunArgs(['api'])
     expect(result.format).toBe('text')
     expect(result.failFast).toBe(false)
+    expect(result.isBatch).toBe(false)
+  })
+
+  it('sets isBatch true when -b flag present', () => {
+    const result = parseRunArgs(['-b', 'api', '+', 'git'])
+    expect(result.isBatch).toBe(true)
   })
 
   it('does not intercept --format after the key — passes it to runeArgs', () => {
@@ -324,9 +331,84 @@ describe('handler — early gating of empty keys', () => {
       format: 'text',
       failFast: false
     })).rejects.toThrow('exit(1)')
-    
+
     expect(errorSpy).toHaveBeenCalledWith('Missing required argument: <rune>')
     errorSpy.mockRestore()
+  })
+})
+
+describe('handler — batch permission enforcement', () => {
+  beforeEach(() => {
+    loadConfig.mockReturnValue({
+      runes: {
+        docs:    { batch: { allow: ['*'] } },
+        release: { batch: { allow: ['info*'] } },
+        deploy:  {},
+      }
+    })
+    runRune.mockResolvedValue([])
+  })
+
+  afterEach(() => { vi.clearAllMocks(); vi.restoreAllMocks() })
+
+  it('allows batched rune when allow wildcard matches', async () => {
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {})
+    await handler({ segments: [{ key: 'docs', runeArgs: [], sections: null }], format: 'text', isBatch: true })
+    expect(exitSpy).not.toHaveBeenCalledWith(1)
+    exitSpy.mockRestore()
+  })
+
+  it('allows batched rune when allow prefix matches args', async () => {
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {})
+    await handler({ segments: [{ key: 'release', runeArgs: ['info', '--verbose'], sections: null }], format: 'text', isBatch: true })
+    expect(exitSpy).not.toHaveBeenCalledWith(1)
+    exitSpy.mockRestore()
+  })
+
+  it('denies batch and exits 1 when no batch block declared', async () => {
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {})
+    const { output } = await import('../../../src/shared/output.js')
+    const errorSpy = vi.spyOn(output, 'error').mockImplementation(() => {})
+    await handler({ segments: [{ key: 'deploy', runeArgs: [], sections: null }], format: 'text', isBatch: true })
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('Batch not permitted for "deploy"'))
+    expect(exitSpy).toHaveBeenCalledWith(1)
+    exitSpy.mockRestore()
+    errorSpy.mockRestore()
+  })
+
+  it('denies batch when allow prefix does not match args', async () => {
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {})
+    const { output } = await import('../../../src/shared/output.js')
+    const errorSpy = vi.spyOn(output, 'error').mockImplementation(() => {})
+    await handler({ segments: [{ key: 'release', runeArgs: ['bump', '--minor'], sections: null }], format: 'text', isBatch: true })
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('Batch not permitted for "release bump --minor"'))
+    expect(exitSpy).toHaveBeenCalledWith(1)
+    exitSpy.mockRestore()
+    errorSpy.mockRestore()
+  })
+
+  it('denies entire batch if any one segment is denied — nothing runs', async () => {
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => { throw new Error('exit(1)') })
+    const { output } = await import('../../../src/shared/output.js')
+    vi.spyOn(output, 'error').mockImplementation(() => {})
+    await expect(handler({
+      segments: [
+        { key: 'docs',   runeArgs: [], sections: null },
+        { key: 'deploy', runeArgs: [], sections: null },
+      ],
+      format: 'text',
+      isBatch: true,
+    })).rejects.toThrow('exit(1)')
+    expect(runRune).not.toHaveBeenCalled()
+    expect(exitSpy).toHaveBeenCalledWith(1)
+    exitSpy.mockRestore()
+  })
+
+  it('does not check batch permission for single-rune invocation', async () => {
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {})
+    await handler({ segments: [{ key: 'deploy', runeArgs: [], sections: null }], format: 'text', isBatch: false })
+    expect(runRune).toHaveBeenCalled()
+    exitSpy.mockRestore()
   })
 })
 

@@ -28,6 +28,19 @@ function formatSlashCommands(commands, indent = '') {
   return lines.join('\n')
 }
 
+function formatBatch(batch) {
+  const lines = ['Batch:']
+  if (!batch) {
+    lines.push('  (not permitted — no batch block declared)')
+    return lines.join('\n')
+  }
+  const allow = batch.allow ?? []
+  const deny  = batch.deny  ?? []
+  lines.push(`  allow: ${allow.length ? allow.join(', ') : '(none)'}`)
+  if (deny.length) lines.push(`  deny:  ${deny.join(', ')}`)
+  return lines.join('\n')
+}
+
 export async function handler({ keys, format = 'text', projectRoot = process.cwd(), configRoot = projectRoot }) {
   let config
   try {
@@ -77,6 +90,10 @@ export async function handler({ keys, format = 'text', projectRoot = process.cwd
       output.warn(`Could not load REPL schema for "${key}": ${err.message}`)
     }
 
+    const batch = entry.batch != null
+      ? { allow: entry.batch.allow ?? [], deny: entry.batch.deny ?? [] }
+      : null
+
     results.push({
       key,
       name: entry.name ?? key,
@@ -84,6 +101,7 @@ export async function handler({ keys, format = 'text', projectRoot = process.cwd
       relativePath,
       schema,
       repl,
+      batch,
     })
   }
 
@@ -100,6 +118,7 @@ export async function handler({ keys, format = 'text', projectRoot = process.cwd
       if (r.repl?.commandsSchema?.commands?.length) {
         parts.push(formatSlashCommands(r.repl.commandsSchema.commands))
       }
+      parts.push(formatBatch(r.batch))
       blocks.push(parts.join('\n\n'))
     }
     if (blocks.length > 0) process.stdout.write(blocks.join('\n\n') + '\n')
