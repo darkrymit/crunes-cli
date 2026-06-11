@@ -122,6 +122,16 @@ describe('resolveCompletions — other subcommands', () => {
   })
 })
 
+describe('resolveCompletions — docs subcommands', () => {
+  it('completes docs subcommands including new repl lifecycle commands', () => {
+    expect(resolveCompletions(['crunes', 'docs', ''], program)).toEqual([
+      'rune', 'utils', 'globals', 'intro', 'args', 'run',
+      'run-repl', 'args-repl',
+      'banner-repl', 'commands-repl', 'input-repl', 'complete-input-repl',
+    ])
+  })
+})
+
 describe('resolveCompletions — --cwd flag', () => {
   let dir
 
