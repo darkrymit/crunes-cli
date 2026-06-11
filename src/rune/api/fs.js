@@ -2,7 +2,7 @@ import fsPromises from 'node:fs/promises'
 import { createReadStream, createWriteStream } from 'node:fs'
 import path from 'node:path'
 import { glob } from 'tinyglobby'
-import { resolvePath, canonicalizeLocation } from './utils.js'
+import { resolvePath } from './utils.js'
 
 function stripBom(str) {
   return str.charCodeAt(0) === 0xfeff ? str.slice(1) : str
@@ -13,9 +13,8 @@ export function createFsUtils(dir, checkPermission, pluginDir = null, pluginId =
 
   return {
     async read(relPath, { throw: shouldThrow = true } = {}) {
-      const token = canonicalizeLocation(relPath, { dir })
       const abs   = resolvePath(relPath, ctx())
-      if (checkPermission) checkPermission('fs.read', token)
+      if (checkPermission) checkPermission('fs.read', relPath)
       try {
         return stripBom(await fsPromises.readFile(abs, 'utf8'))
       } catch (err) {
@@ -29,9 +28,8 @@ export function createFsUtils(dir, checkPermission, pluginDir = null, pluginId =
     },
 
     async exists(relPath) {
-      const token = canonicalizeLocation(relPath, { dir })
       const abs   = resolvePath(relPath, ctx())
-      if (checkPermission) checkPermission('fs.read', token)
+      if (checkPermission) checkPermission('fs.read', relPath)
       try {
         await fsPromises.access(abs)
         return true
@@ -44,8 +42,7 @@ export function createFsUtils(dir, checkPermission, pluginDir = null, pluginId =
       if (path.isAbsolute(pattern)) {
         throw new Error('utils.fs.glob does not support absolute patterns — use a relative pattern.')
       }
-      const token = canonicalizeLocation(pattern, { dir })
-      if (checkPermission) checkPermission('fs.glob', token)
+      if (checkPermission) checkPermission('fs.glob', pattern)
 
       // Virtual-path patterns (e.g. @local-project-cache/vault/*.enc) must be
       // resolved to a real absolute base before passing to tinyglobby, which
@@ -85,18 +82,15 @@ export function createFsUtils(dir, checkPermission, pluginDir = null, pluginId =
     },
 
     async write(relPath, content) {
-      const token = canonicalizeLocation(relPath, { dir })
       const abs   = resolvePath(relPath, ctx())
-      if (checkPermission) checkPermission('fs.write', token)
+      if (checkPermission) checkPermission('fs.write', relPath)
       await fsPromises.mkdir(path.dirname(abs), { recursive: true })
       await fsPromises.writeFile(abs, content, 'utf8')
     },
 
     async copy(src, dest) {
-      const srcToken  = canonicalizeLocation(src,  { dir })
-      const destToken = canonicalizeLocation(dest, { dir })
-      if (checkPermission) checkPermission('fs.read',  srcToken)
-      if (checkPermission) checkPermission('fs.write', destToken)
+      if (checkPermission) checkPermission('fs.read',  src)
+      if (checkPermission) checkPermission('fs.write', dest)
       const srcAbs  = resolvePath(src,  ctx())
       const destAbs = resolvePath(dest, ctx())
       await fsPromises.mkdir(path.dirname(destAbs), { recursive: true })
@@ -104,17 +98,14 @@ export function createFsUtils(dir, checkPermission, pluginDir = null, pluginId =
     },
 
     async remove(relPath, { recursive = false } = {}) {
-      const token = canonicalizeLocation(relPath, { dir })
       const abs   = resolvePath(relPath, ctx())
-      if (checkPermission) checkPermission('fs.write', token)
+      if (checkPermission) checkPermission('fs.write', relPath)
       await fsPromises.rm(abs, { recursive, force: true })
     },
 
     async move(src, dest) {
-      const srcToken  = canonicalizeLocation(src,  { dir })
-      const destToken = canonicalizeLocation(dest, { dir })
-      if (checkPermission) checkPermission('fs.read',  srcToken)
-      if (checkPermission) checkPermission('fs.write', destToken)
+      if (checkPermission) checkPermission('fs.read',  src)
+      if (checkPermission) checkPermission('fs.write', dest)
       const srcAbs  = resolvePath(src,  ctx())
       const destAbs = resolvePath(dest, ctx())
       await fsPromises.mkdir(path.dirname(destAbs), { recursive: true })
@@ -131,9 +122,8 @@ export function createFsUtils(dir, checkPermission, pluginDir = null, pluginId =
     },
 
     async stat(relPath) {
-      const token = canonicalizeLocation(relPath, { dir })
       const abs   = resolvePath(relPath, ctx())
-      if (checkPermission) checkPermission('fs.read', token)
+      if (checkPermission) checkPermission('fs.read', relPath)
       const s = await fsPromises.stat(abs)
       return {
         size: s.size,
@@ -145,16 +135,14 @@ export function createFsUtils(dir, checkPermission, pluginDir = null, pluginId =
     },
 
     async mkdir(relPath) {
-      const token = canonicalizeLocation(relPath, { dir })
       const abs   = resolvePath(relPath, ctx())
-      if (checkPermission) checkPermission('fs.write', token)
+      if (checkPermission) checkPermission('fs.write', relPath)
       await fsPromises.mkdir(abs, { recursive: true })
     },
 
     async readAsBytes(relPath, { throw: shouldThrow = true } = {}) {
-      const token = canonicalizeLocation(relPath, { dir })
       const abs   = resolvePath(relPath, ctx())
-      if (checkPermission) checkPermission('fs.read', token)
+      if (checkPermission) checkPermission('fs.read', relPath)
       try {
         const buffer = await fsPromises.readFile(abs)
         return new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength)
@@ -165,47 +153,41 @@ export function createFsUtils(dir, checkPermission, pluginDir = null, pluginId =
     },
 
     async writeAsBytes(relPath, content) {
-      const token = canonicalizeLocation(relPath, { dir })
       const abs   = resolvePath(relPath, ctx())
-      if (checkPermission) checkPermission('fs.write', token)
+      if (checkPermission) checkPermission('fs.write', relPath)
       await fsPromises.mkdir(path.dirname(abs), { recursive: true })
       await fsPromises.writeFile(abs, content)
     },
 
     async append(relPath, content) {
-      const token = canonicalizeLocation(relPath, { dir })
       const abs   = resolvePath(relPath, ctx())
-      if (checkPermission) checkPermission('fs.write', token)
+      if (checkPermission) checkPermission('fs.write', relPath)
       await fsPromises.mkdir(path.dirname(abs), { recursive: true })
       await fsPromises.appendFile(abs, content, 'utf8')
     },
 
     async appendAsBytes(relPath, content) {
-      const token = canonicalizeLocation(relPath, { dir })
       const abs   = resolvePath(relPath, ctx())
-      if (checkPermission) checkPermission('fs.write', token)
+      if (checkPermission) checkPermission('fs.write', relPath)
       await fsPromises.mkdir(path.dirname(abs), { recursive: true })
       await fsPromises.appendFile(abs, content)
     },
 
     async chmod(relPath, mode) {
-      const token = canonicalizeLocation(relPath, { dir })
       const abs   = resolvePath(relPath, ctx())
-      if (checkPermission) checkPermission('fs.write', token)
+      if (checkPermission) checkPermission('fs.write', relPath)
       await fsPromises.chmod(abs, mode)
     },
 
     readStreamIter(relPath) {
-      const token = canonicalizeLocation(relPath, { dir })
       const abs   = resolvePath(relPath, ctx())
-      if (checkPermission) checkPermission('fs.read', token)
+      if (checkPermission) checkPermission('fs.read', relPath)
       return createReadStream(abs)
     },
 
     async writeStreamRef(relPath) {
-      const token = canonicalizeLocation(relPath, { dir })
       const abs   = resolvePath(relPath, ctx())
-      if (checkPermission) checkPermission('fs.write', token)
+      if (checkPermission) checkPermission('fs.write', relPath)
       
       await fsPromises.mkdir(path.dirname(abs), { recursive: true })
       const stream = createWriteStream(abs)

@@ -18,9 +18,13 @@ export class PermissionError extends Error {
 
 const HOME = os.homedir().replace(/\\/g, '/')
 
-// Virtual token prefixes that resolvePath can expand to real absolute paths.
-// @plugin is handled separately by resolvePath (not in VIRTUAL_STORE_PREFIXES).
-const VIRTUAL_PREFIXES = [
+// @local-project-* tokens resolve inside dir, so their absolute also gets relative siblings.
+const LOCAL_VIRTUAL_PREFIXES = new Set([
+  '@local-project-cache', '@local-project-plugin-cache',
+  '@local-project-sqlite', '@local-project-plugin-sqlite',
+])
+
+const ALL_VIRTUAL_PREFIXES = [
   '@global-plugin-cache', '@global-project-plugin-cache', '@global-project-cache',
   '@global-plugin-sqlite', '@global-project-plugin-sqlite', '@global-project-sqlite',
   '@local-project-cache', '@local-project-plugin-cache',
@@ -29,38 +33,67 @@ const VIRTUAL_PREFIXES = [
 ]
 
 /**
- * Expand a single fs pattern value (no cap: prefix) into one or two strings.
- * Emits a sibling so that relative ↔ absolute ↔ virtual forms all match at check time.
+ * Expand a full "cap:value" permission string into all equivalent sibling forms.
+ * Handles fs.*, cache.*, and sqlite.* caps. All others return [perm].
  *
  * ctx = { dir, pluginId?, pluginDir?, projectId? }
  */
-function expandPattern(patternValue, ctx) {
-  if (!ctx?.dir) return [patternValue]
+function expandPattern(perm, ctx) {
+  const colonIdx = perm.indexOf(':')
+  if (colonIdx === -1) return [perm]
+  const cap = perm.slice(0, colonIdx)
+  const isFs    = cap === 'fs.read' || cap === 'fs.write' || cap === 'fs.exists' || cap === 'fs.glob'
+  const isStore = cap === 'cache.read' || cap === 'cache.write' || cap === 'sqlite.read' || cap === 'sqlite.write'
+  if (!isFs && !isStore) return [perm]
+  if (!ctx?.dir) return [perm]
   const { dir, pluginId = null, pluginDir = null, projectId = null } = ctx
   const absDir = dir.replace(/\\/g, '/')
 
-  if (patternValue.startsWith('./')) {
-    return [patternValue, absDir + '/' + patternValue.slice(2)]
+  if (isStore) {
+    const rest = perm.slice(colonIdx + 1)
+    const dColonIdx = rest.indexOf('::')
+    const loc  = dColonIdx === -1 ? rest : rest.slice(0, dColonIdx)
+    const name = dColonIdx === -1 ? '' : '::' + rest.slice(dColonIdx + 2)
+    return expandLocValue(loc, absDir, { pluginId, pluginDir, projectId })
+      .map(expandedLoc => `${cap}:${expandedLoc}${name}`)
   }
 
-  const isAbsolute = patternValue.startsWith('/') || /^[a-zA-Z]:/.test(patternValue)
+  const value = perm.slice(colonIdx + 1)
+  return expandLocValue(value, absDir, { pluginId, pluginDir, projectId })
+    .map(v => `${cap}:${v}`)
+}
+
+function expandLocValue(value, absDir, { pluginId, pluginDir, projectId }) {
+  const v = value.replace(/\\/g, '/')
+  if (v.startsWith('~/')) return [v, HOME + v.slice(1)]
+  if (v.startsWith('../')) return [v]
+  const isAbsolute = v.startsWith('/') || /^[a-zA-Z]:/.test(v)
   if (isAbsolute) {
-    const absVal = patternValue.replace(/\\/g, '/')
-    if (absVal.startsWith(absDir + '/')) return [patternValue, './' + absVal.slice(absDir.length + 1)]
-    return [patternValue]
+    if (v.startsWith(absDir + '/')) {
+      const rel = v.slice(absDir.length + 1)
+      return [v, `./${rel}`, rel, `@project/${rel}`]
+    }
+    return [v]
   }
-
-  // Virtual token: split prefix from glob suffix, resolve prefix only.
-  const matchedPrefix = VIRTUAL_PREFIXES.find(p => patternValue === p || patternValue.startsWith(p + '/'))
+  if (v.startsWith('@project/')) {
+    const rel = v.slice('@project/'.length)
+    return [v, `./${rel}`, rel, absDir + '/' + rel]
+  }
+  const matchedPrefix = ALL_VIRTUAL_PREFIXES.find(p => v === p || v.startsWith(p + '/'))
   if (matchedPrefix) {
-    const suffix = patternValue.slice(matchedPrefix.length) // '' or '/sub/**'
+    const suffix = v.slice(matchedPrefix.length)
     try {
-      const base = resolvePath(matchedPrefix, { dir, pluginId, pluginDir, projectId }).replace(/\\/g, '/')
-      return [patternValue, base + suffix]
-    } catch { return [patternValue] }
+      const base = resolvePath(matchedPrefix, { dir: absDir, pluginId, pluginDir, projectId }).replace(/\\/g, '/')
+      const absResolved = base + suffix
+      if (LOCAL_VIRTUAL_PREFIXES.has(matchedPrefix)) {
+        const rel = absResolved.slice(absDir.length + 1)
+        return [v, absResolved, `./${rel}`, rel, `@project/${rel}`]
+      }
+      return [v, absResolved]
+    } catch { return [v] }
   }
-
-  return [patternValue]
+  const rel = v.startsWith('./') ? v.slice(2) : v
+  return [`./${rel}`, rel, absDir + '/' + rel, `@project/${rel}`]
 }
 
 function normalizeGitBashPath(p) {
@@ -127,14 +160,12 @@ export function computeEffectivePermissions(pluginPerms, projectPerms, lifecycle
   }
 }
 
-const FS_CAPS = new Set(['fs.read', 'fs.write', 'fs.exists', 'fs.glob'])
-
 /**
  * Returns a checkPermission(capability, value) function that throws PermissionError
  * if the request is not in effective.allow or is in effective.deny.
  *
- * ctx = { dir, pluginId?, pluginDir?, projectId? } — used to expand fs pattern siblings
- * at build time so relative ↔ absolute ↔ virtual forms all match.
+ * ctx = { dir, pluginId?, pluginDir?, projectId? } — used to expand fs/cache/sqlite pattern
+ * siblings at build time so runtime path values match regardless of their form.
  */
 export function makePermissionChecker(effective, ctx = null) {
   const buckets = new Map()
@@ -144,24 +175,10 @@ export function makePermissionChecker(effective, ctx = null) {
   }
   const capOf = p => { const i = p.indexOf(':'); return i === -1 ? p : p.slice(0, i) }
   for (const p of effective.allow) {
-    const cap = capOf(p)
-    const b = getBucket(cap)
-    if (FS_CAPS.has(cap) && ctx) {
-      const pv = p.slice(cap.length + 1)
-      for (const expanded of expandPattern(pv, ctx)) b.allow.push(`${cap}:${expanded}`)
-    } else {
-      b.allow.push(p)
-    }
+    for (const expanded of expandPattern(p, ctx)) getBucket(capOf(expanded)).allow.push(expanded)
   }
   for (const p of effective.deny) {
-    const cap = capOf(p)
-    const b = getBucket(cap)
-    if (FS_CAPS.has(cap) && ctx) {
-      const pv = p.slice(cap.length + 1)
-      for (const expanded of expandPattern(pv, ctx)) b.deny.push(`${cap}:${expanded}`)
-    } else {
-      b.deny.push(p)
-    }
+    for (const expanded of expandPattern(p, ctx)) getBucket(capOf(expanded)).deny.push(expanded)
   }
 
   const checkAndThrow = (capability, value, matchFn) => {
@@ -179,9 +196,9 @@ export function makePermissionChecker(effective, ctx = null) {
       case 'fs.write':
       case 'fs.exists':
       case 'fs.glob': {
-        const strip = s => s.replace(/^~\//, `${HOME}/`).replace(/^\.\//, '')
-        const v = strip(value.replace(/\\/g, '/'))
-        checkAndThrow(capability, value, pv => isMatch(v, strip(pv)))
+        const normalize = s => s.replace(/\\/g, '/').replace(/^@project\//, '').replace(/^\.\//, '')
+        const v = normalize(value)
+        checkAndThrow(capability, value, pv => isMatch(v, normalize(pv)))
         return
       }
       case 'shell.run':

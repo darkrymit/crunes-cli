@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { tmpdir, homedir } from 'node:os'
 import {
   shortHash, getProjectKey,
-  resolvePath, canonicalizeLocation,
+  resolvePath,
   getAutoPermits,
 } from '../../../src/rune/api/utils.js'
 
@@ -139,50 +139,6 @@ describe('resolvePath', () => {
   })
   it('relative path resolved against dir', () => {
     expect(resolvePath('./sub/path', { dir: tmp })).toBe(join(tmp, 'sub', 'path'))
-  })
-})
-
-describe('canonicalizeLocation', () => {
-  let tmp
-  beforeEach(async () => { tmp = await makeTmp() })
-  afterEach(async () => { await rm(tmp, { recursive: true, force: true }) })
-
-  it('@project/subpath strips prefix to ./subpath', () => {
-    expect(canonicalizeLocation('@project/data/foo', { dir: tmp })).toBe('./data/foo')
-  })
-  it('@plugin/path returned verbatim', () => {
-    expect(canonicalizeLocation('@plugin/assets', { dir: tmp })).toBe('@plugin/assets')
-  })
-  it('@global-project-sqlite returned verbatim', () => {
-    expect(canonicalizeLocation('@global-project-sqlite', { dir: tmp })).toBe('@global-project-sqlite')
-  })
-  it('@global-project-sqlite/subpath returned verbatim', () => {
-    expect(canonicalizeLocation('@global-project-sqlite/data/archive', { dir: tmp })).toBe('@global-project-sqlite/data/archive')
-  })
-  it('@global-plugin-sqlite returned verbatim', () => {
-    expect(canonicalizeLocation('@global-plugin-sqlite', { dir: tmp })).toBe('@global-plugin-sqlite')
-  })
-  it('~/path returned verbatim', () => {
-    expect(canonicalizeLocation('~/foo', { dir: tmp })).toBe('~/foo')
-  })
-  it('bare relative path normalized to ./ form', () => {
-    expect(canonicalizeLocation('sub/path', { dir: tmp })).toBe('./sub/path')
-  })
-  it('./relative kept as-is', () => {
-    expect(canonicalizeLocation('./foo', { dir: tmp })).toBe('./foo')
-  })
-  it('../outside preserved with ../ prefix', () => {
-    expect(canonicalizeLocation('../outside', { dir: tmp })).toBe('../outside')
-  })
-  it('absolute path inside dir relativized to ./subpath form', () => {
-    const abs = join(tmp, 'dev', 'test-ref', 'img', 'photo.webp')
-    expect(canonicalizeLocation(abs, { dir: tmp })).toBe('./dev/test-ref/img/photo.webp')
-  })
-  it('absolute path outside dir returned as normalized absolute', () => {
-    const outside = join(tmpdir(), 'other', 'file.txt')
-    const result = canonicalizeLocation(outside, { dir: tmp })
-    expect(result).toBe(outside.replace(/\\/g, '/'))
-    expect(result.startsWith('./')).toBe(false)
   })
 })
 

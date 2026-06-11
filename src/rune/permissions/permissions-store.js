@@ -1,7 +1,4 @@
-import os from 'node:os'
 import { isMatch } from '../../shared/match.js'
-
-const HOME = os.homedir().replace(/\\/g, '/')
 
 export function matchStorePermission(value, pattern) {
   // Split value into location and name at '::'
@@ -24,9 +21,7 @@ export function matchStorePermission(value, pattern) {
     }
   }
 
-  const locOk  = isMatch(
-    valueLoc.startsWith('~/') ? HOME + valueLoc.slice(1) : valueLoc,
-    patLoc.startsWith('~/') ? HOME + patLoc.slice(1) : patLoc,
+  const locOk  = isMatch(valueLoc, patLoc,
     { dot: true, noextglob: true, nonegate: true, nobrace: true, nobracket: true }
   )
   const nameOk = patName === '*' || patName == null ||

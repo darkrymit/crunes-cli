@@ -1,6 +1,6 @@
 import { mkdirSync } from 'node:fs'
 import path from 'node:path'
-import { resolvePath, canonicalizeLocation } from './utils.js'
+import { resolvePath } from './utils.js'
 import { upsertSqliteDb } from '../../sqlite/index.js'
 
 async function loadDatabase() {
@@ -88,8 +88,7 @@ export function createSqliteUtils(dir, checkPermission, { pluginId = null, store
       const ctx    = { dir, pluginId, storeDir, projectName, projectId }
       const base   = resolvePath(location, ctx)
       const dbPath = path.join(base, resolveFileName(name))
-      const canon  = canonicalizeLocation(location, { dir })
-      const tokenValue = `${canon}::${name}`
+      const tokenValue = `${location}::${name}`
       const checkRead  = checkPermission ? () => checkPermission('sqlite.read',  tokenValue) : null
       const checkWrite = checkPermission ? () => checkPermission('sqlite.write', tokenValue) : null
       if (scope !== null && GLOBAL_SCOPES.has(scope)) {
