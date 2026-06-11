@@ -48,44 +48,44 @@ describe('parseEnvPattern', () => {
 
 describe('matchEnvPermission', () => {
   it('matches when source and key both match', () => {
-    expect(matchEnvPermission('process::GITHUB_TOKEN', 'process::GITHUB_*')).toBe(true)
+    expect(matchEnvPermission('process::GITHUB_TOKEN', ['process::GITHUB_*'])).toBe(true)
   })
 
   it('matches .env source', () => {
-    expect(matchEnvPermission('.env::API_KEY', '.env::API_*')).toBe(true)
+    expect(matchEnvPermission('.env::API_KEY', ['.env::API_*'])).toBe(true)
   })
 
   it('rejects when source does not match', () => {
-    expect(matchEnvPermission('.env.local::API_KEY', '.env::API_*')).toBe(false)
+    expect(matchEnvPermission('.env.local::API_KEY', ['.env::API_*'])).toBe(false)
   })
 
   it('rejects when key does not match glob', () => {
-    expect(matchEnvPermission('process::DB_HOST', 'process::API_*')).toBe(false)
+    expect(matchEnvPermission('process::DB_HOST', ['process::API_*'])).toBe(false)
   })
 
   it('wildcard key pattern matches any key', () => {
-    expect(matchEnvPermission('process::ANY_KEY', 'process::*')).toBe(true)
+    expect(matchEnvPermission('process::ANY_KEY', ['process::*'])).toBe(true)
   })
 
   it('supports * wildcard key matching on any source', () => {
-    expect(matchEnvPermission('process::API_KEY', '*')).toBe(true)
-    expect(matchEnvPermission('.env::API_KEY', '*')).toBe(true)
+    expect(matchEnvPermission('process::API_KEY', ['*'])).toBe(true)
+    expect(matchEnvPermission('.env::API_KEY', ['*'])).toBe(true)
   })
 
   it('supports KEY_NAME single-argument wildcard source matching for specific key', () => {
-    expect(matchEnvPermission('process::TOKEN', 'TOKEN')).toBe(true)
-    expect(matchEnvPermission('.env::TOKEN', 'TOKEN')).toBe(true)
-    expect(matchEnvPermission('.env::OTHER', 'TOKEN')).toBe(false)
+    expect(matchEnvPermission('process::TOKEN', ['TOKEN'])).toBe(true)
+    expect(matchEnvPermission('.env::TOKEN', ['TOKEN'])).toBe(true)
+    expect(matchEnvPermission('.env::OTHER', ['TOKEN'])).toBe(false)
   })
 
   it('supports comma-separated sources and comma-separated keys with positional double-colon', () => {
-    expect(matchEnvPermission('process::PORT', 'process,.env::PORT,API_KEY')).toBe(true)
-    expect(matchEnvPermission('.env::API_KEY', 'process,.env::PORT,API_KEY')).toBe(true)
-    expect(matchEnvPermission('.env::OTHER', 'process,.env::PORT,API_KEY')).toBe(false)
+    expect(matchEnvPermission('process::PORT', ['process,.env::PORT,API_KEY'])).toBe(true)
+    expect(matchEnvPermission('.env::API_KEY', ['process,.env::PORT,API_KEY'])).toBe(true)
+    expect(matchEnvPermission('.env::OTHER', ['process,.env::PORT,API_KEY'])).toBe(false)
   })
 
   it('rejects legacy single-colon patterns without double-colon', () => {
-    expect(matchEnvPermission('process::TOKEN', 'process:TOKEN')).toBe(false)
+    expect(matchEnvPermission('process::TOKEN', ['process:TOKEN'])).toBe(false)
   })
 })
 

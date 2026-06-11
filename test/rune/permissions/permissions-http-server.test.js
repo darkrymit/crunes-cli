@@ -21,21 +21,21 @@ describe('isLoopbackHost', () => {
 
 describe('matchHttpServerPermission', () => {
   it('matches exact host and port', () => {
-    expect(matchHttpServerPermission('0.0.0.0:3000', '0.0.0.0:3000')).toBe(true)
+    expect(matchHttpServerPermission('0.0.0.0:3000', ['0.0.0.0:3000'])).toBe(true)
   })
   it('rejects wrong port', () => {
-    expect(matchHttpServerPermission('0.0.0.0:4000', '0.0.0.0:3000')).toBe(false)
+    expect(matchHttpServerPermission('0.0.0.0:4000', ['0.0.0.0:3000'])).toBe(false)
   })
   it('wildcard port matches any port', () => {
-    expect(matchHttpServerPermission('0.0.0.0:9999', '0.0.0.0:*')).toBe(true)
+    expect(matchHttpServerPermission('0.0.0.0:9999', ['0.0.0.0:*'])).toBe(true)
   })
   it('matches port 0 explicitly', () => {
-    expect(matchHttpServerPermission('0.0.0.0:0', '0.0.0.0:0')).toBe(true)
+    expect(matchHttpServerPermission('0.0.0.0:0', ['0.0.0.0:0'])).toBe(true)
   })
   it('rejects wrong host', () => {
-    expect(matchHttpServerPermission('192.168.1.1:3000', '0.0.0.0:3000')).toBe(false)
+    expect(matchHttpServerPermission('192.168.1.1:3000', ['0.0.0.0:3000'])).toBe(false)
   })
   it('pattern without  prefix still matches', () => {
-    expect(matchHttpServerPermission('0.0.0.0:3000', '0.0.0.0:3000')).toBe(true)
+    expect(matchHttpServerPermission('0.0.0.0:3000', ['0.0.0.0:3000'])).toBe(true)
   })
 })

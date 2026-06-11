@@ -20,17 +20,17 @@ export function parseEnvPattern(pattern) {
 
 // value: 'source::key' e.g. 'process::TOKEN' or '.env::API_KEY'
 // pattern: already stripped of 'env.read:' prefix by check()
-export function matchEnvPermission(value, pattern) {
+export function matchEnvPermission(value, patterns) {
   const dColonIdx = value.indexOf('::')
   if (dColonIdx === -1) return false
 
   const valueSource = value.slice(0, dColonIdx)
   const valueKey    = value.slice(dColonIdx + 2)
 
-  const { sources, keyPatterns } = parseEnvPattern(pattern)
-
-  const sourceOk = sources.includes('*') || sources.includes(valueSource)
-  const keyOk = keyPatterns.some(pat => isMatch(valueKey, pat))
-
-  return sourceOk && keyOk
+  return patterns.some(pattern => {
+    const { sources, keyPatterns } = parseEnvPattern(pattern)
+    const sourceOk = sources.includes('*') || sources.includes(valueSource)
+    const keyOk = keyPatterns.some(pat => isMatch(valueKey, pat))
+    return sourceOk && keyOk
+  })
 }

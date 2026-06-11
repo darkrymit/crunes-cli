@@ -467,4 +467,12 @@ describe('expandPattern — full sibling coverage via makePermissionChecker', ()
     expect(() => check('fs.read', '../sibling/file.txt')).not.toThrow()
     expect(() => check('fs.read', './sibling/file.txt')).toThrow(PermissionError)
   })
+
+  it('./** pattern with ctx matches absolute path inside dir but not outside', () => {
+    const check = makePermissionChecker({ allow: ['fs.read:./**'], deny: [] }, ctx)
+    expect(() => check('fs.read', `${dir}/src/index.js`)).not.toThrow()
+    expect(() => check('fs.read', `${dir}/.hidden/file`)).not.toThrow()
+    expect(() => check('fs.read', '/etc/passwd')).toThrow(PermissionError)
+    expect(() => check('fs.read', '/home/user/otherproject/file.txt')).toThrow(PermissionError)
+  })
 })
