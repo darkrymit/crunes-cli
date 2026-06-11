@@ -2,6 +2,7 @@ import { loadConfig } from '../../core/config.js'
 import { runRune } from '../resolver.js'
 import { renderSection } from '../../shared/render.js'
 import { output, isVerbose } from '../../shared/output.js'
+import { checkBatchPermission, buildMatchString } from './batch-permission.js'
 
 import micromatch from 'micromatch'
 
@@ -86,7 +87,7 @@ export function parseRunArgs(argv) {
   rawSegments.push(current)
 
   const segments = rawSegments.map(parseSegment)
-  return { segments, format, failFast }
+  return { segments, format, failFast, isBatch: allowBatch }
 }
 
 
@@ -94,6 +95,7 @@ export async function handler({
   segments,
   format = 'text',
   failFast = false,
+  isBatch = false,
   projectRoot = process.cwd(),
   configRoot = projectRoot,
 }) {
@@ -112,6 +114,18 @@ export async function handler({
     output.error(`Config unreadable: ${err.message}`)
     output.info('Run `crunes init` to create a config file.')
     process.exit(1)
+  }
+
+  if (isBatch) {
+    for (const seg of segments) {
+      const entry = config.runes?.[seg.key] ?? {}
+      const matchString = buildMatchString(seg.key, seg.runeArgs)
+      const result = checkBatchPermission(entry, matchString)
+      if (!result.allowed) {
+        output.error(`Batch not permitted for "${matchString}". Add a batch.allow pattern in config.json or run it separately.`)
+        process.exit(1)
+      }
+    }
   }
 
   let anyFailed = false

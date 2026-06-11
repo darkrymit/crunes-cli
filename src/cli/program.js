@@ -54,8 +54,8 @@ export function buildProgram() {
     .passThroughOptions()
     .action(async (args) => {
       const { handler, parseRunArgs } = await import('../rune/commands/run.js')
-      const { segments, format, failFast } = parseRunArgs(args)
-      await handler({ segments, format, failFast, projectRoot: projectRoot(), configRoot: configRoot() })
+      const { segments, format, failFast, isBatch } = parseRunArgs(args)
+      await handler({ segments, format, failFast, isBatch, projectRoot: projectRoot(), configRoot: configRoot() })
     })
 
   program
