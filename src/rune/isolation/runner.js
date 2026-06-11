@@ -1258,6 +1258,148 @@ export async function getArgsSchema(runeFile, effective, projectDir, {
   }
 }
 
+export async function getReplSchema(runeFile, effective, args, projectDir, {
+  nodeModulesDir = null,
+  pluginDeps = {},
+  pluginDir = null,
+  isolateMemoryMb = 128,
+  isolateTimeoutMs = 30_000,
+  vars = {},
+} = {}) {
+  const augmented = {
+    allow: [...effective.allow, ...getAutoPermits({ pluginId: null, pluginDir })],
+    deny: effective.deny,
+  }
+  const checkPermission = makePermissionChecker(augmented)
+  const { utils, dispose } = createUtils(projectDir, checkPermission, pluginDir ?? null, augmented, vars, null, null)
+  const isolate = new ivm.Isolate({ memoryLimit: isolateMemoryMb })
+  try {
+    const context = await isolate.createContext()
+    await context.global.set('$__hostRequire', new ivm.Reference((spec) => {
+      const msg = DENY_BUILTINS.get(spec) ?? `Sandbox escape blocked. Cannot require '${spec}' on host.`
+      throw new Error(`PermissionError: ${msg}`)
+    }))
+    const utilsMod = await injectUtils(isolate, context, utils, null, vars, projectDir, checkPermission, null, null, null)
+    await injectConsole(isolate, context, null)
+    if (pluginDir != null) await context.global.set('CRUNES_PLUGIN_ROOT', pluginDir)
+
+    const runeSrc = await fs.readFile(runeFile, 'utf8')
+    const patchedSrc = runeSrc +
+      '\nif (typeof argsRepl !== "undefined") globalThis.__crunes_argsRepl = argsRepl;\n' +
+      '\nif (typeof commandsRepl !== "undefined") globalThis.__crunes_commandsRepl = commandsRepl;\n'
+    const runeMod = await isolate.compileModule(patchedSrc, { filename: runeFile })
+    const resolver = createModuleResolver(
+      isolate,
+      path.dirname(runeFile),
+      nodeModulesDir ?? path.join(path.dirname(runeFile), 'node_modules'),
+      pluginDeps,
+      effective.allow,
+      effective.deny,
+      projectDir,
+      pluginDir ?? null,
+      new Map([['@utils', utilsMod]])
+    )
+    await runeMod.instantiate(context, resolver)
+    await runeMod.evaluate({ timeout: isolateTimeoutMs })
+    await context.eval('delete globalThis.$__hostRequire')
+
+    // Extract argsRepl schema
+    let argsSchema = null
+    if (await context.eval('typeof __crunes_argsRepl !== "undefined"')) {
+      argsSchema = await context.evalClosure(
+        `return (async () => {
+          const b = (() => {
+            const opts = [], pos = [], exs = [], cmds = []
+            const createBuilder = (subName, subDesc) => {
+              const sOpts = [], sPos = [], sExs = [], sCmds = []
+              const subBuilder = {
+                option(flags, description, def) { sOpts.push({ flags, description, def }); return subBuilder },
+                positional(spec, description)   { sPos.push({ spec, description }); return subBuilder },
+                example(usage, description)     { sExs.push({ usage, description }); return subBuilder },
+                command(name, description, callback) {
+                  const nestedBuilder = createBuilder(name, description)
+                  if (typeof callback === 'function') callback(nestedBuilder)
+                  sCmds.push(nestedBuilder.build())
+                  return subBuilder
+                },
+                build() { return { name: subName, description: subDesc, options: sOpts, positionals: sPos, examples: sExs, commands: sCmds } }
+              }
+              return subBuilder
+            }
+            const rootBuilder = {
+              option(flags, description, def) { opts.push({ flags, description, def }); return rootBuilder },
+              positional(spec, description)   { pos.push({ spec, description }); return rootBuilder },
+              example(usage, description)     { exs.push({ usage, description }); return rootBuilder },
+              command(name, description, callback) {
+                const subBuilder = createBuilder(name, description)
+                if (typeof callback === 'function') callback(subBuilder)
+                cmds.push(subBuilder.build())
+                return rootBuilder
+              },
+              build() { return { options: opts, positionals: pos, examples: exs, commands: cmds } }
+            }
+            return rootBuilder
+          })()
+          const res = await __crunes_argsRepl(b)
+          return (res && typeof res.build === 'function') ? res.build() : res
+        })()`,
+        [],
+        { timeout: isolateTimeoutMs, result: { promise: true, copy: true } }
+      )
+    }
+
+    // Extract commandsRepl schema (root .option/.positional/.example are no-ops)
+    let commandsSchema = null
+    if (await context.eval('typeof __crunes_commandsRepl !== "undefined"')) {
+      commandsSchema = await context.evalClosure(
+        `return (async () => {
+          const b = (() => {
+            const cmds = []
+            const createBuilder = (subName, subDesc) => {
+              const sOpts = [], sPos = [], sExs = [], sCmds = []
+              const subBuilder = {
+                option(flags, description, def) { sOpts.push({ flags, description, def }); return subBuilder },
+                positional(spec, description)   { sPos.push({ spec, description }); return subBuilder },
+                example(usage, description)     { sExs.push({ usage, description }); return subBuilder },
+                command(name, description, callback) {
+                  const nestedBuilder = createBuilder(name, description)
+                  if (typeof callback === 'function') callback(nestedBuilder)
+                  sCmds.push(nestedBuilder.build())
+                  return subBuilder
+                },
+                build() { return { name: subName, description: subDesc, options: sOpts, positionals: sPos, examples: sExs, commands: sCmds } }
+              }
+              return subBuilder
+            }
+            const rootBuilder = {
+              option() { return rootBuilder },
+              positional() { return rootBuilder },
+              example() { return rootBuilder },
+              command(name, description, callback) {
+                const subBuilder = createBuilder(name, description)
+                if (typeof callback === 'function') callback(subBuilder)
+                cmds.push(subBuilder.build())
+                return rootBuilder
+              },
+              build() { return { commands: cmds } }
+            }
+            return rootBuilder
+          })()
+          const res = await __crunes_commandsRepl(b)
+          return (res && typeof res.build === 'function') ? res.build() : res
+        })()`,
+        [],
+        { timeout: isolateTimeoutMs, result: { promise: true, copy: true } }
+      )
+    }
+
+    return { argsSchema, commandsSchema }
+  } finally {
+    await dispose()
+    isolate.dispose()
+  }
+}
+
 /**
  * Compute effective permissions and run a plugin rune. Convenience wrapper for core.js.
  */

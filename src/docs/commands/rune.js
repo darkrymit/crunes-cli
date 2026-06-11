@@ -1,7 +1,7 @@
 import { join, relative } from 'node:path'
 import { loadConfig } from '../../core/config.js'
 import { getRune } from '../../rune/resolver.js'
-import { getArgsSchema } from '../../rune/isolation/runner.js'
+import { getArgsSchema, getReplSchema } from '../../rune/isolation/runner.js'
 import { formatHelp } from '../formatter.js'
 import { computeEffectivePermissions } from '../../rune/permissions/permissions.js'
 import { output } from '../../shared/output.js'
@@ -12,6 +12,20 @@ const SUGGESTIONS = {
   intro: 'crunes docs intro',
   utils: 'crunes docs utils',
   globals: 'crunes docs globals',
+}
+
+function formatSlashCommands(commands, indent = '') {
+  const lines = [`${indent}REPL Slash Commands:`]
+  for (const cmd of commands) {
+    lines.push(`${indent}  /${cmd.name.padEnd(12)} ${cmd.description ?? ''}`)
+    for (const pos of (cmd.positionals ?? [])) {
+      lines.push(`${indent}               ${pos.spec.padEnd(14)} ${pos.description ?? ''}`)
+    }
+    for (const opt of (cmd.options ?? [])) {
+      lines.push(`${indent}               ${opt.flags.padEnd(14)} ${opt.description ?? ''}`)
+    }
+  }
+  return lines.join('\n')
 }
 
 export async function handler({ keys, format = 'text', projectRoot = process.cwd(), configRoot = projectRoot }) {
@@ -41,13 +55,26 @@ export async function handler({ keys, format = 'text', projectRoot = process.cwd
     const runeFile = join(configRoot, entry.path ?? `.crunes/runes/${key}.js`)
     const relativePath = relative(projectRoot, runeFile).replace(/\\/g, '/')
     const basePerms = entry.permissions ?? { allow: [], deny: [] }
-    const effective = computeEffectivePermissions(basePerms, config.permissions?.[key], 'args', projectRoot)
+    const vars = entry.vars ?? {}
+
+    const runEffective  = computeEffectivePermissions(basePerms, config.permissions?.[key], 'run', projectRoot)
+    const replEffective = computeEffectivePermissions(basePerms, config.permissions?.[key], 'runRepl', projectRoot)
 
     let schema = null
     try {
-      schema = await getArgsSchema(runeFile, effective, projectRoot, { vars: entry.vars ?? {} })
+      schema = await getArgsSchema(runeFile, runEffective, projectRoot, { vars })
     } catch (err) {
       output.warn(`Could not load args schema for "${key}": ${err.message}`)
+    }
+
+    let repl = null
+    try {
+      const { argsSchema, commandsSchema } = await getReplSchema(runeFile, replEffective, [], projectRoot, { vars })
+      if (argsSchema !== null || commandsSchema !== null) {
+        repl = { argsSchema, commandsSchema }
+      }
+    } catch (err) {
+      output.warn(`Could not load REPL schema for "${key}": ${err.message}`)
     }
 
     results.push({
@@ -56,13 +83,25 @@ export async function handler({ keys, format = 'text', projectRoot = process.cwd
       description: entry.description ?? null,
       relativePath,
       schema,
+      repl,
     })
   }
 
   if (format === 'json') {
     process.stdout.write(JSON.stringify(results, null, 2) + '\n')
   } else {
-    const blocks = results.map(r => formatHelp(r.schema, { key: r.key, name: r.name, description: r.description, relativePath: r.relativePath }))
+    const blocks = []
+    for (const r of results) {
+      const parts = []
+      parts.push(formatHelp(r.schema, { key: r.key, name: r.name, description: r.description, relativePath: r.relativePath }))
+      if (r.repl?.argsSchema) {
+        parts.push(formatHelp(r.repl.argsSchema, { key: r.key, name: r.name, description: r.description, relativePath: r.relativePath, lifecycle: 'runRepl' }))
+      }
+      if (r.repl?.commandsSchema?.commands?.length) {
+        parts.push(formatSlashCommands(r.repl.commandsSchema.commands))
+      }
+      blocks.push(parts.join('\n\n'))
+    }
     if (blocks.length > 0) process.stdout.write(blocks.join('\n\n') + '\n')
   }
 
