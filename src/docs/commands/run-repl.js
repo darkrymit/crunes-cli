@@ -1,67 +1,107 @@
 export async function handler() {
-  process.stdout.write(`# Docs: The runRepl(args, input) Export
+  process.stdout.write(`# Docs: The REPL Lifecycle Exports
 
-The \`export async function runRepl(args, input)\` export makes a rune interactive. It is called once per input line inside a keep-alive isolate — JS closures are the state store across calls.
+The REPL lifecycle is a family of six named exports. At minimum, export \`runRepl\` or \`inputRepl\` (or both).
 
-## 1. Signature
+## Lifecycle Export Family
+
+| Export | Role | Called | Returns |
+|---|---|---|---|
+| \`argsRepl(builder)\` | Session option schema | Once, before start | schema |
+| \`runRepl(args)\` | Session initializer | Once at session start | \`string | void\` — initial prompt |
+| \`bannerRepl(args)\` | Welcome banner | Once after \`runRepl\` | \`string | void\` — banner text |
+| \`commandsRepl(builder)\` | Slash command schema | Once, before start | schema |
+| \`inputRepl(input)\` | Per-input dispatch | Once per \`InputEvent\` | \`ReplSignal | string | void\` |
+| \`completeInputRepl(tokens)\` | Tab completion | On Tab key | \`string[]\` |
+
+## 1. runRepl(args) — Session Initializer
+
+Called once at session start. Open connections, validate config, set up module-level state. Returns the initial prompt string, or void for the default \`"> "\`.
 
 \`\`\`js
-export async function runRepl(args, input) {
-  // args   — ParsedArgs from argsRepl() schema, built once at session start
-  // input  — raw string the user typed this turn (not trimmed)
+export async function runRepl(args) {
+  replDb = await sqlite.open(args.db, 'books')
+  return 'sqlite> '
 }
 \`\`\`
 
-## 2. The \`input\` Parameter
+## 2. bannerRepl(args) — Welcome Banner
 
-The raw string typed by the user this turn. Not trimmed — handle whitespace in your rune if needed. For piped / non-TTY consumers (AI agents, scripts), each line of stdin is delivered as a separate \`input\` call.
+Called once after \`runRepl\` resolves. Printed to stderr before the first prompt. Can use module-level state set up by \`runRepl\`.
 
-## 3. The \`args\` Parameter
+\`\`\`js
+export function bannerRepl(args) {
+  return \`Connected to \${args.db}/books.db — /help for commands\`
+}
+\`\`\`
 
-Parsed once at session start from the \`argsRepl()\` schema. Same \`ParsedArgs\` shape as \`run(args)\`:
-- **\`args.$command\`**, **\`args.$commands\`**, **\`args._\`**, **\`args.$rest\`**, **\`args.$raw\`**
-- Named options and positionals declared in \`argsRepl()\`
+## 3. commandsRepl(builder) — Slash Command Schema
 
-If \`argsRepl()\` is absent, \`args\` is an empty object \`{}\`.
+Declares rune slash commands. Only \`.command()\` at root level is used. Matched commands arrive in \`inputRepl\` as \`{ type: 'command', args }\` where \`args.$command\` is the command name.
 
-## 4. Return Values — ReplSignal
+\`\`\`js
+export function commandsRepl(b) {
+  return b
+    .command('tables', 'List all tables')
+    .command('schema', 'Show table schema', sub => sub.positional('<table>', 'Table name'))
+}
+\`\`\`
 
-Return value controls session flow:
+## 4. inputRepl(input) — Per-Input Dispatch
+
+Called once per \`InputEvent\`. All session logic lives here.
+
+### InputEvent type
+
+| type | text | When |
+|---|---|---|
+| \`'line'\` | raw input string | Normal user input |
+| \`'interrupt'\` | \`''\` | Ctrl+C on empty prompt |
+| \`'eof'\` | \`''\` | Ctrl+D or stdin closed |
+| \`'command'\` | — | Matched slash command (use \`input.args.$command\`) |
+
+\`\`\`js
+export async function inputRepl(input) {
+  if (input.type === 'eof' || input.type === 'interrupt') {
+    await replDb.close(); replDb = null
+    return { type: 'done', message: 'Disconnected.' }
+  }
+  if (input.type === 'command') {
+    if (input.args.$command === 'tables') { /* ... */ }
+    return undefined
+  }
+  const trimmed = input.text.trim()
+  if (!trimmed) return undefined
+  const result = await execQuery(replDb, trimmed)
+  section.emit(result)
+  return 'sqlite> '
+}
+\`\`\`
+
+### Return values
 
 | Return value | Effect |
 |---|---|
-| \`undefined\` or \`null\` | Continue — re-prompt with current prompt string |
-| \`"string"\` | Continue — update prompt to this string |
-| \`{ type: 'prompt', value?: string }\` | Continue — optionally update prompt |
-| \`{ type: 'done', message?: string }\` | End session — optional goodbye message printed |
+| \`undefined\` or \`null\` | Continue — re-prompt |
+| \`"string"\` | Continue — update prompt |
+| \`{ type: 'prompt', value? }\` | Continue — optionally update prompt |
+| \`{ type: 'done', message? }\` | End session |
 
-## 5. Output
+## 5. completeInputRepl(tokens) — Tab Completion
 
-Use \`console.log()\` for log lines (written to stderr in text mode, emitted as \`log\` events in JSONL mode).
-
-Use \`utils.section.emit(section)\` to stream sections to the consumer in real time before the step returns. Also accepts an array: \`utils.section.emit([s1, s2])\`.
+Called on Tab. Last token is the partial word being typed — same convention as the CLI completions system.
 
 \`\`\`js
-import { sqlite, section, md } from '@utils'
-
-export async function runRepl(args, input) {
-  const trimmed = input.trim()
-  if (!trimmed) return undefined
-
-  if (trimmed === 'exit') return { type: 'done', message: 'Bye!' }
-
-  const rows = await db.query(trimmed)
-  section.emit(section.create('result', {
-    type: 'markdown',
-    content: md.table(Object.keys(rows[0] ?? {}), rows.map(r => Object.values(r).map(String))),
-  }))
-  return \`[\${rows.length} rows]> \`
+export async function completeInputRepl(tokens) {
+  const partial = tokens[tokens.length - 1] ?? ''
+  return ['SELECT', 'FROM', 'WHERE', 'INSERT', 'UPDATE', 'DELETE']
+    .filter(k => k.startsWith(partial.toUpperCase()))
 }
 \`\`\`
 
 ## 6. Permissions
 
-\`runRepl\` uses a **separate permission namespace** from \`run\`. Declare a \`"runRepl"\` block in \`config.json\` — it does not inherit from \`"run"\`:
+\`runRepl\` uses a **separate permission namespace** from \`run\`. Declare a \`"runRepl"\` block in \`config.json\`:
 
 \`\`\`json
 {
@@ -76,14 +116,18 @@ export async function runRepl(args, input) {
 }
 \`\`\`
 
-If the \`"runRepl"\` block is absent, all permission checks inside \`runRepl\` will throw a \`PermissionError\`.
+## 7. Built-in Slash Commands
 
-## 7. Strict 3-Tier Parsing Boundary
+These are always available regardless of \`commandsRepl\`:
 
-Global flags and rune args follow the same boundary as \`crunes run\`:
-\`\`\`bash
-crunes --cwd ./project run-repl --format jsonl my-shell --db ./data
-#      ^global         ^command                ^rune args
-\`\`\`
+| Command | Action |
+|---|---|
+| \`/help\` | Show available commands |
+| \`/clear\` | Clear the screen (TTY only) |
+| \`/exit\` | End the session |
+
+## 8. Input History
+
+Arrow keys (↑/↓) navigate input history within the session. No persistence across sessions.
 \n`)
 }

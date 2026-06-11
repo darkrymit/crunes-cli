@@ -25,7 +25,7 @@ export function argsRepl(b) {
 }
 \`\`\`
 
-If \`argsRepl()\` is absent, \`runRepl(args, input)\` receives \`args = {}\`.
+If \`argsRepl()\` is absent, \`runRepl(args)\` receives \`args = {}\`.
 
 ## 2. Builder Methods Reference
 
@@ -39,7 +39,7 @@ Same API as \`args()\` — see \`crunes docs args\` for the full reference:
 
 ## 3. When to Use \`argsRepl()\`
 
-Use it when your REPL session needs startup configuration — a path, a target, a mode — that is provided once when the session starts and then available on every \`runRepl(args, input)\` call:
+Use it when your REPL session needs startup configuration — a path, a target, a mode — that is provided once when the session starts and then available on every \`runRepl(args)\` call:
 
 \`\`\`js
 export function argsRepl(b) {
@@ -52,9 +52,9 @@ export function argsRepl(b) {
 
 let db = null
 
-export async function runRepl(args, input) {
-  if (!db) db = await sqlite.open(args.db, 'main')
-  // args.readOnly is available every call
+export async function runRepl(args) {
+  db = await sqlite.open(args.db, 'main')
+  // args.readOnly is available for the session
 }
 \`\`\`
 

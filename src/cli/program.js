@@ -155,6 +155,38 @@ export function buildProgram() {
       await handler()
     })
 
+  helpGroup
+    .command('banner-repl')
+    .description('Show detailed documentation and examples for the bannerRepl(args) export')
+    .action(async () => {
+      const { handler } = await import('../docs/commands/banner-repl.js')
+      await handler()
+    })
+
+  helpGroup
+    .command('commands-repl')
+    .description('Show detailed documentation and examples for the commandsRepl(builder) export')
+    .action(async () => {
+      const { handler } = await import('../docs/commands/commands-repl.js')
+      await handler()
+    })
+
+  helpGroup
+    .command('input-repl')
+    .description('Show detailed documentation and examples for the inputRepl(input) export')
+    .action(async () => {
+      const { handler } = await import('../docs/commands/input-repl.js')
+      await handler()
+    })
+
+  helpGroup
+    .command('complete-input-repl')
+    .description('Show detailed documentation and examples for the completeInputRepl(tokens) export')
+    .action(async () => {
+      const { handler } = await import('../docs/commands/complete-input-repl.js')
+      await handler()
+    })
+
   program
     .command('version')
     .description('Print the installed version and check for updates')

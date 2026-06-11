@@ -3,6 +3,7 @@ import micromatch from 'micromatch'
 import { loadConfig } from '../../core/config.js'
 import { renderSection } from '../../shared/render.js'
 import { output, isVerbose } from '../../shared/output.js'
+import { parseArgs } from '../api/args-parser.js'
 
 export function parseReplReturn(value) {
   if (value === undefined || value === null) return { type: 'continue', prompt: null }
@@ -12,6 +13,22 @@ export function parseReplReturn(value) {
     if (value.type === 'prompt') return { type: 'continue', prompt: value.value ?? null }
   }
   return { type: 'continue', prompt: null }
+}
+
+export const BUILTIN_SLASH_COMMANDS = [
+  { name: 'help',  description: 'Show available commands' },
+  { name: 'clear', description: 'Clear the screen' },
+  { name: 'exit',  description: 'End the session' },
+]
+
+export function parseSlashCommand(line) {
+  const trimmed = line.trim()
+  if (!trimmed.startsWith('/')) return null
+  const spaceIdx = trimmed.indexOf(' ')
+  const name = spaceIdx === -1 ? trimmed.slice(1) : trimmed.slice(1, spaceIdx)
+  const rest  = spaceIdx === -1 ? '' : trimmed.slice(spaceIdx + 1).trim()
+  if (!name) return null
+  return { name, rest }
 }
 
 export function parseReplArgs(argv) {
@@ -110,13 +127,43 @@ export async function handler({
     process.stdout.write(JSON.stringify({ type: 'session-start', rune: key, instance: instanceId }) + '\n')
   }
 
-  let currentPrompt = '> '
+  // Print banner before first prompt
+  if (session.banner) {
+    if (format === 'jsonl') {
+      process.stdout.write(JSON.stringify({ type: 'banner', rune: key, instance: instanceId, message: session.banner }) + '\n')
+    } else {
+      process.stderr.write(session.banner + '\n')
+    }
+  }
+
+  let currentPrompt = session.initialPrompt ?? '> '
   let sessionEnded = false
-  // Resolves when the session should end (set by close event)
   let eofResolve = null
   const eofPromise = new Promise(resolve => { eofResolve = resolve })
 
-  const rl = readline.createInterface({ input: process.stdin, output: process.stderr, terminal: process.stdin.isTTY })
+  // Wire tab completer if rune exports completeInputRepl
+  const completerFn = session.complete
+    ? (line, cb) => {
+        const tokens = line.length === 0 ? [''] : line.trimStart().split(/\s+/)
+        // Ensure last token is the partial word (empty string if line ends with space)
+        if (line.length > 0 && line[line.length - 1] === ' ') tokens.push('')
+        Promise.resolve(session.complete(tokens))
+          .then(candidates => {
+            const partial = tokens[tokens.length - 1] ?? ''
+            const matches = candidates.filter(c => c.startsWith(partial))
+            cb(null, [matches, partial])
+          })
+          .catch(() => cb(null, [[], '']))
+      }
+    : undefined
+
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stderr,
+    terminal: process.stdin.isTTY,
+    historySize: process.stdin.isTTY ? 100 : 0,
+    ...(completerFn ? { completer: completerFn } : {}),
+  })
 
   function prompt() {
     if (process.stdin.isTTY) rl.setPrompt(currentPrompt)
@@ -139,47 +186,115 @@ export async function handler({
     await session.dispose()
   }
 
+  function buildHelpText() {
+    const lines = ['Built-in commands:']
+    for (const cmd of BUILTIN_SLASH_COMMANDS) {
+      lines.push(`  /${cmd.name.padEnd(8)} ${cmd.description}`)
+    }
+    if (session.commandsSchema?.commands?.length) {
+      lines.push('Rune commands:')
+      for (const cmd of session.commandsSchema.commands) {
+        lines.push(`  /${cmd.name.padEnd(8)} ${cmd.description ?? ''}`)
+      }
+    }
+    lines.push('Press Ctrl+D or return { type: "done" } from inputRepl() to exit.')
+    return lines.join('\n')
+  }
+
   // Process lines sequentially using an async queue to avoid race conditions
   // in piped (non-TTY) mode where readline fires all line events synchronously
   // before any async handler resolves.
   let queue = Promise.resolve()
 
-  rl.on('line', (input) => {
-    queue = queue.then(async () => {
+  function enqueue(fn) {
+    queue = queue.then(fn)
+  }
+
+  async function handleInputEvent(event) {
+    if (sessionEnded) return
+    let result
+    try {
+      result = await session.step(event)
+    } catch (err) {
       if (sessionEnded) return
-      let result
-      try {
-        result = await session.step(input)
-      } catch (err) {
-        if (sessionEnded) return
-        const msg = isVerbose ? (err.stack || err.message) : err.message
-        if (format === 'jsonl') {
-          process.stdout.write(JSON.stringify({ type: 'error', rune: key, instance: instanceId, message: msg }) + '\n')
-        } else {
-          process.stderr.write(`Error: ${msg}\n`)
-        }
-        prompt()
-        return
+      const msg = isVerbose ? (err.stack || err.message) : err.message
+      if (format === 'jsonl') {
+        process.stdout.write(JSON.stringify({ type: 'error', rune: key, instance: instanceId, message: msg }) + '\n')
+      } else {
+        process.stderr.write(`Error: ${msg}\n`)
       }
-
-      const signal = parseReplReturn(result)
-
-      if (signal.type === 'done') {
-        await endSession(signal.message)
-        eofResolve()
-        return
-      }
-
-      if (signal.prompt !== null) currentPrompt = signal.prompt
       prompt()
+      return
+    }
+
+    const signal = parseReplReturn(result)
+    if (signal.type === 'done') {
+      await endSession(signal.message)
+      eofResolve()
+      return
+    }
+    if (signal.prompt !== null) currentPrompt = signal.prompt
+    prompt()
+  }
+
+  rl.on('SIGINT', () => {
+    // If line has content: clear it and re-prompt (standard terminal behaviour)
+    if (rl.line && rl.line.length > 0) {
+      process.stderr.write('\n')
+      prompt()
+      return
+    }
+    // Empty prompt: fire interrupt event into the queue
+    enqueue(() => handleInputEvent({ type: 'interrupt', text: '' }))
+  })
+
+  rl.on('line', (text) => {
+    enqueue(async () => {
+      if (sessionEnded) return
+
+      // Slash command interception
+      const slash = parseSlashCommand(text)
+      if (slash) {
+        // Built-in commands
+        if (slash.name === 'exit') {
+          enqueue(() => handleInputEvent({ type: 'eof', text: '' }))
+          return
+        }
+        if (slash.name === 'clear') {
+          if (process.stdin.isTTY) process.stderr.write('\x1Bc')
+          prompt()
+          return
+        }
+        if (slash.name === 'help') {
+          process.stderr.write(buildHelpText() + '\n')
+          prompt()
+          return
+        }
+        // Rune-declared command: parse args against commandsSchema and dispatch as 'command' event
+        if (session.commandsSchema?.commands?.some(c => c.name === slash.name)) {
+          const cmdSchema = {
+            commands: session.commandsSchema.commands,
+            options: [], positionals: [], examples: [],
+          }
+          const cmdTokens = slash.rest ? [slash.name, ...slash.rest.split(/\s+/)] : [slash.name]
+          const parsedCmdArgs = parseArgs(cmdTokens, cmdSchema)
+          await handleInputEvent({ type: 'command', args: parsedCmdArgs })
+          return
+        }
+        // Unrecognised slash command: pass through as normal line
+      }
+
+      await handleInputEvent({ type: 'line', text })
     })
   })
 
   rl.on('close', () => {
-    // Wait for the queue to drain, then end session if not already done
+    // Wait for the queue to drain, then send eof if session still running
     queue.then(async () => {
+      if (!sessionEnded) {
+        await handleInputEvent({ type: 'eof', text: '' })
+      }
       eofResolve()
-      await endSession(null)
     })
   })
 

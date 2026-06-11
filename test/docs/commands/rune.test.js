@@ -94,4 +94,53 @@ describe('help rune handler', () => {
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('Unknown rune: "run". (Tip: Did you mean "crunes docs run"?)'))
     expect(exitSpy).toHaveBeenCalledWith(1)
   })
+
+  // REPL schema extension tests
+  describe('REPL schema display', () => {
+    beforeEach(async () => {
+      await writeFile(join(tmp, '.crunes', 'runes', 'shell.js'), [
+        'export async function argsRepl(b) {',
+        '  return b.option("--db <path>", "DB path", "./state").build()',
+        '}',
+        'export function commandsRepl(b) {',
+        '  return b.command("tables", "List tables").command("exit", "Quit")',
+        '}',
+        'export async function inputRepl(input) { return { type: "done" } }',
+      ].join('\n'))
+      const cfg = JSON.parse(await import('node:fs').then(m => m.promises.readFile(join(tmp, '.crunes', 'config.json'), 'utf8')))
+      cfg.runes.shell = { name: 'Shell', description: 'Interactive shell' }
+      await import('node:fs').then(m => m.promises.writeFile(join(tmp, '.crunes', 'config.json'), JSON.stringify(cfg)))
+    })
+
+    it('text output includes REPL args section when argsRepl exported', async () => {
+      await handler({ keys: ['shell'], projectRoot: tmp, configRoot: tmp })
+      const out = written.join('')
+      expect(out).toContain('crunes run-repl shell')
+      expect(out).toContain('--db <path>')
+    })
+
+    it('text output includes slash commands section when commandsRepl exported', async () => {
+      await handler({ keys: ['shell'], projectRoot: tmp, configRoot: tmp })
+      const out = written.join('')
+      expect(out).toContain('/tables')
+      expect(out).toContain('List tables')
+      expect(out).toContain('/exit')
+    })
+
+    it('json output includes repl field with argsSchema and commandsSchema', async () => {
+      await handler({ keys: ['shell'], format: 'json', projectRoot: tmp, configRoot: tmp })
+      const out = written.join('')
+      const parsed = JSON.parse(out)
+      expect(parsed[0].repl).not.toBeNull()
+      expect(parsed[0].repl.argsSchema.options[0].flags).toBe('--db <path>')
+      expect(parsed[0].repl.commandsSchema.commands).toHaveLength(2)
+    })
+
+    it('json output repl is null for rune with no REPL exports', async () => {
+      await handler({ keys: ['count'], format: 'json', projectRoot: tmp, configRoot: tmp })
+      const out = written.join('')
+      const parsed = JSON.parse(out)
+      expect(parsed[0].repl).toBeNull()
+    })
+  })
 })

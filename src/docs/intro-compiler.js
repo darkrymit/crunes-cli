@@ -246,7 +246,7 @@ export async function compileIntro({ config, format, projectRoot, configRoot, ha
   lines.push('')
   const [lifecycleNs] = walk(lifecycleApiData)
   lines.push(formatMembers(lifecycleNs?.members ?? [], { indent: '' }))
-  lines.push('> **REPL Lifecycle:** `runRepl(args, input)` and `argsRepl(builder)` are the interactive counterparts to `run` and `args`. The isolate stays alive across inputs — use JS module-level variables as session state. `runRepl` requires its own `"runRepl"` permission block in `config.json`; it does not inherit from `"run"`. See `crunes docs run-repl` and `crunes docs args-repl` for full reference.')
+  lines.push('> **REPL Lifecycle:** Six exports form the interactive lifecycle — `argsRepl`, `runRepl`, `bannerRepl`, `commandsRepl`, `inputRepl`, `completeInputRepl`. The isolate stays alive across inputs — use JS module-level variables as session state. `runRepl` requires its own `"runRepl"` permission block in `config.json`; it does not inherit from `"run"`. See `crunes docs run-repl`, `crunes docs input-repl`, and related commands for the full reference.')
   lines.push('')
 
   // Section 3: Global Sandbox APIs
