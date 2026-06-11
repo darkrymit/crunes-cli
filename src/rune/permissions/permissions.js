@@ -27,7 +27,7 @@ function normalizeGitBashPath(p) {
 function normalizePermission(perm, dir) {
   if (perm.startsWith('fs.read:') || perm.startsWith('fs.write:') || perm.startsWith('fs.exists:') || perm.startsWith('fs.glob:')) {
     const [cap, ...rest] = perm.split(':')
-    const rawVal = rest.join(':').replace(/^~\//, os.homedir().replace(/\\/g, '/') + '/')
+    const rawVal = rest.join(':')
     const val = normalizeGitBashPath(rawVal.replace(/\\/g, '/'))
     const isAbsolute = val.startsWith('/') || /^[a-zA-Z]:/.test(val)
     if (isAbsolute && dir) {
@@ -41,6 +41,7 @@ function normalizePermission(perm, dir) {
       !val.startsWith('./') &&
       !val.startsWith('../') &&
       !val.startsWith('@') &&
+      !val.startsWith('~/') &&
       !isAbsolute
     ) {
       return `${cap}:./${val}`
@@ -147,18 +148,21 @@ export function makePermissionChecker(effective) {
       if (!allowed || denied) throw new PermissionError(capability, '')
       return
     }
-    const token   = `${capability}:${value}`.replace(/\\/g, '/')
+    const home = os.homedir().replace(/\\/g, '/')
+    const expandHome = s => s.replace(/(^|:)~\//, `$1${home}/`)
+    const token   = expandHome(`${capability}:${value}`.replace(/\\/g, '/'))
     const matchToken = (tok, patterns) => {
       return patterns.some(pattern => {
-        if (pattern.endsWith(':**')) {
-          const prefix = pattern.slice(0, -2)
+        const p = expandHome(pattern)
+        if (p.endsWith(':**')) {
+          const prefix = p.slice(0, -2)
           if (tok.startsWith(prefix)) return true
         }
-        if (pattern.endsWith(':*')) {
-          const prefix = pattern.slice(0, -1)
+        if (p.endsWith(':*')) {
+          const prefix = p.slice(0, -1)
           if (tok.startsWith(prefix)) return true
         }
-        return micromatch.isMatch(tok, pattern, { dot: true })
+        return micromatch.isMatch(tok, p, { dot: true })
       })
     }
     const allowed = matchToken(token, effective.allow)
