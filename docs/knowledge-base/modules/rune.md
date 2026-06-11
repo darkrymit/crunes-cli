@@ -37,7 +37,7 @@ Rune execution begins with a single entry point that resolves a key through a ti
 
 **Static modules compiled from source strings:** Built-in utility modules are stored as source strings and compiled into the isolate at runtime, keeping them sandboxed while remaining real ESM modules with imports between them.
 
-**Effective permissions:** Permissions are computed by merging plugin declarations, project overrides, and auto-grants into a flat set of allow and deny patterns. Permissions must be nested under a lifecycle key (e.g. `{ "run": { "allow": [...] } }`); a flat top-level `allow` is silently ignored because it has no lifecycle context.
+**Effective permissions:** Permissions are computed by merging plugin declarations, project overrides, and auto-grants into a flat set of allow and deny patterns. For `fs.*` capabilities, each pattern is expanded into sibling forms (relative ↔ absolute ↔ virtual-token) at checker build time so runtime path values match regardless of their form. Permissions must be nested under a lifecycle key (e.g. `{ "run": { "allow": [...] } }`); a flat top-level `allow` is silently ignored because it has no lifecycle context.
 
 ## Key Decisions
 
@@ -123,11 +123,13 @@ The runner calls `args(builder)` before `run(parsedArgs)`. Without an `args` exp
 
 - **Lifecycle namespacing is mandatory in permissions:** Permissions declared in a flat `{ "allow": [...] }` structure (not nested under a lifecycle key) are silently ignored at runtime.
 
-- **`normalizePattern` prepends `./`:** `fs.read:package.json` is normalized to `fs.read:./package.json`. Both bare and `./`-prefixed forms in config produce the same pattern, so they match interchangeably.
+- **`normalizePattern` prepends `./` to bare fs names:** `fs.read:package.json` is normalized to `fs.read:./package.json`. Both bare and `./`-prefixed forms in config produce the same pattern.
+
+- **fs patterns are expanded into sibling forms at checker build time:** When `makePermissionChecker` receives a `ctx` (`{ dir, pluginId?, pluginDir?, projectId? }`), every `fs.*` pattern value is expanded into one or two entries so that relative ↔ absolute ↔ virtual forms all match at check time. `fs.read:./src/**` also produces `<dir>/src/**`; an absolute path inside the project root also produces a `./rel/**` sibling; virtual tokens like `@local-project-cache/vault/**` resolve to their real absolute path and emit it as a sibling. `~/...`, `../...`, and absolute paths outside the project get no sibling. Expansion happens in `makePermissionChecker`, not in `computeEffectivePermissions` — the latter no longer accepts a `dir` parameter.
 
 - **`http.fetch:` and `env.read:` parse values before matching:** These capabilities split the value into structured parts (method, URL, source, key) before calling `isMatch`. The glob matching itself still uses the shared `match.js` — only the pre-match parsing is custom.
 
-- **Shell/rune permission matching uses startsWith then micromatch:** `shell.run:**` and `shell.run:*` patterns use a `startsWith` check because micromatch can't match Windows drive letters (`C:/`) in glob tokens; all other patterns fall back to micromatch. `shell.run:git log *` allows `git log --oneline` but not `git status`.
+- **Shell/rune permission matching uses plain micromatch:** Patterns are matched with the shared `isMatch` wrapper (dot-enabled, no extglob/brace/bracket/negate). `:` in capability prefixes was the historic reason for special-casing; that is gone now that buckets strip the prefix before matching.
 
 - **Plugin runes execute in the project root context:** The project root is used as the working directory for plugin rune execution. The plugin cache directory is used only for resolving the rune file path and node_modules.
 

@@ -296,6 +296,73 @@ describe('rune.spawn / rune.kill / rune.exists permissions', () => {
 })
 
 
+describe('makePermissionChecker — expandPattern siblings (ctx)', () => {
+  const dir = '/home/user/myproject'
+  const ctx = { dir }
+
+  it('relative pattern ./src/** also matches its absolute form', () => {
+    const check = makePermissionChecker(
+      { allow: ['fs.read:./src/**'], deny: [] },
+      ctx
+    )
+    expect(() => check('fs.read', `${dir}/src/index.js`)).not.toThrow()
+    expect(() => check('fs.read', './src/index.js')).not.toThrow()
+  })
+
+  it('absolute pattern inside dir also matches relative form', () => {
+    const check = makePermissionChecker(
+      { allow: [`fs.read:${dir}/src/**`], deny: [] },
+      ctx
+    )
+    expect(() => check('fs.read', './src/index.js')).not.toThrow()
+    expect(() => check('fs.read', `${dir}/src/index.js`)).not.toThrow()
+  })
+
+  it('absolute pattern outside dir gets no sibling', () => {
+    const check = makePermissionChecker(
+      { allow: ['fs.read:/etc/hosts'], deny: [] },
+      ctx
+    )
+    expect(() => check('fs.read', '/etc/hosts')).not.toThrow()
+    expect(() => check('fs.read', './etc/hosts')).toThrow(PermissionError)
+  })
+
+  it('@local-project-cache/** pattern matches its real absolute path', () => {
+    const check = makePermissionChecker(
+      { allow: ['fs.read:@local-project-cache/**'], deny: [] },
+      ctx
+    )
+    // The real path for @local-project-cache is <dir>/.crunes/caches/project
+    expect(() => check('fs.read', `${dir}/.crunes/caches/project/vault/file.enc`)).not.toThrow()
+  })
+
+  it('@local-project-cache/sub/** pattern matches absolute subpath', () => {
+    const check = makePermissionChecker(
+      { allow: ['fs.read:@local-project-cache/vault/**'], deny: [] },
+      ctx
+    )
+    expect(() => check('fs.read', `${dir}/.crunes/caches/project/vault/secret.json`)).not.toThrow()
+    expect(() => check('fs.read', `${dir}/.crunes/caches/project/other/file`)).toThrow(PermissionError)
+  })
+
+  it('no ctx — no sibling expansion, original pattern still checked', () => {
+    const check = makePermissionChecker(
+      { allow: ['fs.read:./src/**'], deny: [] }
+    )
+    expect(() => check('fs.read', './src/index.js')).not.toThrow()
+    expect(() => check('fs.read', `${dir}/src/index.js`)).toThrow(PermissionError)
+  })
+
+  it('deny fs pattern is also expanded with ctx', () => {
+    const check = makePermissionChecker(
+      { allow: ['fs.read:./**'], deny: ['fs.read:./secret/**'] },
+      ctx
+    )
+    expect(() => check('fs.read', `${dir}/secret/file.txt`)).toThrow(PermissionError)
+    expect(() => check('fs.read', './secret/file.txt')).toThrow(PermissionError)
+  })
+})
+
 describe('makePermissionChecker — db.connect capability', () => {
   it('allows db.connect when matched by allowance pattern', () => {
     const checker = makePermissionChecker({
