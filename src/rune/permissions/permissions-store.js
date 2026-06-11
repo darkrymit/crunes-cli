@@ -1,7 +1,7 @@
 import os from 'node:os'
 import micromatch from 'micromatch'
 
-const expandHome = s => s.startsWith('~/') ? os.homedir().replace(/\\/g, '/') + s.slice(1) : s
+const HOME = os.homedir().replace(/\\/g, '/')
 
 export function matchStorePermission(value, pattern, cap) {
   const prefix  = cap + ':'
@@ -27,7 +27,11 @@ export function matchStorePermission(value, pattern, cap) {
     }
   }
 
-  const locOk  = micromatch.isMatch(expandHome(valueLoc), expandHome(patLoc), { dot: true })
+  const locOk  = micromatch.isMatch(
+    valueLoc.startsWith('~/') ? HOME + valueLoc.slice(1) : valueLoc,
+    patLoc.startsWith('~/') ? HOME + patLoc.slice(1) : patLoc,
+    { dot: true }
+  )
   const nameOk = patName === '*' || patName == null ||
     (valueName != null && micromatch.isMatch(valueName, patName, { dot: true }))
   return locOk && nameOk

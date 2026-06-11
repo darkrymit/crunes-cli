@@ -152,7 +152,7 @@ export async function compileIntro({ config, format, projectRoot, configRoot, ha
     for (const [key, entry] of runesList) {
       const runeFile = resolve(configRoot, entry.path ?? `.crunes/runes/${key}.js`)
       const basePerms = entry.permissions ?? { allow: [], deny: [] }
-      const effective = computeEffectivePermissions(basePerms, config.permissions?.[key], 'args', configRoot)
+      const effective = computeEffectivePermissions(basePerms, config.permissions?.[key], 'args')
 
       let schema = null
       let schemaError = null
