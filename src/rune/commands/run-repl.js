@@ -273,10 +273,11 @@ export async function handler({
         // Rune-declared command: parse args against commandsSchema and dispatch as 'command' event
         if (session.commandsSchema?.commands?.some(c => c.name === slash.name)) {
           const cmdSchema = {
-            commands: session.commandsSchema.commands.filter(c => c.name === slash.name),
+            commands: session.commandsSchema.commands,
             options: [], positionals: [], examples: [],
           }
-          const parsedCmdArgs = parseArgs(slash.rest ? slash.rest.split(/\s+/) : [], cmdSchema)
+          const cmdTokens = slash.rest ? [slash.name, ...slash.rest.split(/\s+/)] : [slash.name]
+          const parsedCmdArgs = parseArgs(cmdTokens, cmdSchema)
           await handleInputEvent({ type: 'command', args: parsedCmdArgs })
           return
         }
