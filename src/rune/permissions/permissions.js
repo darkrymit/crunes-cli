@@ -1,5 +1,5 @@
 import os from 'node:os'
-import micromatch from 'micromatch'
+import { isMatch } from '../../shared/match.js'
 import { matchFetchPermission } from './permissions-http.js'
 import { matchEnvPermission } from './permissions-env.js'
 import { matchStorePermission } from './permissions-store.js'
@@ -16,7 +16,6 @@ export class PermissionError extends Error {
 }
 
 const HOME = os.homedir().replace(/\\/g, '/')
-const MM_OPTS = { dot: true, noextglob: true, nonegate: true, nobrace: true, nobracket: true }
 
 function normalizeGitBashPath(p) {
   if (process.platform === 'win32') {
@@ -101,7 +100,7 @@ export function makePermissionChecker(effective) {
         const token = `${capability}:${v}`
         check(capability, value, p => {
           const [pc, pv = ''] = p.split(/:(.*)/)
-          return micromatch.isMatch(token, `${pc}:${pv.replace(/^~\//, `${HOME}/`)}`, MM_OPTS)
+          return isMatch(token, `${pc}:${pv.replace(/^~\//, `${HOME}/`)}`)
         })
         return
       }
@@ -119,7 +118,7 @@ export function makePermissionChecker(effective) {
         check(capability, value, p => {
           if (p.endsWith(':**') && token.startsWith(p.slice(0, -2))) return true
           if (p.endsWith(':*')  && token.startsWith(p.slice(0, -1))) return true
-          return micromatch.isMatch(token, p, MM_OPTS)
+          return isMatch(token, p)
         })
         return
       }

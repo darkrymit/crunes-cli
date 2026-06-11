@@ -1,4 +1,4 @@
-import micromatch from 'micromatch'
+import { isMatch } from '../../shared/match.js'
 
 export function matchFetchPermission(value, pattern) {
   const patternBody = pattern.startsWith('http.fetch:') ? pattern.slice(11) : pattern
@@ -26,7 +26,7 @@ export function matchFetchPermission(value, pattern) {
   const patternUrl = right
 
   const methodOk = patternMethods.includes('*') || patternMethods.includes(valueMethod)
-  const urlOk = micromatch.isMatch(valueUrl, patternUrl)
+  const urlOk = isMatch(valueUrl, patternUrl)
 
   return methodOk && urlOk
 }

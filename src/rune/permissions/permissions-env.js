@@ -1,4 +1,4 @@
-import micromatch from 'micromatch'
+import { isMatch } from '../../shared/match.js'
 
 export function parseEnvPattern(pattern) {
   const body = pattern.startsWith('env.read:') ? pattern.slice(9) : pattern
@@ -30,7 +30,7 @@ export function matchEnvPermission(value, pattern) {
   const { sources, keyPatterns } = parseEnvPattern(pattern)
   
   const sourceOk = sources.includes('*') || sources.includes(valueSource)
-  const keyOk = keyPatterns.some(pat => micromatch.isMatch(valueKey, pat))
+  const keyOk = keyPatterns.some(pat => isMatch(valueKey, pat))
   
   return sourceOk && keyOk
 }

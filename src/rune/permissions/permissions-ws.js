@@ -1,8 +1,8 @@
-import micromatch from 'micromatch'
+import { isMatch } from '../../shared/match.js'
 
 export function matchWsPermission(url, pattern) {
   const patternBody = pattern.startsWith('ws.client:') ? pattern.slice(10) : pattern
-  return micromatch.isMatch(url, patternBody)
+  return isMatch(url, patternBody)
 }
 
 export function matchWsServerPermission(value, pattern) {

@@ -4,7 +4,7 @@ import { renderSection } from '../../shared/render.js'
 import { output, isVerbose } from '../../shared/output.js'
 import { checkBatchPermission, buildMatchString } from './batch-permission.js'
 
-import micromatch from 'micromatch'
+import { isMatch } from '../../shared/match.js'
 
 export function parseSegment(argv) {
   let sections = null
@@ -146,7 +146,7 @@ export async function handler({
           const prefix = `[${instanceId}:${rune}:${type}]`
           if (format === 'jsonl') {
             if (type === 'section') {
-              if (sectionFilter && !micromatch.isMatch(section.name, sectionFilter)) {
+              if (sectionFilter && !isMatch(section.name, sectionFilter)) {
                 return
               }
               printedSections.add(section)
@@ -160,7 +160,7 @@ export async function handler({
             }) + '\n')
           } else {
             if (type === 'section') {
-              if (!sectionFilter || micromatch.isMatch(section.name, sectionFilter)) {
+              if (!sectionFilter || isMatch(section.name, sectionFilter)) {
                 const rendered = renderSection(section)
                 const lines = rendered ? rendered.split('\n') : []
                 let contentStartIndex = 1
@@ -202,7 +202,7 @@ export async function handler({
     }
 
     const filtered = sectionFilter
-      ? sections.filter(s => micromatch.isMatch(s.name, sectionFilter))
+      ? sections.filter(s => isMatch(s.name, sectionFilter))
       : sections
 
     // Print any sections returned by the rune that were not progressively emitted

@@ -1,5 +1,5 @@
 import readline from 'node:readline'
-import micromatch from 'micromatch'
+import { isMatch } from '../../shared/match.js'
 import { loadConfig } from '../../core/config.js'
 import { renderSection } from '../../shared/render.js'
 import { output, isVerbose } from '../../shared/output.js'
@@ -104,7 +104,7 @@ export async function handler({
       process.stdout.write(JSON.stringify({ type, rune, instance: iid, ...(message != null ? { message } : {}), ...(section != null ? { section } : {}) }) + '\n')
     } else {
       if (type === 'section') {
-        if (!sectionFilter || micromatch.isMatch(section.name, sectionFilter)) {
+        if (!sectionFilter || isMatch(section.name, sectionFilter)) {
           const rendered = renderSection(section)
           if (rendered) process.stdout.write(rendered + '\n')
         }
