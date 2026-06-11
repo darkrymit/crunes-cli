@@ -139,6 +139,22 @@ export function buildProgram() {
       await handler()
     })
 
+  helpGroup
+    .command('run-repl')
+    .description('Show detailed documentation, conventions, and examples for the runRepl(args, input) export')
+    .action(async () => {
+      const { handler } = await import('../docs/commands/run-repl.js')
+      await handler()
+    })
+
+  helpGroup
+    .command('args-repl')
+    .description('Show detailed documentation, conventions, and examples for the argsRepl(builder) export')
+    .action(async () => {
+      const { handler } = await import('../docs/commands/args-repl.js')
+      await handler()
+    })
+
   program
     .command('version')
     .description('Print the installed version and check for updates')
