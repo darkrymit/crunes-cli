@@ -1,3 +1,4 @@
+import os from 'node:os'
 import path from 'node:path'
 import micromatch from 'micromatch'
 import { matchFetchPermission } from './permissions-http.js'
@@ -26,22 +27,25 @@ function normalizeGitBashPath(p) {
 function normalizePermission(perm, dir) {
   if (perm.startsWith('fs.read:') || perm.startsWith('fs.write:') || perm.startsWith('fs.exists:') || perm.startsWith('fs.glob:')) {
     const [cap, ...rest] = perm.split(':')
-    const rawVal = rest.join(':')
+    const rawVal = rest.join(':').replace(/^~\//, os.homedir().replace(/\\/g, '/') + '/')
     const val = normalizeGitBashPath(rawVal.replace(/\\/g, '/'))
     const isAbsolute = val.startsWith('/') || /^[a-zA-Z]:/.test(val)
     if (isAbsolute && dir) {
-      const rel = path.relative(dir, val).replace(/\\/g, '/')
-      if (!rel.startsWith('..')) return `${cap}:./${rel}`
+      // Strip glob suffix before relativizing, reattach after
+      const globMatch = val.match(/(\/\*\*.*|\/\*.*)$/)
+      const base = globMatch ? val.slice(0, val.length - globMatch[0].length) : val
+      const rel = path.relative(dir, base).replace(/\\/g, '/')
+      if (!rel.startsWith('..')) return `${cap}:./${rel}${globMatch ? globMatch[0] : ''}`
     }
     if (
       !val.startsWith('./') &&
       !val.startsWith('../') &&
       !val.startsWith('@') &&
-      !val.startsWith('~/') &&
       !isAbsolute
     ) {
       return `${cap}:./${val}`
     }
+    return `${cap}:${val}`
   }
   if (perm.startsWith('cache.read:') || perm.startsWith('cache.write:') ||
       perm.startsWith('sqlite.read:') || perm.startsWith('sqlite.write:')) {
@@ -82,7 +86,7 @@ export function computeEffectivePermissions(pluginPerms, projectPerms, lifecycle
   const pluginDeny  = (namespacePlugin.deny ?? []).map(norm)
 
   return {
-    allow: (namespaceProject?.allow ?? pluginAllow).map(norm),
+    allow: namespaceProject?.allow ? namespaceProject.allow.map(norm) : pluginAllow,
     deny:  [...pluginDeny, ...(namespaceProject?.deny ?? []).map(norm)],
   }
 }
@@ -138,21 +142,14 @@ export function makePermissionChecker(effective) {
       return
     }
     if (value == null) {
-      const norm = capability.replace(/\\/g, '/')
-      const allowed = effective.allow.map(p => p.replace(/\\/g, '/')).includes(norm)
-      const denied  = effective.deny.length > 0 && effective.deny.map(p => p.replace(/\\/g, '/')).includes(norm)
+      const allowed = effective.allow.includes(capability)
+      const denied  = effective.deny.length > 0 && effective.deny.includes(capability)
       if (!allowed || denied) throw new PermissionError(capability, '')
       return
     }
     const token   = `${capability}:${value}`.replace(/\\/g, '/')
-    const normalizedAllow = effective.allow.map(p => p.replace(/\\/g, '/'))
-    const normalizedDeny = effective.deny.map(p => p.replace(/\\/g, '/'))
     const matchToken = (tok, patterns) => {
       return patterns.some(pattern => {
-        if (pattern.endsWith('/**')) {
-          const prefix = pattern.slice(0, -2)
-          if (tok.startsWith(prefix)) return true
-        }
         if (pattern.endsWith(':**')) {
           const prefix = pattern.slice(0, -2)
           if (tok.startsWith(prefix)) return true
@@ -164,8 +161,8 @@ export function makePermissionChecker(effective) {
         return micromatch.isMatch(tok, pattern, { dot: true })
       })
     }
-    const allowed = matchToken(token, normalizedAllow)
-    const denied  = effective.deny.length > 0 && matchToken(token, normalizedDeny)
+    const allowed = matchToken(token, effective.allow)
+    const denied  = effective.deny.length > 0 && matchToken(token, effective.deny)
     if (!allowed || denied) throw new PermissionError(capability, value)
   }
 }
