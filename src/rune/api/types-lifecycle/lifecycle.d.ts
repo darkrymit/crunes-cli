@@ -26,6 +26,7 @@ declare namespace lifecycle {
    * Does NOT fall back to args() — the two lifecycles are independent.
    *
    * @param builder The schema builder to declare options, positionals, and examples.
+   * If this export is absent, runRepl(args, input) receives an empty args object — it does NOT fall back to args().
    */
   function argsRepl(builder: ArgBuilder): void | ArgBuilder | any | Promise<void | ArgBuilder | any>
 
@@ -38,6 +39,7 @@ declare namespace lifecycle {
    * @param args  Parsed args from argsRepl() schema (built once at session start).
    * @param input The raw string the user typed this turn.
    * @returns A ReplSignal to control the prompt or end the session, or void to continue.
+   * Requires a separate "runRepl" permission block in config.json — does not inherit from "run".
    */
   function runRepl(args: ParsedArgs, input: string): Promise<ReplSignal | string | void> | ReplSignal | string | void
 

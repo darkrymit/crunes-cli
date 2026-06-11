@@ -608,23 +608,25 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
   await jail.set('$__utils_sqlite_query', new ivm.Reference(async (id, sql, params) => {
     const handle = sqliteHandles.get(id)
     if (!handle) throw new Error(`Invalid sqlite handle: ${id}`)
-    return handle.query(sql, params || [])
+    try { return handle.query(sql, params || []) } catch (e) { return Promise.reject(e) }
   }))
   await jail.set('$__utils_sqlite_get', new ivm.Reference(async (id, sql, params) => {
     const handle = sqliteHandles.get(id)
     if (!handle) throw new Error(`Invalid sqlite handle: ${id}`)
-    const row = handle.get(sql, params || [])
-    return row !== null ? row : null
+    try {
+      const row = handle.get(sql, params || [])
+      return row !== null ? row : null
+    } catch (e) { return Promise.reject(e) }
   }))
   await jail.set('$__utils_sqlite_exec', new ivm.Reference(async (id, sql, params) => {
     const handle = sqliteHandles.get(id)
     if (!handle) throw new Error(`Invalid sqlite handle: ${id}`)
-    return handle.exec(sql, params || [])
+    try { return handle.exec(sql, params || []) } catch (e) { return Promise.reject(e) }
   }))
   await jail.set('$__utils_sqlite_run', new ivm.Reference(async (id, sql) => {
     const handle = sqliteHandles.get(id)
     if (!handle) throw new Error(`Invalid sqlite handle: ${id}`)
-    handle.run(sql)
+    try { handle.run(sql) } catch (e) { return Promise.reject(e) }
   }))
   await jail.set('$__utils_sqlite_close', new ivm.Reference(async (id) => {
     const handle = sqliteHandles.get(id)
