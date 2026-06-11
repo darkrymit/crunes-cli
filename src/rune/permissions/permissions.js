@@ -54,17 +54,26 @@ function expandPattern(perm, ctx) {
     const dColonIdx = rest.indexOf('::')
     const loc  = dColonIdx === -1 ? rest : rest.slice(0, dColonIdx)
     const name = dColonIdx === -1 ? '' : '::' + rest.slice(dColonIdx + 2)
-    return expandLocValue(loc, absDir, { pluginId, pluginDir, projectId })
+    return expandLocValue(loc, absDir, { pluginId, pluginDir, projectId }, dir)
       .map(expandedLoc => `${cap}:${expandedLoc}${name}`)
   }
 
   const value = perm.slice(colonIdx + 1)
-  return expandLocValue(value, absDir, { pluginId, pluginDir, projectId })
+  return expandLocValue(value, absDir, { pluginId, pluginDir, projectId }, dir)
     .map(v => `${cap}:${v}`)
 }
 
-function expandLocValue(value, absDir, { pluginId, pluginDir, projectId }) {
+function normalizeGitBashPath(p) {
+  if (process.platform === 'win32') {
+    const m = p.match(/^\/([a-zA-Z])(\/|$)/)
+    if (m) return `${m[1].toUpperCase()}:/${p.slice(3)}`
+  }
+  return p
+}
+
+function expandLocValue(value, absDir, { pluginId, pluginDir, projectId }, dir) {
   const v = value.replace(/\\/g, '/')
+  if (v === '**' || v.startsWith('**/')) return [v]
   if (v.startsWith('~/')) return [v, HOME + v.slice(1)]
   if (v.startsWith('../')) return [v]
   const isAbsolute = v.startsWith('/') || /^[a-zA-Z]:/.test(v)
@@ -83,7 +92,7 @@ function expandLocValue(value, absDir, { pluginId, pluginDir, projectId }) {
   if (matchedPrefix) {
     const suffix = v.slice(matchedPrefix.length)
     try {
-      const base = resolvePath(matchedPrefix, { dir: absDir, pluginId, pluginDir, projectId }).replace(/\\/g, '/')
+      const base = resolvePath(matchedPrefix, { dir, pluginId, pluginDir, projectId }).replace(/\\/g, '/')
       const absResolved = base + suffix
       if (LOCAL_VIRTUAL_PREFIXES.has(matchedPrefix)) {
         const rel = absResolved.slice(absDir.length + 1)
@@ -92,26 +101,22 @@ function expandLocValue(value, absDir, { pluginId, pluginDir, projectId }) {
       return [v, absResolved]
     } catch { return [v] }
   }
-  const rel = v.startsWith('./') ? v.slice(2) : v
-  return [`./${rel}`, rel, absDir + '/' + rel, `@project/${rel}`]
-}
-
-function normalizeGitBashPath(p) {
-  if (process.platform === 'win32') {
-    const m = p.match(/^\/([a-zA-Z])(\/|$)/)
-    if (m) return `${m[1].toUpperCase()}:/${p.slice(3)}`
-  }
-  return p
+  const hasDot = v.startsWith('./')
+  const rel    = hasDot ? v.slice(2) : v
+  const relIsGlob = rel === '**' || rel.startsWith('**/')
+  return hasDot
+    ? (relIsGlob
+      ? [`./${rel}`, absDir + '/' + rel, `@project/${rel}`]
+      : [`./${rel}`, rel, absDir + '/' + rel, `@project/${rel}`])
+    : [`./${rel}`, rel, absDir + '/' + rel, `@project/${rel}`]
 }
 
 function normalizePattern(perm) {
   if (perm.startsWith('fs.read:') || perm.startsWith('fs.write:') || perm.startsWith('fs.exists:') || perm.startsWith('fs.glob:')) {
     const [cap, ...rest] = perm.split(':')
     const raw = normalizeGitBashPath(rest.join(':').replace(/\\/g, '/'))
-    // @project/foo is an alias for ./foo (purely syntactic)
     const val = raw.startsWith('@project/') ? './' + raw.slice('@project/'.length) : raw
     const isAbsolute = val.startsWith('/') || /^[a-zA-Z]:/.test(val)
-    // Bare names (no prefix) get ./ so the checker can strip it for micromatch.
     const v = (!val.startsWith('./') && !val.startsWith('../') && !val.startsWith('@') && !val.startsWith('~/') && !isAbsolute)
       ? `./${val}`
       : val
@@ -123,18 +128,12 @@ function normalizePattern(perm) {
     const cap      = perm.slice(0, colonIdx)
     const rest     = perm.slice(colonIdx + 1)
     if (rest.startsWith('@')) return perm
-
     const dColonIdx = rest.indexOf('::')
     const rawLoc  = dColonIdx === -1 ? rest : rest.slice(0, dColonIdx)
     const rawName = dColonIdx !== -1 ? rest.slice(dColonIdx + 2) : null
     let loc = rawLoc
-    if (
-      !loc.startsWith('./') &&
-      !loc.startsWith('../') &&
-      !loc.startsWith('~/') &&
-      !loc.startsWith('/') &&
-      !/^[a-zA-Z]:/.test(loc)
-    ) {
+    if (!loc.startsWith('./') && !loc.startsWith('../') && !loc.startsWith('~/') &&
+        !loc.startsWith('/') && !/^[a-zA-Z]:/.test(loc)) {
       loc = './' + loc
     }
     if (rawName === null) return `${cap}:${loc}`
@@ -152,7 +151,7 @@ export function computeEffectivePermissions(pluginPerms, projectPerms, lifecycle
   const namespaceProject = projectPerms?.[lifecycle]
 
   const pluginAllow = (namespacePlugin.allow ?? []).map(normalizePattern)
-  const pluginDeny  = (namespacePlugin.deny ?? []).map(normalizePattern)
+  const pluginDeny  = (namespacePlugin.deny  ?? []).map(normalizePattern)
 
   return {
     allow: namespaceProject?.allow ? namespaceProject.allow.map(normalizePattern) : pluginAllow,
@@ -181,12 +180,14 @@ export function makePermissionChecker(effective, ctx = null) {
     for (const expanded of expandPattern(p, ctx)) getBucket(capOf(expanded)).deny.push(expanded)
   }
 
-  const checkAndThrow = (capability, value, matchFn) => {
-    const b = buckets.get(capability) ?? { allow: [], deny: [] }
-    const n = capability.length + 1
-    const pv = p => p.length > n ? p.slice(n) : null
-    const allowed = b.allow.some(p => { const v = pv(p); return v !== null && matchFn(v) })
-    const denied  = b.deny.length > 0 && b.deny.some(p => { const v = pv(p); return v !== null && matchFn(v) })
+  const pvs = (list, cap) => {
+    const n = cap.length + 1
+    return list.reduce((acc, p) => { if (p.length > n) acc.push(p.slice(n)); return acc }, [])
+  }
+  const checkBatchAndThrow = (capability, value, matchFn) => {
+    const b       = buckets.get(capability) ?? { allow: [], deny: [] }
+    const allowed = b.allow.length > 0 && matchFn(pvs(b.allow, capability))
+    const denied  = b.deny.length  > 0 && matchFn(pvs(b.deny,  capability))
     if (!allowed || denied) throw new PermissionError(capability, value)
   }
 
@@ -196,9 +197,9 @@ export function makePermissionChecker(effective, ctx = null) {
       case 'fs.write':
       case 'fs.exists':
       case 'fs.glob': {
-        const normalize = s => s.replace(/\\/g, '/').replace(/^@project\//, '').replace(/^\.\//, '')
-        const v = normalize(value)
-        checkAndThrow(capability, value, pv => isMatch(v, normalize(pv)))
+        const sub = s => s.startsWith('./') ? '__DOT__/' + s.slice(2) : s
+        const v   = sub(value.replace(/\\/g, '/'))
+        checkBatchAndThrow(capability, value, pvs => isMatch(v, pvs.map(sub)))
         return
       }
       case 'shell.run':
@@ -209,8 +210,7 @@ export function makePermissionChecker(effective, ctx = null) {
       case 'rune.kill':
       case 'rune.exists':
       case 'db.connect': {
-        const v = value.replace(/\\/g, '/')
-        checkAndThrow(capability, value, pv => isMatch(v, pv))
+        checkBatchAndThrow(capability, value, pvs => isMatch(value.replace(/\\/g, '/'), pvs))
         return
       }
       // Capabilities whose value is always null — permission declared as bare capability name.
@@ -225,32 +225,32 @@ export function makePermissionChecker(effective, ctx = null) {
         return
       }
       case 'http.fetch':
-        checkAndThrow(capability, value, pv => matchFetchPermission(value, pv))
+        checkBatchAndThrow(capability, value, pvs => matchFetchPermission(value, pvs))
         return
       case 'env.read':
-        checkAndThrow(capability, value, pv => matchEnvPermission(value, pv))
+        checkBatchAndThrow(capability, value, pvs => matchEnvPermission(value, pvs))
         return
       case 'sqlite.read':
       case 'sqlite.write':
       case 'cache.read':
       case 'cache.write':
-        checkAndThrow(capability, value, pv => matchStorePermission(value, pv))
+        checkBatchAndThrow(capability, value, pvs => matchStorePermission(value, pvs))
         return
       case 'ws.client':
-        checkAndThrow(capability, value, pv => matchWsPermission(value, pv))
+        checkBatchAndThrow(capability, value, pvs => matchWsPermission(value, pvs))
         return
       case 'http.server': {
         const colonIdx = value.lastIndexOf(':')
         const host = colonIdx !== -1 ? value.slice(0, colonIdx) : value
         if (isLoopbackHost(host)) return
-        checkAndThrow(capability, value, pv => matchHttpServerPermission(value, pv))
+        checkBatchAndThrow(capability, value, pvs => matchHttpServerPermission(value, pvs))
         return
       }
       case 'ws.server': {
         const firstColon = value.indexOf(':')
         const host = firstColon !== -1 ? value.slice(0, firstColon) : value
         if (isLoopbackHost(host)) return
-        checkAndThrow(capability, value, pv => matchWsServerPermission(value, pv))
+        checkBatchAndThrow(capability, value, pvs => matchWsServerPermission(value, pvs))
         return
       }
       default:

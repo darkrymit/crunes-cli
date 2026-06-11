@@ -242,7 +242,7 @@ describe('createFsUtils — @project/ paths', () => {
   })
 
   it('@project/ resolves to project root and reads file content', async () => {
-    const checker = checkerFor(['fs.read:./src/**'])
+    const checker = makePermissionChecker({ allow: ['fs.read:./src/**'], deny: [] }, { dir })
     const content = await createFsUtils(dir, checker).read('@project/src/utils/foo.ts')
     expect(content).toBe('export {}')
   })
