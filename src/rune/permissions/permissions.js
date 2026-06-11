@@ -108,8 +108,9 @@ export function makePermissionChecker(effective) {
       case 'fs.write':
       case 'fs.exists':
       case 'fs.glob': {
-        const v = value.replace(/\\/g, '/').replace(/^~\//, `${HOME}/`)
-        checkAndThrow(capability, value, pv => isMatch(v, pv.replace(/^~\//, `${HOME}/`)))
+        const strip = s => s.replace(/^~\//, `${HOME}/`).replace(/^\.\//, '')
+        const v = strip(value.replace(/\\/g, '/'))
+        checkAndThrow(capability, value, pv => isMatch(v, strip(pv)))
         return
       }
       case 'shell.run':
