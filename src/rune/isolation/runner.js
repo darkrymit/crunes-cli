@@ -322,7 +322,7 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
     const cliPath = process.argv[1]
     const child = spawnProcess(
       process.execPath,
-      [cliPath, '--cwd', projectDir, 'run', runeKey, '--format', 'jsonl', ...(args ?? [])],
+      [cliPath, '--cwd', projectDir, 'run', '--format', 'jsonl', runeKey, '--', ...(args ?? [])],
       { stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, CRUNES_NO_TIMEOUT: '1' }, windowsHideConsole: true }
     )
     let stdout = '', stderr = ''
@@ -369,7 +369,7 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
     const errFd = fsSync.openSync(jobStderrPath(pKey, id), 'a')
     const child = spawnProcess(
       process.execPath,
-      [cliPath, '--cwd', projectDir, 'run', runeKey, '--format', 'jsonl', ...(args ?? [])],
+      [cliPath, '--cwd', projectDir, 'run', '--format', 'jsonl', runeKey, '--', ...(args ?? [])],
       { detached: true, stdio: ['ignore', outFd, errFd], env: { ...process.env, CRUNES_NO_TIMEOUT: '1' }, windowsHideConsole: true }
     )
     await updateJobPid(pKey, id, child.pid)
