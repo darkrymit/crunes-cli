@@ -42,6 +42,15 @@ export function renderSection(section) {
   return parts.filter(Boolean).join('\n') || null;
 }
 
+export function formatSection(section, rune) {
+  const nameStr = section.title ?? section.name ?? '(no title)'
+  const attrsStr = section.attrs && Object.keys(section.attrs).length > 0
+    ? ' ' + Object.entries(section.attrs).map(([k, v]) => `[${k}: ${v}]`).join(' ')
+    : ''
+  const content = render(section.data)
+  return `[${rune}:section] ${nameStr}${attrsStr}${content ? '\n' + content : ''}`
+}
+
 function renderTree(root) {
   if (!root) return null;
   const lines = [`${root.name.padEnd(12)}${root.description}`];
