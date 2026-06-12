@@ -12,7 +12,10 @@ export function parseSegment(argv) {
 
   while (i < argv.length) {
     const tok = argv[i]
-    if ((tok === '--section' || tok === '-s') && i + 1 < argv.length) {
+    if (tok === '--') {
+      i++
+      break
+    } else if ((tok === '--section' || tok === '-s') && i + 1 < argv.length) {
       sections = argv[i + 1].split(',').map(s => s.trim()).filter(Boolean)
       i += 2
     } else if (tok.startsWith('--section=')) {
@@ -38,12 +41,13 @@ Arguments must follow this strict structure:
   4. Rune Key        (e.g., myrune)
   5. Rune Arguments  (e.g., --strict, pos-arg)
 
-Example: crunes --cwd ./dir use --format json myrune --strict
+Example: crunes --cwd ./dir run myrune --strict
 `.trimEnd())
     process.exit(1)
   }
 
-  const runeArgs = key !== null ? argv.slice(i + 1) : []
+  const raw = key !== null ? argv.slice(i + 1) : []
+  const runeArgs = raw[0] === '--' ? raw.slice(1) : raw
   return { key, sections, runeArgs }
 }
 
@@ -54,10 +58,13 @@ export function parseRunArgs(argv) {
   let i = 0
 
   // Consume command-level flags from the prefix only — stops at the first non-flag token.
-  // This ensures rune flags with the same name (e.g. --format) are never intercepted.
+  // -- acts as an explicit end-of-run-flags marker and is consumed (not passed to segments).
   while (i < argv.length) {
     const tok = argv[i]
-    if (tok === '--format' && i + 1 < argv.length) {
+    if (tok === '--') {
+      i++
+      break
+    } else if (tok === '--format' && i + 1 < argv.length) {
       format = argv[i + 1]
       i += 2
     } else if (tok.startsWith('--format=')) {
