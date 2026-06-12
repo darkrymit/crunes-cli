@@ -29,6 +29,9 @@
             "shell.run:git tag *"
           ]
         }
+      },
+      "batch": {
+        "allow": ["info*"]
       }
     },
     "m": {
@@ -43,6 +46,9 @@
             "fs.exists:src/**"
           ]
         }
+      },
+      "batch": {
+        "allow": ["*"]
       }
     },
     "kb": {
@@ -57,6 +63,9 @@
             "fs.exists:docs/knowledge-base/**"
           ]
         }
+      },
+      "batch": {
+        "allow": ["*"]
       }
     }
   },
