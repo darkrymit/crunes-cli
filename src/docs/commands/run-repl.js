@@ -129,5 +129,42 @@ These are always available regardless of \`commandsRepl\`:
 ## 8. Input History
 
 Arrow keys (↑/↓) navigate input history within the session. No persistence across sessions.
+
+## 9. Multiline Input (Ctrl+Enter)
+
+In TTY mode, press **Ctrl+Enter** to add a soft newline without dispatching the input. The prompt indents to match the current prompt width. Press **Enter** to flush the entire buffer as a single \`line\` event — \`input.text\` contains the full multi-line string.
+
+\`\`\`
+sqlite> SELECT *
+        FROM books
+        WHERE genre = 'Sci-Fi';
+\`\`\`
+
+No new exports required. \`inputRepl()\` always receives the complete accumulated text.
+
+## 10. disposeRepl() — Guaranteed Teardown
+
+Export an optional \`disposeRepl()\` function to run cleanup logic when the session ends, regardless of how it ends (normal exit, Ctrl+D, process signal). Errors thrown here are swallowed.
+
+\`\`\`js
+export async function disposeRepl() {
+  if (replDb) { await replDb.close(); replDb = null }
+}
+\`\`\`
+
+This is called automatically before the isolate tears down. It removes the need to close resources inside \`inputRepl()\`'s \`eof\`/\`interrupt\` branches — though doing so there as well is harmless.
+
+## 11. JSONL Input Mode
+
+When \`--format jsonl\` is active and stdin is not a TTY, each stdin line is parsed as a JSON \`InputEvent\` object and dispatched directly:
+
+\`\`\`jsonl
+{"type":"line","text":"SELECT 1"}
+{"type":"line","text":"SELECT *\\nFROM books\\nWHERE genre = 'Sci-Fi'"}
+{"type":"interrupt"}
+{"type":"eof"}
+\`\`\`
+
+Multi-line text is encoded as \`\\n\` in the JSON string — no Ctrl+Enter needed. Invalid JSON or unrecognised \`type\` values emit a \`{ type: "error" }\` JSONL output line and are skipped; the session continues.
 \n`)
 }
