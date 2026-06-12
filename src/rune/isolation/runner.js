@@ -1477,7 +1477,8 @@ export async function runRuneInReplSession(runeFile, effective, args, projectDir
     '\nif (typeof inputRepl !== "undefined") globalThis.__crunes_inputRepl = inputRepl;\n' +
     '\nif (typeof bannerRepl !== "undefined") globalThis.__crunes_bannerRepl = bannerRepl;\n' +
     '\nif (typeof commandsRepl !== "undefined") globalThis.__crunes_commandsRepl = commandsRepl;\n' +
-    '\nif (typeof completeInputRepl !== "undefined") globalThis.__crunes_completeInputRepl = completeInputRepl;\n'
+    '\nif (typeof completeInputRepl !== "undefined") globalThis.__crunes_completeInputRepl = completeInputRepl;\n' +
+    '\nif (typeof disposeRepl !== "undefined") globalThis.__crunes_disposeRepl = disposeRepl;\n'
 
   const runeMod = await isolate.compileModule(patchedSrc, { filename: runeFile })
   const resolver = createModuleResolver(
@@ -1636,7 +1637,16 @@ export async function runRuneInReplSession(runeFile, effective, args, projectDir
     )
   }
 
+  const hasDisposeRepl = await context.eval('typeof __crunes_disposeRepl !== "undefined"')
+
   async function dispose() {
+    if (hasDisposeRepl) {
+      await context.evalClosure(
+        `return (async () => { await __crunes_disposeRepl() })()`,
+        [],
+        { result: { promise: true, copy: true } }
+      ).catch(() => {})
+    }
     await disposeUtils()
     isolate.dispose()
   }

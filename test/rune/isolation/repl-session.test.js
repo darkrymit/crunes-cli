@@ -146,4 +146,40 @@ describe('runRuneInReplSession — new session object', () => {
     await writeFile(f, `export async function run() {}`)
     await expect(runRuneInReplSession(f, effective, [], tmp)).rejects.toThrow()
   })
+
+  it('calls disposeRepl() when session.dispose() is called', async () => {
+    const f = join(tmp, 'rune.js')
+    const flag = join(tmp, 'disposed.txt')
+    await writeFile(f, `
+      import { fs } from '@utils'
+      export async function runRepl(args) { return '> ' }
+      export async function inputRepl(input) { return { type: 'done' } }
+      export async function disposeRepl() { await fs.write('disposed.txt', 'yes') }
+    `)
+    const session = await runRuneInReplSession(f, { allow: ['fs.write:./*'], deny: [] }, [], tmp)
+    await session.dispose()
+    const { readFile } = await import('node:fs/promises')
+    expect(await readFile(flag, 'utf8')).toBe('yes')
+  })
+
+  it('swallows errors thrown by disposeRepl()', async () => {
+    const f = join(tmp, 'rune.js')
+    await writeFile(f, `
+      export async function runRepl(args) { return '> ' }
+      export async function inputRepl(input) { return { type: 'done' } }
+      export async function disposeRepl() { throw new Error('cleanup failed') }
+    `)
+    const session = await runRuneInReplSession(f, effective, [], tmp)
+    await expect(session.dispose()).resolves.toBeUndefined()
+  })
+
+  it('does not require disposeRepl() export', async () => {
+    const f = join(tmp, 'rune.js')
+    await writeFile(f, `
+      export async function runRepl(args) { return '> ' }
+      export async function inputRepl(input) { return { type: 'done' } }
+    `)
+    const session = await runRuneInReplSession(f, effective, [], tmp)
+    await expect(session.dispose()).resolves.toBeUndefined()
+  })
 })
