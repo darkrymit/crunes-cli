@@ -21,6 +21,16 @@ export const BUILTIN_SLASH_COMMANDS = [
   { name: 'exit',  description: 'End the session' },
 ]
 
+const VALID_INPUT_TYPES = new Set(['line', 'interrupt', 'eof', 'command'])
+
+export function parseJsonlInputLine(text) {
+  if (!text) return null
+  let parsed
+  try { parsed = JSON.parse(text) } catch { return null }
+  if (!parsed || !VALID_INPUT_TYPES.has(parsed.type)) return null
+  return parsed
+}
+
 export function parseSlashCommand(line) {
   const trimmed = line.trim()
   if (!trimmed.startsWith('/')) return null
@@ -97,6 +107,7 @@ export async function handler({
   }
 
   const instanceId = '1'
+  const jsonlInput = format === 'jsonl' && !process.stdin.isTTY
 
   function onEvent(event) {
     const { type, message, section, rune, instanceId: iid } = event
@@ -251,6 +262,16 @@ export async function handler({
   rl.on('line', (text) => {
     enqueue(async () => {
       if (sessionEnded) return
+
+      if (jsonlInput) {
+        const event = parseJsonlInputLine(text)
+        if (!event) {
+          process.stdout.write(JSON.stringify({ type: 'error', rune: key, instance: instanceId, message: `Invalid JSONL input: ${text}` }) + '\n')
+          return
+        }
+        await handleInputEvent(event)
+        return
+      }
 
       // Slash command interception
       const slash = parseSlashCommand(text)
