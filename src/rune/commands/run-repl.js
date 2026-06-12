@@ -148,6 +148,7 @@ export async function handler({
   }
 
   let currentPrompt = session.initialPrompt ?? '> '
+  let lineBuffer = []
   let sessionEnded = false
   let eofResolve = null
   const eofPromise = new Promise(resolve => { eofResolve = resolve })
@@ -179,6 +180,22 @@ export async function handler({
   function prompt() {
     if (process.stdin.isTTY) rl.setPrompt(currentPrompt)
     rl.prompt()
+  }
+
+  if (process.stdin.isTTY && !jsonlInput) {
+    readline.emitKeypressEvents(process.stdin, rl)
+    process.stdin.setRawMode(true)
+    process.stdin.on('keypress', (ch, key) => {
+      if (!key) return
+      if (key.ctrl && key.name === 'return') {
+        const currentLine = rl.line
+        lineBuffer.push(currentLine)
+        rl.write(null, { ctrl: true, name: 'u' })
+        process.stderr.write('\n')
+        rl.setPrompt(' '.repeat(currentPrompt.length))
+        rl.prompt()
+      }
+    })
   }
 
   async function endSession(message) {
@@ -249,6 +266,14 @@ export async function handler({
   }
 
   rl.on('SIGINT', () => {
+    // If we're mid-multiline: cancel the buffer and re-prompt
+    if (lineBuffer.length > 0) {
+      lineBuffer = []
+      process.stderr.write('\n')
+      rl.setPrompt(currentPrompt)
+      prompt()
+      return
+    }
     // If line has content: clear it and re-prompt (standard terminal behaviour)
     if (rl.line && rl.line.length > 0) {
       process.stderr.write('\n')
@@ -262,6 +287,16 @@ export async function handler({
   rl.on('line', (text) => {
     enqueue(async () => {
       if (sessionEnded) return
+
+      // Multiline flush: buffer has accumulated lines — append this one and dispatch the block
+      if (lineBuffer.length > 0) {
+        lineBuffer.push(text)
+        const fullText = lineBuffer.join('\n')
+        lineBuffer = []
+        rl.setPrompt(currentPrompt)
+        await handleInputEvent({ type: 'line', text: fullText })
+        return
+      }
 
       if (jsonlInput) {
         const event = parseJsonlInputLine(text)
