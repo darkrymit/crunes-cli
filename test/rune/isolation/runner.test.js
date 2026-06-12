@@ -745,3 +745,61 @@ describe('runRuneInIsolate — dispose export', () => {
   })
 })
 
+describe('runRuneInIsolate — console events', () => {
+  let tmp
+
+  beforeEach(async () => { tmp = await mkdtemp(join(tmpdir(), 'crunes-console-')) })
+  afterEach(async () => { await rm(tmp, { recursive: true, force: true }) })
+
+  it('console.log emits { type: "log" } event', async () => {
+    const runeFile = join(tmp, 'rune.js')
+    await writeFile(runeFile, `
+export async function run() { console.log('hello log') }
+`)
+    const events = []
+    await runRuneInIsolate(runeFile, { allow: [], deny: [] }, [], tmp, {
+      onEvent(e) { events.push(e) }
+    })
+    expect(events).toHaveLength(1)
+    expect(events[0]).toMatchObject({ type: 'log', message: 'hello log' })
+  })
+
+  it('console.warn emits { type: "warn" } event', async () => {
+    const runeFile = join(tmp, 'rune.js')
+    await writeFile(runeFile, `
+export async function run() { console.warn('careful') }
+`)
+    const events = []
+    await runRuneInIsolate(runeFile, { allow: [], deny: [] }, [], tmp, {
+      onEvent(e) { events.push(e) }
+    })
+    expect(events).toHaveLength(1)
+    expect(events[0]).toMatchObject({ type: 'warn', message: 'careful' })
+  })
+
+  it('console.error emits { type: "error" } event', async () => {
+    const runeFile = join(tmp, 'rune.js')
+    await writeFile(runeFile, `
+export async function run() { console.error('boom') }
+`)
+    const events = []
+    await runRuneInIsolate(runeFile, { allow: [], deny: [] }, [], tmp, {
+      onEvent(e) { events.push(e) }
+    })
+    expect(events).toHaveLength(1)
+    expect(events[0]).toMatchObject({ type: 'error', message: 'boom' })
+  })
+
+  it('console.warn does NOT emit { type: "error" }', async () => {
+    const runeFile = join(tmp, 'rune.js')
+    await writeFile(runeFile, `
+export async function run() { console.warn('just a warning') }
+`)
+    const events = []
+    await runRuneInIsolate(runeFile, { allow: [], deny: [] }, [], tmp, {
+      onEvent(e) { events.push(e) }
+    })
+    expect(events[0].type).not.toBe('error')
+  })
+})
+
