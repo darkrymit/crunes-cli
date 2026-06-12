@@ -1004,9 +1004,10 @@ export async function runRuneInIsolate(runeFile, effective, args, projectDir, {
 
   if (isVerbose) console.error(`[crunes:debug] creating Isolate...`)
   const isolate = new ivm.Isolate({ memoryLimit: isolateMemoryMb })
+  let context
   try {
     if (isVerbose) console.error(`[crunes:debug] creating Context...`)
-    const context = await isolate.createContext()
+    context = await isolate.createContext()
 
     if (isVerbose) console.error(`[crunes:debug] injecting $__hostRequire...`)
     await context.global.set('$__hostRequire', new ivm.Reference((spec) => {
@@ -1030,7 +1031,7 @@ export async function runRuneInIsolate(runeFile, effective, args, projectDir, {
     // so context.eval() can call it. The typeof guard prevents ReferenceError when the
     // rune does not export it — the missing-export check below handles that case.
     const runeSrc    = await fs.readFile(runeFile, 'utf8')
-    const exportBinding = `\nif (typeof ${lifecycle} !== "undefined") globalThis.__crunes_target = ${lifecycle};\nif (typeof args !== "undefined") globalThis.__crunes_args = args;\n`
+    const exportBinding = `\nif (typeof ${lifecycle} !== "undefined") globalThis.__crunes_target = ${lifecycle};\nif (typeof args !== "undefined") globalThis.__crunes_args = args;\nif (typeof dispose !== "undefined") globalThis.__crunes_dispose = dispose;\n`
     const patchedSrc = runeSrc + exportBinding
     if (isVerbose) console.error(`[crunes:debug] compiling Module...`)
     const runeMod    = await isolate.compileModule(patchedSrc, { filename: runeFile })
@@ -1128,6 +1129,13 @@ export async function runRuneInIsolate(runeFile, effective, args, projectDir, {
     return result
   } finally {
     if (isVerbose) console.error(`[crunes:debug] disposing Isolate...`)
+    if (await context.eval('typeof __crunes_dispose !== "undefined"').catch(() => false)) {
+      await context.evalClosure(
+        `return (async () => { await __crunes_dispose() })()`,
+        [],
+        { result: { promise: true, copy: true } }
+      ).catch(() => {})
+    }
     await dispose()
     isolate.dispose()
   }

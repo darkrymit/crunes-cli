@@ -698,3 +698,50 @@ export async function run() {
   })
 })
 
+describe('runRuneInIsolate — dispose export', () => {
+  let tmp
+  beforeEach(async () => { tmp = await mkdtemp(join(tmpdir(), 'crunes-dispose-')) })
+  afterEach(async () => { await rm(tmp, { recursive: true, force: true }) })
+
+  it('calls dispose() after run() succeeds', async () => {
+    const f = join(tmp, 'rune.js')
+    const flag = join(tmp, 'disposed.txt')
+    await writeFile(f, `
+      import { fs } from '@utils'
+      export async function run(args) { return 'ok' }
+      export async function dispose() { await fs.write('disposed.txt', 'yes') }
+    `)
+    await runRuneInIsolate(f, { allow: ['fs.write:./*'], deny: [] }, [], tmp)
+    const { readFile } = await import('node:fs/promises')
+    expect(await readFile(flag, 'utf8')).toBe('yes')
+  })
+
+  it('calls dispose() even when run() throws', async () => {
+    const f = join(tmp, 'rune.js')
+    const flag = join(tmp, 'disposed.txt')
+    await writeFile(f, `
+      import { fs } from '@utils'
+      export async function run(args) { throw new Error('boom') }
+      export async function dispose() { await fs.write('disposed.txt', 'yes') }
+    `)
+    await expect(runRuneInIsolate(f, { allow: ['fs.write:./*'], deny: [] }, [], tmp)).rejects.toThrow('boom')
+    const { readFile } = await import('node:fs/promises')
+    expect(await readFile(flag, 'utf8')).toBe('yes')
+  })
+
+  it('swallows errors thrown by dispose()', async () => {
+    const f = join(tmp, 'rune.js')
+    await writeFile(f, `
+      export async function run(args) { return 'ok' }
+      export async function dispose() { throw new Error('cleanup failed') }
+    `)
+    await expect(runRuneInIsolate(f, { allow: [], deny: [] }, [], tmp)).resolves.toBe('ok')
+  })
+
+  it('does not require dispose() export', async () => {
+    const f = join(tmp, 'rune.js')
+    await writeFile(f, `export async function run(args) { return 'ok' }`)
+    await expect(runRuneInIsolate(f, { allow: [], deny: [] }, [], tmp)).resolves.toBe('ok')
+  })
+})
+
