@@ -803,3 +803,95 @@ export async function run() { console.warn('just a warning') }
   })
 })
 
+describe('runRuneInIsolate — logger global', () => {
+  let tmp
+
+  beforeEach(async () => { tmp = await mkdtemp(join(tmpdir(), 'crunes-logger-')) })
+  afterEach(async () => { await rm(tmp, { recursive: true, force: true }) })
+
+  it('logger.info emits { type: "log", level: "info" }', async () => {
+    const runeFile = join(tmp, 'rune.js')
+    await writeFile(runeFile, `
+export async function run() { logger.info('hello') }
+`)
+    const events = []
+    await runRuneInIsolate(runeFile, { allow: [], deny: [] }, [], tmp, {
+      onEvent(e) { events.push(e) }
+    })
+    expect(events).toHaveLength(1)
+    expect(events[0]).toMatchObject({ type: 'log', level: 'info', message: 'hello' })
+  })
+
+  it('logger.warn emits { type: "log", level: "warn" }', async () => {
+    const runeFile = join(tmp, 'rune.js')
+    await writeFile(runeFile, `
+export async function run() { logger.warn('careful') }
+`)
+    const events = []
+    await runRuneInIsolate(runeFile, { allow: [], deny: [] }, [], tmp, {
+      onEvent(e) { events.push(e) }
+    })
+    expect(events[0]).toMatchObject({ type: 'log', level: 'warn', message: 'careful' })
+  })
+
+  it('logger.error emits { type: "log", level: "error" }', async () => {
+    const runeFile = join(tmp, 'rune.js')
+    await writeFile(runeFile, `
+export async function run() { logger.error('boom') }
+`)
+    const events = []
+    await runRuneInIsolate(runeFile, { allow: [], deny: [] }, [], tmp, {
+      onEvent(e) { events.push(e) }
+    })
+    expect(events[0]).toMatchObject({ type: 'log', level: 'error', message: 'boom' })
+  })
+
+  it('logger.debug emits { type: "log", level: "debug" }', async () => {
+    const runeFile = join(tmp, 'rune.js')
+    await writeFile(runeFile, `
+export async function run() { logger.debug('trace') }
+`)
+    const events = []
+    await runRuneInIsolate(runeFile, { allow: [], deny: [] }, [], tmp, {
+      onEvent(e) { events.push(e) }
+    })
+    expect(events[0]).toMatchObject({ type: 'log', level: 'debug', message: 'trace' })
+  })
+
+  it('logger.info with meta includes meta in event', async () => {
+    const runeFile = join(tmp, 'rune.js')
+    await writeFile(runeFile, `
+export async function run() { logger.info('started', { count: 42 }) }
+`)
+    const events = []
+    await runRuneInIsolate(runeFile, { allow: [], deny: [] }, [], tmp, {
+      onEvent(e) { events.push(e) }
+    })
+    expect(events[0]).toMatchObject({ type: 'log', level: 'info', message: 'started', meta: { count: 42 } })
+  })
+
+  it('logger.info without meta omits meta field', async () => {
+    const runeFile = join(tmp, 'rune.js')
+    await writeFile(runeFile, `
+export async function run() { logger.info('no meta') }
+`)
+    const events = []
+    await runRuneInIsolate(runeFile, { allow: [], deny: [] }, [], tmp, {
+      onEvent(e) { events.push(e) }
+    })
+    expect(events[0]).not.toHaveProperty('meta')
+  })
+
+  it('logger is available as a global without import', async () => {
+    const runeFile = join(tmp, 'rune.js')
+    await writeFile(runeFile, `
+export async function run() { logger.info('global works') }
+`)
+    const events = []
+    await runRuneInIsolate(runeFile, { allow: [], deny: [] }, [], tmp, {
+      onEvent(e) { events.push(e) }
+    })
+    expect(events[0]).toMatchObject({ type: 'log', level: 'info', message: 'global works' })
+  })
+})
+
