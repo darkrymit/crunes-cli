@@ -955,11 +955,19 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
 async function injectConsole(isolate, context, onEvent) {
   const jail = context.global
   if (onEvent) {
-    await jail.set('$__log', new ivm.Reference((...args) => onEvent({ type: 'log', message: args.join(' ') })))
-    await jail.set('$__err', new ivm.Reference((...args) => onEvent({ type: 'error', message: args.join(' ') })))
+    await jail.set('$__log',  new ivm.Reference((...args) => onEvent({ type: 'log',   message: args.join(' ') })))
+    await jail.set('$__warn', new ivm.Reference((...args) => onEvent({ type: 'warn',  message: args.join(' ') })))
+    await jail.set('$__err',  new ivm.Reference((...args) => onEvent({ type: 'error', message: args.join(' ') })))
+    await jail.set('$__utils_logger_emit', new ivm.Reference((level, message, meta) => {
+      onEvent({ type: 'log', level, message, ...(meta != null ? { meta } : {}) })
+    }))
   } else {
-    await jail.set('$__log', new ivm.Reference((...args) => process.stdout.write(args.join(' ') + '\n')))
-    await jail.set('$__err', new ivm.Reference((...args) => process.stderr.write(args.join(' ') + '\n')))
+    await jail.set('$__log',  new ivm.Reference((...args) => process.stdout.write(args.join(' ') + '\n')))
+    await jail.set('$__warn', new ivm.Reference((...args) => process.stderr.write(args.join(' ') + '\n')))
+    await jail.set('$__err',  new ivm.Reference((...args) => process.stderr.write(args.join(' ') + '\n')))
+    await jail.set('$__utils_logger_emit', new ivm.Reference((level, message) => {
+      process.stderr.write(`[${level}] ${message}\n`)
+    }))
   }
 
   const consoleMod = await compileStaticModule(isolate, 'console')
