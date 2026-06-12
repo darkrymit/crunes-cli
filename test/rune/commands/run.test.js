@@ -142,6 +142,28 @@ describe('parseRunArgs', () => {
     expect(result.failFast).toBe(false)
     expect(result.segments[0].runeArgs).toEqual(['--fail-fast'])
   })
+
+  it('treats -- as end of run-flags, strips it, passes nothing to segments', () => {
+    const result = parseRunArgs(['--format', 'jsonl', '--', 'api'])
+    expect(result.format).toBe('jsonl')
+    expect(result.segments[0].key).toBe('api')
+    expect(result.segments[0].runeArgs).toEqual([])
+  })
+
+  it('strips -- before key, rune args follow normally', () => {
+    const result = parseRunArgs(['--', 'api', '--format', 'json'])
+    expect(result.format).toBe('text')
+    expect(result.segments[0].key).toBe('api')
+    expect(result.segments[0].runeArgs).toEqual(['--format', 'json'])
+  })
+
+  it('strips -- in batch — each segment still split by +', () => {
+    const result = parseRunArgs(['-b', '--', 'api', '--flag', '+', 'git'])
+    expect(result.isBatch).toBe(true)
+    expect(result.segments[0].key).toBe('api')
+    expect(result.segments[0].runeArgs).toEqual(['--flag'])
+    expect(result.segments[1].key).toBe('git')
+  })
 })
 
 describe('handler — configRoot', () => {

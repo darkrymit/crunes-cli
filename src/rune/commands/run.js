@@ -54,10 +54,13 @@ export function parseRunArgs(argv) {
   let i = 0
 
   // Consume command-level flags from the prefix only — stops at the first non-flag token.
-  // This ensures rune flags with the same name (e.g. --format) are never intercepted.
+  // -- acts as an explicit end-of-run-flags marker and is consumed (not passed to segments).
   while (i < argv.length) {
     const tok = argv[i]
-    if (tok === '--format' && i + 1 < argv.length) {
+    if (tok === '--') {
+      i++
+      break
+    } else if (tok === '--format' && i + 1 < argv.length) {
       format = argv[i + 1]
       i += 2
     } else if (tok.startsWith('--format=')) {
