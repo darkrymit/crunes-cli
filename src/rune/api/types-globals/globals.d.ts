@@ -290,6 +290,35 @@ declare namespace globals {
     title?: string
     attrs?: Record<string, string>
   }
+
+  /** Partial console shim available in the rune sandbox. */
+  interface Console {
+    /** Writes a log message. Emits a { type: 'log' } event. */
+    log(...args: any[]): void
+    /** Writes a warning message. Emits a { type: 'warn' } event. */
+    warn(...args: any[]): void
+    /** Writes an error message. Emits a { type: 'error' } event. */
+    error(...args: any[]): void
+  }
+
+  /** Pre-injected console shim. Routes output through the crunes event pipeline. */
+  const console: Console
+
+  /** Structured logger available globally in the rune sandbox. */
+  interface Logger {
+    /** Emit an info-level log event. */
+    info(message: string, meta?: Record<string, unknown>): void
+    /** Emit a warn-level log event. */
+    warn(message: string, meta?: Record<string, unknown>): void
+    /** Emit an error-level log event. */
+    error(message: string, meta?: Record<string, unknown>): void
+    /** Emit a debug-level log event. */
+    debug(message: string, meta?: Record<string, unknown>): void
+  }
+
+  /** Pre-injected structured logger. Emits { type: 'log', level, message, meta? } events.
+   *  Available globally — no import required. */
+  const logger: Logger
 }
 
 // Top-level type aliases so rune API .d.ts files can reference these types
