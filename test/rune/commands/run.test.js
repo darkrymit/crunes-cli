@@ -320,8 +320,8 @@ describe('handler — progressive streaming and console logs', () => {
     
     const lines = stdoutWritten.split('\n').filter(Boolean).map(JSON.parse)
     expect(lines).toHaveLength(4)
-    expect(lines[0]).toEqual({ type: 'log', message: 'started' })
-    expect(lines[1]).toEqual({ type: 'error', message: 'warning' })
+    expect(lines[0]).toMatchObject({ type: 'log', message: 'started' })
+    expect(lines[1]).toMatchObject({ type: 'error', message: 'warning' })
     expect(lines[2]).toEqual({ type: 'section', section: { name: 'sec1', data: { type: 'markdown', content: 'c1' } } })
     expect(lines[3]).toEqual({
       type: 'section',
@@ -329,6 +329,41 @@ describe('handler — progressive streaming and console logs', () => {
       instance: '1',
       section: { name: 'sec2', data: { type: 'markdown', content: 'c2' } }
     })
+  })
+
+  it('log event with level renders [instanceId:rune:log:level] prefix in text mode', async () => {
+    runRune.mockImplementation(async (dir, config, key, args, opts) => {
+      opts.onEvent({ type: 'log', level: 'info', message: 'hello', rune: 'docs', instanceId: '1' })
+      return []
+    })
+    let stdoutWritten = ''
+    vi.spyOn(process.stdout, 'write').mockImplementation(s => { stdoutWritten += s })
+    await handler({ segments: [{ key: 'docs', sections: null, runeArgs: [] }], format: 'text' })
+    expect(stdoutWritten).toContain('[1:docs:log:info] hello')
+  })
+
+  it('log event with meta appends attrs in text mode', async () => {
+    runRune.mockImplementation(async (dir, config, key, args, opts) => {
+      opts.onEvent({ type: 'log', level: 'warn', message: 'slow', meta: { ms: 1200 }, rune: 'docs', instanceId: '1' })
+      return []
+    })
+    let stdoutWritten = ''
+    vi.spyOn(process.stdout, 'write').mockImplementation(s => { stdoutWritten += s })
+    await handler({ segments: [{ key: 'docs', sections: null, runeArgs: [] }], format: 'text' })
+    expect(stdoutWritten).toContain('[1:docs:log:warn] slow [ms: 1200]')
+  })
+
+  it('log event with level and meta emits structured JSONL', async () => {
+    runRune.mockImplementation(async (dir, config, key, args, opts) => {
+      opts.onEvent({ type: 'log', level: 'debug', message: 'trace', meta: { key: 'foo' }, rune: 'docs', instanceId: '1' })
+      return []
+    })
+    let stdoutWritten = ''
+    vi.spyOn(process.stdout, 'write').mockImplementation(s => { stdoutWritten += s })
+    await handler({ segments: [{ key: 'docs', sections: null, runeArgs: [] }], format: 'jsonl' })
+    const lines = stdoutWritten.split('\n').filter(Boolean).map(JSON.parse)
+    const logLine = lines.find(l => l.type === 'log')
+    expect(logLine).toMatchObject({ type: 'log', level: 'debug', message: 'trace', meta: { key: 'foo' } })
   })
 
   it('filters progressive JSONL section events when section filter is present', async () => {

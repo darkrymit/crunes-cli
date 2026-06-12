@@ -149,8 +149,8 @@ export async function handler({
         configDir: configRoot,
         instanceId: String(i + 1),
         onEvent(event) {
-          const { type, message, section, instanceId, rune } = event
-          const prefix = `[${instanceId}:${rune}:${type}]`
+          const { type, level, message, meta, section, instanceId, rune } = event
+          const prefix = level ? `[${instanceId}:${rune}:${type}:${level}]` : `[${instanceId}:${rune}:${type}]`
           if (format === 'jsonl') {
             if (type === 'section') {
               if (sectionFilter && !isMatch(section.name, sectionFilter)) {
@@ -162,7 +162,9 @@ export async function handler({
               type,
               rune,
               instance: instanceId,
+              ...(level   != null ? { level }   : {}),
               ...(message != null ? { message } : {}),
+              ...(meta    != null ? { meta }    : {}),
               ...(section != null ? { section } : {}),
             }) + '\n')
           } else {
@@ -181,10 +183,13 @@ export async function handler({
                 printedSections.add(section)
               }
             } else {
+              const attrsStr = meta && Object.keys(meta).length > 0
+                ? ' ' + Object.entries(meta).map(([k, v]) => `[${k}: ${v}]`).join(' ')
+                : ''
               if (message && message.includes('\n')) {
-                process.stdout.write(`${prefix}\n${message}\n\n`)
+                process.stdout.write(`${prefix}${attrsStr}\n${message}\n\n`)
               } else {
-                process.stdout.write(`${prefix} ${message ?? ''}\n`)
+                process.stdout.write(`${prefix} ${message ?? ''}${attrsStr}\n`)
               }
             }
           }
