@@ -54,9 +54,10 @@ describe('renderSection', () => {
     expect(out).not.toContain('[')
   })
 
-  it('wraps markdown content in ```md fence', () => {
+  it('renders markdown content inline without fence', () => {
     const out = renderSection({ name: 's', data: { type: 'markdown', content: 'hello' } })
-    expect(out).toContain('```md\nhello\n```')
+    expect(out).toContain('hello')
+    expect(out).not.toContain('```')
   })
 
   it('renders tree content inline without fence', () => {

@@ -3,7 +3,5 @@
 exports[`renderSection > matches snapshot for a full markdown section 1`] = `
 "## Overview
 [generated: true]
-\`\`\`md
-**Hello world**
-\`\`\`"
+**Hello world**"
 `;
