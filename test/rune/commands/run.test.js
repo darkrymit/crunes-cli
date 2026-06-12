@@ -46,6 +46,36 @@ describe('parseSegment', () => {
       .toEqual({ key: 'api', sections: ['layout'], runeArgs: ['--flag', 'val'] })
   })
 
+  it('-- before key: skips --, treats next token as key', () => {
+    expect(parseSegment(['--', 'api', '--format', 'json']))
+      .toEqual({ key: 'api', sections: null, runeArgs: ['--format', 'json'] })
+  })
+
+  it('-- before key after --section', () => {
+    expect(parseSegment(['--section', 'x', '--', 'api', '--flag']))
+      .toEqual({ key: 'api', sections: ['x'], runeArgs: ['--flag'] })
+  })
+
+  it('-- after key strips from runeArgs', () => {
+    expect(parseSegment(['api', '--', '--format', 'json']))
+      .toEqual({ key: 'api', sections: null, runeArgs: ['--format', 'json'] })
+  })
+
+  it('-- after key with no args after it', () => {
+    expect(parseSegment(['api', '--']))
+      .toEqual({ key: 'api', sections: null, runeArgs: [] })
+  })
+
+  it('-- after key after --section', () => {
+    expect(parseSegment(['--section', 'x', 'api', '--', '--flag']))
+      .toEqual({ key: 'api', sections: ['x'], runeArgs: ['--flag'] })
+  })
+
+  it('-- not first runeArg is passed through verbatim', () => {
+    expect(parseSegment(['api', '--flag', '--', 'val']))
+      .toEqual({ key: 'api', sections: null, runeArgs: ['--flag', '--', 'val'] })
+  })
+
   it('throws an error and exits if the resolved key starts with a hyphen', async () => {
     const { output } = await import('../../../src/shared/output.js')
     const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {})

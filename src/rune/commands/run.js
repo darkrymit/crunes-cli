@@ -12,7 +12,10 @@ export function parseSegment(argv) {
 
   while (i < argv.length) {
     const tok = argv[i]
-    if ((tok === '--section' || tok === '-s') && i + 1 < argv.length) {
+    if (tok === '--') {
+      i++
+      break
+    } else if ((tok === '--section' || tok === '-s') && i + 1 < argv.length) {
       sections = argv[i + 1].split(',').map(s => s.trim()).filter(Boolean)
       i += 2
     } else if (tok.startsWith('--section=')) {
@@ -38,12 +41,13 @@ Arguments must follow this strict structure:
   4. Rune Key        (e.g., myrune)
   5. Rune Arguments  (e.g., --strict, pos-arg)
 
-Example: crunes --cwd ./dir use --format json myrune --strict
+Example: crunes --cwd ./dir run myrune --strict
 `.trimEnd())
     process.exit(1)
   }
 
-  const runeArgs = key !== null ? argv.slice(i + 1) : []
+  const raw = key !== null ? argv.slice(i + 1) : []
+  const runeArgs = raw[0] === '--' ? raw.slice(1) : raw
   return { key, sections, runeArgs }
 }
 
