@@ -21,6 +21,14 @@ declare namespace lifecycle {
   function run(args: ParsedArgs): Promise<RuneSection[] | RuneSection | string | void> | RuneSection[] | RuneSection | string | void
 
   /**
+   * Optional cleanup hook for the regular run lifecycle.
+   * Called after run() resolves or throws, before the isolate tears down.
+   * Errors thrown here are swallowed. No arguments are passed.
+   * Use this to close connections or release resources opened during run().
+   */
+  function dispose(): Promise<void> | void
+
+  /**
    * Defines the argument and option schema for the REPL session.
    * If absent, runRepl(args) receives an empty args object — it does NOT fall back to args().
    *
@@ -76,6 +84,14 @@ declare namespace lifecycle {
    * @returns Array of completion candidates.
    */
   function completeInputRepl(tokens: string[]): Promise<string[]> | string[]
+
+  /**
+   * Optional cleanup hook for REPL sessions.
+   * Called when the session's dispose() method is invoked (on normal exit, Ctrl+D, or signal).
+   * Guaranteed to run even if inputRepl() never receives an eof event.
+   * Errors thrown here are swallowed. No arguments are passed.
+   */
+  function disposeRepl(): Promise<void> | void
 
   /** Input event passed to inputRepl() each turn. */
   type InputEvent =

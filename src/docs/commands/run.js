@@ -79,5 +79,24 @@ export async function run(args) {
 2. **Command Flags**: Scoped to the command (e.g. \`run --format json\`).
 3. **Rune Arguments**: Scoped after the rune key (e.g. \`myrune remote add origin --verbose\`).
 Placing global or command flags after the rune key will cause them to be passed as raw rune arguments!
+
+## 5. dispose() — Guaranteed Teardown
+
+Export an optional \`dispose()\` function to run cleanup logic after \`run()\` completes or throws, before the isolate tears down. Errors thrown by \`dispose()\` are swallowed.
+
+\`\`\`js
+let db = null
+
+export async function run(args) {
+  db = await sqlite.open(args.db, 'books')
+  return await execQuery(db, args.query)
+}
+
+export async function dispose() {
+  if (db) { await db.close(); db = null }
+}
+\`\`\`
+
+This is equivalent to wrapping your entire \`run()\` body in a \`try/finally\` — but cleaner. The \`try/finally\` pattern still works if you prefer it.
 \n`)
 }
