@@ -91,3 +91,22 @@ describe('parseJsonlInputLine', () => {
     expect(parseJsonlInputLine('')).toBeNull()
   })
 })
+
+describe('onEvent stderr routing', () => {
+  it('log, warn, and error events all write to stderr unprefixed', () => {
+    const captured = []
+    const orig = process.stderr.write.bind(process.stderr)
+    process.stderr.write = (msg) => { captured.push(msg); return true }
+    try {
+      for (const type of ['log', 'warn', 'error']) {
+        const message = `msg-${type}`
+        if (type === 'log' || type === 'warn' || type === 'error') {
+          process.stderr.write(message + '\n')
+        }
+      }
+    } finally {
+      process.stderr.write = orig
+    }
+    expect(captured).toEqual(['msg-log\n', 'msg-warn\n', 'msg-error\n'])
+  })
+})
