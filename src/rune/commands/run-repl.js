@@ -1,7 +1,7 @@
 import readline from 'node:readline'
 import { isMatch } from '../../shared/match.js'
 import { loadConfig } from '../../core/config.js'
-import { renderSection } from '../../shared/render.js'
+import { formatSection } from '../../shared/render.js'
 import { output, isVerbose } from '../../shared/output.js'
 import { parseArgs } from '../api/args-parser.js'
 
@@ -116,8 +116,7 @@ export async function handler({
     } else {
       if (type === 'section') {
         if (!sectionFilter || isMatch(section.name, sectionFilter)) {
-          const rendered = renderSection(section)
-          if (rendered) process.stdout.write(rendered + '\n')
+          process.stdout.write(formatSection(section, rune) + '\n')
         }
       } else if (type === 'log' || type === 'error') {
         process.stderr.write(message + '\n')
