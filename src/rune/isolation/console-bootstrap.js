@@ -1,9 +1,9 @@
-// Console shim for the isolate. $__log and $__err are ivm.Reference globals
+// Console shim for the isolate. $__utils_console_emit is an ivm.Reference global
 // set by the host before this module is evaluated.
 globalThis.console = {
-  log:   (...a) => $__log.applyIgnored(undefined, a.map(String)),
-  warn:  (...a) => $__warn.applyIgnored(undefined, a.map(String)),
-  error: (...a) => $__err.applyIgnored(undefined, a.map(String)),
+  log:   (...a) => $__utils_console_emit.applyIgnored(undefined, ['log',   ...a.map(String)]),
+  warn:  (...a) => $__utils_console_emit.applyIgnored(undefined, ['warn',  ...a.map(String)]),
+  error: (...a) => $__utils_console_emit.applyIgnored(undefined, ['error', ...a.map(String)]),
 }
 
 globalThis.logger = {

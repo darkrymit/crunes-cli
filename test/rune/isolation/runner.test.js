@@ -751,7 +751,7 @@ describe('runRuneInIsolate — console events', () => {
   beforeEach(async () => { tmp = await mkdtemp(join(tmpdir(), 'crunes-console-')) })
   afterEach(async () => { await rm(tmp, { recursive: true, force: true }) })
 
-  it('console.log emits { type: "log" } event', async () => {
+  it('console.log emits { type: "log", level: "log" } event', async () => {
     const runeFile = join(tmp, 'rune.js')
     await writeFile(runeFile, `
 export async function run() { console.log('hello log') }
@@ -761,10 +761,10 @@ export async function run() { console.log('hello log') }
       onEvent(e) { events.push(e) }
     })
     expect(events).toHaveLength(1)
-    expect(events[0]).toMatchObject({ type: 'log', message: 'hello log' })
+    expect(events[0]).toMatchObject({ type: 'log', level: 'log', message: 'hello log' })
   })
 
-  it('console.warn emits { type: "warn" } event', async () => {
+  it('console.warn emits { type: "log", level: "warn" } event', async () => {
     const runeFile = join(tmp, 'rune.js')
     await writeFile(runeFile, `
 export async function run() { console.warn('careful') }
@@ -774,10 +774,10 @@ export async function run() { console.warn('careful') }
       onEvent(e) { events.push(e) }
     })
     expect(events).toHaveLength(1)
-    expect(events[0]).toMatchObject({ type: 'warn', message: 'careful' })
+    expect(events[0]).toMatchObject({ type: 'log', level: 'warn', message: 'careful' })
   })
 
-  it('console.error emits { type: "error" } event', async () => {
+  it('console.error emits { type: "log", level: "error" } event', async () => {
     const runeFile = join(tmp, 'rune.js')
     await writeFile(runeFile, `
 export async function run() { console.error('boom') }
@@ -787,10 +787,10 @@ export async function run() { console.error('boom') }
       onEvent(e) { events.push(e) }
     })
     expect(events).toHaveLength(1)
-    expect(events[0]).toMatchObject({ type: 'error', message: 'boom' })
+    expect(events[0]).toMatchObject({ type: 'log', level: 'error', message: 'boom' })
   })
 
-  it('console.warn does NOT emit { type: "error" }', async () => {
+  it('console.warn emits level "warn" not "error"', async () => {
     const runeFile = join(tmp, 'rune.js')
     await writeFile(runeFile, `
 export async function run() { console.warn('just a warning') }
@@ -799,7 +799,8 @@ export async function run() { console.warn('just a warning') }
     await runRuneInIsolate(runeFile, { allow: [], deny: [] }, [], tmp, {
       onEvent(e) { events.push(e) }
     })
-    expect(events[0].type).not.toBe('error')
+    expect(events[0]).toMatchObject({ type: 'log', level: 'warn' })
+    expect(events[0].level).not.toBe('error')
   })
 })
 
