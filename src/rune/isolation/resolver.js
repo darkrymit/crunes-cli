@@ -15,16 +15,23 @@ import { isMatch } from '../../shared/match.js'
 export function createModuleResolver(isolate, pluginDir, pluginNodeModules, pluginDeps, effectiveAllow, effectiveDeny, projectDir = null, pluginRootDir = null, virtualModules = new Map()) {
   // Cache compiled modules to avoid re-compiling within one isolate lifetime
   const cache = new Map()
+  // isolated-vm Module objects expose no .filename property — track it ourselves
+  const moduleFilenames = new Map()
 
   async function compileFile(specifier, absPath) {
     if (cache.has(specifier)) return cache.get(specifier)
     const source = await fs.readFile(absPath, 'utf8')
     const mod = await isolate.compileModule(source, { filename: absPath })
     cache.set(specifier, mod)
+    moduleFilenames.set(mod, absPath)
     return mod
   }
 
-  return async function moduleResolver(specifier, referrer) {
+  function registerModule(mod, filename) {
+    moduleFilenames.set(mod, filename)
+  }
+
+  async function moduleResolver(specifier, referrer) {
     // Step 0 — virtual modules: pre-compiled modules registered by the host
     if (virtualModules.has(specifier)) return virtualModules.get(specifier)
 
@@ -65,7 +72,8 @@ export function createModuleResolver(isolate, pluginDir, pluginNodeModules, plug
 
     // Step 1 — relative or absolute path: plugin's own files
     if (specifier.startsWith('.') || specifier.startsWith('/')) {
-      const baseDir = referrer?.filename ? path.dirname(referrer.filename) : pluginDir
+      const referrerFile = referrer ? moduleFilenames.get(referrer) : undefined
+      const baseDir = referrerFile ? path.dirname(referrerFile) : pluginDir
       const absPath = path.resolve(baseDir, specifier)
       return compileFile(absPath, absPath) // Use absPath as cache key instead of specifier
     }
@@ -103,4 +111,6 @@ export function createModuleResolver(isolate, pluginDir, pluginNodeModules, plug
       `Add "module:${specifier}" to allow in permissions and "${specifier}" to dependencies.`
     )
   }
+
+  return { resolve: moduleResolver, register: registerModule }
 }
