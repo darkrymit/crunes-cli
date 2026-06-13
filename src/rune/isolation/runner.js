@@ -20,6 +20,17 @@ import { RuneSession } from '../api/rune.js'
 
 const __isolationDir = path.dirname(fileURLToPath(import.meta.url))
 
+const DYNAMIC_IMPORT_RE = /\bimport\s*\(/
+
+function assertNoDynamicImport(src, runeFile) {
+  if (DYNAMIC_IMPORT_RE.test(src)) {
+    throw new Error(
+      `Rune "${runeFile}" uses dynamic import() which is not supported in the crunes VM.\n` +
+      `Use static top-level imports instead: import ... from '...'`
+    )
+  }
+}
+
 // Map from embedded key → source file path (used as fallback in dev/test when EMBEDDED is empty)
 const staticModulePaths = {
   md:      path.join(__isolationDir, '../api/md.js'),
@@ -955,16 +966,16 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
 async function injectConsole(isolate, context, onEvent) {
   const jail = context.global
   if (onEvent) {
-    await jail.set('$__log',  new ivm.Reference((...args) => onEvent({ type: 'log',   message: args.join(' ') })))
-    await jail.set('$__warn', new ivm.Reference((...args) => onEvent({ type: 'warn',  message: args.join(' ') })))
-    await jail.set('$__err',  new ivm.Reference((...args) => onEvent({ type: 'error', message: args.join(' ') })))
+    await jail.set('$__utils_console_emit', new ivm.Reference((level, ...args) => {
+      onEvent({ type: 'log', level, message: args.join(' ') })
+    }))
     await jail.set('$__utils_logger_emit', new ivm.Reference((level, message, meta) => {
       onEvent({ type: 'log', level, message, ...(meta != null ? { meta } : {}) })
     }))
   } else {
-    await jail.set('$__log',  new ivm.Reference((...args) => process.stdout.write(args.join(' ') + '\n')))
-    await jail.set('$__warn', new ivm.Reference((...args) => process.stderr.write(args.join(' ') + '\n')))
-    await jail.set('$__err',  new ivm.Reference((...args) => process.stderr.write(args.join(' ') + '\n')))
+    await jail.set('$__utils_console_emit', new ivm.Reference((level, ...args) => {
+      process.stderr.write(args.join(' ') + '\n')
+    }))
     await jail.set('$__utils_logger_emit', new ivm.Reference((level, message) => {
       process.stderr.write(`[${level}] ${message}\n`)
     }))
@@ -1039,12 +1050,13 @@ export async function runRuneInIsolate(runeFile, effective, args, projectDir, {
     // so context.eval() can call it. The typeof guard prevents ReferenceError when the
     // rune does not export it — the missing-export check below handles that case.
     const runeSrc    = await fs.readFile(runeFile, 'utf8')
+    assertNoDynamicImport(runeSrc, runeFile)
     const exportBinding = `\nif (typeof ${lifecycle} !== "undefined") globalThis.__crunes_target = ${lifecycle};\nif (typeof args !== "undefined") globalThis.__crunes_args = args;\nif (typeof dispose !== "undefined") globalThis.__crunes_dispose = dispose;\n`
     const patchedSrc = runeSrc + exportBinding
     if (isVerbose) console.error(`[crunes:debug] compiling Module...`)
     const runeMod    = await isolate.compileModule(patchedSrc, { filename: runeFile })
 
-    const resolver = createModuleResolver(
+    const { resolve, register } = createModuleResolver(
       isolate,
       path.dirname(runeFile),
       nodeModulesDir ?? path.join(path.dirname(runeFile), 'node_modules'),
@@ -1055,8 +1067,9 @@ export async function runRuneInIsolate(runeFile, effective, args, projectDir, {
       pluginDir ?? null,
       new Map([['@utils', utilsMod]])
     )
+    register(runeMod, runeFile)
     if (isVerbose) console.error(`[crunes:debug] instantiating Module...`)
-    await runeMod.instantiate(context, resolver)
+    await runeMod.instantiate(context, resolve)
     
     if (isVerbose) console.error(`[crunes:debug] evaluating Module...`)
     await runeMod.evaluate(isolateTimeoutMs !== undefined ? { timeout: isolateTimeoutMs } : {})
@@ -1204,9 +1217,10 @@ export async function getArgsSchema(runeFile, effective, projectDir, {
     if (pluginDir != null) await context.global.set('CRUNES_PLUGIN_ROOT', pluginDir)
 
     const runeSrc = await fs.readFile(runeFile, 'utf8')
+    assertNoDynamicImport(runeSrc, runeFile)
     const patchedSrc = runeSrc + '\nif (typeof args !== "undefined") globalThis.__crunes_args = args;\n'
     const runeMod = await isolate.compileModule(patchedSrc, { filename: runeFile })
-    const resolver = createModuleResolver(
+    const { resolve, register } = createModuleResolver(
       isolate,
       path.dirname(runeFile),
       nodeModulesDir ?? path.join(path.dirname(runeFile), 'node_modules'),
@@ -1217,7 +1231,8 @@ export async function getArgsSchema(runeFile, effective, projectDir, {
       pluginDir ?? null,
       new Map([['@utils', utilsMod]])
     )
-    await runeMod.instantiate(context, resolver)
+    register(runeMod, runeFile)
+    await runeMod.instantiate(context, resolve)
     await runeMod.evaluate({ timeout: isolateTimeoutMs })
     await context.eval('delete globalThis.$__hostRequire')
 
@@ -1301,11 +1316,12 @@ export async function getReplSchema(runeFile, effective, args, projectDir, {
     if (pluginDir != null) await context.global.set('CRUNES_PLUGIN_ROOT', pluginDir)
 
     const runeSrc = await fs.readFile(runeFile, 'utf8')
+    assertNoDynamicImport(runeSrc, runeFile)
     const patchedSrc = runeSrc +
       '\nif (typeof argsRepl !== "undefined") globalThis.__crunes_argsRepl = argsRepl;\n' +
       '\nif (typeof commandsRepl !== "undefined") globalThis.__crunes_commandsRepl = commandsRepl;\n'
     const runeMod = await isolate.compileModule(patchedSrc, { filename: runeFile })
-    const resolver = createModuleResolver(
+    const { resolve, register } = createModuleResolver(
       isolate,
       path.dirname(runeFile),
       nodeModulesDir ?? path.join(path.dirname(runeFile), 'node_modules'),
@@ -1316,7 +1332,8 @@ export async function getReplSchema(runeFile, effective, args, projectDir, {
       pluginDir ?? null,
       new Map([['@utils', utilsMod]])
     )
-    await runeMod.instantiate(context, resolver)
+    register(runeMod, runeFile)
+    await runeMod.instantiate(context, resolve)
     await runeMod.evaluate({ timeout: isolateTimeoutMs })
     await context.eval('delete globalThis.$__hostRequire')
 
@@ -1479,6 +1496,7 @@ export async function runRuneInReplSession(runeFile, effective, args, projectDir
   if (pluginDir != null) await context.global.set('CRUNES_PLUGIN_ROOT', pluginDir)
 
   const runeSrc = await fs.readFile(runeFile, 'utf8')
+  assertNoDynamicImport(runeSrc, runeFile)
   const patchedSrc = runeSrc +
     '\nif (typeof runRepl !== "undefined") globalThis.__crunes_runRepl = runRepl;\n' +
     '\nif (typeof argsRepl !== "undefined") globalThis.__crunes_argsRepl = argsRepl;\n' +
@@ -1489,7 +1507,7 @@ export async function runRuneInReplSession(runeFile, effective, args, projectDir
     '\nif (typeof disposeRepl !== "undefined") globalThis.__crunes_disposeRepl = disposeRepl;\n'
 
   const runeMod = await isolate.compileModule(patchedSrc, { filename: runeFile })
-  const resolver = createModuleResolver(
+  const { resolve, register } = createModuleResolver(
     isolate,
     path.dirname(runeFile),
     nodeModulesDir ?? path.join(path.dirname(runeFile), 'node_modules'),
@@ -1500,7 +1518,8 @@ export async function runRuneInReplSession(runeFile, effective, args, projectDir
     pluginDir ?? null,
     new Map([['@utils', utilsMod]])
   )
-  await runeMod.instantiate(context, resolver)
+  register(runeMod, runeFile)
+  await runeMod.instantiate(context, resolve)
   await runeMod.evaluate()
   await context.eval('delete globalThis.$__hostRequire')
 

@@ -307,8 +307,8 @@ describe('handler — progressive streaming and console logs', () => {
 
   it('outputs console logs progressively and formats as JSON Lines', async () => {
     runRune.mockImplementation(async (dir, config, key, args, opts) => {
-      opts.onEvent({ type: 'log', message: 'started' })
-      opts.onEvent({ type: 'error', message: 'warning' })
+      opts.onEvent({ type: 'log', level: 'log', message: 'started' })
+      opts.onEvent({ type: 'log', level: 'error', message: 'warning' })
       opts.onEvent({ type: 'section', section: { name: 'sec1', data: { type: 'markdown', content: 'c1' } } })
       return [{ name: 'sec2', data: { type: 'markdown', content: 'c2' } }]
     })
@@ -320,8 +320,8 @@ describe('handler — progressive streaming and console logs', () => {
     
     const lines = stdoutWritten.split('\n').filter(Boolean).map(JSON.parse)
     expect(lines).toHaveLength(4)
-    expect(lines[0]).toMatchObject({ type: 'log', message: 'started' })
-    expect(lines[1]).toMatchObject({ type: 'error', message: 'warning' })
+    expect(lines[0]).toMatchObject({ type: 'log', level: 'log', message: 'started' })
+    expect(lines[1]).toMatchObject({ type: 'log', level: 'error', message: 'warning' })
     expect(lines[2]).toEqual({ type: 'section', section: { name: 'sec1', data: { type: 'markdown', content: 'c1' } } })
     expect(lines[3]).toEqual({
       type: 'section',

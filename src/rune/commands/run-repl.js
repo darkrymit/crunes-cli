@@ -118,7 +118,7 @@ export async function handler({
         if (!sectionFilter || isMatch(section.name, sectionFilter)) {
           process.stdout.write(formatSection(section, rune) + '\n')
         }
-      } else if (type === 'log' || type === 'warn' || type === 'error') {
+      } else if (type === 'log') {
         process.stderr.write(message + '\n')
       }
     }

@@ -293,11 +293,11 @@ declare namespace globals {
 
   /** Partial console shim available in the rune sandbox. */
   interface Console {
-    /** Writes a log message. Emits a { type: 'log' } event. */
+    /** Writes a log message. Emits { type: 'log', level: 'log' }. */
     log(...args: any[]): void
-    /** Writes a warning message. Emits a { type: 'warn' } event. */
+    /** Writes a warning message. Emits { type: 'log', level: 'warn' }. */
     warn(...args: any[]): void
-    /** Writes an error message. Emits a { type: 'error' } event. */
+    /** Writes an error message. Emits { type: 'log', level: 'error' }. */
     error(...args: any[]): void
   }
 
