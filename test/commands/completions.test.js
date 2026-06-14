@@ -6,7 +6,7 @@ import { resolveCompletions } from '../../src/cli/commands/completions.js'
 import { buildProgram } from '../../src/cli/program.js'
 
 const program = buildProgram()
-const TOP = ['run','run-repl','docs','version','doctor','check','bench','list','job','cache','sqlite','init','create','plugin','template','marketplace','completions']
+const TOP = ['run','run-repl','docs','version','doctor','bench','list','job','cache','sqlite','init','create','plugin','template','marketplace','completions']
 
 describe('resolveCompletions — top level', () => {
   it('returns all subcommands when only crunes typed', () => {
@@ -40,11 +40,6 @@ describe('resolveCompletions — rune key commands', () => {
     const result = resolveCompletions(['crunes', 'run', ''], program, { cwd: dir })
     expect(result).toContain('release')
     expect(result).toContain('pkg-info')
-  })
-
-  it('completes rune keys for check', () => {
-    const result = resolveCompletions(['crunes', 'check', ''], program, { cwd: dir })
-    expect(result).toContain('release')
   })
 
   it('completes rune keys for bench', () => {

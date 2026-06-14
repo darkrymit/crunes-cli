@@ -211,29 +211,6 @@ export function buildProgram() {
     })
 
   program
-    .command('check [args...]')
-    .description('Run a rune and validate its output shape.')
-    .addHelpText('after', '\nImportant: Global flags (e.g. --cwd) MUST appear before the "check" command.\n\nSyntax:\n  [--section s1,s2] [--] <key> [rune-args...]')
-    .helpOption(false)
-    .allowUnknownOption()
-    .passThroughOptions()
-    .action(async (args, _opts, command) => {
-      for (const tok of args) {
-        if (tok === '--') break
-        if (tok === '--help' || tok === '-h') { command.help(); return }
-      }
-      const { parseSegment } = await import('../rune/commands/run.js')
-      const { handler } = await import('../rune/commands/check.js')
-      const { key, sections, runeArgs } = parseSegment(args)
-      if (!key) {
-        const { output } = await import('../shared/output.js')
-        output.error('Missing required argument: <rune>')
-        process.exit(1)
-      }
-      await handler({ key, sections, runeArgs, projectRoot: projectRoot(), configRoot: configRoot() })
-    })
-
-  program
     .command('bench [args...]')
     .description('Time rune execution and report fast, ok, or slow.')
     .addHelpText('after',
