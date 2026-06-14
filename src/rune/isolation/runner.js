@@ -9,7 +9,7 @@ import { createModuleResolver } from './resolver.js'
 import { DENY_BUILTINS } from './builtins.js'
 import { createJob, getJob } from '../../job/index.js'
 import { updateJobPid, jobStdoutPath, jobStderrPath, jobStdinPath } from '../../job/registry.js'
-import { tailStdin, EOF_SENTINEL } from '../../job/stdin-tail.js'
+import { EOF_SENTINEL } from '../../job/stdin-tail.js'
 import fsSync from 'node:fs'
 import { ensureProjectIdentity } from '../../project/index.js'
 import { hash, hashAsHex, hashAsBase64, hmac, hmacAsHex, hmacAsBase64, encrypt, decrypt, uuid as cryptoUuid, randomHex as cryptoHex, randomBase64 as cryptoBase64, randomBytesFn } from '../api/crypto.js'
@@ -440,21 +440,17 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
     const cliArgs = repl
       ? [cliPath, '--cwd', projectDir, 'run-repl', '--format', 'jsonl', runeKey, ...(args ?? [])]
       : [cliPath, '--cwd', projectDir, 'run', '--format', 'jsonl', runeKey, '--', ...(args ?? [])]
-    const stdinMode = repl ? 'pipe' : 'ignore'
-    const child = spawnProcess(
-      process.execPath,
-      cliArgs,
-      { detached: true, stdio: [stdinMode, outFd, errFd], env: { ...process.env, CRUNES_NO_TIMEOUT: '1' }, windowsHideConsole: true }
-    )
+    let childEnv = { ...process.env, CRUNES_NO_TIMEOUT: '1' }
     if (repl) {
       const stdinLog = jobStdinPath(pKey, id)
       fsSync.writeFileSync(stdinLog, '')
-      const tail = tailStdin(stdinLog, {
-        onLine: (line) => { child.stdin.write(line + '\n') },
-        onEof: () => { child.stdin.end() },
-      })
-      child.on('exit', () => tail.stop())
+      childEnv = { ...childEnv, CRUNES_STDIN_LOG: stdinLog }
     }
+    const child = spawnProcess(
+      process.execPath,
+      cliArgs,
+      { detached: true, stdio: ['ignore', outFd, errFd], env: childEnv, windowsHideConsole: true }
+    )
     await updateJobPid(pKey, id, child.pid)
     child.unref()
     fsSync.closeSync(outFd)

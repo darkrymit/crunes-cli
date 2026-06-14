@@ -230,12 +230,12 @@ export function createShellUtils(dir, checkPermission) {
     const errFd = fs.openSync(jobStderrPath(projectKey, id), 'a')
     let stdinArg = 'ignore'
     let tailHandle = null
+    const [prog, ...cmdArgs] = cmd.split(' ')
     if (repl) {
       const stdinLog = jobStdinPath(projectKey, id)
       fs.writeFileSync(stdinLog, '')
       stdinArg = 'pipe'
-      const child = spawn(cmd, [], {
-        shell:   true,
+      const child = spawn(prog, cmdArgs, {
         detached: true,
         stdio:   [stdinArg, outFd, errFd],
         cwd:     jobProjectDir,
@@ -253,8 +253,7 @@ export function createShellUtils(dir, checkPermission) {
       fs.closeSync(errFd)
       return { id }
     }
-    const child = spawn(cmd, [], {
-      shell:   true,
+    const child = spawn(prog, cmdArgs, {
       detached: true,
       stdio:   [stdinArg, outFd, errFd],
       cwd:     jobProjectDir,

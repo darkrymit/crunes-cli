@@ -44,7 +44,7 @@ export function tailStdin(logPath, { onLine, onEof = () => {}, pollMs = 50 } = {
   }
 
   function schedule() {
-    if (!stopped) timer = setTimeout(read, pollMs)
+    if (!stopped) { timer = setTimeout(read, pollMs); timer.unref() }
   }
 
   function stop() {
