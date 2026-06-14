@@ -53,7 +53,6 @@ export function buildProgram() {
       '  name                 auto-resolve: project config first, then plugins\n\n' +
       'For rune argument documentation: crunes docs rune <key>'
     )
-    .helpOption(false)
     .allowUnknownOption()
     .passThroughOptions()
     .action(async (args, _opts, _command) => {
@@ -74,7 +73,6 @@ export function buildProgram() {
       'The rune must export a runRepl(args, input) function.\n' +
       'For rune argument documentation: crunes docs rune <key>'
     )
-    .helpOption(false)
     .allowUnknownOption()
     .passThroughOptions()
     .action(async (args, _opts, _command) => {
@@ -228,7 +226,6 @@ export function buildProgram() {
       '  --warmup             override warmup for this rune\n' +
       '  -s, --section s1,s2  filter output sections for this rune'
     )
-    .helpOption(false)
     .allowUnknownOption()
     .passThroughOptions()
     .action(async (args, _opts, _command) => {
