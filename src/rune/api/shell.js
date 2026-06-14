@@ -226,44 +226,45 @@ export function createShellUtils(dir, checkPermission) {
     const { id } = await createJob(null, {
       type: 'shell', spawnedBy, runeKey: null, projectDir: jobProjectDir, args: [cmd],
     })
-    const outFd = fs.openSync(jobStdoutPath(projectKey, id), 'a')
-    const errFd = fs.openSync(jobStderrPath(projectKey, id), 'a')
     let stdinArg = 'ignore'
     let tailHandle = null
-    const [prog, ...cmdArgs] = cmd.split(' ')
     if (repl) {
       const stdinLog = jobStdinPath(projectKey, id)
       fs.writeFileSync(stdinLog, '')
       stdinArg = 'pipe'
-      const child = spawn(prog, cmdArgs, {
-        detached: true,
-        stdio:   [stdinArg, outFd, errFd],
-        cwd:     jobProjectDir,
-        env:     opts?.env ? { ...process.env, ...opts.env } : process.env,
+      const child = spawn(cmd, [], {
+        shell: true,
+        stdio: [stdinArg, 'pipe', 'pipe'],
+        cwd:   jobProjectDir,
+        env:   opts?.env ? { ...process.env, ...opts.env } : process.env,
         windowsHideConsole: true,
       })
+      const outStream = fs.createWriteStream(jobStdoutPath(projectKey, id), { flags: 'a' })
+      const errStream = fs.createWriteStream(jobStderrPath(projectKey, id), { flags: 'a' })
+      child.stdout.pipe(outStream)
+      child.stderr.pipe(errStream)
       tailHandle = tailStdin(stdinLog, {
         onLine: (line) => { child.stdin.write(line + '\n') },
-        onEof: () => { child.stdin.end() },
+        onEof:  () => { child.stdin.end() },
       })
       child.on('exit', () => { if (tailHandle) tailHandle.stop() })
       await updateJobPid(projectKey, id, child.pid)
       child.unref()
-      fs.closeSync(outFd)
-      fs.closeSync(errFd)
       return { id }
     }
-    const child = spawn(prog, cmdArgs, {
-      detached: true,
-      stdio:   [stdinArg, outFd, errFd],
-      cwd:     jobProjectDir,
-      env:     opts?.env ? { ...process.env, ...opts.env } : process.env,
+    const child = spawn(cmd, [], {
+      shell: true,
+      stdio: [stdinArg, 'pipe', 'pipe'],
+      cwd:   jobProjectDir,
+      env:   opts?.env ? { ...process.env, ...opts.env } : process.env,
       windowsHideConsole: true,
     })
+    const outStream = fs.createWriteStream(jobStdoutPath(projectKey, id), { flags: 'a' })
+    const errStream = fs.createWriteStream(jobStderrPath(projectKey, id), { flags: 'a' })
+    child.stdout.pipe(outStream)
+    child.stderr.pipe(errStream)
     await updateJobPid(projectKey, id, child.pid)
     child.unref()
-    fs.closeSync(outFd)
-    fs.closeSync(errFd)
     return { id }
   }
 
