@@ -306,7 +306,7 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
     if (process.platform === 'win32') {
       try { spawnProcess('taskkill', ['/F', '/T', '/PID', String(record.pid)], { stdio: 'ignore' }) } catch {}
     } else {
-      try { process.kill(record.pid, sig) } catch {}
+      try { process.kill(-record.pid, sig) } catch {}
     }
   }))
   await jail.set('$__utils_shell_job_exists', asyncRef(async (id) => {
@@ -453,7 +453,7 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
     const child = spawnProcess(
       process.execPath,
       cliArgs,
-      { detached: true, stdio: ['ignore', outFd, errFd], env: childEnv, windowsHideConsole: true }
+      { detached: process.platform !== 'win32', stdio: ['ignore', outFd, errFd], env: childEnv, windowsHide: true }
     )
     await updateJobPid(pKey, id, child.pid)
     child.unref()
