@@ -122,3 +122,17 @@ describe('makePermissionChecker — env.read capability', () => {
     expect(err.value).toBe('process::TOKEN')
   })
 })
+
+describe('matchEnvPermission — flat wildcard key matching', () => {
+  it('GITHUB_* matches GITHUB_TOKEN', () => {
+    expect(matchEnvPermission('process::GITHUB_TOKEN', ['process::GITHUB_*'])).toBe(true)
+  })
+
+  it('GITHUB_* does not match DB_HOST', () => {
+    expect(matchEnvPermission('process::DB_HOST', ['process::GITHUB_*'])).toBe(false)
+  })
+
+  it('API_* matches API_SECRET_KEY (flat wildcard, not path glob)', () => {
+    expect(matchEnvPermission('process::API_SECRET_KEY', ['process::API_*'])).toBe(true)
+  })
+})

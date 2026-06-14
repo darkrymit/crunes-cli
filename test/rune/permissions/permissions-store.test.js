@@ -61,3 +61,17 @@ describe('matchStorePermission', () => {
     )).toBe(false)
   })
 })
+
+describe('matchStorePermission — flat wildcard name matching', () => {
+  it('my-* name pattern matches my-cache', () => {
+    expect(matchStorePermission('./stores::my-cache', ['./stores::my-*'])).toBe(true)
+  })
+
+  it('my-* name pattern does not match other-cache', () => {
+    expect(matchStorePermission('./stores::other-cache', ['./stores::my-*'])).toBe(false)
+  })
+
+  it('session-* matches session-abc123 (flat wildcard, no path segments in name)', () => {
+    expect(matchStorePermission('./stores::session-abc123', ['./stores::session-*'])).toBe(true)
+  })
+})
