@@ -54,6 +54,7 @@ crunes run fetch-status
 crunes init                          # Create .crunes/config.json in current project
 crunes create [key]                  # Scaffold a new rune and register it in config
 crunes run <key> [args...]           # Run a rune (use -b for batch execution)
+crunes run-repl <key> [args...]      # Run a rune in interactive REPL mode
 crunes check <key>                   # Execute a rune and validate its return schema
 crunes bench <key>                   # Profile execution time (fast/ok/slow)
 crunes list                          # List all registered local and plugin runes
@@ -81,9 +82,10 @@ crunes marketplace add <url>         # Register a marketplace source
 
 Crunes features a fully dynamic documentation engine built directly into the CLI. Rather than keeping static, outdated markdown guides, you can compile up-to-date workspace handbooks containing precise types, active schemas, and active permissions:
 
-### 1. Compile the Ecosystem & Workspace Handbook
-Generates a comprehensive `INTRO.md` containing sandboxed ESM recipes, permission tokens, active workspace settings, and current plugins:
+### 1. Compile the Ecosystem Handbook
+Generates a comprehensive document covering anatomy, CLI conventions, configuration, API reference, and sandbox utilities:
 ```bash
+crunes docs intro
 crunes docs intro --out INTRO.md
 ```
 

@@ -206,15 +206,16 @@ export async function compileIntro({ config, format, projectRoot, configRoot, ha
   // Section 1: Anatomy of a Rune
   lines.push('## 1. Anatomy of a Rune')
   lines.push('')
-  lines.push('Crunes execute inside an isolated sandbox (`isolated-vm`). Runes are ESM modules exporting a `run` method and an optional `args` method to declare schemas:')
+  lines.push('Crunes execute inside an isolated sandbox (`isolated-vm`). Runes are ESM modules with two primary execution modes: **run** (one-shot) and **run-repl** (interactive session).')
+  lines.push('')
+  lines.push('**Run mode** \u2014 export `args` to declare a schema and `run` to execute:')
   lines.push('')
   lines.push('```javascript')
-  lines.push('// Example Rune: git.js')
   lines.push('export function args(builder) {')
   lines.push('  return builder')
   lines.push('    .option(\'--verbose\', \'Verbose output\', false)')
   lines.push('    .command(\'remote\', \'Manage git remotes\', remote => {')
-  lines.push('      remote.command(\'add\', \'Add remote\', add => {')
+  lines.push('      remote.command(\'add\', \'Add a remote\', add => {')
   lines.push('        add.positional(\'<name>\', \'Remote name\')')
   lines.push('           .positional(\'<url>\', \'Remote URL\')')
   lines.push('      })')
@@ -223,48 +224,45 @@ export async function compileIntro({ config, format, projectRoot, configRoot, ha
   lines.push('')
   lines.push('export async function run(args) {')
   lines.push('  if (args.$command === \'remote add\') {')
-  lines.push('    return `Adding remote ${args.name} at ${args.url}`;')
+  lines.push('    return `Adding remote ${args.name} at ${args.url}`')
   lines.push('  }')
+  lines.push('}')
+  lines.push('```')
+  lines.push('')
+  lines.push('**run-repl mode** \u2014 export `runRepl` + `inputRepl` for an interactive session. The isolate stays alive across inputs; use module-level variables as session state:')
+  lines.push('')
+  lines.push('```javascript')
+  lines.push('import { section, md } from \'@utils\'')
+  lines.push('')
+  lines.push('let count = 0')
+  lines.push('')
+  lines.push('export async function runRepl() { return \'counter> \' }')
+  lines.push('')
+  lines.push('export async function inputRepl(input) {')
+  lines.push('  if (input.type === \'eof\') return { type: \'done\' }')
+  lines.push('  if (input.type === \'line\' && input.text === \'inc\')')
+  lines.push('    section.emit(section.create(\'result\', { type: \'markdown\', content: md.p(`count: ${++count}`) }))')
   lines.push('}')
   lines.push('```')
   lines.push('')
   lines.push('### Import System')
   lines.push('')
-  lines.push('Rune files are ESM modules executed inside an isolated sandbox. The following import specifiers are supported:')
-  lines.push('')
-  lines.push('- **`from \'@utils\'`** \u2014 The standard utility namespace. Always available. Use this for all built-in capabilities (fs, shell, crypto, archive, etc.).')
-  lines.push('- **`from \'./relative\'`** \u2014 Relative imports. Always available. Resolves relative to the current rune file. Ideal for shared helper modules within the same directory tree.')
-  lines.push('- **`from \'@project/path\'`** \u2014 Import from the project root. Requires `fs.read:<path>` in the rune\'s allow list.')
-  lines.push('- **`from \'@plugin/path\'`** \u2014 Plugin runes only. Resolves from the plugin\'s own root directory. Not available in project runes.')
-  lines.push('- **`from \'node:fs\'` / `node:path` / etc.** \u2014 Always blocked. Node.js built-in modules are denied in the sandbox. Use the `@utils` equivalents: `utils.fs` for file I/O, `utils.shell` for process execution, `utils.crypto` for hashing/encryption.')
+  lines.push('- **`from \'@utils\'`** \u2014 The standard utility namespace. Always available.')
+  lines.push('- **`from \'./relative\'`** \u2014 Relative imports. Always available. Resolves relative to the current rune file.')
+  lines.push('- **`from \'@project/path\'`** \u2014 Import from the project root. Requires `fs.read:<path>` permission.')
+  lines.push('- **`from \'@plugin/path\'`** \u2014 Plugin runes only. Resolves from the plugin\'s own root directory.')
+  lines.push('- **`from \'node:fs\'` / `node:path` / etc.** \u2014 Always blocked. Use the `@utils` equivalents instead.')
   lines.push('')
 
-  // Section 2: Rune Exports API Reference
-  lines.push('## 2. Rune Exports API Reference')
-  lines.push('')
-  lines.push('The sandboxed execution environment parses entrypoint exports to build schemas and run modules safely. Their dynamic type specification is detailed below:')
-  lines.push('')
-  const [lifecycleNs] = walk(lifecycleApiData)
-  lines.push(formatMembers(lifecycleNs?.members ?? [], { indent: '' }))
-  lines.push('> **REPL Lifecycle:** Six exports form the interactive lifecycle — `argsRepl`, `runRepl`, `bannerRepl`, `commandsRepl`, `inputRepl`, `completeInputRepl`. The isolate stays alive across inputs — use JS module-level variables as session state. `runRepl` requires its own `"runRepl"` permission block in `config.json`; it does not inherit from `"run"`. See `crunes docs run-repl`, `crunes docs input-repl`, and related commands for the full reference.')
-  lines.push('')
-
-  // Section 3: Global Sandbox APIs
-  lines.push('## 3. Global Sandbox APIs')
-  lines.push('')
-  const [globalsNs] = walk(globalsApiData)
-  lines.push(formatMembers(globalsNs?.members ?? [], { indent: '' }))
-  lines.push('')
-
-  // Section 4: CLI Calling & Argument Conventions
-  lines.push('## 4. CLI Calling & Argument Conventions')
+  // Section 2: CLI Calling & Argument Conventions
+  lines.push('## 2. CLI Calling & Argument Conventions')
   lines.push('')
   lines.push('Crunes enforces a strict 3-tier boundary when executing runes via the CLI. Misplacing flags will cause the parser to fail or misinterpret the arguments.')
   lines.push('')
   lines.push('### The Strict 3-Tier Parsing Boundary')
   lines.push('All command invocations must follow this structural order exactly:')
   lines.push('1. **Global Flags**: Options parsed by the core process (e.g. `--cwd <path>`, `-p` for plain output, `--verbose`).')
-  lines.push('2. **Command Flags**: Options parsed by the `use` command (e.g. `-b` / `--batch`, `--fail-fast`, `--format json`).')
+  lines.push('2. **Command Flags**: Options parsed by the `run` command (e.g. `-b` / `--batch`, `--fail-fast`, `--format json`).')
   lines.push('3. **Rune Arguments**: Config and positional values passed directly to the execution sandbox.')
   lines.push('')
   lines.push('```bash')
@@ -305,16 +303,9 @@ export async function compileIntro({ config, format, projectRoot, configRoot, ha
   lines.push('crunes run -b api[-s endpoints] + greeting[-s summary] "World"')
   lines.push('```')
   lines.push('')
-  lines.push('### Hook Token Prompt Syntax')
-  lines.push('When using the Claude Code plugin (`crunes-aci`), prompt tokens are parsed automatically before submission:')
-  lines.push('- **`$key`**: Runs `key` with all sections.')
-  lines.push('- **`$key(arg1,arg2)`**: Passes positional arguments to `key`.')
-  lines.push('- **`$key::sec1,sec2`**: Section filters applied to `key`.')
-  lines.push('- **`$key(arg1)::sec1`**: Combination of positional argument and section filter.')
-  lines.push('')
 
-  // Section 5: Configuration Reference
-  lines.push('## 5. Configuration Reference')
+  // Section 3: Configuration Reference
+  lines.push('## 3. Configuration Reference')
   lines.push('')
   lines.push('Configuration properties in `.crunes/config.json` control permissions, default variables, mappings, and plugin registration.')
   lines.push('')
@@ -359,6 +350,23 @@ export async function compileIntro({ config, format, projectRoot, configRoot, ha
   lines.push('- **`plugins`**: Mappings of enabled third-party marketplaces or plugins.')
   lines.push('')
 
+  // Section 4: Rune Exports API Reference
+  lines.push('## 4. Rune Exports API Reference')
+  lines.push('')
+  lines.push('The sandboxed execution environment parses entrypoint exports to build schemas and run modules safely. Their dynamic type specification is detailed below:')
+  lines.push('')
+  const [lifecycleNs] = walk(lifecycleApiData)
+  lines.push(formatMembers(lifecycleNs?.members ?? [], { indent: '' }))
+  lines.push('> **REPL Lifecycle:** Six exports form the interactive lifecycle — `argsRepl`, `runRepl`, `bannerRepl`, `commandsRepl`, `inputRepl`, `completeInputRepl`. The isolate stays alive across inputs — use JS module-level variables as session state. `runRepl` requires its own `"runRepl"` permission block in `config.json`; it does not inherit from `"run"`. See `crunes docs run-repl`, `crunes docs input-repl`, and related commands for the full reference.')
+  lines.push('')
+
+  // Section 5: Global Sandbox APIs
+  lines.push('## 5. Global Sandbox APIs')
+  lines.push('')
+  const [globalsNs] = walk(globalsApiData)
+  lines.push(formatMembers(globalsNs?.members ?? [], { indent: '' }))
+  lines.push('')
+
   // Section 6: Dynamic @utils Reference
   lines.push('## 6. Dynamic `@utils` Reference')
   lines.push('')
@@ -382,66 +390,6 @@ export async function compileIntro({ config, format, projectRoot, configRoot, ha
     lines.push(formatNode(ns))
     lines.push('')
     lines.push('---')
-    lines.push('')
-  }
-
-  // Section 7: Workspace Context
-  if (config) {
-    lines.push('## 7. Workspace Context')
-    lines.push('')
-    lines.push(`- **Project Root**: \`${projectRoot}\``)
-    lines.push(`- **Config Path**: \`${configRoot}\``)
-    lines.push('')
-
-    if (activeRunes.length > 0) {
-      lines.push('### Registered Project Runes')
-      lines.push('')
-      lines.push('| Key | Name | Path | Permissions (Allow) |')
-      lines.push('| --- | --- | --- | --- |')
-      for (const r of activeRunes) {
-        const allow = (r.permissions?.run?.allow ?? r.permissions?.allow ?? []).join(', ') || '*none*'
-        lines.push(`| \`${r.key}\` | ${r.name} | \`${r.path}\` | \`${allow}\` |`)
-      }
-      lines.push('')
-
-      lines.push('### Project Runes API & Usage')
-      lines.push('')
-      for (const r of activeRunes) {
-        lines.push(`#### Rune: \`${r.key}\``)
-        lines.push('')
-        if (r.schemaError) {
-          lines.push(`> [!WARNING]`)
-          lines.push(`> Could not load argument schema: ${r.schemaError}`)
-        } else if (r.schema) {
-          lines.push(formatHelp(r.schema, { key: r.key, name: r.name, description: r.description }))
-        } else {
-          lines.push('*No custom arguments registered.*')
-        }
-        lines.push('')
-        lines.push('---')
-        lines.push('')
-      }
-    }
-
-    const plugins = config.plugins ?? []
-    if (plugins.length > 0) {
-      lines.push('### Enabled Plugins')
-      lines.push('')
-      for (const pluginName of plugins) {
-        lines.push(`- **${pluginName}**`)
-      }
-      lines.push('')
-    }
-  } else if (hasProjectError) {
-    lines.push('## 7. Workspace Context')
-    lines.push('')
-    lines.push(`> [!WARNING]`)
-    lines.push(`> Failed to resolve local project context: ${hasProjectError}`)
-    lines.push('')
-  } else {
-    lines.push('## 7. Workspace Context')
-    lines.push('')
-    lines.push('_No local project context loaded (global mode enabled)._')
     lines.push('')
   }
 

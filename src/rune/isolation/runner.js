@@ -1585,7 +1585,13 @@ export async function runRuneInReplSession(runeFile, effective, args, projectDir
     throw new Error(`PermissionError: ${msg}`)
   }))
 
-  const utilsMod = await injectUtils(isolate, context, utils, null, vars, projectDir, checkPermission, runeKey, null, wrappedOnEvent)
+  let helpText = null
+  try {
+    const { argsSchema } = await getReplSchema(runeFile, effective, [], projectDir, { vars, nodeModulesDir, pluginDeps, pluginDir })
+    if (argsSchema) helpText = formatHelp(argsSchema, { key: runeKey, name: runeKey, description: undefined, lifecycle: 'runRepl' })
+  } catch { /* help unavailable, silently skip */ }
+
+  const utilsMod = await injectUtils(isolate, context, utils, null, vars, projectDir, checkPermission, runeKey, null, wrappedOnEvent, helpText)
   await injectConsole(isolate, context, wrappedOnEvent)
 
   if (pluginDir != null) await context.global.set('CRUNES_PLUGIN_ROOT', pluginDir)

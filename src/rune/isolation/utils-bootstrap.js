@@ -1542,7 +1542,7 @@ globalThis.utils = {
 }
 
 export const { fs, shell, section, rune, json, yaml, xml, http, env, vars, archive, cache, sqlite, db, crypto, codec, ws, time } = globalThis.utils
-export { md, tree }
+export { md, tree, help }
 
 // ─── Global Sandbox Timers ───────────────────────────────────────────────────
 const timers = new Map()
@@ -1609,7 +1609,7 @@ globalThis.fetch = (input, init) => globalThis.utils.http.fetch(input, init)
 
 const __helpText = typeof $__help_text !== 'undefined' ? $__help_text : null
 
-globalThis.help = {
+const help = {
   text() {
     return __helpText ?? ''
   },

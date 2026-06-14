@@ -59,6 +59,8 @@ Cache and sqlite operations use special tokens that resolve to different paths d
 
 ## Rune Authoring
 
+### run mode
+
 Every rune must export a `run` function called with the parsed argument object.
 
 ```js
@@ -69,7 +71,6 @@ export async function run(args) {
   // args.$command  — space-separated matched command path (e.g. 'remote add')
   // args.$commands — array of matched command levels (e.g. ['remote', 'add'])
   // args.verbose   — named flag value (if args() export is defined)
-  // fs.cwd()       — absolute path to the project root
 }
 ```
 
@@ -81,13 +82,39 @@ export async function args(b) {
     .option('-v, --verbose', 'Verbose output', false)
     .option('-c, --count <number>', 'Max results', 10)
     .positional('<target>', 'Target path')
-    .command('sub', 'Sub-command', b => b.option('--flag', 'A flag'))
+    .command('sub', 'Sub-command', sub => sub.option('--flag', 'A flag'))
     .example('crunes run myrune foo', 'Basic use')
     .build()
 }
 ```
 
 The runner calls `args(builder)` before `run(parsedArgs)`. Without an `args` export, all positionals are collected as strings.
+
+**Help text** — `import { help } from '@utils'` inside `run` to access the formatted CLI help string for the current rune: `help.text()` returns a plain string, `help.section()` wraps it in a markdown section ready to return.
+
+### run-repl mode
+
+Export `runRepl` (session initializer) and/or `inputRepl` (per-input handler) to enter interactive mode via `crunes run-repl <key>`. The isolate stays alive across inputs — JS module-level variables are session state.
+
+```js
+import { section, md } from '@utils'
+
+export async function argsRepl(b) { return b.option('--db <path>', 'Database', './state').build() }
+export async function runRepl(args) { /* open connections, return initial prompt string */ }
+export function bannerRepl(args) { /* return welcome string shown before first prompt */ }
+export function commandsRepl(b) { return b.command('exit', 'Quit') }
+export async function inputRepl(input) {
+  if (input.type === 'eof') return { type: 'done' }
+  if (input.type === 'command' && input.args.$command === 'exit') return { type: 'done' }
+  // input.type === 'line' — input.text is the raw line
+  // return { type: 'prompt', value: 'new> ' } to change prompt
+  // return void / undefined to keep current prompt
+}
+export async function completeInputRepl(tokens) { /* return completion candidates */ }
+export async function disposeRepl() { /* cleanup on session end */ }
+```
+
+`runRepl` requires a separate `"runRepl"` permission block — it does not inherit from `"run"`.
 
 ## Flows
 
@@ -96,6 +123,10 @@ The runner calls `args(builder)` before `run(parsedArgs)`. Without an `args` exp
 ## Gotchas & Debugging
 
 - **Command-level flags must precede the key:** Running `crunes run --format json mykey` passes `--format json` as rune arguments, not a command flag. Place these flags before the key.
+
+- **Section filters use bracket syntax — `-s` before the key is rejected:** The only supported way to filter sections is `key[-s section]`. Running `crunes run -s endpoints api` causes a "misplaced flag" error because the first positional is parsed as the rune key and anything starting with `-` is rejected. Correct: `crunes run api[-s endpoints]`.
+
+- **`help` must be imported — it is not a global:** `import { help } from '@utils'` is required. `help.text()` returns the formatted CLI help string for the current rune; `help.section()` wraps it as a markdown section. Returns an empty string if the rune has no `args`/`argsRepl` schema.
 
 - **`section()` vs `section.create()`:** `section` is an object, not a function. Calling `section(name, data)` throws `TypeError: section is not a function`. Use `section.create(name, data)`.
 

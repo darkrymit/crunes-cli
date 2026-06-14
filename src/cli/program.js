@@ -70,7 +70,7 @@ export function buildProgram() {
       '  [--format text|jsonl] <key>[-s s1,s2] [rune-args...]\n\n' +
       'Per-rune bracket flags (inside key[...]):\n' +
       '  -s, --section s1,s2  filter output sections for this rune\n\n' +
-      'The rune must export a runRepl(args, input) function.\n' +
+      'The rune must export runRepl(args) and/or inputRepl(input).\n' +
       'For rune argument documentation: crunes docs rune <key>'
     )
     .allowUnknownOption()
