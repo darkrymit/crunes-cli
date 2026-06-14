@@ -8,8 +8,9 @@ The `utils` object injected into every rune at runtime. `index.js` assembles the
 - **utils.js** — `createUtils(dir, checkPermission, pluginDir, permissions, vars, requestedSections, pluginId, projectName)` — assembles and returns `{ utils, dispose }` containing all utility namespaces. `createSectionUtils(patterns)` — returns `{ create, match, selected }` for section filtering.
 - **md.js** — Markdown string builders: `h1`–`h3`, `p`, `bold`, `italic`, `code`, `codeBlock`, `ul`, `ol`, `link`, `table`, `blockquote`. Embedded at build time as a source string; runs entirely inside the isolate.
 - **tree.js** — Tree node builders and formatters: `node(name, description, children)`, `format(root, options)`. Embedded at build time as a source string; runs entirely inside the isolate.
+- **help.js** — `text()` returns the formatted CLI help string for the current rune; `section()` wraps it in a markdown section. Pre-rendered from the rune's `args`/`argsRepl` schema before the isolate starts; returns empty string when no schema is defined.
 - **fs.js** — Permission-gated filesystem access: `read`, `resolve`, `exists`, `glob`, `write`, `copy`, `remove`, `move`, `stat`, `mkdir`, `readAsBytes`, `writeAsBytes`, `append`, `appendAsBytes`, `chmod`, `readStreamIter`, `writeStreamRef`.
-- **shell.js** — Permission-gated shell execution. `exec(cmd, opts?)` runs a command and returns `{ stdout, stderr, exitCode, ok }`. `spawn(cmd, opts?)` returns a `ShellSession` with Node-like streams: `write`, `kill`, `terminate` and event handlers for stdout/stderr/exit/error. `createShellJob(cmd, opts, jobContext)` spawns a detached background job.
+- **shell.js** — Permission-gated shell execution. `exec(cmd, opts?)` runs a command and returns `{ stdout, stderr, exitCode, ok }`. `spawn(cmd, opts?)` returns a `ShellSession` with Node-like streams: `write`, `kill`, `terminate` and event handlers for stdout/stderr/exit/error. `createShellJob(cmd, opts, jobContext)` spawns a background shell job; on Unix it uses `detached: true` so the shell is a process group leader (enabling group kill), on Windows it uses `detached: false` with `windowsHide: true` (tree kill is handled by `taskkill /F /T`).
 - **json.js** — JSON file access with JSONPath: `read`, `readPath`, `readPathAll`, `write`, `modify`.
 - **yaml.js** — YAML file access with comment-preserving round-trips: `read`, `write`, `modify`.
 - **xml.js** — XML file access (`@_` attribute prefix, `#comment` comments): `read`, `write`, `modify`.
@@ -25,7 +26,7 @@ The `utils` object injected into every rune at runtime. `index.js` assembles the
 - **crypto.js** — Cryptographic utilities: `hash`, `hashAsHex`, `hashAsBase64`, `hmac`, `hmacAsHex`, `hmacAsBase64`, `encrypt`, `decrypt`, `uuid`, `randomHex`, `randomBase64`, `randomBytesFn`.
 - **args-parser.js** — `parseArgs(rawArgs, schema)`, `buildYargsConfig(schema)`, `mapPositionals(parsed, positionals, offset)`, `parseFlags(flagStr)` — converts a rune's `args()` schema into a yargs-parser config and runs the parser. Called by `isolation/runner.js` before invoking `run(parsedArgs)`.
 
-**Sandbox globals:** `setTimeout`, `clearTimeout`, `setInterval`, `clearInterval`, `TextEncoder`, `TextDecoder`, `TextEncoderStream`, `TextDecoderStream`, `AbortController`, `AbortSignal`, `Blob`, `Headers`, `FormData`, `URLSearchParams`, `Request`, `ReadableStream`, `WritableStream`, `TransformStream`, and `fetch` are available on `globalThis` inside every rune without any import.
+**Sandbox globals:** `setTimeout`, `clearTimeout`, `setInterval`, `clearInterval`, `TextEncoder`, `TextDecoder`, `TextEncoderStream`, `TextDecoderStream`, `AbortController`, `AbortSignal`, `Blob`, `Headers`, `FormData`, `URLSearchParams`, `Request`, `ReadableStream`, `WritableStream`, `TransformStream`, and `fetch` are available on `globalThis` inside every rune without any import. All other utilities — including `help` — must be imported from `@utils`.
 
 ## Related Modules
 

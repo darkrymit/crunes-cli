@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 
-describe('rune.exec — subprocess result parsing', () => {
+describe('rune.exec — JSONL result parsing', () => {
   it('parses JSONL stdout and returns RuneResult shape', async () => {
     const jsonlLines = [
       JSON.stringify({ type: 'section', section: { name: 'result', data: { type: 'text', content: 'hello' } } }),
@@ -45,5 +45,35 @@ describe('rune.exec — subprocess result parsing', () => {
     }
     expect(sections).toHaveLength(1)
     expect(sections[0].name).toBe('ok')
+  })
+})
+
+describe('rune.exec — repl CLI args construction', () => {
+  it('non-repl builds run command args', () => {
+    const cliPath = '/fake/cli.js'
+    const projectDir = '/fake'
+    const runeKey = 'worker'
+    const args = ['--verbose']
+    const repl = false
+    const cliArgs = repl
+      ? [cliPath, '--cwd', projectDir, 'run-repl', '--format', 'jsonl', runeKey, ...args]
+      : [cliPath, '--cwd', projectDir, 'run', '--format', 'jsonl', runeKey, '--', ...args]
+    expect(cliArgs).toContain('run')
+    expect(cliArgs).not.toContain('run-repl')
+    expect(cliArgs).toContain('--')
+  })
+
+  it('repl builds run-repl command args without --', () => {
+    const cliPath = '/fake/cli.js'
+    const projectDir = '/fake'
+    const runeKey = 'worker'
+    const args = ['--verbose']
+    const repl = true
+    const cliArgs = repl
+      ? [cliPath, '--cwd', projectDir, 'run-repl', '--format', 'jsonl', runeKey, ...args]
+      : [cliPath, '--cwd', projectDir, 'run', '--format', 'jsonl', runeKey, '--', ...args]
+    expect(cliArgs).toContain('run-repl')
+    expect(cliArgs).not.toContain('run')
+    expect(cliArgs).not.toContain('--')
   })
 })

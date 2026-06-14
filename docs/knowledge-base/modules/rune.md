@@ -11,14 +11,14 @@ tags: [module]
 
 ## Overview
 
-Rune execution begins with a single entry point that resolves a key through a tiered lookup (local-only, plugin-specific, or bare), computes effective permissions, and delegates to the appropriate isolation runner. Every rune runs in its own fresh V8 isolate with no access to Node.js built-ins — all I/O flows through a `utils` bridge, a collection of granular async functions injected as host callbacks. The command-line parser accepts segments with the form `[--section s1,s2] [prefix:]key [rune-args...]`, but the section filter is applied post-execution by pattern matching against returned section names, not inside the isolate itself.
+Rune execution begins with a single entry point that resolves a key through a tiered lookup (local-only, plugin-specific, or bare), computes effective permissions, and delegates to the appropriate isolation runner. Every rune runs in its own fresh V8 isolate with no access to Node.js built-ins — all I/O flows through a `utils` bridge, a collection of granular async functions injected as host callbacks. The command-line parser accepts segments with the form `[prefix:]key[-s s1,s2] [rune-args...]`, but the section filter is applied post-execution by pattern matching against returned section names, not inside the isolate itself.
 
 ## Submodules
 
 - **`isolation/`** — Manages the sandboxed VM lifecycle: creates the isolate, compiles built-in utility modules into it, injects the utils bridge as host callbacks, compiles the rune code, evaluates it, and collects results.
 - **`api/`** — Implements the complete utils object that rune authors depend on, partitioned into namespace modules for filesystem I/O, process spawning, structured data handling, networking, configuration reading, output formatting, local storage, and cryptographic utilities.
 - **`permissions/`** — Computes effective permission sets by merging plugin declarations, project overrides, and auto-grants, then provides per-operation checkers that gate all I/O calls.
-- **`commands/`** — Implements CLI handlers: `run` executes runes and renders output, `list` enumerates available runes, `create` scaffolds new ones, `check` validates syntax and permissions, `benchmark` times execution over configurable repetitions.
+- **`commands/`** — Implements CLI handlers: `run` executes runes and renders output, `run-repl` runs a rune in persistent REPL mode, `list` enumerates available runes, `create` scaffolds new ones, `benchmark` times execution over configurable repetitions.
 
 ## Concepts
 
@@ -51,13 +51,15 @@ Rune execution begins with a single entry point that resolves a key through a ti
 
 - **`@plugin/**` auto-grant:** Plugin runes always get `fs.read:@plugin/**` injected, resolving to the plugin cache directory. Plugin runes needing to read project files must explicitly declare `fs.read:./**`.
 
-- **`rune.exec` spawns a child process:** Calling a rune via `rune.exec` does not run it in-process; it spawns a child process with its own isolate and permissions context.
+- **`rune.exec` / `rune.spawn` / `rune.job.start` spawn child processes:** These never run in-process — they always spawn a child with its own isolate and permissions context. Without `repl: true` they spawn `crunes run <key>`; with `repl: true` they spawn `crunes run-repl <key>` and require `rune.runRepl:<key>` permission instead of `rune.run:<key>`.
 
 ## Virtual Location Tokens
 
 Cache and sqlite operations use special tokens that resolve to different paths depending on context. Tokens like `@local-project-cache`, `@global-project-cache`, and plugin variants are available in different contexts (project vs. plugin runes). Consult `api/utils.js` for the complete token-to-path mapping.
 
 ## Rune Authoring
+
+### run mode
 
 Every rune must export a `run` function called with the parsed argument object.
 
@@ -69,7 +71,6 @@ export async function run(args) {
   // args.$command  — space-separated matched command path (e.g. 'remote add')
   // args.$commands — array of matched command levels (e.g. ['remote', 'add'])
   // args.verbose   — named flag value (if args() export is defined)
-  // fs.cwd()       — absolute path to the project root
 }
 ```
 
@@ -81,7 +82,7 @@ export async function args(b) {
     .option('-v, --verbose', 'Verbose output', false)
     .option('-c, --count <number>', 'Max results', 10)
     .positional('<target>', 'Target path')
-    .command('sub', 'Sub-command', b => b.option('--flag', 'A flag'))
+    .command('sub', 'Sub-command', sub => sub.option('--flag', 'A flag'))
     .example('crunes run myrune foo', 'Basic use')
     .build()
 }
@@ -89,21 +90,55 @@ export async function args(b) {
 
 The runner calls `args(builder)` before `run(parsedArgs)`. Without an `args` export, all positionals are collected as strings.
 
+**Help text** — `import { help } from '@utils'` inside `run` to access the formatted CLI help string for the current rune: `help.text()` returns a plain string, `help.section()` wraps it in a markdown section ready to return.
+
+### run-repl mode
+
+Export `runRepl` (session initializer) and/or `inputRepl` (per-input handler) to enter interactive mode via `crunes run-repl <key>`. The isolate stays alive across inputs — JS module-level variables are session state.
+
+```js
+import { section, md } from '@utils'
+
+export async function argsRepl(b) { return b.option('--db <path>', 'Database', './state').build() }
+export async function runRepl(args) { /* open connections, return initial prompt string */ }
+export function bannerRepl(args) { /* return welcome string shown before first prompt */ }
+export function commandsRepl(b) { return b.command('exit', 'Quit') }
+export async function inputRepl(input) {
+  if (input.type === 'eof') return { type: 'done' }
+  if (input.type === 'command' && input.args.$command === 'exit') return { type: 'done' }
+  // input.type === 'line' — input.text is the raw line
+  // return { type: 'prompt', value: 'new> ' } to change prompt
+  // return void / undefined to keep current prompt
+}
+export async function completeInputRepl(tokens) { /* return completion candidates */ }
+export async function disposeRepl() { /* cleanup on session end */ }
+```
+
+`runRepl` requires a separate `"runRepl"` permission block — it does not inherit from `"run"`.
+
 ## Flows
 
 - [[flows/run]] — owns the full execution path from CLI input to section output
 
 ## Gotchas & Debugging
 
-- **Command-level flags must precede the key:** Running `crunes run --format json mykey` passes `--format json` as rune arguments, not a command flag. Place these flags before the key.
+- **Command-level flags must precede the key:** Running `crunes run --format jsonl mykey` passes `--format jsonl` as rune arguments, not a command flag. Place these flags before the key.
+
+- **Section filters use bracket syntax — `-s` before the key is rejected:** The only supported way to filter sections is `key[-s section]`. Running `crunes run -s endpoints api` causes a "misplaced flag" error because the first positional is parsed as the rune key and anything starting with `-` is rejected. Correct: `crunes run api[-s endpoints]`.
+
+- **`help` must be imported — it is not a global:** `import { help } from '@utils'` is required. `help.text()` returns the formatted CLI help string for the current rune; `help.section()` wraps it as a markdown section. Returns an empty string if the rune has no `args`/`argsRepl` schema.
 
 - **`section()` vs `section.create()`:** `section` is an object, not a function. Calling `section(name, data)` throws `TypeError: section is not a function`. Use `section.create(name, data)`.
 
 - **`shell.exec` `opts.throw` defaults to `true`:** Non-zero exits throw by default. Pass `{ throw: false }` to get `{ stdout, stderr, exitCode, ok }` regardless of exit code.
 
-- **`time.after` vs `time.afterRef`:** `time.after(ms)` uses an unref'd timer, so the process exits if nothing else is running. Use `time.afterRef(ms)` for top-level waits; use `after` inside loops.
+- **`time.after` keeps the process alive:** `time.after(ms)` uses a ref'd timer — the process will not exit while it is pending. Global `setTimeout` inside the sandbox uses an unref'd timer, so the process can exit if nothing else holds a ref.
 
-- **`rune.exec` spawns a child process:** Calling `rune.exec` spawns `crunes run <key>` as a child with its own isolate and permissions, not a function call in the parent isolate.
+- **`rune.exec` spawns a child process:** Calling `rune.exec` spawns `crunes run <key>` (or `crunes run-repl <key>` with `{ repl: true }`) as a child with its own isolate and permissions, not a function call in the parent isolate.
+
+- **`rune.runRepl:<key>` is a separate permission from `rune.run:<key>`:** Calling `rune.exec`, `rune.spawn`, or `rune.job.start` with `{ repl: true }` checks `rune.runRepl:<key>`, not `rune.run:<key>`. Declare it under the `runRepl` lifecycle block: `"runRepl": { "allow": ["rune.runRepl:worker"] }`.
+
+- **`rune.job.write` / `shell.job.write` throw if the job has no stdin.log:** These methods append to the job's `stdin.log` file, which only exists when the job was started with `{ repl: true }`. Calling them on a non-repl job throws `ENOENT`. Check that the job was started in repl mode before writing.
 
 - **Module compilation order matters:** Modules must be compiled and instantiated in the right order before evaluation, or "module not linked" errors occur.
 

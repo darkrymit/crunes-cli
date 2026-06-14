@@ -131,7 +131,11 @@ export function formatNode(node, { prefix = '', indent = '' } = {}) {
 }
 
 export function formatMembers(members, { prefix = '', indent = '' } = {}) {
-  return (members ?? [])
+  const sorted = [...(members ?? [])].sort((a, b) => {
+    const rank = k => (k === 'namespace' ? 0 : k === 'function' ? 1 : 2)
+    return rank(a.kind) - rank(b.kind)
+  })
+  return sorted
     .map(m => formatNode(m, { prefix, indent }))
     .filter(Boolean)
     .join('\n\n')

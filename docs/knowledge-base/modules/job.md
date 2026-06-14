@@ -24,7 +24,9 @@ This design avoids the concurrency issues that would arise from a shared index f
 
 **Job identification by prefix:** Job identifiers can be matched by prefix rather than requiring the full string. Since job IDs are long unique strings, eight characters is usually enough to identify one unambiguously. The system tries exact match first, then prefix match, and complains if zero or multiple jobs match the prefix.
 
-**Log files are written directly by the job:** When a rune spawns a job, it passes open file descriptors for stdout and stderr directly to the spawned process. The process writes logs directly to files in the store. There is no redirection wrapper or buffering — the job owns the file handles. The only way to read logs is to load the entire file into memory.
+**Log files are written via piped streams:** Rune jobs pass open file descriptors for stdout and stderr directly to the spawned Node process — the child writes to files without any wrapper. Shell jobs use `pipe` stdio and pipe the child's stdout/stderr through Node `WriteStream`s into the log files; this is required because `detached: false` on Windows (used for shell jobs) makes fd inheritance unreliable. The only way to read either log type is to load the entire file into memory.
+
+**Repl jobs use a poll-based stdin log:** When a job is started with `{ repl: true }`, a `stdin.log` file is created alongside `stdout.log` and `stderr.log`. The parent appends JSONL `InputEvent` lines (for rune jobs) or raw text lines (for shell jobs) to this file. The child process tails `stdin.log` via a poll-based reader (`tailStdin`) and forwards each line to its own stdin pipe. An EOF sentinel line (`__CRUNES_STDIN_EOF__`) signals the tail reader to call `stdin.end()` on the child. This design survives parent restarts — the child keeps tailing as long as it is alive, and a new parent can resume writing to the same path.
 
 ## Key Decisions
 
@@ -40,6 +42,10 @@ This design avoids the concurrency issues that would arise from a shared index f
 
 **PID reuse causes false positives:** If a process dies and its process ID is reused by another completely different process, the existence check will return true for the stale job record even though the original job is long gone. There is no additional metadata to disambiguate — the system only stores the PID. On heavily loaded systems this is a real risk, though rare in practice.
 
-**Log files grow without bound:** Job stdout and stderr files are never truncated or rotated. Long-running jobs can consume significant disk space if they produce lots of output. There is no mechanism to cap file size or archive old logs — the files exist until manually deleted or the entire job record is deleted.
+**Log files grow without bound:** Job stdout, stderr, and (for repl jobs) stdin files are never truncated or rotated. Long-running jobs can consume significant disk space if they produce lots of output. There is no mechanism to cap file size or archive old logs — the files exist until manually deleted or the entire job record is deleted.
+
+**Repl stdin tail timer may leak on Windows after SIGKILL:** The tail reader's `stop()` is called from the child's `exit` event. On Windows, SIGKILL does not always fire `exit` reliably. If the parent calls `job.kill(id, 'SIGKILL')` on a repl job, the tail `setTimeout` loop may continue polling `stdin.log` until the Node process exits. This is benign in practice but means the child process reference is not fully released until garbage collection.
 
 **Jobs spawned from outside a project have null project reference:** This is valid and intentional. These jobs appear in global listing with a placeholder in the project column. Code that assumes all jobs belong to a project will crash if it does not check for this case.
+
+**`shell.job.kill` kills the entire process tree, not just the shell:** Shell jobs spawn with `shell: true`, so the stored PID is the shell process (`cmd.exe /c` on Windows, `/bin/sh -c` on Unix). For compound commands (`&&`, pipes, `PORT=3000 node server.js`), the shell stays alive with children as separate processes. On Windows, `shell.job.kill` uses `taskkill /F /T` to kill the entire process tree rooted at the stored PID. On Unix, shell jobs spawn with `detached: true` so the shell becomes a process group leader; `shell.job.kill` sends the signal to the entire process group via `process.kill(-pid, sig)`. Killing only the shell PID directly on Unix would leave compound-command children as orphans.

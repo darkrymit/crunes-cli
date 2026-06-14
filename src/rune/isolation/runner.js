@@ -8,7 +8,8 @@ import { getAutoPermits } from '../api/utils.js'
 import { createModuleResolver } from './resolver.js'
 import { DENY_BUILTINS } from './builtins.js'
 import { createJob, getJob } from '../../job/index.js'
-import { updateJobPid, jobStdoutPath, jobStderrPath } from '../../job/registry.js'
+import { updateJobPid, jobStdoutPath, jobStderrPath, jobStdinPath } from '../../job/registry.js'
+import { EOF_SENTINEL } from '../../job/stdin-tail.js'
 import fsSync from 'node:fs'
 import { ensureProjectIdentity } from '../../project/index.js'
 import { hash, hashAsHex, hashAsBase64, hmac, hmacAsHex, hmacAsBase64, encrypt, decrypt, uuid as cryptoUuid, randomHex as cryptoHex, randomBase64 as cryptoBase64, randomBytesFn } from '../api/crypto.js'
@@ -278,9 +279,23 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
   await jail.set('$__utils_shell_job_start', asyncRef(async (cmd, opts) => {
     checkPermission('shell.job.start', cmd)
     return utils.shell.createShellJob(cmd, opts, {
-      createJob, updateJobPid, jobStdoutPath, jobStderrPath,
+      createJob, updateJobPid, jobStdoutPath, jobStderrPath, jobStdinPath,
       spawnedBy: currentRuneKey, projectKey: pKey, projectDir,
     })
+  }))
+  await jail.set('$__utils_shell_job_write', asyncRef(async (id, text) => {
+    checkPermission('shell.job.read', null)
+    const record = await getJob(pKey, id)
+    if (!record) throw new Error(`Unknown job: ${id}`)
+    const logPath = jobStdinPath(record.projectKey, id)
+    await fsSync.promises.appendFile(logPath, text + '\n', 'utf8')
+  }))
+  await jail.set('$__utils_shell_job_write_eof', asyncRef(async (id) => {
+    checkPermission('shell.job.read', null)
+    const record = await getJob(pKey, id)
+    if (!record) throw new Error(`Unknown job: ${id}`)
+    const logPath = jobStdinPath(record.projectKey, id)
+    await fsSync.promises.appendFile(logPath, EOF_SENTINEL + '\n', 'utf8')
   }))
   await jail.set('$__utils_shell_job_kill', asyncRef(async (id, signal) => {
     checkPermission('shell.job.kill', null)
@@ -288,7 +303,11 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
     if (!VALID_SIGNALS.has(sig)) throw new Error(`Invalid signal: ${sig}`)
     const record = await getJob(pKey, id)
     if (!record) return
-    try { process.kill(record.pid, sig) } catch { /* already gone */ }
+    if (process.platform === 'win32') {
+      try { spawnProcess('taskkill', ['/F', '/T', '/PID', String(record.pid)], { stdio: 'ignore' }) } catch {}
+    } else {
+      try { process.kill(-record.pid, sig) } catch {}
+    }
   }))
   await jail.set('$__utils_shell_job_exists', asyncRef(async (id) => {
     checkPermission('shell.job.exists', null)
@@ -329,14 +348,35 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
   await jail.set('$__utils_section_selected', new ivm.Reference(() => {
     return utils.section.selected() ?? undefined
   }))
-  await jail.set('$__utils_rune_exec', asyncRef(async (runeKey, args) => {
-    checkPermission('rune.run', runeKey)
+  await jail.set('$__utils_rune_exec', asyncRef(async (runeKey, args, opts) => {
+    const repl = opts?.repl === true
+    if (repl) {
+      checkPermission('rune.runRepl', runeKey)
+    } else {
+      checkPermission('rune.run', runeKey)
+    }
     const cliPath = process.argv[1]
+    const cliArgs = repl
+      ? [cliPath, '--cwd', projectDir, 'run-repl', '--format', 'jsonl', runeKey, ...(args ?? [])]
+      : [cliPath, '--cwd', projectDir, 'run', '--format', 'jsonl', runeKey, ...(args ?? [])]
     const child = spawnProcess(
       process.execPath,
-      [cliPath, '--cwd', projectDir, 'run', '--format', 'jsonl', runeKey, '--', ...(args ?? [])],
-      { stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, CRUNES_NO_TIMEOUT: '1' }, windowsHideConsole: true }
+      cliArgs,
+      { stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env, CRUNES_NO_TIMEOUT: '1' }, windowsHideConsole: true }
     )
+    const stdinInput = opts?.stdin
+    if (stdinInput !== undefined && stdinInput !== null) {
+      if (typeof stdinInput === 'string') {
+        child.stdin.write(stdinInput)
+        child.stdin.end()
+      } else if (stdinInput && typeof stdinInput.pipe === 'function') {
+        stdinInput.pipe(child.stdin)
+      } else {
+        child.stdin.end()
+      }
+    } else {
+      child.stdin.end()
+    }
     let stdout = '', stderr = ''
     child.stdout.on('data', chunk => { stdout += chunk })
     child.stderr.on('data', chunk => { stderr += chunk })
@@ -351,9 +391,14 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
     }
     return { sections, stdout, stderr, exitCode, ok: exitCode === 0 }
   }))
-  await jail.set('$__utils_rune_spawn_open', new ivm.Reference((runeKey, args) => {
-    checkPermission('rune.run', runeKey)
-    const session = new RuneSession(runeKey, args, { cliPath: process.argv[1], projectDir })
+  await jail.set('$__utils_rune_spawn_open', new ivm.Reference((runeKey, args, opts) => {
+    const repl = opts?.repl === true
+    if (repl) {
+      checkPermission('rune.runRepl', runeKey)
+    } else {
+      checkPermission('rune.run', runeKey)
+    }
+    const session = new RuneSession(runeKey, args, { cliPath: process.argv[1], projectDir, repl })
     const id = String(nextShellHandle++)
     shellHandles.set(id, session)
     return id
@@ -373,16 +418,42 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
     const handle = shellHandles.get(id)
     if (handle) { handle.kill(signal ?? undefined); shellHandles.delete(id) }
   }))
-  await jail.set('$__utils_rune_job_start', asyncRef(async (runeKey, args) => {
-    checkPermission('rune.job.start', runeKey)
+  await jail.set('$__utils_rune_spawn_write', new ivm.Reference((id, text) => {
+    const handle = shellHandles.get(id)
+    if (handle) handle.write(text)
+  }))
+  await jail.set('$__utils_rune_spawn_write_eof', new ivm.Reference((id) => {
+    const handle = shellHandles.get(id)
+    if (handle) handle.writeEof()
+  }))
+  await jail.set('$__utils_rune_spawn_write_interrupt', new ivm.Reference((id) => {
+    const handle = shellHandles.get(id)
+    if (handle) handle.writeInterrupt()
+  }))
+  await jail.set('$__utils_rune_spawn_stdin_write', new ivm.Reference((id, chunk) => {
+    const handle = shellHandles.get(id)
+    if (handle) handle.stdin.write(chunk)
+  }))
+  await jail.set('$__utils_rune_job_start', asyncRef(async (runeKey, args, opts) => {
+    const repl = opts?.repl ?? false
+    checkPermission(repl ? 'rune.runRepl' : 'rune.job.start', runeKey)
     const cliPath = process.argv[1]
     const { id } = await createJob(null, { type: 'rune', spawnedBy: currentRuneKey, runeKey, projectDir, args: args ?? [] })
     const outFd = fsSync.openSync(jobStdoutPath(pKey, id), 'a')
     const errFd = fsSync.openSync(jobStderrPath(pKey, id), 'a')
+    const cliArgs = repl
+      ? [cliPath, '--cwd', projectDir, 'run-repl', '--format', 'jsonl', runeKey, ...(args ?? [])]
+      : [cliPath, '--cwd', projectDir, 'run', '--format', 'jsonl', runeKey, ...(args ?? [])]
+    let childEnv = { ...process.env, CRUNES_NO_TIMEOUT: '1' }
+    if (repl) {
+      const stdinLog = jobStdinPath(pKey, id)
+      fsSync.writeFileSync(stdinLog, '')
+      childEnv = { ...childEnv, CRUNES_STDIN_LOG: stdinLog }
+    }
     const child = spawnProcess(
       process.execPath,
-      [cliPath, '--cwd', projectDir, 'run', '--format', 'jsonl', runeKey, '--', ...(args ?? [])],
-      { detached: true, stdio: ['ignore', outFd, errFd], env: { ...process.env, CRUNES_NO_TIMEOUT: '1' }, windowsHideConsole: true }
+      cliArgs,
+      { detached: true, stdio: ['ignore', outFd, errFd], env: childEnv, windowsHide: true }
     )
     await updateJobPid(pKey, id, child.pid)
     child.unref()
@@ -436,6 +507,20 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
       } catch {}
     }
     return sections
+  }))
+  await jail.set('$__utils_rune_job_write', asyncRef(async (id, text) => {
+    checkPermission('rune.job.read', null)
+    const record = await getJob(pKey, id)
+    if (!record) throw new Error(`Unknown job: ${id}`)
+    const logPath = jobStdinPath(record.projectKey, id)
+    await fsSync.promises.appendFile(logPath, JSON.stringify({ type: 'line', text }) + '\n', 'utf8')
+  }))
+  await jail.set('$__utils_rune_job_write_eof', asyncRef(async (id) => {
+    checkPermission('rune.job.read', null)
+    const record = await getJob(pKey, id)
+    if (!record) throw new Error(`Unknown job: ${id}`)
+    const logPath = jobStdinPath(record.projectKey, id)
+    await fsSync.promises.appendFile(logPath, JSON.stringify({ type: 'eof', text: '' }) + '\n', 'utf8')
   }))
   await jail.set('$__utils_time_after', new ivm.Reference((ms) => {
     return new Promise(resolve => setTimeout(resolve, ms).unref())
@@ -1500,7 +1585,13 @@ export async function runRuneInReplSession(runeFile, effective, args, projectDir
     throw new Error(`PermissionError: ${msg}`)
   }))
 
-  const utilsMod = await injectUtils(isolate, context, utils, null, vars, projectDir, checkPermission, runeKey, null, wrappedOnEvent)
+  let helpText = null
+  try {
+    const { argsSchema } = await getReplSchema(runeFile, effective, [], projectDir, { vars, nodeModulesDir, pluginDeps, pluginDir })
+    if (argsSchema) helpText = formatHelp(argsSchema, { key: runeKey, name: runeKey, description: undefined, lifecycle: 'runRepl' })
+  } catch { /* help unavailable, silently skip */ }
+
+  const utilsMod = await injectUtils(isolate, context, utils, null, vars, projectDir, checkPermission, runeKey, null, wrappedOnEvent, helpText)
   await injectConsole(isolate, context, wrappedOnEvent)
 
   if (pluginDir != null) await context.global.set('CRUNES_PLUGIN_ROOT', pluginDir)

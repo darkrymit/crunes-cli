@@ -5,6 +5,7 @@ import { formatSection } from '../../shared/render.js'
 import { output, isVerbose } from '../../shared/output.js'
 import { parseArgs } from '../api/args-parser.js'
 import { parseSegment } from './run.js'
+import { tailStdin } from '../../job/stdin-tail.js'
 
 export function parseReplReturn(value) {
   if (value === undefined || value === null) return { type: 'continue', prompt: null }
@@ -138,80 +139,11 @@ export async function handler({
   let eofResolve = null
   const eofPromise = new Promise(resolve => { eofResolve = resolve })
 
-  // Wire tab completer if rune exports completeInputRepl
-  const completerFn = session.complete
-    ? (line, cb) => {
-        const tokens = line.length === 0 ? [''] : line.trimStart().split(/\s+/)
-        // Ensure last token is the partial word (empty string if line ends with space)
-        if (line.length > 0 && line[line.length - 1] === ' ') tokens.push('')
-        Promise.resolve(session.complete(tokens))
-          .then(candidates => {
-            const partial = tokens[tokens.length - 1] ?? ''
-            const matches = candidates.filter(c => c.startsWith(partial))
-            cb(null, [matches, partial])
-          })
-          .catch(() => cb(null, [[], '']))
-      }
-    : undefined
-
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stderr,
-    terminal: process.stdin.isTTY,
-    historySize: process.stdin.isTTY ? 100 : 0,
-    ...(completerFn ? { completer: completerFn } : {}),
-  })
-
+  let rl = null
   function prompt() {
+    if (!rl) return
     if (process.stdin.isTTY) rl.setPrompt(currentPrompt)
     rl.prompt()
-  }
-
-  if (process.stdin.isTTY && !jsonlInput) {
-    readline.emitKeypressEvents(process.stdin, rl)
-    process.stdin.setRawMode(true)
-    process.stdin.on('keypress', (ch, key) => {
-      if (!key) return
-      if (key.ctrl && key.name === 'return') {
-        const currentLine = rl.line
-        lineBuffer.push(currentLine)
-        rl.write(null, { ctrl: true, name: 'u' })
-        process.stderr.write('\n')
-        rl.setPrompt(' '.repeat(currentPrompt.length))
-        rl.prompt()
-      }
-    })
-  }
-
-  async function endSession(message) {
-    if (sessionEnded) return
-    sessionEnded = true
-    if (message) {
-      if (format === 'jsonl') {
-        process.stdout.write(JSON.stringify({ type: 'session-end', rune: key, instance: instanceId, message }) + '\n')
-      } else {
-        process.stderr.write(message + '\n')
-      }
-    } else if (format === 'jsonl') {
-      process.stdout.write(JSON.stringify({ type: 'session-end', rune: key, instance: instanceId }) + '\n')
-    }
-    rl.close()
-    await session.dispose()
-  }
-
-  function buildHelpText() {
-    const lines = ['Built-in commands:']
-    for (const cmd of BUILTIN_SLASH_COMMANDS) {
-      lines.push(`  /${cmd.name.padEnd(8)} ${cmd.description}`)
-    }
-    if (session.commandsSchema?.commands?.length) {
-      lines.push('Rune commands:')
-      for (const cmd of session.commandsSchema.commands) {
-        lines.push(`  /${cmd.name.padEnd(8)} ${cmd.description ?? ''}`)
-      }
-    }
-    lines.push('Press Ctrl+D or return { type: "done" } from inputRepl() to exit.')
-    return lines.join('\n')
   }
 
   // Process lines sequentially using an async queue to avoid race conditions
@@ -248,6 +180,108 @@ export async function handler({
     }
     if (signal.prompt !== null) currentPrompt = signal.prompt
     prompt()
+  }
+
+  // Wire tab completer if rune exports completeInputRepl
+  const completerFn = session.complete
+    ? (line, cb) => {
+        const tokens = line.length === 0 ? [''] : line.trimStart().split(/\s+/)
+        // Ensure last token is the partial word (empty string if line ends with space)
+        if (line.length > 0 && line[line.length - 1] === ' ') tokens.push('')
+        Promise.resolve(session.complete(tokens))
+          .then(candidates => {
+            const partial = tokens[tokens.length - 1] ?? ''
+            const matches = candidates.filter(c => c.startsWith(partial))
+            cb(null, [matches, partial])
+          })
+          .catch(() => cb(null, [[], '']))
+      }
+    : undefined
+
+  // Job-mode: parent wrote a stdin.log path via env — tail it instead of process.stdin.
+  // The child's actual stdin is 'ignore'; the file outlives the parent process.
+  const stdinLogPath = process.env.CRUNES_STDIN_LOG
+  if (stdinLogPath) {
+    // Keep the process alive while waiting for stdin.log input.
+    const keepAlive = setInterval(() => {}, 10_000)
+    const tail = tailStdin(stdinLogPath, {
+      onLine: (line) => {
+        enqueue(async () => {
+          if (sessionEnded) return
+          if (jsonlInput) {
+            const event = parseJsonlInputLine(line)
+            if (event) await handleInputEvent(event)
+          } else {
+            await handleInputEvent({ type: 'line', text: line })
+          }
+        })
+      },
+      onEof: () => {
+        enqueue(async () => {
+          if (!sessionEnded) await handleInputEvent({ type: 'eof', text: '' })
+          eofResolve()
+        })
+      },
+    })
+    eofPromise.then(() => { tail.stop(); clearInterval(keepAlive) })
+    await eofPromise
+    await queue
+    return
+  }
+
+  rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stderr,
+    terminal: process.stdin.isTTY,
+    historySize: process.stdin.isTTY ? 100 : 0,
+    ...(completerFn ? { completer: completerFn } : {}),
+  })
+
+  if (process.stdin.isTTY && !jsonlInput) {
+    readline.emitKeypressEvents(process.stdin, rl)
+    process.stdin.setRawMode(true)
+    process.stdin.on('keypress', (ch, key) => {
+      if (!key) return
+      if (key.ctrl && key.name === 'return') {
+        const currentLine = rl.line
+        lineBuffer.push(currentLine)
+        rl.write(null, { ctrl: true, name: 'u' })
+        process.stderr.write('\n')
+        rl.setPrompt(' '.repeat(currentPrompt.length))
+        rl.prompt()
+      }
+    })
+  }
+
+  async function endSession(message) {
+    if (sessionEnded) return
+    sessionEnded = true
+    if (message) {
+      if (format === 'jsonl') {
+        process.stdout.write(JSON.stringify({ type: 'session-end', rune: key, instance: instanceId, message }) + '\n')
+      } else {
+        process.stderr.write(message + '\n')
+      }
+    } else if (format === 'jsonl') {
+      process.stdout.write(JSON.stringify({ type: 'session-end', rune: key, instance: instanceId }) + '\n')
+    }
+    rl?.close()
+    await session.dispose()
+  }
+
+  function buildHelpText() {
+    const lines = ['Built-in commands:']
+    for (const cmd of BUILTIN_SLASH_COMMANDS) {
+      lines.push(`  /${cmd.name.padEnd(8)} ${cmd.description}`)
+    }
+    if (session.commandsSchema?.commands?.length) {
+      lines.push('Rune commands:')
+      for (const cmd of session.commandsSchema.commands) {
+        lines.push(`  /${cmd.name.padEnd(8)} ${cmd.description ?? ''}`)
+      }
+    }
+    lines.push('Press Ctrl+D or return { type: "done" } from inputRepl() to exit.')
+    return lines.join('\n')
   }
 
   rl.on('SIGINT', () => {

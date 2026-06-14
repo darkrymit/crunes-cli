@@ -10,6 +10,7 @@ function jobPath(key, id)    { return join(projectJobsDir(key), `${id}.json`) }
 
 export function jobStdoutPath(key, id) { return join(projectJobsDir(key), `${id}.stdout.log`) }
 export function jobStderrPath(key, id) { return join(projectJobsDir(key), `${id}.stderr.log`) }
+export function jobStdinPath(key, id)  { return join(projectJobsDir(key), `${id}.stdin.log`) }
 
 export async function updateJobPid(key, id, pid) {
   const record = await getJob(key, id)

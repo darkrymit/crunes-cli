@@ -1,9 +1,10 @@
 import { spawn } from 'node:child_process'
 
 export class RuneSession {
-  constructor(runeKey, args, { cliPath, projectDir }) {
+  constructor(runeKey, args, { cliPath, projectDir, repl = false }) {
     this.handlers = new Map()
     this._spawnArgs = { runeKey, args, cliPath, projectDir }
+    this._repl = repl
     this.proc = null
     this._pending = null
   }
@@ -11,11 +12,14 @@ export class RuneSession {
   open() {
     const { runeKey, args, cliPath, projectDir } = this._spawnArgs
     this._pending = []
+    const cliArgs = this._repl
+      ? [cliPath, '--cwd', projectDir, 'run-repl', '--format', 'jsonl', runeKey, ...(args ?? [])]
+      : [cliPath, '--cwd', projectDir, 'run', '--format', 'jsonl', runeKey, ...(args ?? [])]
     this.proc = spawn(
       process.execPath,
-      [cliPath, '--cwd', projectDir, 'run', '--format', 'jsonl', runeKey, '--', ...(args ?? [])],
+      cliArgs,
       {
-        stdio: ['ignore', 'pipe', 'pipe'],
+        stdio: [this._repl ? 'pipe' : 'ignore', 'pipe', 'pipe'],
         env: { ...process.env, CRUNES_NO_TIMEOUT: '1' },
         windowsHideConsole: true,
       }
@@ -29,6 +33,40 @@ export class RuneSession {
       this.emit('session', 'exit', code ?? 0)
     })
     this.proc.on('error', err => this.emit('session', 'error', err))
+  }
+
+  get stdin() {
+    const self = this
+    return {
+      write(chunk) {
+        if (!self._repl) throw new Error('write() is only available in repl mode')
+        if (!self.proc) throw new Error('Session not open')
+        self.proc.stdin.write(chunk)
+      },
+      end() {
+        if (!self._repl) throw new Error('write() is only available in repl mode')
+        if (!self.proc) throw new Error('Session not open')
+        self.proc.stdin.end()
+      },
+    }
+  }
+
+  write(text) {
+    if (!this._repl) throw new Error('write() is only available in repl mode')
+    if (!this.proc) throw new Error('Session not open')
+    this.proc.stdin.write(JSON.stringify({ type: 'line', text }) + '\n')
+  }
+
+  writeEof() {
+    if (!this._repl) throw new Error('write() is only available in repl mode')
+    if (!this.proc) throw new Error('Session not open')
+    this.proc.stdin.write(JSON.stringify({ type: 'eof', text: '' }) + '\n')
+  }
+
+  writeInterrupt() {
+    if (!this._repl) throw new Error('write() is only available in repl mode')
+    if (!this.proc) throw new Error('Session not open')
+    this.proc.stdin.write(JSON.stringify({ type: 'interrupt', text: '' }) + '\n')
   }
 
   setHandler(type, event, callbackRef) {
