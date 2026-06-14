@@ -26,6 +26,8 @@ This design avoids the concurrency issues that would arise from a shared index f
 
 **Log files are written directly by the job:** When a rune spawns a job, it passes open file descriptors for stdout and stderr directly to the spawned process. The process writes logs directly to files in the store. There is no redirection wrapper or buffering — the job owns the file handles. The only way to read logs is to load the entire file into memory.
 
+**Repl jobs use a poll-based stdin log:** When a job is started with `{ repl: true }`, a `stdin.log` file is created alongside `stdout.log` and `stderr.log`. The parent appends JSONL `InputEvent` lines (for rune jobs) or raw text lines (for shell jobs) to this file. The child process tails `stdin.log` via a poll-based reader (`tailStdin`) and forwards each line to its own stdin pipe. An EOF sentinel line (`__CRUNES_STDIN_EOF__`) signals the tail reader to call `stdin.end()` on the child. This design survives parent restarts — the child keeps tailing as long as it is alive, and a new parent can resume writing to the same path.
+
 ## Key Decisions
 
 **One file per job, no central index:** A single jobs.json file would require read-modify-write on every job spawn. With concurrent rune processes spawning jobs simultaneously, this creates a bottleneck and risk of corruption. Instead, each job writes its own file, eliminating coordination. The cost is that listing requires a directory scan instead of reading one file.
@@ -40,6 +42,8 @@ This design avoids the concurrency issues that would arise from a shared index f
 
 **PID reuse causes false positives:** If a process dies and its process ID is reused by another completely different process, the existence check will return true for the stale job record even though the original job is long gone. There is no additional metadata to disambiguate — the system only stores the PID. On heavily loaded systems this is a real risk, though rare in practice.
 
-**Log files grow without bound:** Job stdout and stderr files are never truncated or rotated. Long-running jobs can consume significant disk space if they produce lots of output. There is no mechanism to cap file size or archive old logs — the files exist until manually deleted or the entire job record is deleted.
+**Log files grow without bound:** Job stdout, stderr, and (for repl jobs) stdin files are never truncated or rotated. Long-running jobs can consume significant disk space if they produce lots of output. There is no mechanism to cap file size or archive old logs — the files exist until manually deleted or the entire job record is deleted.
+
+**Repl stdin tail timer may leak on Windows after SIGKILL:** The tail reader's `stop()` is called from the child's `exit` event. On Windows, SIGKILL does not always fire `exit` reliably. If the parent calls `job.kill(id, 'SIGKILL')` on a repl job, the tail `setTimeout` loop may continue polling `stdin.log` until the Node process exits. This is benign in practice but means the child process reference is not fully released until garbage collection.
 
 **Jobs spawned from outside a project have null project reference:** This is valid and intentional. These jobs appear in global listing with a placeholder in the project column. Code that assumes all jobs belong to a project will crash if it does not check for this case.

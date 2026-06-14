@@ -18,7 +18,7 @@ Rune execution begins with a single entry point that resolves a key through a ti
 - **`isolation/`** — Manages the sandboxed VM lifecycle: creates the isolate, compiles built-in utility modules into it, injects the utils bridge as host callbacks, compiles the rune code, evaluates it, and collects results.
 - **`api/`** — Implements the complete utils object that rune authors depend on, partitioned into namespace modules for filesystem I/O, process spawning, structured data handling, networking, configuration reading, output formatting, local storage, and cryptographic utilities.
 - **`permissions/`** — Computes effective permission sets by merging plugin declarations, project overrides, and auto-grants, then provides per-operation checkers that gate all I/O calls.
-- **`commands/`** — Implements CLI handlers: `run` executes runes and renders output, `list` enumerates available runes, `create` scaffolds new ones, `check` validates syntax and permissions, `benchmark` times execution over configurable repetitions.
+- **`commands/`** — Implements CLI handlers: `run` executes runes and renders output, `run-repl` runs a rune in persistent REPL mode, `list` enumerates available runes, `create` scaffolds new ones, `check` validates syntax and permissions, `benchmark` times execution over configurable repetitions.
 
 ## Concepts
 
@@ -51,7 +51,7 @@ Rune execution begins with a single entry point that resolves a key through a ti
 
 - **`@plugin/**` auto-grant:** Plugin runes always get `fs.read:@plugin/**` injected, resolving to the plugin cache directory. Plugin runes needing to read project files must explicitly declare `fs.read:./**`.
 
-- **`rune.exec` spawns a child process:** Calling a rune via `rune.exec` does not run it in-process; it spawns a child process with its own isolate and permissions context.
+- **`rune.exec` / `rune.spawn` / `rune.job.start` spawn child processes:** These never run in-process — they always spawn a child with its own isolate and permissions context. Without `repl: true` they spawn `crunes run <key>`; with `repl: true` they spawn `crunes run-repl <key>` and require `rune.runRepl:<key>` permission instead of `rune.run:<key>`.
 
 ## Virtual Location Tokens
 
@@ -103,7 +103,11 @@ The runner calls `args(builder)` before `run(parsedArgs)`. Without an `args` exp
 
 - **`time.after` vs `time.afterRef`:** `time.after(ms)` uses an unref'd timer, so the process exits if nothing else is running. Use `time.afterRef(ms)` for top-level waits; use `after` inside loops.
 
-- **`rune.exec` spawns a child process:** Calling `rune.exec` spawns `crunes run <key>` as a child with its own isolate and permissions, not a function call in the parent isolate.
+- **`rune.exec` spawns a child process:** Calling `rune.exec` spawns `crunes run <key>` (or `crunes run-repl <key>` with `{ repl: true }`) as a child with its own isolate and permissions, not a function call in the parent isolate.
+
+- **`rune.runRepl:<key>` is a separate permission from `rune.run:<key>`:** Calling `rune.exec`, `rune.spawn`, or `rune.job.start` with `{ repl: true }` checks `rune.runRepl:<key>`, not `rune.run:<key>`. Declare it under the `runRepl` lifecycle block: `"runRepl": { "allow": ["rune.runRepl:worker"] }`.
+
+- **`rune.job.write` / `shell.job.write` throw if the job has no stdin.log:** These methods append to the job's `stdin.log` file, which only exists when the job was started with `{ repl: true }`. Calling them on a non-repl job throws `ENOENT`. Check that the job was started in repl mode before writing.
 
 - **Module compilation order matters:** Modules must be compiled and instantiated in the right order before evaluation, or "module not linked" errors occur.
 

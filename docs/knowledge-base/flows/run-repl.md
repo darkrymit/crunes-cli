@@ -58,6 +58,15 @@ flowchart TD
 
 **JSONL input mode:** When `--format jsonl` and stdin is not a TTY, each line is parsed as a JSON `InputEvent` object (`{ type, text? }` or `{ type: 'command', args }`) instead of being treated as raw text. Invalid JSON lines produce `{ type: 'error' }` on stdout.
 
+**Programmatic spawning via `rune.spawn` / `rune.job.start`:** A parent rune can spawn a REPL session programmatically by passing `{ repl: true }` to `rune.spawn`, `rune.exec`, or `rune.job.start`. All three ultimately run `crunes run-repl --format jsonl <key>` — the same JSONL wire protocol described above. The parent communicates with the child using convenience methods that write JSONL `InputEvent` objects:
+
+- `session.write(text)` → `{"type":"line","text":"..."}` — a normal input line
+- `session.writeEof()` → `{"type":"eof","text":""}` — signals end of input (the child's REPL exits cleanly)
+- `session.writeInterrupt()` → `{"type":"interrupt","text":""}` — equivalent to Ctrl+C
+- `session.stdin.write(chunk)` — raw pipe access for pre-serialized JSONL
+
+For detached jobs, `rune.job.write(id, text)` and `rune.job.writeEof(id)` append the same JSONL lines to a `stdin.log` file that the child tails via a poll-based reader — no live pipe required, and a new parent can resume writing after a restart.
+
 **Session teardown:** `endSession` is idempotent (guarded by `sessionEnded` flag). It emits `session-end` (JSONL) or prints the done message (text), closes readline, and calls `session.dispose()` which runs `disposeRepl()` in the isolate. `disposeRepl` errors are swallowed.
 
 ## JSONL event shape (stdout)
