@@ -129,7 +129,7 @@ The runner calls `args(builder)` before `run(parsedArgs)`. Without an `args` exp
 
 - **`http.fetch:` and `env.read:` parse values before matching:** These capabilities split the value into structured parts (method, URL, source, key) before matching. Each sub-matcher (`matchFetchPermission`, `matchEnvPermission`, etc.) accepts a full patterns array and loops internally — `checkPermission` passes the whole bucket array in one call rather than iterating with `.some` at the call site.
 
-- **Shell/rune permission matching uses plain micromatch:** Patterns are matched with the shared `isMatch` wrapper (dot-enabled, no extglob/brace/bracket/negate). `:` in capability prefixes was the historic reason for special-casing; that is gone now that buckets strip the prefix before matching.
+- **Shell/rune/db/env-key/store-name matching uses `isWildcardMatch`, not micromatch:** These capabilities use a regex-based flat matcher where `*` matches any characters including `/`, spaces, and commas. This is intentional — shell commands like `bash ./run.sh --profile=dev,staging` contain `/` and commas that would silently block a `bash *` micromatch pattern. `fs.*`, `http.*`, and `ws.*` still use `isGlobMatch` (micromatch) where `*` stops at `/` because path-segment boundaries are a meaningful security boundary for files and URLs.
 
 - **Plugin runes execute in the project root context:** The project root is used as the working directory for plugin rune execution. The plugin cache directory is used only for resolving the rune file path and node_modules.
 
@@ -144,3 +144,20 @@ The runner calls `args(builder)` before `run(parsedArgs)`. Without an `args` exp
 - **`shell.spawn` and `rune.spawn` require an explicit `open()` call:** Both return a session object immediately without starting the subprocess. Register all handlers (`session.stdout.on`, `session.on('exit', ...)`, etc.) first, then call `session.open()` to start the process. Skipping `open()` means the process never starts and all reads hang indefinitely.
 
 - **All `fs.*` operations support virtual-path prefixes:** Paths starting with `@` (e.g. `@local-project-cache/vault/file.enc`) are resolved through the virtual location scheme via `resolvePath`. `fs.glob` additionally reconstructs results with the original `@prefix/...` form so callers get back virtual paths, not real absolute ones.
+
+- **`logger` is a global — no import needed:** The `logger` object is injected into every rune sandbox alongside `console`. Use `logger.info(message, meta?)`, `logger.warn(...)`, `logger.error(...)`, `logger.debug(...)` to emit structured log events. Each call emits `{ type: 'log', level, message, meta? }` through the event pipeline; in text mode these write to stderr, in JSONL mode they appear as JSON objects on stdout. The optional `meta` param is a plain object surfaced in JSONL output and in the `[level]` prefix in text output. `console.log/warn/error` also emit `{ type: 'log', level: 'log'/'warn'/'error' }` — the same unified event shape, just without the `meta` field.
+
+- **`dispose()` and `disposeRepl()` are optional lifecycle exports:** Export `dispose()` from a rune to run cleanup after `run()` resolves or throws (close connections, release handles). Export `disposeRepl()` to run cleanup when a REPL session ends — it is called on normal exit, Ctrl+D, and signal teardown, even if `inputRepl()` never received an `eof` event. Errors thrown in either function are swallowed. Neither receives arguments.
+
+- **`batch.allow` / `batch.deny` must be declared for `-b` runs:** When a rune is invoked via `crunes run -b`, the runner checks the rune's config entry for a `batch` block before executing. Without it, the run is blocked. Add a `batch` block to the rune's `.crunes/config.json` entry: `"batch": { "allow": ["*"], "deny": [] }`. Patterns match against the rune args string (everything after the key); `*` matches any args. The `deny` list is checked first.
+
+```json
+{
+  "runes": {
+    "my-rune": {
+      "path": ".crunes/runes/my-rune.js",
+      "batch": { "allow": ["*"] }
+    }
+  }
+}
+```
