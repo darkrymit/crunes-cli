@@ -2,7 +2,7 @@ import { performance } from 'node:perf_hooks'
 import chalk from 'chalk'
 import { loadConfig } from '../../core/config.js'
 import { runRune } from '../resolver.js'
-import { parseSegment } from './run.js'
+import { parseBracketKey } from './run.js'
 import { output } from '../../shared/output.js'
 
 const FAST_MS  = 200
@@ -34,49 +34,103 @@ function labelColour(l, plain) {
 }
 
 export function parseBenchArgs(argv) {
-  let runs = 1
-  let warmup = false
+  let globalRuns = 1
+  let globalWarmup = false
+  let allowBatch = false
+  let failFast = false
+  let format = 'text'
   let i = 0
 
-  // Consume command-level flags from the prefix only — stops at the first non-flag token.
-  // This ensures rune flags with the same name (e.g. --runs) are never intercepted.
   while (i < argv.length) {
     const tok = argv[i]
     if (tok === '--runs' && i + 1 < argv.length) {
-      runs = parseInt(argv[i + 1], 10)
-      i += 2
+      globalRuns = parseInt(argv[i + 1], 10); i += 2
     } else if (tok.startsWith('--runs=')) {
-      runs = parseInt(tok.slice(7), 10)
-      i++
+      globalRuns = parseInt(tok.slice(7), 10); i++
     } else if (tok === '--warmup') {
-      warmup = true
-      i++
+      globalWarmup = true; i++
+    } else if (tok === '-b' || tok === '--batch') {
+      allowBatch = true; i++
+    } else if (tok === '--fail-fast') {
+      failFast = true; i++
+    } else if (tok === '--format' && i + 1 < argv.length) {
+      format = argv[i + 1]; i += 2
+    } else if (tok.startsWith('--format=')) {
+      format = tok.slice(9); i++
     } else {
       break
     }
   }
 
-  const { key, sections, runeArgs } = parseSegment(argv.slice(i))
-  return { key, sections, runeArgs, runs, warmup }
+  const rawSegments = []
+  let current = []
+  for (const tok of argv.slice(i)) {
+    if (allowBatch && tok === '+') {
+      rawSegments.push(current)
+      current = []
+    } else {
+      current.push(tok)
+    }
+  }
+  rawSegments.push(current)
+
+  const segments = rawSegments.map(seg => {
+    const { key, bracketArgs } = parseBracketKey(seg[0] ?? '')
+    let runs = globalRuns
+    let warmup = globalWarmup
+    let sections = null
+    let j = 0
+    while (j < bracketArgs.length) {
+      const tok = bracketArgs[j]
+      if (tok === '--runs' && j + 1 < bracketArgs.length) {
+        runs = parseInt(bracketArgs[j + 1], 10); j += 2
+      } else if (tok.startsWith('--runs=')) {
+        runs = parseInt(tok.slice(7), 10); j++
+      } else if (tok === '--warmup') {
+        warmup = true; j++
+      } else if ((tok === '--section' || tok === '-s') && j + 1 < bracketArgs.length) {
+        sections = bracketArgs[j + 1].split(',').map(s => s.trim()).filter(Boolean); j += 2
+      } else if (tok.startsWith('--section=')) {
+        sections = tok.slice(10).split(',').map(s => s.trim()).filter(Boolean); j++
+      } else if (tok.startsWith('-s=')) {
+        sections = tok.slice(3).split(',').map(s => s.trim()).filter(Boolean); j++
+      } else {
+        j++
+      }
+    }
+    return { key: key || null, runs, warmup, sections, runeArgs: seg.slice(1) }
+  })
+
+  return { segments, format, failFast, isBatch: allowBatch, globalRuns, globalWarmup }
 }
 
 export async function handler({
+  segments,
   key,
   runeArgs = [],
-  runs = 1,
-  warmup = false,
+  runs: legacyRuns,
+  warmup: legacyWarmup,
+  format: _format = 'text',
+  failFast = false,
+  isBatch: _isBatch = false,
   plain = false,
   projectRoot = process.cwd(),
   configRoot = projectRoot,
 } = {}) {
-  if (!key) {
+  // Support legacy single-rune call shape (handler({ key, runeArgs, runs, warmup }))
+  const resolvedSegments = segments ?? [{ key, runeArgs, runs: legacyRuns ?? 1, warmup: legacyWarmup ?? false, sections: null }]
+
+  const firstKey = resolvedSegments[0]?.key
+  if (!firstKey) {
     output.error('Missing required argument: <rune>')
     process.exit(1)
   }
 
-  if (!Number.isInteger(runs) || runs < 1) {
-    output.error('Invalid option: --runs must be a positive integer >= 1')
-    process.exit(1)
+  for (const seg of resolvedSegments) {
+    if (!Number.isInteger(seg.runs) || seg.runs < 1) {
+      output.error('Invalid option: --runs must be a positive integer >= 1')
+      process.exit(1)
+    }
   }
 
   let config
@@ -94,47 +148,50 @@ export async function handler({
     console.log()
   }
 
-  const times = []
-  let err = null
-
-  if (warmup) {
-    try { await runRune(projectRoot, config, key, runeArgs, { configDir: configRoot }) } catch {}
-  }
-
-  for (let i = 0; i < runs; i++) {
-    const t0 = performance.now()
-    try {
-      await runRune(projectRoot, config, key, runeArgs, { configDir: configRoot })
-    } catch (e) {
-      err = e
-      break
-    }
-    times.push(performance.now() - t0)
-  }
-
-  const maxKeyLen = key.length
-
+  const maxKeyLen = Math.max(...resolvedSegments.map(s => (s.key ?? '').length))
   let total = 0
   let slowCount = 0
 
-  if (err) {
-    if (plain) {
-      process.stdout.write(`${key}\terror\t${err.message}\n`)
-    } else {
-      console.log(`  ${chalk.dim(key.padEnd(maxKeyLen))}  ${chalk.red('error')}  ${chalk.dim(err.message)}`)
-    }
-  } else {
-    const avg = Math.round(times.reduce((a, b) => a + b, 0) / times.length)
-    const l = label(avg)
-    if (l === 'slow') slowCount++
-    total += avg
+  for (const seg of resolvedSegments) {
+    const { key: segKey, runeArgs: segArgs, runs, warmup } = seg
+    const times = []
+    let err = null
 
-    if (plain) {
-      process.stdout.write(`${key}\t${avg}\t${l}\n`)
+    if (warmup) {
+      try { await runRune(projectRoot, config, segKey, segArgs, { configDir: configRoot }) } catch {}
+    }
+
+    for (let i = 0; i < runs; i++) {
+      const t0 = performance.now()
+      try {
+        await runRune(projectRoot, config, segKey, segArgs, { configDir: configRoot })
+      } catch (e) {
+        err = e
+        break
+      }
+      times.push(performance.now() - t0)
+    }
+
+    if (err) {
+      if (plain) {
+        process.stdout.write(`${segKey}\terror\t${err.message}\n`)
+      } else {
+        console.log(`  ${chalk.dim(segKey.padEnd(maxKeyLen))}  ${chalk.red('error')}  ${chalk.dim(err.message)}`)
+      }
+      if (failFast) process.exit(1)
     } else {
-      const k = key.padEnd(maxKeyLen)
-      const warn = l === 'slow' ? `  ${chalk.yellow('⚠')}` : ''
-      console.log(`  ${chalk.cyan(k)}  ${String(avg).padStart(6)}ms  ${bar(avg, plain)}  ${labelColour(l, plain)}${warn}`)
+      const avg = Math.round(times.reduce((a, b) => a + b, 0) / times.length)
+      const l = label(avg)
+      if (l === 'slow') slowCount++
+      total += avg
+
+      if (plain) {
+        process.stdout.write(`${segKey}\t${avg}\t${l}\n`)
+      } else {
+        const k = segKey.padEnd(maxKeyLen)
+        const warn = l === 'slow' ? `  ${chalk.yellow('⚠')}` : ''
+        console.log(`  ${chalk.cyan(k)}  ${String(avg).padStart(6)}ms  ${bar(avg, plain)}  ${labelColour(l, plain)}${warn}`)
+      }
     }
   }
 
@@ -145,7 +202,7 @@ export async function handler({
     const slowMsg = slowCount > 0
       ? `  ${chalk.yellow('⚠')} ${slowCount} slow rune${slowCount > 1 ? 's' : ''} (> ${SLOW_MS}ms)`
       : `  ${chalk.green('✓')} All runes within acceptable range`
-    console.log(`  ${chalk.dim('Total:')} ${total}ms${runs > 1 ? ` (avg of ${runs} runs)` : ''}`)
+    console.log(`  ${chalk.dim('Total:')} ${total}ms`)
     console.log(slowMsg)
     console.log()
   }

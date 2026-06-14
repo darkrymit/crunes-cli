@@ -236,18 +236,28 @@ export function buildProgram() {
   program
     .command('bench [args...]')
     .description('Time rune execution and report fast, ok, or slow.')
-    .addHelpText('after', '\nImportant: Global flags (e.g. --cwd) MUST appear before the "bench" command.\n\nSyntax:\n  [--runs <n>] [--warmup] [--section s1,s2] [--] <key> [rune-args...]')
+    .addHelpText('after',
+      '\nImportant: Global flags (e.g. --cwd) MUST appear before the "bench" command.\n\n' +
+      'Syntax:\n' +
+      '  [--runs <n>] [--warmup] <key>[--runs <n>] [--warmup] [-s s1,s2] [rune-args...]\n\n' +
+      'Command flags:\n' +
+      '  -b, --batch          enable batching multiple runes with +\n' +
+      '  --format text|jsonl  output format (default: text)\n' +
+      '  --fail-fast          stop on first error\n' +
+      '  --runs <n>           default number of runs for all runes (default: 1)\n' +
+      '  --warmup             default warmup run for all runes\n\n' +
+      'Per-rune bracket flags (inside key[...]):\n' +
+      '  --runs <n>           override run count for this rune\n' +
+      '  --warmup             override warmup for this rune\n' +
+      '  -s, --section s1,s2  filter output sections for this rune'
+    )
     .helpOption(false)
     .allowUnknownOption()
     .passThroughOptions()
-    .action(async (args, _opts, command) => {
-      for (const tok of args) {
-        if (tok === '--') break
-        if (tok === '--help' || tok === '-h') { command.help(); return }
-      }
+    .action(async (args, _opts, _command) => {
       const { handler, parseBenchArgs } = await import('../rune/commands/benchmark.js')
       const parsed = parseBenchArgs(args)
-      if (!parsed.key) {
+      if (!parsed.segments[0]?.key) {
         const { output } = await import('../shared/output.js')
         output.error('Missing required argument: <rune>')
         process.exit(1)
