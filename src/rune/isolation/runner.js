@@ -303,7 +303,11 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
     if (!VALID_SIGNALS.has(sig)) throw new Error(`Invalid signal: ${sig}`)
     const record = await getJob(pKey, id)
     if (!record) return
-    try { process.kill(record.pid, sig) } catch { /* already gone */ }
+    if (process.platform === 'win32') {
+      try { spawnProcess('taskkill', ['/F', '/T', '/PID', String(record.pid)], { stdio: 'ignore' }) } catch {}
+    } else {
+      try { process.kill(record.pid, sig) } catch {}
+    }
   }))
   await jail.set('$__utils_shell_job_exists', asyncRef(async (id) => {
     checkPermission('shell.job.exists', null)
