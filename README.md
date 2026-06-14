@@ -24,7 +24,7 @@ Install globally via `npm`:
 npm install -g @darkrymit/crunes-cli
 ```
 
-*Requires Node.js ≥ 20.*
+*Requires Node.js ≥ 22.*
 
 ---
 
