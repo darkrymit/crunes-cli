@@ -453,7 +453,7 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
     const child = spawnProcess(
       process.execPath,
       cliArgs,
-      { detached: process.platform !== 'win32', stdio: ['ignore', outFd, errFd], env: childEnv, windowsHide: true }
+      { detached: true, stdio: ['ignore', outFd, errFd], env: childEnv, windowsHide: true }
     )
     await updateJobPid(pKey, id, child.pid)
     child.unref()
