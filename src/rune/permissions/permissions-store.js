@@ -1,4 +1,4 @@
-import { isMatch } from '../../shared/match.js'
+import { isGlobMatch, isWildcardMatch } from '../../shared/match.js'
 
 export function matchStorePermission(value, patterns) {
   const vDColon   = value.indexOf('::')
@@ -13,13 +13,13 @@ export function matchStorePermission(value, patterns) {
     const patName = dColonIdx !== -1 ? pattern.slice(dColonIdx + 2) : null
 
     const nameOk = patName === '*' || patName == null ||
-      (valueName != null && isMatch(valueName, patName))
+      (valueName != null && isWildcardMatch(valueName, patName))
 
     if (patLoc.startsWith('@') && patLoc.endsWith('/**')) {
       const bare = patLoc.slice(0, -3)
-      return isMatch(valueLoc, [patLoc, bare]) && nameOk
+      return isGlobMatch(valueLoc, [patLoc, bare]) && nameOk
     }
 
-    return isMatch(sub(valueLoc), sub(patLoc)) && nameOk
+    return isGlobMatch(sub(valueLoc), sub(patLoc)) && nameOk
   })
 }

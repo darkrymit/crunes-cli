@@ -476,3 +476,40 @@ describe('expandPattern — full sibling coverage via makePermissionChecker', ()
     expect(() => check('fs.read', '/home/user/otherproject/file.txt')).toThrow(PermissionError)
   })
 })
+
+describe('makePermissionChecker — shell.run wildcard matching', () => {
+  it('bash * matches command with path separators and flags', () => {
+    const check = makePermissionChecker({ allow: ['shell.run:bash *'], deny: [] })
+    expect(() => check('shell.run', 'bash ./run.sh --profile=dev,staging,prod')).not.toThrow()
+  })
+
+  it('bash ./run.sh * matches any args to specific script', () => {
+    const check = makePermissionChecker({ allow: ['shell.run:bash ./run.sh *'], deny: [] })
+    expect(() => check('shell.run', 'bash ./run.sh --profile=dev')).not.toThrow()
+    expect(() => check('shell.run', 'npm install')).toThrow(PermissionError)
+  })
+
+  it('bash ./run.sh --profile=* matches any profile value', () => {
+    const check = makePermissionChecker({ allow: ['shell.run:bash ./run.sh --profile=*'], deny: [] })
+    expect(() => check('shell.run', 'bash ./run.sh --profile=dev,staging,prod')).not.toThrow()
+    expect(() => check('shell.run', 'bash ./run.sh --other')).toThrow(PermissionError)
+  })
+
+  it('npm * matches any npm command', () => {
+    const check = makePermissionChecker({ allow: ['shell.run:npm *'], deny: [] })
+    expect(() => check('shell.run', 'npm run build')).not.toThrow()
+    expect(() => check('shell.run', 'npm install')).not.toThrow()
+    expect(() => check('shell.run', 'bash something')).toThrow(PermissionError)
+  })
+
+  it('shell.job.start: bash * matches command with slashes', () => {
+    const check = makePermissionChecker({ allow: ['shell.job.start:bash *'], deny: [] })
+    expect(() => check('shell.job.start', 'bash ./run.sh --profile=dev,staging,prod')).not.toThrow()
+  })
+
+  it('db.connect:postgres:* matches any postgres URI', () => {
+    const check = makePermissionChecker({ allow: ['db.connect:postgres:*'], deny: [] })
+    expect(() => check('db.connect', 'postgres:localhost:5432/mydb')).not.toThrow()
+    expect(() => check('db.connect', 'mysql:localhost:3306/mydb')).toThrow(PermissionError)
+  })
+})

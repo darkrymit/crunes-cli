@@ -1,4 +1,4 @@
-import { isMatch } from '../../shared/match.js'
+import { isGlobMatch } from '../../shared/match.js'
 
 export function matchFetchPermission(value, patterns) {
   // Value is formatted as "METHOD::URL"
@@ -15,6 +15,6 @@ export function matchFetchPermission(value, patterns) {
 
     const patternMethods = left ? left.split(',').map(m => m.trim().toUpperCase()) : ['GET']
     const methodOk = patternMethods.includes('*') || patternMethods.includes(valueMethod)
-    return methodOk && isMatch(valueUrl, right)
+    return methodOk && isGlobMatch(valueUrl, right)
   })
 }

@@ -1,7 +1,7 @@
-import { isMatch } from '../../shared/match.js'
+import { isGlobMatch } from '../../shared/match.js'
 
 export function matchWsPermission(url, patterns) {
-  return isMatch(url, patterns)
+  return isGlobMatch(url, patterns)
 }
 
 export function matchWsServerPermission(value, patterns) {
