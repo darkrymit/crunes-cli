@@ -27,9 +27,10 @@ export class ShellSession {
     const { cmd, dir, env } = this._spawnArgs
     this._pending = []
     this.proc = spawn(cmd, [], {
-      shell:              true,
-      cwd:                dir,
-      windowsHideConsole: true,
+      shell:       true,
+      detached:    process.platform !== 'win32',
+      cwd:         dir,
+      windowsHide: true,
       env: env ? { ...process.env, ...env } : process.env,
     })
 
@@ -111,12 +112,12 @@ export class ShellSession {
     }
     if (process.platform === 'win32') {
       try {
-        spawn('taskkill', ['/pid', String(this.proc.pid), '/t', '/f'], { windowsHideConsole: true })
-      } catch (e) {
+        spawn('taskkill', ['/pid', String(this.proc.pid), '/t', '/f'], { windowsHide: true })
+      } catch {
         this.proc.kill()
       }
     } else {
-      this.proc.kill(signal ?? 'SIGTERM')
+      try { process.kill(-this.proc.pid, signal ?? 'SIGTERM') } catch {}
     }
   }
 }
@@ -233,11 +234,12 @@ export function createShellUtils(dir, checkPermission) {
       fs.writeFileSync(stdinLog, '')
       stdinArg = 'pipe'
       const child = spawn(cmd, [], {
-        shell: true,
-        stdio: [stdinArg, 'pipe', 'pipe'],
-        cwd:   jobProjectDir,
-        env:   opts?.env ? { ...process.env, ...opts.env } : process.env,
-        windowsHideConsole: true,
+        shell:       true,
+        detached:    process.platform !== 'win32',
+        stdio:       [stdinArg, 'pipe', 'pipe'],
+        cwd:         jobProjectDir,
+        env:         opts?.env ? { ...process.env, ...opts.env } : process.env,
+        windowsHide: true,
       })
       const outStream = fs.createWriteStream(jobStdoutPath(projectKey, id), { flags: 'a' })
       const errStream = fs.createWriteStream(jobStderrPath(projectKey, id), { flags: 'a' })
@@ -253,11 +255,12 @@ export function createShellUtils(dir, checkPermission) {
       return { id }
     }
     const child = spawn(cmd, [], {
-      shell: true,
-      stdio: [stdinArg, 'pipe', 'pipe'],
-      cwd:   jobProjectDir,
-      env:   opts?.env ? { ...process.env, ...opts.env } : process.env,
-      windowsHideConsole: true,
+      shell:       true,
+      detached:    process.platform !== 'win32',
+      stdio:       [stdinArg, 'pipe', 'pipe'],
+      cwd:         jobProjectDir,
+      env:         opts?.env ? { ...process.env, ...opts.env } : process.env,
+      windowsHide: true,
     })
     const outStream = fs.createWriteStream(jobStdoutPath(projectKey, id), { flags: 'a' })
     const errStream = fs.createWriteStream(jobStderrPath(projectKey, id), { flags: 'a' })
