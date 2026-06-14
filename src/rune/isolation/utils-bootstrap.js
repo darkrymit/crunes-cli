@@ -630,10 +630,10 @@ globalThis.utils = {
     selected: () => $__utils_section_selected.applySync(undefined, [], { result: { copy: true } }),
   },
   rune: {
-    exec: (key, args) => $__utils_rune_exec
-      .apply(undefined, [key, args], { arguments: { copy: true }, result: { promise: true, copy: true } }),
-    spawn: (key, args) => {
-      const id = $__utils_rune_spawn_open.applySync(undefined, [key, args], { arguments: { copy: true } })
+    exec: (key, args, opts) => $__utils_rune_exec
+      .apply(undefined, [key, args, opts], { arguments: { copy: true }, result: { promise: true, copy: true } }),
+    spawn: (key, args, opts) => {
+      const id = $__utils_rune_spawn_open.applySync(undefined, [key, args, opts], { arguments: { copy: true } })
 
       const createHybridReadable = (streamType) => {
         let controller
@@ -665,10 +665,16 @@ globalThis.utils = {
         },
         open: () => $__utils_rune_spawn_start.applySync(undefined, [id]),
         kill: (signal) => $__utils_rune_spawn_kill.applySync(undefined, [id, signal ?? null]),
+        write: (text) => $__utils_rune_spawn_write.applySync(undefined, [id, text], { arguments: { copy: true } }),
+        writeEof: () => $__utils_rune_spawn_write_eof.applySync(undefined, [id]),
+        writeInterrupt: () => $__utils_rune_spawn_write_interrupt.applySync(undefined, [id]),
+        stdin: {
+          write: (chunk) => $__utils_rune_spawn_stdin_write.applySync(undefined, [id, chunk], { arguments: { copy: true } }),
+        },
       }
     },
     job: {
-      start:    (key, args)  => $__utils_rune_job_start.apply(undefined, [key, args], { arguments: { copy: true }, result: { promise: true, copy: true } }),
+      start:    (key, args, opts)  => $__utils_rune_job_start.apply(undefined, [key, args, opts], { arguments: { copy: true }, result: { promise: true, copy: true } }),
       kill:     (id, signal) => $__utils_rune_job_kill.apply(undefined, [id, signal ?? null], { arguments: { copy: true }, result: { promise: true } }),
       exists:   (id)         => $__utils_rune_job_exists.apply(undefined, [id], { result: { promise: true, copy: true } }),
       stdout:   (id)         => $__utils_rune_job_stdout.apply(undefined, [id], { result: { promise: true, copy: true } }),
