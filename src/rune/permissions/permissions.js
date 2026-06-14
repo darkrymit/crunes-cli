@@ -1,5 +1,5 @@
 import os from 'node:os'
-import { isMatch } from '../../shared/match.js'
+import { isGlobMatch, isWildcardMatch } from '../../shared/match.js'
 import { resolvePath } from '../api/utils.js'
 import { matchFetchPermission } from './permissions-http.js'
 import { matchEnvPermission } from './permissions-env.js'
@@ -199,7 +199,7 @@ export function makePermissionChecker(effective, ctx = null) {
       case 'fs.glob': {
         const sub = s => s.startsWith('./') ? '__DOT__/' + s.slice(2) : s
         const v   = sub(value.replace(/\\/g, '/'))
-        checkBatchAndThrow(capability, value, pvs => isMatch(v, pvs.map(sub)))
+        checkBatchAndThrow(capability, value, pvs => isGlobMatch(v, pvs.map(sub)))
         return
       }
       case 'shell.run':
@@ -210,7 +210,7 @@ export function makePermissionChecker(effective, ctx = null) {
       case 'rune.kill':
       case 'rune.exists':
       case 'db.connect': {
-        checkBatchAndThrow(capability, value, pvs => isMatch(value.replace(/\\/g, '/'), pvs))
+        checkBatchAndThrow(capability, value, pvs => isWildcardMatch(value.replace(/\\/g, '/'), pvs))
         return
       }
       // Capabilities whose value is always null — permission declared as bare capability name.
