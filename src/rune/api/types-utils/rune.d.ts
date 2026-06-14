@@ -3,14 +3,14 @@ declare namespace rune {
   /**
    * Calls another rune as a subprocess and awaits completion.
    * Hard process boundary — safe for cross-author/plugin rune composition.
-   * Requires `rune.run:<key>` permission.
+   * Requires `rune.run:<key>` permission. `*` matches any characters (e.g. `rune.run:myplugin:*`).
    */
   function exec(key: string, args?: string[]): Promise<RuneResult>
 
   /**
    * Spawns a rune as a streaming subprocess session.
    * Returns immediately with live stdout/stderr streams.
-   * Requires `rune.run:<key>` permission.
+   * Requires `rune.run:<key>` permission. `*` matches any characters (e.g. `rune.run:myplugin:*`).
    */
   function spawn(key: string, args?: string[]): RuneSession
 
@@ -43,7 +43,7 @@ declare namespace rune {
   namespace job {
     /**
      * Starts a rune as a detached background job with log-backed stdout/stderr.
-     * Survives parent process exit. Requires `rune.job.start:<key>` permission.
+     * Survives parent process exit. Requires `rune.job.start:<key>` permission. `*` matches any characters.
      */
     function start(key: string, args?: string[]): Promise<{ id: string }>
 

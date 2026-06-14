@@ -1,4 +1,4 @@
-import { isMatch } from '../../shared/match.js'
+import { isWildcardMatch } from '../../shared/match.js'
 
 export function buildMatchString(key, args) {
   return args.length === 0 ? key : `${key} ${args.join(' ')}`
@@ -15,10 +15,10 @@ export function checkBatchPermission(entry, matchString) {
   const spaceIdx = matchString.indexOf(' ')
   const subject = spaceIdx === -1 ? matchString : matchString.slice(spaceIdx + 1)
 
-  if (deny.length > 0 && isMatch(subject, deny)) {
+  if (deny.length > 0 && isWildcardMatch(subject, deny)) {
     return { allowed: false, reason: 'Matches deny pattern' }
   }
-  if (allow.length > 0 && isMatch(subject, allow)) {
+  if (allow.length > 0 && isWildcardMatch(subject, allow)) {
     return { allowed: true }
   }
   return { allowed: false, reason: 'No matching allow pattern' }

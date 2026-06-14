@@ -1,5 +1,5 @@
 import readline from 'node:readline'
-import { isMatch } from '../../shared/match.js'
+import { isGlobMatch } from '../../shared/match.js'
 import { loadConfig } from '../../core/config.js'
 import { formatSection } from '../../shared/render.js'
 import { output, isVerbose } from '../../shared/output.js'
@@ -115,7 +115,7 @@ export async function handler({
       process.stdout.write(JSON.stringify({ type, rune, instance: iid, ...(message != null ? { message } : {}), ...(section != null ? { section } : {}) }) + '\n')
     } else {
       if (type === 'section') {
-        if (!sectionFilter || isMatch(section.name, sectionFilter)) {
+        if (!sectionFilter || isGlobMatch(section.name, sectionFilter)) {
           process.stdout.write(formatSection(section, rune) + '\n')
         }
       } else if (type === 'log') {

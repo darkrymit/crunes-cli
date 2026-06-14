@@ -2,7 +2,7 @@
 declare namespace env {
   /**
    * Returns the value of an environment variable, or fallback if absent.
-   * Requires `env.read:<source>::<key>` permission (where source is 'process' or a .env filename like '.env').
+   * Requires `env.read:<source>::<key>` permission (where source is `process` or a .env filename like `.env`). `*` matches any characters in the key (e.g. `env.read:process::GITHUB_*`).
    * @param key Environment variable name
    * @param fallback Value returned if key is absent
    */
@@ -10,7 +10,7 @@ declare namespace env {
 
   /**
    * Returns true if the environment variable exists and is permitted.
-   * Requires `env.read:<source>::<key>` permission (where source is 'process' or a .env filename like '.env').
+   * Requires `env.read:<source>::<key>` permission (where source is `process` or a .env filename like `.env`). `*` matches any characters in the key (e.g. `env.read:process::GITHUB_*`).
    * @param key Environment variable name
    */
   function has(key: string): Promise<boolean>

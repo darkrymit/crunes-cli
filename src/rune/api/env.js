@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { parse } from 'dotenv'
-import { isMatch } from '../../shared/match.js'
+import { isWildcardMatch } from '../../shared/match.js'
 import { parseEnvPattern } from '../permissions/permissions-env.js'
 
 function loadFile(dir, src, cache) {
@@ -18,7 +18,7 @@ export function createEnvUtils(dir, checkPermission, permissions) {
     for (const pattern of permissions.allow) {
       if (!pattern.startsWith('env.read:')) continue
       const { sources, keyPatterns } = parseEnvPattern(pattern)
-      const keyOk = keyPatterns.some(pat => isMatch(key, pat))
+      const keyOk = keyPatterns.some(pat => isWildcardMatch(key, pat))
       if (!keyOk) continue
       
       for (const source of sources) {

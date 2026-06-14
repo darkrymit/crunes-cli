@@ -1,7 +1,7 @@
 /** HTTP client and server utilities */
 declare namespace http {
   /**
-   * Makes an HTTP request. Requires `http.fetch:<METHOD>::<url>` permission.
+   * Makes an HTTP request. Requires `http.fetch:<METHOD>::<url>` permission. In the URL, `*` matches within a path segment and `**` matches across segments (e.g. `http.fetch:GET::https://api.example.com/**`).
    * Aligns with the Web Fetch API. Also available as the global `fetch()`.
    * @param input Request URL string or Request object
    * @param init Request options

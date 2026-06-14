@@ -2,7 +2,7 @@
 declare namespace shell {
   /**
    * Runs a shell command asynchronously and returns its output.
-   * Requires `shell.run:<command>` permission.
+   * Requires `shell.run:<command>` permission. `*` matches any characters (e.g. `shell.run:bash *`).
    *
    * @param cmd Shell command to execute
    * @param opts Option object to configure shell execution
@@ -41,7 +41,7 @@ declare namespace shell {
 
   /**
    * Spawns an interactive shell session, allowing progressive streaming and real-time stdin/stdout interaction.
-   * Requires `shell.run:<command>` permission.
+   * Requires `shell.run:<command>` permission. `*` matches any characters (e.g. `shell.run:npm *`).
    *
    * @param cmd Shell command to spawn
    * @param opts Option object to configure interactive execution
@@ -82,7 +82,7 @@ declare namespace shell {
   }
 
   namespace job {
-    /** Starts a detached background shell job with log-backed stdout/stderr. Requires `shell.job.start:<command>` permission. */
+    /** Starts a detached background shell job with log-backed stdout/stderr. Requires `shell.job.start:<command>` permission. `*` matches any characters (e.g. `shell.job.start:bash *`). */
     function start(cmd: string, opts?: { env?: Record<string, string> }): Promise<{ id: string }>
     /** Sends a signal to a background shell job. Requires `shell.job.kill` permission. */
     function kill(id: string, signal?: 'SIGTERM' | 'SIGKILL' | 'SIGINT' | 'SIGHUP' | 'SIGUSR1' | 'SIGUSR2'): Promise<void>

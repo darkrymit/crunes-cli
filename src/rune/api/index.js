@@ -13,7 +13,7 @@ import { createCacheUtils } from './cache.js'
 import { createSqliteUtils } from './sqlite.js'
 import { createWsUtils } from './ws.js'
 import { createDbUtils } from './db.js'
-import { isMatch } from '../../shared/match.js'
+import { isGlobMatch } from '../../shared/match.js'
 
 export function createSectionUtils(patterns) {
   return {
@@ -23,7 +23,7 @@ export function createSectionUtils(patterns) {
     match(sectionName, overridePatterns) {
       const p = overridePatterns !== undefined ? overridePatterns : patterns;
       if (p == null) return true
-      return isMatch(sectionName, p)
+      return isGlobMatch(sectionName, p)
     },
     selected() {
       return patterns

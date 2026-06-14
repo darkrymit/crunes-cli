@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { DENY_BUILTINS } from './builtins.js'
-import { isMatch } from '../../shared/match.js'
+import { isGlobMatch } from '../../shared/match.js'
 
 /**
  * Create an ESM module resolver for use inside an isolated-vm isolate.
@@ -62,8 +62,8 @@ export function createModuleResolver(isolate, pluginDir, pluginNodeModules, plug
       }
       const normalizedRel = './' + rel.replace(/\\/g, '/')
       const token = `fs.read:${normalizedRel}`
-      const allowed = isMatch(token, effectiveAllow)
-      const denied = effectiveDeny.length > 0 && isMatch(token, effectiveDeny)
+      const allowed = isGlobMatch(token, effectiveAllow)
+      const denied = effectiveDeny.length > 0 && isGlobMatch(token, effectiveDeny)
       if (!allowed || denied) {
         throw new Error(`PermissionError: '${specifier}' — add 'fs.read:${normalizedRel}' to allow list.`)
       }
@@ -82,7 +82,7 @@ export function createModuleResolver(isolate, pluginDir, pluginNodeModules, plug
 
     // Step 3 — declared npm dep: must be in effectiveAllow AND in pluginDeps
     const moduleToken = `module:${specifier}`
-    const isAllowed = isMatch(moduleToken, effectiveAllow)
+    const isAllowed = isGlobMatch(moduleToken, effectiveAllow)
     const isDeclared = pluginDeps && Object.prototype.hasOwnProperty.call(pluginDeps, specifier)
     if (isAllowed && isDeclared) {
       const pkgDir = path.join(pluginNodeModules, specifier)
@@ -100,7 +100,7 @@ export function createModuleResolver(isolate, pluginDir, pluginNodeModules, plug
     if (builtinMsg) {
       throw new Error(`PermissionError: '${specifier}' — ${builtinMsg}`)
     }
-    const isDenied = effectiveDeny.length > 0 && isMatch(moduleToken, effectiveDeny)
+    const isDenied = effectiveDeny.length > 0 && isGlobMatch(moduleToken, effectiveDeny)
     if (isDenied) {
       throw new Error(`PermissionError: '${specifier}' is explicitly denied.`)
     }
