@@ -6,17 +6,43 @@ import { checkBatchPermission, buildMatchString } from './batch-permission.js'
 
 import { isGlobMatch } from '../../shared/match.js'
 
+export function parseBracketKey(token) {
+  if (!token) return { key: null, bracketArgs: [] }
+  const bracketStart = token.indexOf('[')
+  if (bracketStart === -1) return { key: token, bracketArgs: [] }
+  const bracketEnd = token.lastIndexOf(']')
+  const key = token.slice(0, bracketStart)
+  const inner = bracketEnd > bracketStart ? token.slice(bracketStart + 1, bracketEnd) : token.slice(bracketStart + 1)
+  const bracketArgs = inner.trim() ? inner.trim().split(/\s+/) : []
+  return { key: key || null, bracketArgs }
+}
+
 export function parseSegment(argv) {
+  if (!argv.length) return { key: null, sections: null, runeArgs: [] }
+
+  const { key, bracketArgs } = parseBracketKey(argv[0])
+
+  if (key && key.startsWith('-')) {
+    output.error(`Unknown option or misplaced flag: "${key}"`)
+    output.info(`
+Arguments must follow this strict structure:
+  1. Global Flags    (e.g., --cwd, --verbose)
+  2. Command         (e.g., run, bench)
+  3. Command Flags   (e.g., --format, -b)
+  4. Rune Key        (e.g., myrune[-s section])
+  5. Rune Arguments  (e.g., --strict, pos-arg)
+
+Example: crunes --cwd ./dir run myrune[-s summary] --strict
+`.trimEnd())
+    process.exit(1)
+  }
+
   let sections = null
   let i = 0
-
-  while (i < argv.length) {
-    const tok = argv[i]
-    if (tok === '--') {
-      i++
-      break
-    } else if ((tok === '--section' || tok === '-s') && i + 1 < argv.length) {
-      sections = argv[i + 1].split(',').map(s => s.trim()).filter(Boolean)
+  while (i < bracketArgs.length) {
+    const tok = bracketArgs[i]
+    if ((tok === '--section' || tok === '-s') && i + 1 < bracketArgs.length) {
+      sections = bracketArgs[i + 1].split(',').map(s => s.trim()).filter(Boolean)
       i += 2
     } else if (tok.startsWith('--section=')) {
       sections = tok.slice(10).split(',').map(s => s.trim()).filter(Boolean)
@@ -25,30 +51,11 @@ export function parseSegment(argv) {
       sections = tok.slice(3).split(',').map(s => s.trim()).filter(Boolean)
       i++
     } else {
-      break
+      i++
     }
   }
 
-  const key = argv[i] ?? null
-
-  if (key && key.startsWith('-')) {
-    output.error(`Unknown option or misplaced flag: "${key}"`)
-    output.info(`
-Arguments must follow this strict structure:
-  1. Global Flags    (e.g., --cwd, --verbose)
-  2. Command         (e.g., use, check, bench)
-  3. Command Flags   (e.g., --format, -b)
-  4. Rune Key        (e.g., myrune)
-  5. Rune Arguments  (e.g., --strict, pos-arg)
-
-Example: crunes --cwd ./dir run myrune --strict
-`.trimEnd())
-    process.exit(1)
-  }
-
-  const raw = key !== null ? argv.slice(i + 1) : []
-  const runeArgs = raw[0] === '--' ? raw.slice(1) : raw
-  return { key, sections, runeArgs }
+  return { key, sections, runeArgs: argv.slice(1) }
 }
 
 export function parseRunArgs(argv) {
@@ -57,14 +64,9 @@ export function parseRunArgs(argv) {
   let allowBatch = false
   let i = 0
 
-  // Consume command-level flags from the prefix only — stops at the first non-flag token.
-  // -- acts as an explicit end-of-run-flags marker and is consumed (not passed to segments).
   while (i < argv.length) {
     const tok = argv[i]
-    if (tok === '--') {
-      i++
-      break
-    } else if (tok === '--format' && i + 1 < argv.length) {
+    if (tok === '--format' && i + 1 < argv.length) {
       format = argv[i + 1]
       i += 2
     } else if (tok.startsWith('--format=')) {

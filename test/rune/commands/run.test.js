@@ -5,75 +5,88 @@ vi.mock('../../../src/rune/resolver.js', () => ({ runRune: vi.fn() }))
 
 import { loadConfig } from '../../../src/core/config.js'
 import { runRune } from '../../../src/rune/resolver.js'
-import { handler, parseSegment, parseRunArgs } from '../../../src/rune/commands/run.js'
+import { handler, parseSegment, parseRunArgs, parseBracketKey } from '../../../src/rune/commands/run.js'
+
+describe('parseBracketKey', () => {
+  it('returns key and empty bracketArgs for bare key', () => {
+    expect(parseBracketKey('qdev')).toEqual({ key: 'qdev', bracketArgs: [] })
+  })
+
+  it('parses --section in brackets', () => {
+    expect(parseBracketKey('qdev[--section foo,bar]')).toEqual({
+      key: 'qdev',
+      bracketArgs: ['--section', 'foo,bar'],
+    })
+  })
+
+  it('parses -s shorthand in brackets', () => {
+    expect(parseBracketKey('qdev[-s foo]')).toEqual({
+      key: 'qdev',
+      bracketArgs: ['-s', 'foo'],
+    })
+  })
+
+  it('parses multiple bracket flags', () => {
+    expect(parseBracketKey('qdev[--section foo --runs 5]')).toEqual({
+      key: 'qdev',
+      bracketArgs: ['--section', 'foo', '--runs', '5'],
+    })
+  })
+
+  it('parses plugin:key with brackets', () => {
+    expect(parseBracketKey('my-plugin:rune-key[-s summary]')).toEqual({
+      key: 'my-plugin:rune-key',
+      bracketArgs: ['-s', 'summary'],
+    })
+  })
+
+  it('returns null key for empty string', () => {
+    expect(parseBracketKey('')).toEqual({ key: null, bracketArgs: [] })
+  })
+})
 
 describe('parseSegment', () => {
   it('parses bare key', () => {
     expect(parseSegment(['api'])).toEqual({ key: 'api', sections: null, runeArgs: [] })
   })
 
-  it('passes rune flags through verbatim after key', () => {
+  it('passes all tokens after key as runeArgs verbatim', () => {
     expect(parseSegment(['api', '--format', 'json', '--verbose']))
       .toEqual({ key: 'api', sections: null, runeArgs: ['--format', 'json', '--verbose'] })
   })
 
-  it('consumes --section before key', () => {
-    expect(parseSegment(['--section', 'endpoints', 'api']))
+  it('passes --help to runeArgs verbatim', () => {
+    expect(parseSegment(['api', '--help']))
+      .toEqual({ key: 'api', sections: null, runeArgs: ['--help'] })
+  })
+
+  it('parses -s in bracket', () => {
+    expect(parseSegment(['api[-s endpoints]']))
       .toEqual({ key: 'api', sections: ['endpoints'], runeArgs: [] })
   })
 
-  it('consumes -s shorthand before key', () => {
-    expect(parseSegment(['-s', 'endpoints', 'api']))
+  it('parses --section in bracket', () => {
+    expect(parseSegment(['api[--section endpoints]']))
       .toEqual({ key: 'api', sections: ['endpoints'], runeArgs: [] })
   })
 
-  it('splits comma-separated section values', () => {
-    expect(parseSegment(['--section', 's1,s2', 'api']))
+  it('splits comma-separated section values from bracket', () => {
+    expect(parseSegment(['api[-s s1,s2]']))
       .toEqual({ key: 'api', sections: ['s1', 's2'], runeArgs: [] })
   })
 
-  it('does NOT consume --section that appears after the key', () => {
-    expect(parseSegment(['api', '--section', 'x']))
-      .toEqual({ key: 'api', sections: null, runeArgs: ['--section', 'x'] })
+  it('bracket + rune args', () => {
+    expect(parseSegment(['api[-s layout]', '--flag', 'val']))
+      .toEqual({ key: 'api', sections: ['layout'], runeArgs: ['--flag', 'val'] })
   })
 
   it('returns null key for empty argv', () => {
     expect(parseSegment([])).toEqual({ key: null, sections: null, runeArgs: [] })
   })
 
-  it('handles --section with key and rune args', () => {
-    expect(parseSegment(['--section', 'layout', 'api', '--flag', 'val']))
-      .toEqual({ key: 'api', sections: ['layout'], runeArgs: ['--flag', 'val'] })
-  })
-
-  it('-- before key: skips --, treats next token as key', () => {
-    expect(parseSegment(['--', 'api', '--format', 'json']))
-      .toEqual({ key: 'api', sections: null, runeArgs: ['--format', 'json'] })
-  })
-
-  it('-- before key after --section', () => {
-    expect(parseSegment(['--section', 'x', '--', 'api', '--flag']))
-      .toEqual({ key: 'api', sections: ['x'], runeArgs: ['--flag'] })
-  })
-
-  it('-- after key strips from runeArgs', () => {
+  it('passes -- through as rune arg', () => {
     expect(parseSegment(['api', '--', '--format', 'json']))
-      .toEqual({ key: 'api', sections: null, runeArgs: ['--format', 'json'] })
-  })
-
-  it('-- after key with no args after it', () => {
-    expect(parseSegment(['api', '--']))
-      .toEqual({ key: 'api', sections: null, runeArgs: [] })
-  })
-
-  it('-- after key after --section', () => {
-    expect(parseSegment(['--section', 'x', 'api', '--', '--flag']))
-      .toEqual({ key: 'api', sections: ['x'], runeArgs: ['--flag'] })
-  })
-
-  it('-- not first runeArg is passed through verbatim', () => {
-    expect(parseSegment(['api', '--flag', '--', 'val']))
-      .toEqual({ key: 'api', sections: null, runeArgs: ['--flag', '--', 'val'] })
+      .toEqual({ key: 'api', sections: null, runeArgs: ['--', '--format', 'json'] })
   })
 
   it('throws an error and exits if the resolved key starts with a hyphen', async () => {
@@ -81,12 +94,12 @@ describe('parseSegment', () => {
     const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {})
     const errorSpy = vi.spyOn(output, 'error').mockImplementation(() => {})
     const infoSpy = vi.spyOn(output, 'info').mockImplementation(() => {})
-    
+
     parseSegment(['--cwd', 'foo'])
-    
+
     expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('Unknown option or misplaced flag: "--cwd"'))
     expect(exitSpy).toHaveBeenCalledWith(1)
-    
+
     exitSpy.mockRestore()
     errorSpy.mockRestore()
     infoSpy.mockRestore()
@@ -131,12 +144,6 @@ describe('parseRunArgs', () => {
     expect(result.segments[0].runeArgs).toEqual(['+', 'git'])
   })
 
-  it('per-segment --section is isolated to its segment', () => {
-    const result = parseRunArgs(['-b', '--section', 'endpoints', 'api', '+', 'git'])
-    expect(result.segments[0].sections).toEqual(['endpoints'])
-    expect(result.segments[1].sections).toBeNull()
-  })
-
   it('rune args in first segment do not bleed into second', () => {
     const result = parseRunArgs(['-b', 'api', '--rune-flag', '+', 'git'])
     expect(result.segments[0].runeArgs).toEqual(['--rune-flag'])
@@ -173,26 +180,28 @@ describe('parseRunArgs', () => {
     expect(result.segments[0].runeArgs).toEqual(['--fail-fast'])
   })
 
-  it('treats -- as end of run-flags, strips it, passes nothing to segments', () => {
-    const result = parseRunArgs(['--format', 'jsonl', '--', 'api'])
-    expect(result.format).toBe('jsonl')
-    expect(result.segments[0].key).toBe('api')
-    expect(result.segments[0].runeArgs).toEqual([])
+  it('does not intercept --help after key — passes it to runeArgs', () => {
+    const result = parseRunArgs(['api', '--help'])
+    expect(result.segments[0].runeArgs).toEqual(['--help'])
   })
 
-  it('strips -- before key, rune args follow normally', () => {
-    const result = parseRunArgs(['--', 'api', '--format', 'json'])
+  it('stops at key — does not consume flags after it', () => {
+    const result = parseRunArgs(['api', '--format', 'jsonl'])
     expect(result.format).toBe('text')
-    expect(result.segments[0].key).toBe('api')
-    expect(result.segments[0].runeArgs).toEqual(['--format', 'json'])
+    expect(result.segments[0].runeArgs).toEqual(['--format', 'jsonl'])
   })
 
-  it('strips -- in batch — each segment still split by +', () => {
-    const result = parseRunArgs(['-b', '--', 'api', '--flag', '+', 'git'])
+  it('batch mode with bracket keys', () => {
+    const result = parseRunArgs(['-b', 'api[-s foo]', 'arg1', '+', 'other'])
     expect(result.isBatch).toBe(true)
-    expect(result.segments[0].key).toBe('api')
-    expect(result.segments[0].runeArgs).toEqual(['--flag'])
-    expect(result.segments[1].key).toBe('git')
+    expect(result.segments[0]).toMatchObject({ key: 'api', sections: ['foo'], runeArgs: ['arg1'] })
+    expect(result.segments[1]).toMatchObject({ key: 'other', sections: null, runeArgs: [] })
+  })
+
+  it('bracket section filter is isolated to its segment', () => {
+    const result = parseRunArgs(['-b', 'api[-s endpoints]', '+', 'git'])
+    expect(result.segments[0].sections).toEqual(['endpoints'])
+    expect(result.segments[1].sections).toBeNull()
   })
 })
 

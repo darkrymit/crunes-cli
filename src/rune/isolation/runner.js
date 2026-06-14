@@ -17,6 +17,7 @@ import { isVerbose } from '../../shared/output.js'
 import * as EMBEDDED from './embedded.js'
 import { parseArgs } from '../api/args-parser.js'
 import { RuneSession } from '../api/rune.js'
+import { formatHelp } from '../../docs/formatter.js'
 
 const __isolationDir = path.dirname(fileURLToPath(import.meta.url))
 
@@ -58,7 +59,7 @@ async function compileStaticModule(isolate, key) {
  */
 const VALID_SIGNALS = new Set(['SIGTERM', 'SIGKILL', 'SIGINT', 'SIGHUP', 'SIGUSR1', 'SIGUSR2'])
 
-async function injectUtils(isolate, context, utils, _runeCallback, vars, projectDir, checkPermission, currentRuneKey, sections, onEvent) {
+async function injectUtils(isolate, context, utils, _runeCallback, vars, projectDir, checkPermission, currentRuneKey, sections, onEvent, helpText) {
   const jail = context.global
   // Wrap async Reference callbacks so their rejected promises are caught on the
   // host side, preventing Node unhandledRejection events. ivm still receives the
@@ -941,6 +942,7 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
 
   await jail.set('$__vars', JSON.stringify(vars))
   await jail.set('$__projectDir', projectDir)
+  await jail.set('$__help_text', helpText ?? null)
 
   const [mdMod, treeMod, utilsMod] = await Promise.all([
     compileStaticModule(isolate, 'md'),
@@ -1035,7 +1037,15 @@ export async function runRuneInIsolate(runeFile, effective, args, projectDir, {
     }))
 
     if (isVerbose) console.error(`[crunes:debug] injecting utils and console...`)
-    const utilsMod = await injectUtils(isolate, context, utils, runeCallback, vars, projectDir, checkPermission, runeKey, sections, wrappedOnEvent)
+    let helpText = null
+    if (lifecycle === 'run') {
+      try {
+        const schema = await getArgsSchema(runeFile, effective, projectDir, { vars, nodeModulesDir, pluginDeps, pluginDir, pluginId })
+        const entry = { name: runeKey, description: undefined }
+        helpText = formatHelp(schema, { key: runeKey, name: entry.name, description: entry.description })
+      } catch { /* help unavailable, silently skip */ }
+    }
+    const utilsMod = await injectUtils(isolate, context, utils, runeCallback, vars, projectDir, checkPermission, runeKey, sections, wrappedOnEvent, helpText)
     await injectConsole(isolate, context, wrappedOnEvent)
 
     if (pluginDir != null) {

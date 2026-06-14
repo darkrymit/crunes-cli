@@ -39,28 +39,23 @@ export function buildProgram() {
     .addHelpText('after',
       '\nImportant: Global flags (e.g. --cwd) MUST appear before the "run" command.\n\n' +
       'Syntax:\n' +
-      '  [run-flags] [--] <key> [rune-args...]\n' +
-      '  -b [run-flags] [--] <key1> [rune-args1] + <key2> [rune-args2]\n\n' +
+      '  [run-flags] <key>[-s s1,s2] [rune-args...]\n' +
+      '  -b [run-flags] <key1>[-s s1] [rune-args1] + <key2>[-s s2] [rune-args2]\n\n' +
       'Command flags:\n' +
       '  -b, --batch          enable batching multiple runes with +\n' +
-      '  --section s1,s2      filter output sections (per rune, before the key)\n' +
       '  --format text|jsonl  output format (default: text)\n' +
-      '  --fail-fast          stop on first error\n' +
-      '  --                   end of run flags; everything after is key + rune args\n' +
-      '                       use when a rune flag collides with a run flag (e.g. --format)\n\n' +
+      '  --fail-fast          stop on first error\n\n' +
+      'Per-rune bracket flags (inside key[...]):\n' +
+      '  -s, --section s1,s2  filter output sections for this rune\n\n' +
       'Key prefixes:\n' +
       '  project:name         resolve from project config only\n' +
       '  plugin:name          resolve directly from an enabled plugin\n' +
-      '  name                 auto-resolve: project config first, then plugins'
+      '  name                 auto-resolve: project config first, then plugins\n\n' +
+      'For rune argument documentation: crunes docs rune <key>'
     )
-    .helpOption(false)
     .allowUnknownOption()
     .passThroughOptions()
-    .action(async (args, _opts, command) => {
-      for (const tok of args) {
-        if (tok === '--') break
-        if (tok === '--help' || tok === '-h') { command.help(); return }
-      }
+    .action(async (args, _opts, _command) => {
       const { handler, parseRunArgs } = await import('../rune/commands/run.js')
       const { segments, format, failFast, isBatch } = parseRunArgs(args)
       await handler({ segments, format, failFast, isBatch, projectRoot: projectRoot(), configRoot: configRoot() })
@@ -72,19 +67,15 @@ export function buildProgram() {
     .addHelpText('after',
       '\nImportant: Global flags (e.g. --cwd) MUST appear before the "run-repl" command.\n\n' +
       'Syntax:\n' +
-      '  [--format text|jsonl] [--section s1,s2] [--] <key> [rune-args...]\n\n' +
+      '  [--format text|jsonl] <key>[-s s1,s2] [rune-args...]\n\n' +
+      'Per-rune bracket flags (inside key[...]):\n' +
+      '  -s, --section s1,s2  filter output sections for this rune\n\n' +
       'The rune must export a runRepl(args, input) function.\n' +
-      'Output via console.log() and utils.section.emit().\n' +
-      'End session with Ctrl+D or by returning { type: "done" } from runRepl.'
+      'For rune argument documentation: crunes docs rune <key>'
     )
-    .helpOption(false)
     .allowUnknownOption()
     .passThroughOptions()
-    .action(async (args, _opts, command) => {
-      for (const tok of args) {
-        if (tok === '--') break
-        if (tok === '--help' || tok === '-h') { command.help(); return }
-      }
+    .action(async (args, _opts, _command) => {
       const { handler, parseReplArgs } = await import('../rune/commands/run-repl.js')
       const { key, runeArgs, sections, format } = parseReplArgs(args)
       await handler({ key, runeArgs, sections, format, projectRoot: projectRoot(), configRoot: configRoot() })
@@ -218,43 +209,29 @@ export function buildProgram() {
     })
 
   program
-    .command('check [args...]')
-    .description('Run a rune and validate its output shape.')
-    .addHelpText('after', '\nImportant: Global flags (e.g. --cwd) MUST appear before the "check" command.\n\nSyntax:\n  [--section s1,s2] [--] <key> [rune-args...]')
-    .helpOption(false)
-    .allowUnknownOption()
-    .passThroughOptions()
-    .action(async (args, _opts, command) => {
-      for (const tok of args) {
-        if (tok === '--') break
-        if (tok === '--help' || tok === '-h') { command.help(); return }
-      }
-      const { parseSegment } = await import('../rune/commands/run.js')
-      const { handler } = await import('../rune/commands/check.js')
-      const { key, sections, runeArgs } = parseSegment(args)
-      if (!key) {
-        const { output } = await import('../shared/output.js')
-        output.error('Missing required argument: <rune>')
-        process.exit(1)
-      }
-      await handler({ key, sections, runeArgs, projectRoot: projectRoot(), configRoot: configRoot() })
-    })
-
-  program
     .command('bench [args...]')
     .description('Time rune execution and report fast, ok, or slow.')
-    .addHelpText('after', '\nImportant: Global flags (e.g. --cwd) MUST appear before the "bench" command.\n\nSyntax:\n  [--runs <n>] [--warmup] [--section s1,s2] [--] <key> [rune-args...]')
-    .helpOption(false)
+    .addHelpText('after',
+      '\nImportant: Global flags (e.g. --cwd) MUST appear before the "bench" command.\n\n' +
+      'Syntax:\n' +
+      '  [--runs <n>] [--warmup] <key>[--runs <n>] [--warmup] [-s s1,s2] [rune-args...]\n\n' +
+      'Command flags:\n' +
+      '  -b, --batch          enable batching multiple runes with +\n' +
+      '  --format text|jsonl  output format (default: text)\n' +
+      '  --fail-fast          stop on first error\n' +
+      '  --runs <n>           default number of runs for all runes (default: 1)\n' +
+      '  --warmup             default warmup run for all runes\n\n' +
+      'Per-rune bracket flags (inside key[...]):\n' +
+      '  --runs <n>           override run count for this rune\n' +
+      '  --warmup             override warmup for this rune\n' +
+      '  -s, --section s1,s2  filter output sections for this rune'
+    )
     .allowUnknownOption()
     .passThroughOptions()
-    .action(async (args, _opts, command) => {
-      for (const tok of args) {
-        if (tok === '--') break
-        if (tok === '--help' || tok === '-h') { command.help(); return }
-      }
+    .action(async (args, _opts, _command) => {
       const { handler, parseBenchArgs } = await import('../rune/commands/benchmark.js')
       const parsed = parseBenchArgs(args)
-      if (!parsed.key) {
+      if (!parsed.segments[0]?.key) {
         const { output } = await import('../shared/output.js')
         output.error('Missing required argument: <rune>')
         process.exit(1)

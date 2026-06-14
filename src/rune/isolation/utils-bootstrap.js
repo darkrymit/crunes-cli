@@ -1596,3 +1596,15 @@ globalThis.clearInterval = function(id) {
 }
 
 globalThis.fetch = (input, init) => globalThis.utils.http.fetch(input, init)
+
+const __helpText = typeof $__help_text !== 'undefined' ? $__help_text : null
+
+globalThis.help = {
+  text() {
+    return __helpText ?? ''
+  },
+  section() {
+    const { section } = globalThis.utils
+    return section.create('help', { type: 'markdown', content: __helpText ?? '' })
+  },
+}

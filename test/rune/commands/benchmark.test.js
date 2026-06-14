@@ -11,39 +11,67 @@ const MINIMAL_SECTION = [{ name: 'out', data: { type: 'markdown', content: 'x' }
 
 describe('parseBenchArgs', () => {
   it('parses bare key with defaults', () => {
-    expect(parseBenchArgs(['api'])).toMatchObject({ key: 'api', runeArgs: [], runs: 1, warmup: false })
+    const result = parseBenchArgs(['api'])
+    expect(result.segments[0]).toMatchObject({ key: 'api', runeArgs: [], runs: 1, warmup: false })
   })
 
-  it('extracts --runs value as integer', () => {
-    expect(parseBenchArgs(['--runs', '5', 'api']).runs).toBe(5)
+  it('global --runs before key', () => {
+    expect(parseBenchArgs(['--runs', '5', 'api']).segments[0].runs).toBe(5)
   })
 
-  it('extracts --warmup flag', () => {
-    expect(parseBenchArgs(['--warmup', 'api']).warmup).toBe(true)
+  it('global --warmup before key', () => {
+    expect(parseBenchArgs(['--warmup', 'api']).segments[0].warmup).toBe(true)
   })
 
   it('passes rune args through verbatim after key', () => {
-    expect(parseBenchArgs(['api', '--verbose', '--flag', 'v']).runeArgs).toEqual(['--verbose', '--flag', 'v'])
+    expect(parseBenchArgs(['api', '--verbose', '--flag', 'v']).segments[0].runeArgs).toEqual(['--verbose', '--flag', 'v'])
   })
 
   it('returns null key for empty argv', () => {
-    expect(parseBenchArgs([]).key).toBeNull()
+    expect(parseBenchArgs([]).segments[0].key).toBeNull()
   })
 
   it('handles --runs=N inline form', () => {
-    expect(parseBenchArgs(['--runs=3', 'api']).runs).toBe(3)
+    expect(parseBenchArgs(['--runs=3', 'api']).segments[0].runs).toBe(3)
   })
 
   it('does not intercept --runs after the key — passes it to runeArgs', () => {
     const result = parseBenchArgs(['api', '--runs', '5'])
-    expect(result.runs).toBe(1)
-    expect(result.runeArgs).toEqual(['--runs', '5'])
+    expect(result.segments[0].runs).toBe(1)
+    expect(result.segments[0].runeArgs).toEqual(['--runs', '5'])
   })
 
   it('does not intercept --warmup after the key — passes it to runeArgs', () => {
     const result = parseBenchArgs(['api', '--warmup'])
-    expect(result.warmup).toBe(false)
-    expect(result.runeArgs).toEqual(['--warmup'])
+    expect(result.segments[0].warmup).toBe(false)
+    expect(result.segments[0].runeArgs).toEqual(['--warmup'])
+  })
+
+  it('per-rune --runs in bracket overrides global', () => {
+    const result = parseBenchArgs(['--runs', '3', 'api[--runs 5]'])
+    expect(result.segments[0].runs).toBe(5)
+  })
+
+  it('global --runs applies to segments without per-rune override', () => {
+    const result = parseBenchArgs(['-b', '--runs', '3', 'api[--runs 5]', '+', 'other'])
+    expect(result.segments[0].runs).toBe(5)
+    expect(result.segments[1].runs).toBe(3)
+  })
+
+  it('-s in bracket sets sections', () => {
+    expect(parseBenchArgs(['api[-s foo]']).segments[0].sections).toEqual(['foo'])
+  })
+
+  it('batch mode splits on +', () => {
+    const result = parseBenchArgs(['-b', 'api[--runs 5]', 'arg1', '+', 'other'])
+    expect(result.isBatch).toBe(true)
+    expect(result.segments).toHaveLength(2)
+    expect(result.segments[0]).toMatchObject({ key: 'api', runs: 5, runeArgs: ['arg1'] })
+    expect(result.segments[1]).toMatchObject({ key: 'other', runs: 1 })
+  })
+
+  it('does not intercept --help — passes to runeArgs', () => {
+    expect(parseBenchArgs(['api', '--help']).segments[0].runeArgs).toEqual(['--help'])
   })
 })
 

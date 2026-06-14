@@ -3,7 +3,7 @@ tags: [module]
 ---
 # shared
 
-> Cross-cutting utilities: `render.js` converts Section data to CLI strings; `output.js` is the global logger with plain/color modes; `match.js` is the single micromatch wrapper used everywhere.
+> Cross-cutting utilities: `render.js` converts Section data to CLI strings; `output.js` is the global logger with plain/color modes; `match.js` exports two matchers — `isGlobMatch` (path-aware, micromatch) and `isWildcardMatch` (flat string, regex).
 
 **Source:** `src/shared/`
 **Related:** all modules (no domain coupling)
@@ -24,7 +24,9 @@ The renderer converts structured data (trees, markdown) into CLI-displayable str
 
 **Sections with no content are dropped:** If a section has no title and no renderable data, it produces an empty string. The run handler filters out empty sections from the output. A rune can return a section with no title and no data, and it silently disappears. This is sometimes intentional (conditional output) and sometimes a bug (missing data field).
 
-**Centralized glob matching:** All micromatch calls go through `match.js` with a fixed option set: `dot` (hidden files match), `noextglob`, `nonegate`, `nobrace`, `nobracket` (disable special syntax that can misfire on values containing `!`, `{`, `[`, etc.). The `startsWith` bypass for `:**`/`:*` patterns exists because micromatch cannot match strings containing `:` (Windows drive letters) against `**` globs.
+**Two matchers for two semantics:** `match.js` exports `isGlobMatch` and `isWildcardMatch` for different matching contexts. `isGlobMatch` wraps micromatch with a fixed option set (`dot`, `noextglob`, `nonegate`, `nobrace`, `nobracket`) — `*` stops at `/`, so it is correct for file paths and URLs where path boundaries are meaningful security boundaries. `isWildcardMatch` converts patterns to a regex where `*` (and `**`) match any characters including `/`, spaces, and commas — correct for shell commands, rune keys, env var names, cache/sqlite names, and db URIs, where there are no path-segment boundaries. Both are imported by name; the correct choice is determined by whether the value being matched has path-segment semantics.
+
+**`formatSection` for CLI output:** `render.js` also exports `formatSection`, which produces a CLI-prefixed string (`[instanceId:rune:section] name`) for REPL and streaming output modes. It is distinct from `renderSection`, which produces the plain section body used in batch post-run flush.
 
 ## Key Decisions
 

@@ -11,7 +11,15 @@ Permission enforcement for all sandboxed rune capabilities. `permissions.js` mer
 - **permissions-http-server.js** — `matchHttpServerPermission(value, patterns)` — matches an HTTP server bind value against an array of patterns. `isLoopbackHost(host)` — returns true for loopback addresses (`127.0.0.1`, `localhost`, `::1`).
 - **permissions-ws.js** — `matchWsPermission(url, patterns)` — matches a WebSocket client URL against an array of patterns. `matchWsServerPermission(value, patterns)` — matches a WebSocket server bind value (`host:port:path`) against an array of patterns.
 
+## Matcher Strategy
+
+Two matchers from `shared/match.js` are used depending on the capability:
+
+- **`isGlobMatch`** (micromatch, path-aware) — `fs.*`, `http.fetch`, `ws.client`, `ws.server`, `http.server`. `*` stops at `/`, preserving path-segment boundaries as security boundaries.
+- **`isWildcardMatch`** (regex, flat) — `shell.run`, `shell.job.start`, `rune.exec`, `rune.job.start`, `db.connect`, env key patterns, store name patterns. `*` matches any characters including `/`, spaces, and commas, since these values have no path-segment semantics.
+
 ## Related Modules
 
 - `rune/api` — All API modules call `checkPermission` at construction time via `makePermissionChecker`.
 - `rune/resolver` — `computeEffectivePermissions` is called before running any rune to merge project and plugin permission sets.
+- `shared/match.js` — Source of both matchers.

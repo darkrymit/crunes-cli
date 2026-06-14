@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseReplReturn, parseSlashCommand, BUILTIN_SLASH_COMMANDS, parseJsonlInputLine } from '../../../src/rune/commands/run-repl.js'
+import { parseReplReturn, parseSlashCommand, BUILTIN_SLASH_COMMANDS, parseJsonlInputLine, parseReplArgs } from '../../../src/rune/commands/run-repl.js'
 
 describe('parseReplReturn', () => {
   it('undefined → continue with no prompt change', () => {
@@ -109,5 +109,38 @@ describe('onEvent stderr routing', () => {
       process.stderr.write = orig
     }
     expect(captured).toEqual(['msg-log\n', 'msg-warn\n', 'msg-error\n', 'msg-info\n', 'msg-debug\n'])
+  })
+})
+
+describe('parseReplArgs — bracket syntax', () => {
+  it('parses bare key', () => {
+    expect(parseReplArgs(['myrepl'])).toMatchObject({ key: 'myrepl', sections: null, runeArgs: [] })
+  })
+
+  it('parses format flag before key', () => {
+    expect(parseReplArgs(['--format', 'jsonl', 'myrepl'])).toMatchObject({
+      format: 'jsonl',
+      key: 'myrepl',
+    })
+  })
+
+  it('parses -s in bracket', () => {
+    expect(parseReplArgs(['myrepl[-s foo]'])).toMatchObject({
+      key: 'myrepl',
+      sections: ['foo'],
+      runeArgs: [],
+    })
+  })
+
+  it('does not intercept --help', () => {
+    expect(parseReplArgs(['myrepl', '--help'])).toMatchObject({
+      key: 'myrepl',
+      runeArgs: ['--help'],
+    })
+  })
+
+  it('passes -- through as rune arg', () => {
+    const result = parseReplArgs(['myrepl', '--', '--flag'])
+    expect(result.runeArgs).toEqual(['--', '--flag'])
   })
 })
