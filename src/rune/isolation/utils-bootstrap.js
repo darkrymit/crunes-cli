@@ -616,11 +616,13 @@ globalThis.utils = {
       return session
     },
     job: {
-      start:  (cmd, opts) => $__utils_shell_job_start.apply(undefined, [cmd, opts], { arguments: { copy: true }, result: { promise: true, copy: true } }),
-      kill:   (id, signal) => $__utils_shell_job_kill.apply(undefined, [id, signal ?? null], { arguments: { copy: true }, result: { promise: true } }),
-      exists: (id) => $__utils_shell_job_exists.apply(undefined, [id], { result: { promise: true, copy: true } }),
-      stdout: (id) => $__utils_shell_job_stdout.apply(undefined, [id], { result: { promise: true, copy: true } }),
-      stderr: (id) => $__utils_shell_job_stderr.apply(undefined, [id], { result: { promise: true, copy: true } }),
+      start:     (cmd, opts) => $__utils_shell_job_start.apply(undefined, [cmd, opts], { arguments: { copy: true }, result: { promise: true, copy: true } }),
+      kill:      (id, signal) => $__utils_shell_job_kill.apply(undefined, [id, signal ?? null], { arguments: { copy: true }, result: { promise: true } }),
+      exists:    (id) => $__utils_shell_job_exists.apply(undefined, [id], { result: { promise: true, copy: true } }),
+      stdout:    (id) => $__utils_shell_job_stdout.apply(undefined, [id], { result: { promise: true, copy: true } }),
+      stderr:    (id) => $__utils_shell_job_stderr.apply(undefined, [id], { result: { promise: true, copy: true } }),
+      write:     (id, text) => $__utils_shell_job_write.apply(undefined, [id, text], { arguments: { copy: true }, result: { promise: true } }),
+      writeEof:  (id) => $__utils_shell_job_write_eof.apply(undefined, [id], { arguments: { copy: true }, result: { promise: true } }),
     },
   },
   section: {
@@ -680,6 +682,8 @@ globalThis.utils = {
       stdout:   (id)         => $__utils_rune_job_stdout.apply(undefined, [id], { result: { promise: true, copy: true } }),
       stderr:   (id)         => $__utils_rune_job_stderr.apply(undefined, [id], { result: { promise: true, copy: true } }),
       sections: (id)         => $__utils_rune_job_sections.apply(undefined, [id], { result: { promise: true, copy: true } }),
+      write:    (id, text)   => $__utils_rune_job_write.apply(undefined, [id, text], { arguments: { copy: true }, result: { promise: true } }),
+      writeEof: (id)         => $__utils_rune_job_write_eof.apply(undefined, [id], { arguments: { copy: true }, result: { promise: true } }),
     },
   },
   json: {

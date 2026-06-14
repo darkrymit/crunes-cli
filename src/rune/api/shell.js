@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process'
 import fs from 'node:fs'
+import { tailStdin } from '../../job/stdin-tail.js'
 
 const ANSI_RE = /\x1b\[[0-9;]*m/g
 
@@ -220,16 +221,42 @@ export function createShellUtils(dir, checkPermission) {
     return new ShellSession(cmd, { dir, ...opts, activeSessions })
   }
 
-  async function createShellJob(cmd, opts, { createJob, updateJobPid, jobStdoutPath, jobStderrPath, spawnedBy, projectKey, projectDir: jobProjectDir }) {
+  async function createShellJob(cmd, opts, { createJob, updateJobPid, jobStdoutPath, jobStderrPath, jobStdinPath, spawnedBy, projectKey, projectDir: jobProjectDir }) {
+    const repl = opts?.repl ?? false
     const { id } = await createJob(null, {
       type: 'shell', spawnedBy, runeKey: null, projectDir: jobProjectDir, args: [cmd],
     })
     const outFd = fs.openSync(jobStdoutPath(projectKey, id), 'a')
     const errFd = fs.openSync(jobStderrPath(projectKey, id), 'a')
+    let stdinArg = 'ignore'
+    let tailHandle = null
+    if (repl) {
+      const stdinLog = jobStdinPath(projectKey, id)
+      fs.writeFileSync(stdinLog, '')
+      stdinArg = 'pipe'
+      const child = spawn(cmd, [], {
+        shell:   true,
+        detached: true,
+        stdio:   [stdinArg, outFd, errFd],
+        cwd:     jobProjectDir,
+        env:     opts?.env ? { ...process.env, ...opts.env } : process.env,
+        windowsHideConsole: true,
+      })
+      tailHandle = tailStdin(stdinLog, {
+        onLine: (line) => { child.stdin.write(line + '\n') },
+        onEof: () => { child.stdin.end() },
+      })
+      child.on('exit', () => { if (tailHandle) tailHandle.stop() })
+      await updateJobPid(projectKey, id, child.pid)
+      child.unref()
+      fs.closeSync(outFd)
+      fs.closeSync(errFd)
+      return { id }
+    }
     const child = spawn(cmd, [], {
       shell:   true,
       detached: true,
-      stdio:   ['ignore', outFd, errFd],
+      stdio:   [stdinArg, outFd, errFd],
       cwd:     jobProjectDir,
       env:     opts?.env ? { ...process.env, ...opts.env } : process.env,
       windowsHideConsole: true,

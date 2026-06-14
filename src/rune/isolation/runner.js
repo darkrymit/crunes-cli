@@ -279,9 +279,23 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
   await jail.set('$__utils_shell_job_start', asyncRef(async (cmd, opts) => {
     checkPermission('shell.job.start', cmd)
     return utils.shell.createShellJob(cmd, opts, {
-      createJob, updateJobPid, jobStdoutPath, jobStderrPath,
+      createJob, updateJobPid, jobStdoutPath, jobStderrPath, jobStdinPath,
       spawnedBy: currentRuneKey, projectKey: pKey, projectDir,
     })
+  }))
+  await jail.set('$__utils_shell_job_write', asyncRef(async (id, text) => {
+    checkPermission('shell.job.read', null)
+    const record = await getJob(pKey, id)
+    if (!record) throw new Error(`Unknown job: ${id}`)
+    const logPath = jobStdinPath(record.projectKey, id)
+    await fsSync.promises.appendFile(logPath, text + '\n', 'utf8')
+  }))
+  await jail.set('$__utils_shell_job_write_eof', asyncRef(async (id) => {
+    checkPermission('shell.job.read', null)
+    const record = await getJob(pKey, id)
+    if (!record) throw new Error(`Unknown job: ${id}`)
+    const logPath = jobStdinPath(record.projectKey, id)
+    await fsSync.promises.appendFile(logPath, EOF_SENTINEL + '\n', 'utf8')
   }))
   await jail.set('$__utils_shell_job_kill', asyncRef(async (id, signal) => {
     checkPermission('shell.job.kill', null)
@@ -416,17 +430,31 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
     const handle = shellHandles.get(id)
     if (handle) handle.stdin.write(chunk)
   }))
-  await jail.set('$__utils_rune_job_start', asyncRef(async (runeKey, args) => {
-    checkPermission('rune.job.start', runeKey)
+  await jail.set('$__utils_rune_job_start', asyncRef(async (runeKey, args, opts) => {
+    const repl = opts?.repl ?? false
+    checkPermission(repl ? 'rune.runRepl' : 'rune.job.start', runeKey)
     const cliPath = process.argv[1]
     const { id } = await createJob(null, { type: 'rune', spawnedBy: currentRuneKey, runeKey, projectDir, args: args ?? [] })
     const outFd = fsSync.openSync(jobStdoutPath(pKey, id), 'a')
     const errFd = fsSync.openSync(jobStderrPath(pKey, id), 'a')
+    const cliArgs = repl
+      ? [cliPath, '--cwd', projectDir, 'run-repl', '--format', 'jsonl', runeKey, ...(args ?? [])]
+      : [cliPath, '--cwd', projectDir, 'run', '--format', 'jsonl', runeKey, '--', ...(args ?? [])]
+    const stdinMode = repl ? 'pipe' : 'ignore'
     const child = spawnProcess(
       process.execPath,
-      [cliPath, '--cwd', projectDir, 'run', '--format', 'jsonl', runeKey, '--', ...(args ?? [])],
-      { detached: true, stdio: ['ignore', outFd, errFd], env: { ...process.env, CRUNES_NO_TIMEOUT: '1' }, windowsHideConsole: true }
+      cliArgs,
+      { detached: true, stdio: [stdinMode, outFd, errFd], env: { ...process.env, CRUNES_NO_TIMEOUT: '1' }, windowsHideConsole: true }
     )
+    if (repl) {
+      const stdinLog = jobStdinPath(pKey, id)
+      fsSync.writeFileSync(stdinLog, '')
+      const tail = tailStdin(stdinLog, {
+        onLine: (line) => { child.stdin.write(line + '\n') },
+        onEof: () => { child.stdin.end() },
+      })
+      child.on('exit', () => tail.stop())
+    }
     await updateJobPid(pKey, id, child.pid)
     child.unref()
     fsSync.closeSync(outFd)
@@ -479,6 +507,20 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
       } catch {}
     }
     return sections
+  }))
+  await jail.set('$__utils_rune_job_write', asyncRef(async (id, text) => {
+    checkPermission('rune.job.read', null)
+    const record = await getJob(pKey, id)
+    if (!record) throw new Error(`Unknown job: ${id}`)
+    const logPath = jobStdinPath(record.projectKey, id)
+    await fsSync.promises.appendFile(logPath, JSON.stringify({ type: 'line', text }) + '\n', 'utf8')
+  }))
+  await jail.set('$__utils_rune_job_write_eof', asyncRef(async (id) => {
+    checkPermission('rune.job.read', null)
+    const record = await getJob(pKey, id)
+    if (!record) throw new Error(`Unknown job: ${id}`)
+    const logPath = jobStdinPath(record.projectKey, id)
+    await fsSync.promises.appendFile(logPath, JSON.stringify({ type: 'eof', text: '' }) + '\n', 'utf8')
   }))
   await jail.set('$__utils_time_after', new ivm.Reference((ms) => {
     return new Promise(resolve => setTimeout(resolve, ms).unref())
