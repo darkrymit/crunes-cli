@@ -8,7 +8,8 @@ import { getAutoPermits } from '../api/utils.js'
 import { createModuleResolver } from './resolver.js'
 import { DENY_BUILTINS } from './builtins.js'
 import { createJob, getJob } from '../../job/index.js'
-import { updateJobPid, jobStdoutPath, jobStderrPath } from '../../job/registry.js'
+import { updateJobPid, jobStdoutPath, jobStderrPath, jobStdinPath } from '../../job/registry.js'
+import { tailStdin, EOF_SENTINEL } from '../../job/stdin-tail.js'
 import fsSync from 'node:fs'
 import { ensureProjectIdentity } from '../../project/index.js'
 import { hash, hashAsHex, hashAsBase64, hmac, hmacAsHex, hmacAsBase64, encrypt, decrypt, uuid as cryptoUuid, randomHex as cryptoHex, randomBase64 as cryptoBase64, randomBytesFn } from '../api/crypto.js'
@@ -329,14 +330,35 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
   await jail.set('$__utils_section_selected', new ivm.Reference(() => {
     return utils.section.selected() ?? undefined
   }))
-  await jail.set('$__utils_rune_exec', asyncRef(async (runeKey, args) => {
-    checkPermission('rune.run', runeKey)
+  await jail.set('$__utils_rune_exec', asyncRef(async (runeKey, args, opts) => {
+    const repl = opts?.repl === true
+    if (repl) {
+      checkPermission('rune.runRepl', runeKey)
+    } else {
+      checkPermission('rune.run', runeKey)
+    }
     const cliPath = process.argv[1]
+    const cliArgs = repl
+      ? [cliPath, '--cwd', projectDir, 'run-repl', '--format', 'jsonl', runeKey, ...(args ?? [])]
+      : [cliPath, '--cwd', projectDir, 'run', '--format', 'jsonl', runeKey, '--', ...(args ?? [])]
     const child = spawnProcess(
       process.execPath,
-      [cliPath, '--cwd', projectDir, 'run', '--format', 'jsonl', runeKey, '--', ...(args ?? [])],
-      { stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, CRUNES_NO_TIMEOUT: '1' }, windowsHideConsole: true }
+      cliArgs,
+      { stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env, CRUNES_NO_TIMEOUT: '1' }, windowsHideConsole: true }
     )
+    const stdinInput = opts?.stdin
+    if (stdinInput !== undefined && stdinInput !== null) {
+      if (typeof stdinInput === 'string') {
+        child.stdin.write(stdinInput)
+        child.stdin.end()
+      } else if (stdinInput && typeof stdinInput.pipe === 'function') {
+        stdinInput.pipe(child.stdin)
+      } else {
+        child.stdin.end()
+      }
+    } else {
+      child.stdin.end()
+    }
     let stdout = '', stderr = ''
     child.stdout.on('data', chunk => { stdout += chunk })
     child.stderr.on('data', chunk => { stderr += chunk })
@@ -351,9 +373,14 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
     }
     return { sections, stdout, stderr, exitCode, ok: exitCode === 0 }
   }))
-  await jail.set('$__utils_rune_spawn_open', new ivm.Reference((runeKey, args) => {
-    checkPermission('rune.run', runeKey)
-    const session = new RuneSession(runeKey, args, { cliPath: process.argv[1], projectDir })
+  await jail.set('$__utils_rune_spawn_open', new ivm.Reference((runeKey, args, opts) => {
+    const repl = opts?.repl === true
+    if (repl) {
+      checkPermission('rune.runRepl', runeKey)
+    } else {
+      checkPermission('rune.run', runeKey)
+    }
+    const session = new RuneSession(runeKey, args, { cliPath: process.argv[1], projectDir, repl })
     const id = String(nextShellHandle++)
     shellHandles.set(id, session)
     return id
@@ -372,6 +399,22 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
   await jail.set('$__utils_rune_spawn_kill', new ivm.Reference((id, signal) => {
     const handle = shellHandles.get(id)
     if (handle) { handle.kill(signal ?? undefined); shellHandles.delete(id) }
+  }))
+  await jail.set('$__utils_rune_spawn_write', new ivm.Reference((id, text) => {
+    const handle = shellHandles.get(id)
+    if (handle) handle.write(text)
+  }))
+  await jail.set('$__utils_rune_spawn_write_eof', new ivm.Reference((id) => {
+    const handle = shellHandles.get(id)
+    if (handle) handle.writeEof()
+  }))
+  await jail.set('$__utils_rune_spawn_write_interrupt', new ivm.Reference((id) => {
+    const handle = shellHandles.get(id)
+    if (handle) handle.writeInterrupt()
+  }))
+  await jail.set('$__utils_rune_spawn_stdin_write', new ivm.Reference((id, chunk) => {
+    const handle = shellHandles.get(id)
+    if (handle) handle.stdin.write(chunk)
   }))
   await jail.set('$__utils_rune_job_start', asyncRef(async (runeKey, args) => {
     checkPermission('rune.job.start', runeKey)
