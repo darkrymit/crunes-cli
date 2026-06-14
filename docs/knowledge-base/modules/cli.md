@@ -31,7 +31,7 @@ The `--cwd` and `--ccd` flags are independent overrides. `--cwd` changes where t
 
 **`--batch` opt-in:** The `-b` or `--batch` flag on the `run` command changes how `+` characters in the rune argument are interpreted. Without `-b`, `+` is a literal rune argument. With `-b`, each `+` acts as a segment boundary separating independent rune invocations. This opt-in design prevents runes that legitimately use `+` in their own argument space from breaking.
 
-**`docs` as a command group:** The `crunes docs` group has 6 subcommands: `rune`, `utils`, `globals`, `intro`, `args`, and `run`. The `run` subcommand documents the `run(args)` function that rune authors write — it is not about the `crunes run` CLI command. Confusing the two is common.
+**`docs` as a command group:** The `crunes docs` group has 10 subcommands: `rune`, `utils`, `globals`, `intro`, `args`, `run`, `run-repl`, `args-repl`, `banner-repl`, `commands-repl`, `input-repl`, and `complete-input-repl`. The `run` and `run-repl` subcommands document the lifecycle exports that rune authors write — they are not about the `crunes run` / `crunes run-repl` CLI commands. Confusing the two is common.
 
 ## Key Decisions
 

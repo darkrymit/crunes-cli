@@ -18,7 +18,7 @@ Rune execution begins with a single entry point that resolves a key through a ti
 - **`isolation/`** — Manages the sandboxed VM lifecycle: creates the isolate, compiles built-in utility modules into it, injects the utils bridge as host callbacks, compiles the rune code, evaluates it, and collects results.
 - **`api/`** — Implements the complete utils object that rune authors depend on, partitioned into namespace modules for filesystem I/O, process spawning, structured data handling, networking, configuration reading, output formatting, local storage, and cryptographic utilities.
 - **`permissions/`** — Computes effective permission sets by merging plugin declarations, project overrides, and auto-grants, then provides per-operation checkers that gate all I/O calls.
-- **`commands/`** — Implements CLI handlers: `run` executes runes and renders output, `run-repl` runs a rune in persistent REPL mode, `list` enumerates available runes, `create` scaffolds new ones, `check` validates syntax and permissions, `benchmark` times execution over configurable repetitions.
+- **`commands/`** — Implements CLI handlers: `run` executes runes and renders output, `run-repl` runs a rune in persistent REPL mode, `list` enumerates available runes, `create` scaffolds new ones, `benchmark` times execution over configurable repetitions.
 
 ## Concepts
 

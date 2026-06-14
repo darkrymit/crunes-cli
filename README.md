@@ -55,7 +55,6 @@ crunes init                          # Create .crunes/config.json in current pro
 crunes create [key]                  # Scaffold a new rune and register it in config
 crunes run <key> [args...]           # Run a rune (use -b for batch execution)
 crunes run-repl <key> [args...]      # Run a rune in interactive REPL mode
-crunes check <key>                   # Execute a rune and validate its return schema
 crunes bench <key>                   # Profile execution time (fast/ok/slow)
 crunes list                          # List all registered local and plugin runes
 
