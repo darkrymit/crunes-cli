@@ -2,7 +2,7 @@
 declare namespace db {
   /**
    * Connects to a PostgreSQL or MySQL database using a standard URI string.
-   * Requires `db.connect:<protocol>:<host>:<port>/<database>` permission.
+   * Requires `db.connect:<protocol>:<host>:<port>/<database>` permission. `*` matches any characters (e.g. `db.connect:postgres:*`).
    *
    * Supported protocols: postgres, postgresql, mysql, mysql2
    *

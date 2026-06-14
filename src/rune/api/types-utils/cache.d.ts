@@ -7,8 +7,9 @@ declare namespace cache {
    * (recommended) or a relative path for a custom location inside the project.
    *
    * The permission token format is `cache.read:<location>::<name>` for reads and
-   * `cache.write:<location>::<name>` for writes. Use `/**` as a wildcard name when
-   * declaring permissions in `config.json` (e.g. `cache.read:@local-project-cache/**`).
+   * `cache.write:<location>::<name>` for writes. In the location part, `*` stops at `/` and `**` spans
+   * path segments (e.g. `cache.read:@local-project-cache/**`). In the name part, `*` matches any characters
+   * (e.g. `cache.read:@local-project-cache/**::my-*`).
    *
    * @param location Storage scope:
    *   - `@local-project-cache` — stored per-project under the local project directory. **Most common choice for project runes.**

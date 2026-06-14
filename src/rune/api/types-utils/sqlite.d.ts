@@ -7,8 +7,9 @@ declare namespace sqlite {
    * (recommended) or a relative path for a custom location inside the project.
    *
    * The permission token format is `sqlite.read:<location>::<name>` for reads and
-   * `sqlite.write:<location>::<name>` for writes. Use `/**` as a wildcard name when
-   * declaring permissions in `config.json` (e.g. `sqlite.read:@local-project-sqlite/**`).
+   * `sqlite.write:<location>::<name>` for writes. In the location part, `*` stops at `/` and `**` spans
+   * path segments (e.g. `sqlite.read:@local-project-sqlite/**`). In the name part, `*` matches any characters
+   * (e.g. `sqlite.read:@local-project-sqlite/**::my-*`).
    *
    * @param location Storage scope:
    *   - `@local-project-sqlite` — stored per-project under the local project directory. **Most common choice for project runes.**
