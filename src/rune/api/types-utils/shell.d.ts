@@ -82,8 +82,14 @@ declare namespace shell {
   }
 
   namespace job {
-    /** Starts a detached background shell job with log-backed stdout/stderr. Requires `shell.job.start:<command>` permission. `*` matches any characters (e.g. `shell.job.start:bash *`). */
-    function start(cmd: string, opts?: { env?: Record<string, string> }): Promise<{ id: string }>
+    /**
+     * Starts a detached background shell job with log-backed stdout/stderr.
+     * Requires `shell.job.start:<command>` permission. `*` matches any characters (e.g. `shell.job.start:bash *`).
+     *
+     * When `repl: true`, the job's stdin is backed by a `stdin.log` file.
+     * Use `shell.job.write(id, text)` and `shell.job.writeEof(id)` to send input.
+     */
+    function start(cmd: string, opts?: { env?: Record<string, string>; repl?: boolean }): Promise<{ id: string }>
     /** Sends a signal to a background shell job. Requires `shell.job.kill` permission. */
     function kill(id: string, signal?: 'SIGTERM' | 'SIGKILL' | 'SIGINT' | 'SIGHUP' | 'SIGUSR1' | 'SIGUSR2'): Promise<void>
     /** Returns true if the background shell job is still running. Requires `shell.job.exists` permission. */
@@ -92,5 +98,18 @@ declare namespace shell {
     function stdout(id: string): Promise<string>
     /** Reads raw stderr log content as written so far. Requires `shell.job.read` permission. */
     function stderr(id: string): Promise<string>
+    /**
+     * Appends a raw text line to the job's stdin log.
+     * The job process tails the log and receives the line on its stdin.
+     * Only works when the job was started with `repl: true`.
+     * Requires `shell.job.read` permission.
+     */
+    function write(id: string, text: string): Promise<void>
+    /**
+     * Appends the EOF sentinel to the job's stdin log, closing its stdin.
+     * Only works when the job was started with `repl: true`.
+     * Requires `shell.job.read` permission.
+     */
+    function writeEof(id: string): Promise<void>
   }
 }
