@@ -11,7 +11,7 @@ tags: [module]
 
 ## Overview
 
-Rune execution begins with a single entry point that resolves a key through a tiered lookup (local-only, plugin-specific, or bare), computes effective permissions, and delegates to the appropriate isolation runner. Every rune runs in its own fresh V8 isolate with no access to Node.js built-ins — all I/O flows through a `utils` bridge, a collection of granular async functions injected as host callbacks. The command-line parser accepts segments with the form `[--section s1,s2] [prefix:]key [rune-args...]`, but the section filter is applied post-execution by pattern matching against returned section names, not inside the isolate itself.
+Rune execution begins with a single entry point that resolves a key through a tiered lookup (local-only, plugin-specific, or bare), computes effective permissions, and delegates to the appropriate isolation runner. Every rune runs in its own fresh V8 isolate with no access to Node.js built-ins — all I/O flows through a `utils` bridge, a collection of granular async functions injected as host callbacks. The command-line parser accepts segments with the form `[prefix:]key[-s s1,s2] [rune-args...]`, but the section filter is applied post-execution by pattern matching against returned section names, not inside the isolate itself.
 
 ## Submodules
 
@@ -122,7 +122,7 @@ export async function disposeRepl() { /* cleanup on session end */ }
 
 ## Gotchas & Debugging
 
-- **Command-level flags must precede the key:** Running `crunes run --format json mykey` passes `--format json` as rune arguments, not a command flag. Place these flags before the key.
+- **Command-level flags must precede the key:** Running `crunes run --format jsonl mykey` passes `--format jsonl` as rune arguments, not a command flag. Place these flags before the key.
 
 - **Section filters use bracket syntax — `-s` before the key is rejected:** The only supported way to filter sections is `key[-s section]`. Running `crunes run -s endpoints api` causes a "misplaced flag" error because the first positional is parsed as the rune key and anything starting with `-` is rejected. Correct: `crunes run api[-s endpoints]`.
 
@@ -132,7 +132,7 @@ export async function disposeRepl() { /* cleanup on session end */ }
 
 - **`shell.exec` `opts.throw` defaults to `true`:** Non-zero exits throw by default. Pass `{ throw: false }` to get `{ stdout, stderr, exitCode, ok }` regardless of exit code.
 
-- **`time.after` vs `time.afterRef`:** `time.after(ms)` uses an unref'd timer, so the process exits if nothing else is running. Use `time.afterRef(ms)` for top-level waits; use `after` inside loops.
+- **`time.after` keeps the process alive:** `time.after(ms)` uses a ref'd timer — the process will not exit while it is pending. Global `setTimeout` inside the sandbox uses an unref'd timer, so the process can exit if nothing else holds a ref.
 
 - **`rune.exec` spawns a child process:** Calling `rune.exec` spawns `crunes run <key>` (or `crunes run-repl <key>` with `{ repl: true }`) as a child with its own isolate and permissions, not a function call in the parent isolate.
 
