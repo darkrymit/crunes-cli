@@ -14,7 +14,7 @@ export class RuneSession {
     this._pending = []
     const cliArgs = this._repl
       ? [cliPath, '--cwd', projectDir, 'run-repl', '--format', 'jsonl', runeKey, ...(args ?? [])]
-      : [cliPath, '--cwd', projectDir, 'run', '--format', 'jsonl', runeKey, '--', ...(args ?? [])]
+      : [cliPath, '--cwd', projectDir, 'run', '--format', 'jsonl', runeKey, ...(args ?? [])]
     this.proc = spawn(
       process.execPath,
       cliArgs,

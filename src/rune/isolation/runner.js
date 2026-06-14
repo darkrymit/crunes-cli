@@ -358,7 +358,7 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
     const cliPath = process.argv[1]
     const cliArgs = repl
       ? [cliPath, '--cwd', projectDir, 'run-repl', '--format', 'jsonl', runeKey, ...(args ?? [])]
-      : [cliPath, '--cwd', projectDir, 'run', '--format', 'jsonl', runeKey, '--', ...(args ?? [])]
+      : [cliPath, '--cwd', projectDir, 'run', '--format', 'jsonl', runeKey, ...(args ?? [])]
     const child = spawnProcess(
       process.execPath,
       cliArgs,
@@ -443,7 +443,7 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
     const errFd = fsSync.openSync(jobStderrPath(pKey, id), 'a')
     const cliArgs = repl
       ? [cliPath, '--cwd', projectDir, 'run-repl', '--format', 'jsonl', runeKey, ...(args ?? [])]
-      : [cliPath, '--cwd', projectDir, 'run', '--format', 'jsonl', runeKey, '--', ...(args ?? [])]
+      : [cliPath, '--cwd', projectDir, 'run', '--format', 'jsonl', runeKey, ...(args ?? [])]
     let childEnv = { ...process.env, CRUNES_NO_TIMEOUT: '1' }
     if (repl) {
       const stdinLog = jobStdinPath(pKey, id)
