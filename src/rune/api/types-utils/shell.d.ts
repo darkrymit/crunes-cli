@@ -83,7 +83,9 @@ declare namespace shell {
 
   namespace job {
     /**
-     * Starts a detached background shell job with log-backed stdout/stderr.
+     * Starts a background shell job with log-backed stdout/stderr.
+     * On Unix, spawns with `detached: true` (process group leadership for group kill).
+     * On Windows, spawns with `detached: false` and `windowsHide: true` (tree kill via `taskkill /F /T`).
      * Requires `shell.job.start:<command>` permission. `*` matches any characters (e.g. `shell.job.start:bash *`).
      *
      * When `repl: true`, the job's stdin is backed by a `stdin.log` file.
