@@ -4,6 +4,7 @@ import { loadConfig } from '../../core/config.js'
 import { formatSection } from '../../shared/render.js'
 import { output, isVerbose } from '../../shared/output.js'
 import { parseArgs } from '../api/args-parser.js'
+import { parseSegment } from './run.js'
 
 export function parseReplReturn(value) {
   if (value === undefined || value === null) return { type: 'continue', prompt: null }
@@ -56,22 +57,7 @@ export function parseReplArgs(argv) {
     }
   }
 
-  let sections = null
-  while (i < argv.length) {
-    const tok = argv[i]
-    if ((tok === '--section' || tok === '-s') && i + 1 < argv.length) {
-      sections = argv[i + 1].split(',').map(s => s.trim()).filter(Boolean); i += 2
-    } else if (tok.startsWith('--section=')) {
-      sections = tok.slice(10).split(',').map(s => s.trim()).filter(Boolean); i++
-    } else if (tok.startsWith('-s=')) {
-      sections = tok.slice(3).split(',').map(s => s.trim()).filter(Boolean); i++
-    } else {
-      break
-    }
-  }
-
-  const key = argv[i] ?? null
-  const runeArgs = key !== null ? argv.slice(i + 1) : []
+  const { key, sections, runeArgs } = parseSegment(argv.slice(i))
   return { key, sections, runeArgs, format }
 }
 
