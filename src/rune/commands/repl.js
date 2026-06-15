@@ -97,9 +97,15 @@ export async function handler({
   const jsonlInput = format === 'jsonl' && !process.stdin.isTTY
 
   function onEvent(event) {
-    const { type, message, section, rune, instanceId: iid } = event
+    const { type, message, section, rune, instanceId: iid, level, meta } = event
     if (format === 'jsonl') {
-      process.stdout.write(JSON.stringify({ type, rune, instance: iid, ...(message != null ? { message } : {}), ...(section != null ? { section } : {}) }) + '\n')
+      process.stdout.write(JSON.stringify({
+        type, rune, instance: iid,
+        ...(message != null ? { message } : {}),
+        ...(section  != null ? { section }  : {}),
+        ...(level    != null ? { level }    : {}),
+        ...(meta     != null ? { meta }     : {}),
+      }) + '\n')
     } else {
       if (type === 'section') {
         if (!sectionFilter || isGlobMatch(section.name, sectionFilter)) {
@@ -265,6 +271,7 @@ export async function handler({
     } else if (format === 'jsonl') {
       process.stdout.write(JSON.stringify({ type: 'session-end', rune: key, instance: instanceId }) + '\n')
     }
+    if (process.stdin.isTTY && !jsonlInput) process.stdin.setRawMode(false)
     rl?.close()
     await session.dispose()
   }

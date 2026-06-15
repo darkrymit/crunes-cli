@@ -8,10 +8,10 @@ export async function handler({ projectRoot = process.cwd() } = {}) {
   let anyFailed = false
 
   const major = parseInt(process.versions.node.split('.')[0], 10)
-  if (major >= 20) {
+  if (major >= 22) {
     output.success(`Node.js v${process.versions.node}`)
   } else {
-    output.error(`Node.js v${process.versions.node} — requires >= 20`)
+    output.error(`Node.js v${process.versions.node} — requires >= 22`)
     anyFailed = true
   }
 

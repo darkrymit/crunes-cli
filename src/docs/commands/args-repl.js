@@ -1,7 +1,7 @@
 export async function handler() {
   process.stdout.write(`# Docs: The argsRepl(builder) Export
 
-Runes declare REPL-specific options using \`export function argsRepl(builder)\`. This schema is parsed **once at session start** and the result is passed as \`args\` to every \`repl(args, input)\` call.
+Runes declare REPL-specific options using \`export function argsRepl(builder)\`. This schema is parsed **once at session start** and the result is passed as \`args\` to every \`repl(args)\` call.
 
 ## 1. Independence from \`args()\`
 

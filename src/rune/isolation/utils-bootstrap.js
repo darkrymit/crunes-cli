@@ -489,8 +489,8 @@ globalThis.utils = {
               }
               
               await $__utils_fs_writeStream_write.apply(
-                undefined, 
-                [stdinStreamId, chunk.buffer], 
+                undefined,
+                [stdinStreamId, chunk.buffer, chunk.byteOffset, chunk.byteLength],
                 { arguments: { copy: true }, result: { promise: true } }
               )
             }

@@ -2,9 +2,9 @@
 
 
 if (process.env.CRUNES_NO_TIMEOUT === '1') {
-  const useIdx = process.argv.indexOf('use')
-  if (useIdx !== -1 && process.argv[useIdx + 1]) {
-    process.title = `crunes: ${process.argv[useIdx + 1]}`
+  const runIdx = process.argv.indexOf('run')
+  if (runIdx !== -1 && process.argv[runIdx + 1]) {
+    process.title = `crunes: ${process.argv[runIdx + 1]}`
   }
 }
 import { buildProgram } from './program.js'
