@@ -1,19 +1,14 @@
 import * as p from '@clack/prompts'
 import { deleteCacheBucket } from '../index.js'
-import { ensureProjectIdentity } from '../../project/index.js'
 
-export async function handler({ id, yes, projectDir, global: isGlobal }) {
+export async function handler({ id, yes, projectDir }) {
   if (!yes) {
     const confirm = await p.confirm({ message: `Delete cache bucket matching "${id}"?` })
-    if (p.isCancel(confirm) || !confirm) {
-      p.cancel('Cancelled.')
-      process.exit(0)
-    }
+    if (p.isCancel(confirm) || !confirm) { p.cancel('Cancelled.'); process.exit(0) }
   }
-  const key = isGlobal ? undefined : (await ensureProjectIdentity(projectDir)).id
   let result
   try {
-    result = await deleteCacheBucket(id, key)
+    result = await deleteCacheBucket(id)
   } catch (err) {
     console.error(`Error: ${err.message}`)
     process.exit(1)

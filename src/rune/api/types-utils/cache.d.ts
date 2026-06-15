@@ -8,15 +8,13 @@ declare namespace cache {
    *
    * The permission token format is `cache.read:<location>::<name>` for reads and
    * `cache.write:<location>::<name>` for writes. In the location part, `*` stops at `/` and `**` spans
-   * path segments (e.g. `cache.read:@local-project-cache/**`). In the name part, `*` matches any characters
-   * (e.g. `cache.read:@local-project-cache/**::my-*`).
+   * path segments (e.g. `cache.read:@local-cache/**`). In the name part, `*` matches any characters
+   * (e.g. `cache.read:@local-cache/**::my-*`).
    *
    * @param location Storage scope:
-   *   - `@local-project-cache` — stored per-project under the local project directory. **Most common choice for project runes.**
-   *   - `@local-project-plugin-cache` — stored per-project, namespaced to the current plugin. Use when the rune is distributed as a plugin.
-   *   - `@global-project-cache` — stored globally, keyed by project identity. Persists across working directory changes.
-   *   - `@global-plugin-cache` — stored globally, shared across all projects for this plugin.
-   *   - `@global-project-plugin-cache` — stored globally, per-project per-plugin combination.
+   *   - `@local-cache` — stored under `.crunes/cache/project/` in the local project directory. **Most common choice for project runes.**
+   *   - `@local-plugin-cache` — stored under `.crunes/cache/plugins/<id>/`, namespaced to the current plugin. Use when the rune is distributed as a plugin.
+   *   - `@global-plugin-cache` — stored globally under `~/.crunes/cache/plugins/<id>/`, shared across all projects for this plugin.
    *   - A relative path string — stored at a custom path inside the project directory.
    * @param name Cache name within the scope (default: "default")
    */

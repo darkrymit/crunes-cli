@@ -71,7 +71,7 @@ import { sqlite, crypto, section } from '@utils'
 
 export async function run() {
   // Scoped SQLite operations
-  const db = await sqlite.open('@local-project-sqlite', 'my-database');
+  const db = await sqlite.open('@local-sqlite', 'my-database');
   await db.exec('CREATE TABLE IF NOT EXISTS logs (id TEXT PRIMARY KEY, msg TEXT)');
   await db.exec('INSERT INTO logs VALUES (?, ?)', [crypto.uuid(), 'Rune executed!']);
   const rows = await db.query('SELECT * FROM logs');
@@ -116,7 +116,7 @@ export async function run() {
 import { cache, section } from '@utils'
 
 export async function run() {
-  const projectCache = await cache.open('@local-project-cache');
+  const projectCache = await cache.open('@local-cache');
   await projectCache.set('last-run', Date.now(), 60); // 60s TTL
   const lastRun = await projectCache.get('last-run');
   return [

@@ -5,31 +5,27 @@ import { tmpdir } from 'node:os'
 import { createJob } from '../../../src/job/registry.js'
 import { handler } from '../../../src/job/commands/list.js'
 
-const META = { spawnedBy: 'server', runeKey: 'worker', projectDir: null, args: [] }
+const META = { spawnedBy: 'server', runeKey: 'worker', args: [] }
 
 describe('jobs list handler', () => {
-  let tmp, projDir, projADir, projBDir
+  let tmp, projDir
 
   beforeEach(async () => {
-    tmp      = await mkdtemp(join(tmpdir(), 'crunes-jobs-list-'))
-    projDir  = await mkdtemp(join(tmpdir(), 'crunes-jobs-proj-'))
-    projADir = await mkdtemp(join(tmpdir(), 'crunes-jobs-proja-'))
-    projBDir = await mkdtemp(join(tmpdir(), 'crunes-jobs-projb-'))
+    tmp     = await mkdtemp(join(tmpdir(), 'crunes-jobs-list-'))
+    projDir = await mkdtemp(join(tmpdir(), 'crunes-jobs-proj-'))
     process.env.CRUNES_STORE = tmp
   })
   afterEach(async () => {
     delete process.env.CRUNES_STORE
     vi.restoreAllMocks()
-    await rm(tmp,      { recursive: true, force: true })
-    await rm(projDir,  { recursive: true, force: true })
-    await rm(projADir, { recursive: true, force: true })
-    await rm(projBDir, { recursive: true, force: true })
+    await rm(tmp,     { recursive: true, force: true })
+    await rm(projDir, { recursive: true, force: true })
   })
 
   it('prints "No background jobs." when project has no jobs', async () => {
     const logs = []
     vi.spyOn(console, 'log').mockImplementation((...a) => logs.push(a.join(' ')))
-    await handler({ projectDir: projDir, global: false })
+    await handler({ projectDir: projDir })
     expect(logs.join('\n')).toMatch(/no background jobs/i)
   })
 
@@ -37,20 +33,9 @@ describe('jobs list handler', () => {
     await createJob(process.pid, { ...META, projectDir: projDir })
     const logs = []
     vi.spyOn(console, 'log').mockImplementation((...a) => logs.push(a.join(' ')))
-    await handler({ projectDir: projDir, global: false })
+    await handler({ projectDir: projDir })
     const out = logs.join('\n')
     expect(out).toMatch(/worker/)
     expect(out).toMatch(/server/)
-  })
-
-  it('--global lists jobs from all projects and shows PROJECT column', async () => {
-    await createJob(process.pid, { ...META, projectDir: projADir })
-    await createJob(process.pid, { ...META, projectDir: projBDir })
-    const logs = []
-    vi.spyOn(console, 'log').mockImplementation((...a) => logs.push(a.join(' ')))
-    await handler({ projectDir: projADir, global: true })
-    const out = logs.join('\n')
-    expect(out).toMatch(new RegExp(projADir.split(/[\\/]/).at(-1)))
-    expect(out).toMatch(new RegExp(projBDir.split(/[\\/]/).at(-1)))
   })
 })

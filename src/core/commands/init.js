@@ -4,7 +4,7 @@ import { intro, outro, confirm, cancel } from '@clack/prompts';
 import { output } from '../../shared/output.js';
 
 const EMPTY_CONFIG = JSON.stringify({ runes: {} }, null, 2) + '\n';
-const GITIGNORE_CONTENT = '# local overrides (machine-specific, never commit)\nconfig.local.json\nproject.local.json\n\n# run logs\nlogs/\n\n# local caches and databases (gitignored by default)\ncaches/\nsqlite/\n';
+const GITIGNORE_CONTENT = '# local overrides (machine-specific, never commit)\nconfig.local.json\nproject.local.json\n\n# run logs\nlogs/\n\n# local caches, databases and job logs (gitignored by default)\ncache/\nsqlite/\njobs/\n';
 
 export async function handler({
   yes = false,

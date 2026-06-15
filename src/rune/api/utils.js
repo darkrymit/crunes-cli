@@ -1,21 +1,18 @@
 import os from 'node:os'
 import path from 'node:path'
-import { getCachePluginDir, getCacheProjectDir, getCacheProjectPluginDir } from '../../cache/index.js'
-import { getSqlitePluginDir, getSqliteProjectDir, getSqliteProjectPluginDir } from '../../sqlite/index.js'
+import { getCachePluginDir } from '../../cache/index.js'
+import { getSqlitePluginDir } from '../../sqlite/index.js'
 import { shortHash, getProjectKey } from '../../project/index.js'
 export { shortHash, getProjectKey }
 
+
 const VIRTUAL_STORE_PREFIXES = [
   '@global-plugin-cache',
-  '@global-project-plugin-cache',
-  '@global-project-cache',
   '@global-plugin-sqlite',
-  '@global-project-plugin-sqlite',
-  '@global-project-sqlite',
-  '@local-project-cache',
-  '@local-project-plugin-cache',
-  '@local-project-sqlite',
-  '@local-project-plugin-sqlite',
+  '@local-cache',
+  '@local-plugin-cache',
+  '@local-sqlite',
+  '@local-plugin-sqlite',
 ]
 
 function parseVirtualStore(location) {
@@ -31,43 +28,28 @@ function parseVirtualStore(location) {
   return null
 }
 
-function virtualStoreBase(prefix, { dir, pluginId, projectName, projectId }) {
-  const key = () => {
-    if (projectId) return projectId
-    if (projectName) return `${projectName}-${shortHash(dir)}`
-    return shortHash(dir)
-  }
+function virtualStoreBase(prefix, { dir, pluginId }) {
   switch (prefix) {
     case '@global-plugin-cache':
       if (!pluginId) throw new Error('@global-plugin-cache requires a plugin context')
       return getCachePluginDir(pluginId)
-    case '@global-project-plugin-cache':
-      if (!pluginId) throw new Error('@global-project-plugin-cache requires a plugin context')
-      return getCacheProjectPluginDir(key(), pluginId)
-    case '@global-project-cache':
-      return getCacheProjectDir(key())
     case '@global-plugin-sqlite':
       if (!pluginId) throw new Error('@global-plugin-sqlite requires a plugin context')
       return getSqlitePluginDir(pluginId)
-    case '@global-project-plugin-sqlite':
-      if (!pluginId) throw new Error('@global-project-plugin-sqlite requires a plugin context')
-      return getSqliteProjectPluginDir(key(), pluginId)
-    case '@global-project-sqlite':
-      return getSqliteProjectDir(key())
-    case '@local-project-cache':
-      return path.join(dir, '.crunes', 'caches', 'project')
-    case '@local-project-plugin-cache':
-      if (!pluginId) throw new Error('@local-project-plugin-cache requires a plugin context')
-      return path.join(dir, '.crunes', 'caches', 'project-plugins', pluginId)
-    case '@local-project-sqlite':
+    case '@local-cache':
+      return path.join(dir, '.crunes', 'cache', 'project')
+    case '@local-plugin-cache':
+      if (!pluginId) throw new Error('@local-plugin-cache requires a plugin context')
+      return path.join(dir, '.crunes', 'cache', 'plugins', pluginId)
+    case '@local-sqlite':
       return path.join(dir, '.crunes', 'sqlite', 'project')
-    case '@local-project-plugin-sqlite':
-      if (!pluginId) throw new Error('@local-project-plugin-sqlite requires a plugin context')
-      return path.join(dir, '.crunes', 'sqlite', 'project-plugins', pluginId)
+    case '@local-plugin-sqlite':
+      if (!pluginId) throw new Error('@local-plugin-sqlite requires a plugin context')
+      return path.join(dir, '.crunes', 'sqlite', 'plugins', pluginId)
   }
 }
 
-export function resolvePath(location, { dir, pluginDir = null, pluginId = null, storeDir = null, projectName = undefined, projectId = undefined } = {}) {
+export function resolvePath(location, { dir, pluginDir = null, pluginId = null, storeDir = null } = {}) {
   if (location.startsWith('@plugin/')) {
     if (!pluginDir) throw new Error('@plugin/ paths are only available in plugin runes')
     return path.join(pluginDir, location.slice('@plugin/'.length))
@@ -77,7 +59,7 @@ export function resolvePath(location, { dir, pluginDir = null, pluginId = null, 
   }
   const virtual = parseVirtualStore(location)
   if (virtual) {
-    const base = virtualStoreBase(virtual.prefix, { dir, pluginId, projectName, projectId })
+    const base = virtualStoreBase(virtual.prefix, { dir, pluginId })
     return virtual.subpath ? path.join(base, virtual.subpath) : base
   }
   if (location === '~' || location.startsWith('~/') || location.startsWith('~\\')) {
@@ -92,18 +74,12 @@ export function getAutoPermits({ pluginId = null, pluginDir = null } = {}) {
   if (!pluginDir) {
     permits.push(
       'fs.read:./.crunes/**',
-      'cache.read:@local-project-cache/**',
-      'cache.write:@local-project-cache/**',
-      'sqlite.read:@local-project-sqlite/**',
-      'sqlite.write:@local-project-sqlite/**',
-      'fs.read:@local-project-sqlite/**',
-      'fs.write:@local-project-sqlite/**',
-      'cache.read:@global-project-cache/**',
-      'cache.write:@global-project-cache/**',
-      'sqlite.read:@global-project-sqlite/**',
-      'sqlite.write:@global-project-sqlite/**',
-      'fs.read:@global-project-sqlite/**',
-      'fs.write:@global-project-sqlite/**',
+      'cache.read:@local-cache/**',
+      'cache.write:@local-cache/**',
+      'sqlite.read:@local-sqlite/**',
+      'sqlite.write:@local-sqlite/**',
+      'fs.read:@local-sqlite/**',
+      'fs.write:@local-sqlite/**',
     )
   }
   if (pluginDir) {
@@ -113,16 +89,10 @@ export function getAutoPermits({ pluginId = null, pluginDir = null } = {}) {
     permits.push(
       'cache.read:@global-plugin-cache/**',
       'cache.write:@global-plugin-cache/**',
-      'cache.read:@global-project-plugin-cache/**',
-      'cache.write:@global-project-plugin-cache/**',
       'sqlite.read:@global-plugin-sqlite/**',
       'sqlite.write:@global-plugin-sqlite/**',
-      'sqlite.read:@global-project-plugin-sqlite/**',
-      'sqlite.write:@global-project-plugin-sqlite/**',
       'fs.read:@global-plugin-sqlite/**',
       'fs.write:@global-plugin-sqlite/**',
-      'fs.read:@global-project-plugin-sqlite/**',
-      'fs.write:@global-project-plugin-sqlite/**',
     )
   }
   return permits

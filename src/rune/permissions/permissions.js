@@ -18,17 +18,17 @@ export class PermissionError extends Error {
 
 const HOME = os.homedir().replace(/\\/g, '/')
 
-// @local-project-* tokens resolve inside dir, so their absolute also gets relative siblings.
+// @local-* tokens resolve inside dir, so their absolute also gets relative siblings.
 const LOCAL_VIRTUAL_PREFIXES = new Set([
-  '@local-project-cache', '@local-project-plugin-cache',
-  '@local-project-sqlite', '@local-project-plugin-sqlite',
+  '@local-cache', '@local-plugin-cache',
+  '@local-sqlite', '@local-plugin-sqlite',
 ])
 
 const ALL_VIRTUAL_PREFIXES = [
-  '@global-plugin-cache', '@global-project-plugin-cache', '@global-project-cache',
-  '@global-plugin-sqlite', '@global-project-plugin-sqlite', '@global-project-sqlite',
-  '@local-project-cache', '@local-project-plugin-cache',
-  '@local-project-sqlite', '@local-project-plugin-sqlite',
+  '@global-plugin-cache',
+  '@global-plugin-sqlite',
+  '@local-cache', '@local-plugin-cache',
+  '@local-sqlite', '@local-plugin-sqlite',
   '@plugin',
 ]
 
@@ -36,7 +36,7 @@ const ALL_VIRTUAL_PREFIXES = [
  * Expand a full "cap:value" permission string into all equivalent sibling forms.
  * Handles fs.*, cache.*, and sqlite.* caps. All others return [perm].
  *
- * ctx = { dir, pluginId?, pluginDir?, projectId? }
+ * ctx = { dir, pluginId?, pluginDir? }
  */
 function expandPattern(perm, ctx) {
   const colonIdx = perm.indexOf(':')
@@ -46,7 +46,7 @@ function expandPattern(perm, ctx) {
   const isStore = cap === 'cache.read' || cap === 'cache.write' || cap === 'sqlite.read' || cap === 'sqlite.write'
   if (!isFs && !isStore) return [perm]
   if (!ctx?.dir) return [perm]
-  const { dir, pluginId = null, pluginDir = null, projectId = null } = ctx
+  const { dir, pluginId = null, pluginDir = null } = ctx
   const absDir = dir.replace(/\\/g, '/')
 
   if (isStore) {
@@ -54,12 +54,12 @@ function expandPattern(perm, ctx) {
     const dColonIdx = rest.indexOf('::')
     const loc  = dColonIdx === -1 ? rest : rest.slice(0, dColonIdx)
     const name = dColonIdx === -1 ? '' : '::' + rest.slice(dColonIdx + 2)
-    return expandLocValue(loc, absDir, { pluginId, pluginDir, projectId }, dir)
+    return expandLocValue(loc, absDir, { pluginId, pluginDir }, dir)
       .map(expandedLoc => `${cap}:${expandedLoc}${name}`)
   }
 
   const value = perm.slice(colonIdx + 1)
-  return expandLocValue(value, absDir, { pluginId, pluginDir, projectId }, dir)
+  return expandLocValue(value, absDir, { pluginId, pluginDir }, dir)
     .map(v => `${cap}:${v}`)
 }
 
@@ -71,7 +71,7 @@ function normalizeGitBashPath(p) {
   return p
 }
 
-function expandLocValue(value, absDir, { pluginId, pluginDir, projectId }, dir) {
+function expandLocValue(value, absDir, { pluginId, pluginDir }, dir) {
   const v = value.replace(/\\/g, '/')
   if (v === '**' || v.startsWith('**/')) return [v]
   if (v.startsWith('~/')) return [v, HOME + v.slice(1)]
@@ -92,7 +92,7 @@ function expandLocValue(value, absDir, { pluginId, pluginDir, projectId }, dir) 
   if (matchedPrefix) {
     const suffix = v.slice(matchedPrefix.length)
     try {
-      const base = resolvePath(matchedPrefix, { dir, pluginId, pluginDir, projectId }).replace(/\\/g, '/')
+      const base = resolvePath(matchedPrefix, { dir, pluginId, pluginDir }).replace(/\\/g, '/')
       const absResolved = base + suffix
       if (LOCAL_VIRTUAL_PREFIXES.has(matchedPrefix)) {
         const rel = absResolved.slice(absDir.length + 1)
@@ -163,7 +163,7 @@ export function computeEffectivePermissions(pluginPerms, projectPerms, lifecycle
  * Returns a checkPermission(capability, value) function that throws PermissionError
  * if the request is not in effective.allow or is in effective.deny.
  *
- * ctx = { dir, pluginId?, pluginDir?, projectId? } — used to expand fs/cache/sqlite pattern
+ * ctx = { dir, pluginId?, pluginDir? } — used to expand fs/cache/sqlite pattern
  * siblings at build time so runtime path values match regardless of their form.
  */
 export function makePermissionChecker(effective, ctx = null) {

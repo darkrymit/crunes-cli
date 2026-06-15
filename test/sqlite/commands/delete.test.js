@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { upsertSqliteDb, loadSqliteDbs } from '../../../src/sqlite/index.js'
 import { handler } from '../../../src/sqlite/commands/delete.js'
 
-const PROJ_KEY = 'abc123def456'
+const PLUGIN_ID = 'my-plugin@1.0.0'
 
 describe('sqlite delete handler', () => {
   let tmp
@@ -21,13 +21,13 @@ describe('sqlite delete handler', () => {
   })
 
   it('deletes the .sqlite file and deregisters (yes: true)', async () => {
-    const dbPath = join(tmp, 'sqlite', 'projects', PROJ_KEY, 'notes.sqlite')
-    await mkdir(join(tmp, 'sqlite', 'projects', PROJ_KEY), { recursive: true })
+    const dbPath = join(tmp, 'sqlite', 'plugins', PLUGIN_ID, 'notes.sqlite')
+    await mkdir(join(tmp, 'sqlite', 'plugins', PLUGIN_ID), { recursive: true })
     await writeFile(dbPath, '')
-    await upsertSqliteDb(dbPath, { scope: 'global-project', projectId: PROJ_KEY, pluginId: null, location: '@global-project-sqlite', name: 'notes' })
+    await upsertSqliteDb(dbPath, { scope: 'global-plugin', projectId: null, pluginId: PLUGIN_ID, location: '@global-plugin-sqlite', name: 'notes' })
     const { databases } = await loadSqliteDbs()
     const id = Object.keys(databases)[0]
-    await handler({ id, yes: true, projectDir: tmp, global: true })
+    await handler({ id, yes: true, projectDir: tmp })
     await expect(access(dbPath)).rejects.toThrow()
     expect(console.log).toHaveBeenCalledWith(expect.stringContaining('Deleted SQLite database'))
     expect(Object.keys((await loadSqliteDbs()).databases)).toHaveLength(0)
@@ -36,20 +36,7 @@ describe('sqlite delete handler', () => {
   it('exits 1 on unknown id', async () => {
     const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => { throw new Error('exit') })
     vi.spyOn(console, 'error').mockImplementation(() => {})
-    await expect(handler({ id: 'nope', yes: true, projectDir: tmp, global: true })).rejects.toThrow('exit')
-    exitSpy.mockRestore()
-  })
-
-  it('rejects cross-project delete when global: false', async () => {
-    const dbPath = join(tmp, 'sqlite', 'projects', 'other-key', 'x.sqlite')
-    await mkdir(join(tmp, 'sqlite', 'projects', 'other-key'), { recursive: true })
-    await writeFile(dbPath, '')
-    await upsertSqliteDb(dbPath, { scope: 'global-project', projectId: 'other-key', pluginId: null, location: '@global-project-sqlite', name: 'x' })
-    const { databases } = await loadSqliteDbs()
-    const id = Object.keys(databases)[0]
-    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => { throw new Error('exit') })
-    vi.spyOn(console, 'error').mockImplementation(() => {})
-    await expect(handler({ id, yes: true, projectDir: tmp, global: false })).rejects.toThrow('exit')
+    await expect(handler({ id: 'nope', yes: true, projectDir: tmp })).rejects.toThrow('exit')
     exitSpy.mockRestore()
   })
 })

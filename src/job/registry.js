@@ -1,81 +1,65 @@
 import { readFile, writeFile, mkdir, readdir, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
-import { getStorePath } from '../store/index.js'
-import { upsertProject, ensureProjectIdentity } from '../project/index.js'
 
-function jobsBase()          { return join(getStorePath(), 'jobs') }
-function projectJobsDir(key) { return join(jobsBase(), 'project', key) }
-function jobPath(key, id)    { return join(projectJobsDir(key), `${id}.json`) }
+function jobDir(projectDir, id)    { return join(projectDir, '.crunes', 'jobs', id) }
 
-export function jobStdoutPath(key, id) { return join(projectJobsDir(key), `${id}.stdout.log`) }
-export function jobStderrPath(key, id) { return join(projectJobsDir(key), `${id}.stderr.log`) }
-export function jobStdinPath(key, id)  { return join(projectJobsDir(key), `${id}.stdin.log`) }
+export function jobStdoutPath(projectDir, id) { return join(jobDir(projectDir, id), 'stdout.log') }
+export function jobStderrPath(projectDir, id) { return join(jobDir(projectDir, id), 'stderr.log') }
+export function jobStdinPath(projectDir, id)  { return join(jobDir(projectDir, id), 'stdin.log') }
 
-export async function updateJobPid(key, id, pid) {
-  const record = await getJob(key, id)
+export async function updateJobPid(projectDir, id, pid) {
+  const record = await getJob(projectDir, id)
   if (!record) return
   record.pid = pid
-  await writeFile(jobPath(key, id), JSON.stringify(record, null, 2), 'utf8')
+  await writeFile(join(jobDir(projectDir, id), 'job.json'), JSON.stringify(record, null, 2), 'utf8')
 }
 
 export async function createJob(pid, { type = 'rune', spawnedBy, runeKey, projectDir, args = [] } = {}) {
-  const { id: key } = await ensureProjectIdentity(projectDir)
-  const id  = randomUUID()
-  const record = { id, type, pid, startedAt: new Date().toISOString(), projectKey: key, projectDir, spawnedBy, runeKey, args }
-  await mkdir(projectJobsDir(key), { recursive: true })
-  await writeFile(jobPath(key, id), JSON.stringify(record, null, 2), 'utf8')
-  await upsertProject(key, projectDir)
-  return { id, projectKey: key }
+  const id = randomUUID()
+  const record = { id, type, pid, startedAt: new Date().toISOString(), projectDir, spawnedBy, runeKey, args }
+  const dir = jobDir(projectDir, id)
+  await mkdir(dir, { recursive: true })
+  await writeFile(join(dir, 'job.json'), JSON.stringify(record, null, 2), 'utf8')
+  return { id }
 }
 
-export async function getJob(key, id) {
+export async function getJob(projectDir, id) {
   try {
-    const raw = await readFile(jobPath(key, id), 'utf8')
+    const raw = await readFile(join(jobDir(projectDir, id), 'job.json'), 'utf8')
     return JSON.parse(raw)
   } catch {
     return null
   }
 }
 
-export async function listJobs(key) {
-  if (key) {
-    let files
-    try { files = await readdir(projectJobsDir(key)) } catch { return [] }
-    const records = await Promise.all(
-      files.filter(f => f.endsWith('.json')).map(f => getJob(key, f.slice(0, -5)))
-    )
-    return records.filter(Boolean)
-  }
-  let keys
-  try { keys = await readdir(join(jobsBase(), 'project')) } catch { return [] }
-  const all = await Promise.all(keys.map(k => listJobs(k)))
-  return all.flat()
-}
-
-export async function deleteJob(key, id) {
-  await rm(jobPath(key, id), { force: true })
-}
-
-export async function cleanJobs(key) {
-  const dir = key ? projectJobsDir(key) : join(jobsBase(), 'project')
+export async function listJobs(projectDir) {
+  const base = join(projectDir, '.crunes', 'jobs')
   let entries
-  try { entries = await readdir(dir) } catch { return }
+  try { entries = await readdir(base, { withFileTypes: true }) } catch { return [] }
+  const records = await Promise.all(
+    entries.filter(e => e.isDirectory()).map(e => getJob(projectDir, e.name))
+  )
+  return records.filter(Boolean)
+}
 
-  if (key) {
-    await Promise.all(
-      entries
-        .filter(f => f.endsWith('.json'))
-        .map(async f => {
-          const id = f.slice(0, -5)
-          const record = await getJob(key, id)
-          if (!record) return
-          if (!isAlive(record.pid)) await rm(jobPath(key, id), { force: true })
-        })
-    )
-  } else {
-    await Promise.all(entries.map(k => cleanJobs(k)))
-  }
+export async function deleteJob(projectDir, id) {
+  await rm(jobDir(projectDir, id), { recursive: true, force: true })
+}
+
+export async function cleanJobs(projectDir) {
+  const base = join(projectDir, '.crunes', 'jobs')
+  let entries
+  try { entries = await readdir(base, { withFileTypes: true }) } catch { return }
+  await Promise.all(
+    entries
+      .filter(e => e.isDirectory())
+      .map(async e => {
+        const record = await getJob(projectDir, e.name)
+        if (!record) return
+        if (!isAlive(record.pid)) await rm(jobDir(projectDir, e.name), { recursive: true, force: true })
+      })
+  )
 }
 
 export function resolveJobId(id, jobs) {

@@ -8,15 +8,13 @@ declare namespace sqlite {
    *
    * The permission token format is `sqlite.read:<location>::<name>` for reads and
    * `sqlite.write:<location>::<name>` for writes. In the location part, `*` stops at `/` and `**` spans
-   * path segments (e.g. `sqlite.read:@local-project-sqlite/**`). In the name part, `*` matches any characters
-   * (e.g. `sqlite.read:@local-project-sqlite/**::my-*`).
+   * path segments (e.g. `sqlite.read:@local-sqlite/**`). In the name part, `*` matches any characters
+   * (e.g. `sqlite.read:@local-sqlite/**::my-*`).
    *
    * @param location Storage scope:
-   *   - `@local-project-sqlite` — stored per-project under the local project directory. **Most common choice for project runes.**
-   *   - `@local-project-plugin-sqlite` — stored per-project, namespaced to the current plugin. Use when the rune is distributed as a plugin.
-   *   - `@global-project-sqlite` — stored globally, keyed by project identity. Persists across working directory changes.
-   *   - `@global-plugin-sqlite` — stored globally, shared across all projects for this plugin.
-   *   - `@global-project-plugin-sqlite` — stored globally, per-project per-plugin combination.
+   *   - `@local-sqlite` — stored under `.crunes/sqlite/project/` in the local project directory. **Most common choice for project runes.**
+   *   - `@local-plugin-sqlite` — stored under `.crunes/sqlite/plugins/<id>/`, namespaced to the current plugin. Use when the rune is distributed as a plugin.
+   *   - `@global-plugin-sqlite` — stored globally under `~/.crunes/sqlite/plugins/<id>/`, shared across all projects for this plugin.
    *   - A relative path string — stored at a custom path inside the project directory.
    * @param name Database filename without extension (default: "default")
    */

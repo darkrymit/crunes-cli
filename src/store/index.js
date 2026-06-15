@@ -30,7 +30,7 @@ export function getMarketplaceCacheDir(name) {
   return path.join(getStorePath(), 'marketplaces', name)
 }
 
-export function getCachesBasePath() { return path.join(getStorePath(), 'caches') }
+export function getCacheBasePath() { return path.join(getStorePath(), 'cache') }
 export function getSqliteBasePath() { return path.join(getStorePath(), 'sqlite') }
 export function getCacheJsonPath()  { return path.join(getStorePath(), 'cache.json') }
 export function getSqliteJsonPath() { return path.join(getStorePath(), 'sqlite.json') }

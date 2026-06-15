@@ -11,7 +11,7 @@ import { createJob, getJob } from '../../job/index.js'
 import { updateJobPid, jobStdoutPath, jobStderrPath, jobStdinPath } from '../../job/registry.js'
 import { EOF_SENTINEL } from '../../job/stdin-tail.js'
 import fsSync from 'node:fs'
-import { ensureProjectIdentity } from '../../project/index.js'
+import { ensureProjectIdentity, upsertProject } from '../../project/index.js'
 import { hash, hashAsHex, hashAsBase64, hmac, hmacAsHex, hmacAsBase64, encrypt, decrypt, uuid as cryptoUuid, randomHex as cryptoHex, randomBase64 as cryptoBase64, randomBytesFn } from '../api/crypto.js'
 import { computeEffectivePermissions, makePermissionChecker } from '../permissions/permissions.js'
 import { isVerbose } from '../../shared/output.js'
@@ -275,33 +275,32 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
     }
   }))
 
-  const { id: pKey } = await ensureProjectIdentity(projectDir)
   await jail.set('$__utils_shell_job_start', asyncRef(async (cmd, opts) => {
     checkPermission('shell.job.start', cmd)
     return utils.shell.createShellJob(cmd, opts, {
       createJob, updateJobPid, jobStdoutPath, jobStderrPath, jobStdinPath,
-      spawnedBy: currentRuneKey, projectKey: pKey, projectDir,
+      spawnedBy: currentRuneKey, projectDir,
     })
   }))
   await jail.set('$__utils_shell_job_write', asyncRef(async (id, text) => {
     checkPermission('shell.job.write', null)
-    const record = await getJob(pKey, id)
+    const record = await getJob(projectDir, id)
     if (!record) throw new Error(`Unknown job: ${id}`)
-    const logPath = jobStdinPath(record.projectKey, id)
+    const logPath = jobStdinPath(projectDir, id)
     await fsSync.promises.appendFile(logPath, text + '\n', 'utf8')
   }))
   await jail.set('$__utils_shell_job_write_eof', asyncRef(async (id) => {
     checkPermission('shell.job.write', null)
-    const record = await getJob(pKey, id)
+    const record = await getJob(projectDir, id)
     if (!record) throw new Error(`Unknown job: ${id}`)
-    const logPath = jobStdinPath(record.projectKey, id)
+    const logPath = jobStdinPath(projectDir, id)
     await fsSync.promises.appendFile(logPath, EOF_SENTINEL + '\n', 'utf8')
   }))
   await jail.set('$__utils_shell_job_kill', asyncRef(async (id, signal) => {
     checkPermission('shell.job.kill', null)
     const sig = signal ?? 'SIGTERM'
     if (!VALID_SIGNALS.has(sig)) throw new Error(`Invalid signal: ${sig}`)
-    const record = await getJob(pKey, id)
+    const record = await getJob(projectDir, id)
     if (!record) return
     if (process.platform === 'win32') {
       try { spawnProcess('taskkill', ['/F', '/T', '/PID', String(record.pid)], { stdio: 'ignore' }) } catch {}
@@ -311,23 +310,23 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
   }))
   await jail.set('$__utils_shell_job_exists', asyncRef(async (id) => {
     checkPermission('shell.job.exists', null)
-    const record = await getJob(pKey, id)
+    const record = await getJob(projectDir, id)
     if (!record) return false
     try { process.kill(record.pid, 0); return true } catch { return false }
   }))
   await jail.set('$__utils_shell_job_stdout', asyncRef(async (id) => {
     checkPermission('shell.job.read', null)
-    const record = await getJob(pKey, id)
+    const record = await getJob(projectDir, id)
     if (!record) throw new Error(`Unknown job: ${id}`)
-    const logPath = jobStdoutPath(record.projectKey, id)
+    const logPath = jobStdoutPath(projectDir, id)
     if (!fsSync.existsSync(logPath)) return ''
     return fsSync.promises.readFile(logPath, 'utf8')
   }))
   await jail.set('$__utils_shell_job_stderr', asyncRef(async (id) => {
     checkPermission('shell.job.read', null)
-    const record = await getJob(pKey, id)
+    const record = await getJob(projectDir, id)
     if (!record) throw new Error(`Unknown job: ${id}`)
-    const logPath = jobStderrPath(record.projectKey, id)
+    const logPath = jobStderrPath(projectDir, id)
     if (!fsSync.existsSync(logPath)) return ''
     return fsSync.promises.readFile(logPath, 'utf8')
   }))
@@ -439,14 +438,14 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
     checkPermission(repl ? 'rune.repl' : 'rune.job.start', runeKey)
     const cliPath = process.argv[1]
     const { id } = await createJob(null, { type: 'rune', spawnedBy: currentRuneKey, runeKey, projectDir, args: args ?? [] })
-    const outFd = fsSync.openSync(jobStdoutPath(pKey, id), 'a')
-    const errFd = fsSync.openSync(jobStderrPath(pKey, id), 'a')
+    const outFd = fsSync.openSync(jobStdoutPath(projectDir, id), 'a')
+    const errFd = fsSync.openSync(jobStderrPath(projectDir, id), 'a')
     const cliArgs = repl
       ? [cliPath, '--cwd', projectDir, 'repl', '--format', 'jsonl', runeKey, ...(args ?? [])]
       : [cliPath, '--cwd', projectDir, 'run', '--format', 'jsonl', runeKey, ...(args ?? [])]
     let childEnv = { ...process.env, CRUNES_NO_TIMEOUT: '1' }
     if (repl) {
-      const stdinLog = jobStdinPath(pKey, id)
+      const stdinLog = jobStdinPath(projectDir, id)
       fsSync.writeFileSync(stdinLog, '')
       childEnv = { ...childEnv, CRUNES_STDIN_LOG: stdinLog }
     }
@@ -455,7 +454,7 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
       cliArgs,
       { detached: true, stdio: ['ignore', outFd, errFd], env: childEnv, windowsHide: true }
     )
-    await updateJobPid(pKey, id, child.pid)
+    await updateJobPid(projectDir, id, child.pid)
     child.unref()
     fsSync.closeSync(outFd)
     fsSync.closeSync(errFd)
@@ -465,37 +464,37 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
     const sig = signal ?? 'SIGTERM'
     if (!VALID_SIGNALS.has(sig)) throw new Error(`Invalid signal: ${sig}`)
     checkPermission('rune.job.kill', null)
-    const record = await getJob(pKey, id)
+    const record = await getJob(projectDir, id)
     if (!record) return
     try { process.kill(record.pid, sig) } catch { /* already gone */ }
   }))
   await jail.set('$__utils_rune_job_exists', asyncRef(async (id) => {
     checkPermission('rune.job.exists', null)
-    const record = await getJob(pKey, id)
+    const record = await getJob(projectDir, id)
     if (!record) return false
     try { process.kill(record.pid, 0); return true } catch { return false }
   }))
   await jail.set('$__utils_rune_job_stdout', asyncRef(async (id) => {
     checkPermission('rune.job.read', null)
-    const record = await getJob(pKey, id)
+    const record = await getJob(projectDir, id)
     if (!record) throw new Error(`Unknown job: ${id}`)
-    const logPath = jobStdoutPath(record.projectKey, id)
+    const logPath = jobStdoutPath(projectDir, id)
     if (!fsSync.existsSync(logPath)) return ''
     return fsSync.promises.readFile(logPath, 'utf8')
   }))
   await jail.set('$__utils_rune_job_stderr', asyncRef(async (id) => {
     checkPermission('rune.job.read', null)
-    const record = await getJob(pKey, id)
+    const record = await getJob(projectDir, id)
     if (!record) throw new Error(`Unknown job: ${id}`)
-    const logPath = jobStderrPath(record.projectKey, id)
+    const logPath = jobStderrPath(projectDir, id)
     if (!fsSync.existsSync(logPath)) return ''
     return fsSync.promises.readFile(logPath, 'utf8')
   }))
   await jail.set('$__utils_rune_job_sections', asyncRef(async (id) => {
     checkPermission('rune.job.read', null)
-    const record = await getJob(pKey, id)
+    const record = await getJob(projectDir, id)
     if (!record) throw new Error(`Unknown job: ${id}`)
-    const logPath = jobStdoutPath(record.projectKey, id)
+    const logPath = jobStdoutPath(projectDir, id)
     if (!fsSync.existsSync(logPath)) return []
     const content = await fsSync.promises.readFile(logPath, 'utf8')
     const sections = []
@@ -510,16 +509,16 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
   }))
   await jail.set('$__utils_rune_job_write', asyncRef(async (id, text) => {
     checkPermission('rune.job.write', null)
-    const record = await getJob(pKey, id)
+    const record = await getJob(projectDir, id)
     if (!record) throw new Error(`Unknown job: ${id}`)
-    const logPath = jobStdinPath(record.projectKey, id)
+    const logPath = jobStdinPath(projectDir, id)
     await fsSync.promises.appendFile(logPath, JSON.stringify({ type: 'line', text }) + '\n', 'utf8')
   }))
   await jail.set('$__utils_rune_job_write_eof', asyncRef(async (id) => {
     checkPermission('rune.job.write', null)
-    const record = await getJob(pKey, id)
+    const record = await getJob(projectDir, id)
     if (!record) throw new Error(`Unknown job: ${id}`)
-    const logPath = jobStdinPath(record.projectKey, id)
+    const logPath = jobStdinPath(projectDir, id)
     await fsSync.promises.appendFile(logPath, JSON.stringify({ type: 'eof', text: '' }) + '\n', 'utf8')
   }))
   await jail.set('$__utils_time_after', new ivm.Reference((ms) => {
@@ -1104,8 +1103,10 @@ export async function runRuneInIsolate(runeFile, effective, args, projectDir, {
     allow: [...effective.allow, ...getAutoPermits({ pluginId, pluginDir })],
     deny: effective.deny,
   }
-  const { id: projectId } = await ensureProjectIdentity(projectDir)
-  const checkPermission = makePermissionChecker(augmented, { dir: projectDir, pluginId, pluginDir, projectId })
+  ensureProjectIdentity(projectDir)
+    .then(({ id }) => upsertProject(id, projectDir))
+    .catch(() => {})
+  const checkPermission = makePermissionChecker(augmented, { dir: projectDir, pluginId, pluginDir })
   const { utils, dispose } = createUtils(projectDir, checkPermission, pluginDir ?? null, augmented, vars, sections, pluginId)
 
   if (isVerbose) console.error(`[crunes:debug] creating Isolate...`)
@@ -1573,8 +1574,10 @@ export async function runRuneInRepl(runeFile, effective, args, projectDir, {
     allow: [...effective.allow, ...getAutoPermits({ pluginId, pluginDir })],
     deny: effective.deny,
   }
-  const { id: projectId } = await ensureProjectIdentity(projectDir)
-  const checkPermission = makePermissionChecker(augmented, { dir: projectDir, pluginId, pluginDir, projectId })
+  ensureProjectIdentity(projectDir)
+    .then(({ id }) => upsertProject(id, projectDir))
+    .catch(() => {})
+  const checkPermission = makePermissionChecker(augmented, { dir: projectDir, pluginId, pluginDir })
   const { utils, dispose: disposeUtils } = createUtils(projectDir, checkPermission, pluginDir ?? null, augmented, vars, null, pluginId)
 
   const isolate = new ivm.Isolate({ memoryLimit: isolateMemoryMb })

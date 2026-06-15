@@ -130,26 +130,26 @@ describe('createSqliteUtils â€” location / pluginId guards', () => {
     await expect(sqlite.openHandle('@global-plugin-sqlite', 'test')).rejects.toThrow('@global-plugin-sqlite requires a plugin context')
   })
 
-  it('@global-project-plugin-sqlite without pluginId throws', async () => {
+  it('@local-plugin-sqlite without pluginId throws', async () => {
     const sqlite = createSqliteUtils(tmp, null)
-    await expect(sqlite.openHandle('@global-project-plugin-sqlite', 'test')).rejects.toThrow('@global-project-plugin-sqlite requires a plugin context')
+    await expect(sqlite.openHandle('@local-plugin-sqlite', 'test')).rejects.toThrow('@local-plugin-sqlite requires a plugin context')
   })
 
-  it('@global-project-sqlite works without pluginId', async () => {
+  it('@local-sqlite works without pluginId', async () => {
     const sqlite = createSqliteUtils(tmp, null)
-    const h = await sqlite.openHandle('@global-project-sqlite', 'test')
+    const h = await sqlite.openHandle('@local-sqlite', 'test')
     h.exec('CREATE TABLE t (id INTEGER PRIMARY KEY)')
     expect(h.query('SELECT * FROM t')).toEqual([])
     h.close()
   })
 
-  it('@global-project-sqlite/subdir stores and retrieves rows', async () => {
+  it('@local-sqlite/subdir stores and retrieves rows', async () => {
     const sqlite2 = createSqliteUtils(tmp, null)
-    const h1 = await sqlite2.openHandle('@global-project-sqlite/data', 'mydb')
+    const h1 = await sqlite2.openHandle('@local-sqlite/data', 'mydb')
     h1.exec('CREATE TABLE t (id INTEGER PRIMARY KEY)')
     h1.exec('INSERT INTO t VALUES (42)')
     h1.close()
-    const h2 = await sqlite2.openHandle('@global-project-sqlite/data', 'mydb')
+    const h2 = await sqlite2.openHandle('@local-sqlite/data', 'mydb')
     expect(h2.query('SELECT * FROM t')).toEqual([{ id: 42 }])
     h2.close()
     sqlite2.dispose()
@@ -157,7 +157,7 @@ describe('createSqliteUtils â€” location / pluginId guards', () => {
 
   it('subpath escape throws RangeError', async () => {
     const sqlite2 = createSqliteUtils(tmp, null)
-    await expect(sqlite2.openHandle('@global-project-sqlite/../etc', 'mydb')).rejects.toThrow(RangeError)
+    await expect(sqlite2.openHandle('@local-sqlite/../etc', 'mydb')).rejects.toThrow(RangeError)
     sqlite2.dispose()
   })
 })
@@ -241,20 +241,20 @@ describe('createSqliteUtils â€” permissions', () => {
     expect(spy).toHaveBeenCalledWith('sqlite.read', './data::default')
   })
 
-  it('@global-project-sqlite calls checkPermission with @global-project-sqlite:name token', async () => {
+  it('@local-sqlite calls checkPermission with @local-sqlite:name token', async () => {
     const spy = vi.fn()
     sqlite = createSqliteUtils(tmp, spy)
-    const h = await sqlite.openHandle('@global-project-sqlite', 'mydb')
+    const h = await sqlite.openHandle('@local-sqlite', 'mydb')
     try { h.exec('CREATE TABLE t (id INTEGER)') } catch {}
-    expect(spy).toHaveBeenCalledWith('sqlite.write', '@global-project-sqlite::mydb')
+    expect(spy).toHaveBeenCalledWith('sqlite.write', '@local-sqlite::mydb')
   })
 
-  it('@global-project-sqlite/data calls checkPermission with subpath token', async () => {
+  it('@local-sqlite/data calls checkPermission with subpath token', async () => {
     const spy = vi.fn()
     sqlite = createSqliteUtils(tmp, spy)
-    const h = await sqlite.openHandle('@global-project-sqlite/data', 'mydb')
+    const h = await sqlite.openHandle('@local-sqlite/data', 'mydb')
     try { h.exec('CREATE TABLE t (id INTEGER)') } catch {}
-    expect(spy).toHaveBeenCalledWith('sqlite.write', '@global-project-sqlite/data::mydb')
+    expect(spy).toHaveBeenCalledWith('sqlite.write', '@local-sqlite/data::mydb')
   })
 
   it('@global-plugin-sqlite permission granted via allow pattern passes check', async () => {

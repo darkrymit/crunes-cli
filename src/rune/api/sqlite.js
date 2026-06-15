@@ -1,7 +1,6 @@
 import { mkdirSync } from 'node:fs'
 import path from 'node:path'
 import { resolvePath } from './utils.js'
-import { upsertSqliteDb } from '../../sqlite/index.js'
 
 async function loadDatabase() {
   try {
@@ -14,17 +13,12 @@ async function loadDatabase() {
     )
   }
 }
-import { upsertProject, ensureProjectIdentity } from '../../project/index.js'
 
 const SQLITE_SCOPES = {
-  '@global-plugin-sqlite':         'global-plugin',
-  '@global-project-sqlite':        'global-project',
-  '@global-project-plugin-sqlite': 'global-project-plugin',
-  '@local-project-sqlite':         'local-project',
-  '@local-project-plugin-sqlite':  'local-project-plugin',
+  '@global-plugin-sqlite': 'global-plugin',
+  '@local-sqlite':         'local',
+  '@local-plugin-sqlite':  'local-plugin',
 }
-
-const GLOBAL_SCOPES = new Set(['global-plugin', 'global-project', 'global-project-plugin'])
 
 function detectSqliteScope(location) {
   for (const [prefix, scope] of Object.entries(SQLITE_SCOPES)) {
@@ -70,33 +64,21 @@ function makeHandle(Database, dbPath, checkRead, checkWrite, connections) {
   }
 }
 
-export function createSqliteUtils(dir, checkPermission, { pluginId = null, storeDir = null, projectName = undefined } = {}) {
+export function createSqliteUtils(dir, checkPermission, { pluginId = null, storeDir = null } = {}) {
   const connections = []
 
   return {
     async openHandle(location, name = 'default') {
       const Database = await loadDatabase()
-      const scope = detectSqliteScope(location)
       if (name.includes('/') || name.includes('\\')) {
         throw new TypeError('sqlite name must not contain path separators — use a flat name like "branch-main" instead of "branch/main"')
       }
-      let projectId = null
-      if (scope !== null) {
-        const { id } = await ensureProjectIdentity(dir)
-        projectId = id
-      }
-      const ctx    = { dir, pluginId, storeDir, projectName, projectId }
+      const ctx    = { dir, pluginId, storeDir }
       const base   = resolvePath(location, ctx)
       const dbPath = path.join(base, resolveFileName(name))
       const tokenValue = `${location}::${name}`
       const checkRead  = checkPermission ? () => checkPermission('sqlite.read',  tokenValue) : null
       const checkWrite = checkPermission ? () => checkPermission('sqlite.write', tokenValue) : null
-      if (scope !== null && GLOBAL_SCOPES.has(scope)) {
-        await upsertSqliteDb(dbPath, { scope, projectId, pluginId: pluginId ?? null, location, name })
-        if (scope === 'global-project' || scope === 'global-project-plugin') {
-          await upsertProject(projectId, dir)
-        }
-      }
       return makeHandle(Database, dbPath, checkRead, checkWrite, connections)
     },
     dispose() {

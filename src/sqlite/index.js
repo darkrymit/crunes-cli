@@ -20,14 +20,6 @@ export function getSqlitePluginDir(pluginId) {
   return path.join(getSqliteBasePath(), 'plugins', pluginId)
 }
 
-export function getSqliteProjectDir(key) {
-  return path.join(getSqliteBasePath(), 'projects', key)
-}
-
-export function getSqliteProjectPluginDir(key, pluginId) {
-  return path.join(getSqliteBasePath(), 'project-plugins', key, pluginId)
-}
-
 export async function loadSqliteDbs() {
   try {
     return JSON.parse(await readFile(getSqliteJsonPath(), 'utf8'))
@@ -54,28 +46,12 @@ export async function upsertSqliteDb(resolvedPath, { scope, projectId, pluginId,
   await writeFile(p, JSON.stringify(data, null, 2), 'utf8')
 }
 
-function scopedDatabases(data, projectKey) {
-  if (projectKey === undefined) return data.databases
-  return Object.fromEntries(
-    Object.entries(data.databases).filter(([, e]) =>
-      (e.scope === 'global-project' || e.scope === 'global-project-plugin') && e.projectKey === projectKey
-    )
-  )
-}
-
-export async function listSqliteDbs(projectKey = undefined) {
+export async function listSqliteDbs() {
   const data = await loadSqliteDbs()
-  return Object.entries(scopedDatabases(data, projectKey)).map(([key, entry]) => ({ key, ...entry }))
+  return Object.entries(data.databases).map(([key, entry]) => ({ key, ...entry }))
 }
 
 export async function listLocalSqliteDbs(projectDir) {
-  let projectId
-  try {
-    const raw = await readFile(path.join(projectDir, '.crunes', 'project.local.json'), 'utf8')
-    projectId = JSON.parse(raw).id
-  } catch {
-    return []
-  }
   const results = []
   const localSqliteDir = path.join(projectDir, '.crunes', 'sqlite')
 
@@ -85,22 +61,20 @@ export async function listLocalSqliteDbs(projectDir) {
     for (const entry of entries) {
       if (!entry.isFile() || !entry.name.endsWith('.sqlite')) continue
       const name = entry.name.slice(0, -'.sqlite'.length)
-      const key = storageKey(scope, { projectId, pluginId, name })
-      const location = pluginId
-        ? `@local-project-plugin-sqlite/${pluginId}/${name}`
-        : `@local-project-sqlite/${name}`
-      results.push({ key, scope, projectKey: projectId, pluginId, location, name, firstSeenAt: null, path: path.join(scopeDir, entry.name) })
+      const key = storageKey(scope, { projectId: null, pluginId, name })
+      const location = pluginId ? `@local-plugin-sqlite/${pluginId}/${name}` : `@local-sqlite/${name}`
+      results.push({ key, scope, projectKey: null, pluginId, location, name, firstSeenAt: null, path: path.join(scopeDir, entry.name) })
     }
   }
 
-  await scanScope(path.join(localSqliteDir, 'project'), 'local-project')
+  await scanScope(path.join(localSqliteDir, 'project'), 'local')
 
-  const pluginsDir = path.join(localSqliteDir, 'project-plugins')
+  const pluginsDir = path.join(localSqliteDir, 'plugins')
   let pluginEntries
   try { pluginEntries = await readdir(pluginsDir, { withFileTypes: true }) } catch { pluginEntries = [] }
   for (const pluginEntry of pluginEntries) {
     if (!pluginEntry.isDirectory()) continue
-    await scanScope(path.join(pluginsDir, pluginEntry.name), 'local-project-plugin', pluginEntry.name)
+    await scanScope(path.join(pluginsDir, pluginEntry.name), 'local-plugin', pluginEntry.name)
   }
 
   return results
@@ -114,9 +88,9 @@ export function resolveKey(id, databases) {
   throw new Error(`Ambiguous id "${id}" — matches: ${matches.join(', ')}.`)
 }
 
-export async function deleteSqliteDb(id, projectKey = undefined) {
+export async function deleteSqliteDb(id) {
   const data = await loadSqliteDbs()
-  const key = resolveKey(id, scopedDatabases(data, projectKey))
+  const key = resolveKey(id, data.databases)
   const { path: dbPath, name } = data.databases[key]
   await rm(dbPath, { force: true })
   await rm(dbPath + '-wal', { force: true })
@@ -128,10 +102,10 @@ export async function deleteSqliteDb(id, projectKey = undefined) {
   return { name }
 }
 
-export async function querySqliteDb(id, sql, projectKey = undefined) {
+export async function querySqliteDb(id, sql) {
   const Database = await loadDatabase()
   const data = await loadSqliteDbs()
-  const key = resolveKey(id, scopedDatabases(data, projectKey))
+  const key = resolveKey(id, data.databases)
   const { path: dbPath } = data.databases[key]
   const db = new Database(dbPath, { readonly: true })
   try {

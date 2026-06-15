@@ -221,16 +221,16 @@ export function createShellUtils(dir, checkPermission) {
     return new ShellSession(cmd, { dir, ...opts, activeSessions })
   }
 
-  async function createShellJob(cmd, opts, { createJob, updateJobPid, jobStdoutPath, jobStderrPath, jobStdinPath, spawnedBy, projectKey, projectDir: jobProjectDir }) {
+  async function createShellJob(cmd, opts, { createJob, updateJobPid, jobStdoutPath, jobStderrPath, jobStdinPath, spawnedBy, projectDir: jobProjectDir }) {
     const repl = opts?.repl ?? false
     const { id } = await createJob(null, {
       type: 'shell', spawnedBy, runeKey: null, projectDir: jobProjectDir, args: [cmd],
     })
-    const outFd = fs.openSync(jobStdoutPath(projectKey, id), 'a')
-    const errFd = fs.openSync(jobStderrPath(projectKey, id), 'a')
+    const outFd = fs.openSync(jobStdoutPath(jobProjectDir, id), 'a')
+    const errFd = fs.openSync(jobStderrPath(jobProjectDir, id), 'a')
     const childEnv = opts?.env ? { ...process.env, ...opts.env } : process.env
     if (repl) {
-      const stdinLog = jobStdinPath(projectKey, id)
+      const stdinLog = jobStdinPath(jobProjectDir, id)
       fs.writeFileSync(stdinLog, '')
       // Wrapper process: tails stdinLog and feeds lines into the real child's stdin.
       // Runs detached so it outlives the parent; kill(wrapperPid) kills the full tree.
@@ -261,7 +261,7 @@ sched()
         env:         wrapperEnv,
         windowsHide: true,
       })
-      await updateJobPid(projectKey, id, wrapper_child.pid)
+      await updateJobPid(jobProjectDir, id, wrapper_child.pid)
       wrapper_child.unref()
       fs.closeSync(outFd)
       fs.closeSync(errFd)
@@ -275,7 +275,7 @@ sched()
       env:         childEnv,
       windowsHide: true,
     })
-    await updateJobPid(projectKey, id, child.pid)
+    await updateJobPid(jobProjectDir, id, child.pid)
     child.unref()
     fs.closeSync(outFd)
     fs.closeSync(errFd)

@@ -102,14 +102,14 @@ describe('createCacheUtils', () => {
     await expect(cache.openHandle('@global-plugin-cache', 'test')).rejects.toThrow('@global-plugin-cache requires a plugin context')
   })
 
-  it('@global-project-plugin-cache without pluginId throws', async () => {
+  it('@local-plugin-cache without pluginId throws', async () => {
     const cache = createCacheUtils(tmp, null)
-    await expect(cache.openHandle('@global-project-plugin-cache', 'test')).rejects.toThrow('@global-project-plugin-cache requires a plugin context')
+    await expect(cache.openHandle('@local-plugin-cache', 'test')).rejects.toThrow('@local-plugin-cache requires a plugin context')
   })
 
-  it('@global-project-cache works without pluginId (local rune)', async () => {
+  it('@local-cache works without pluginId (local rune)', async () => {
     const cache = createCacheUtils(tmp, null)
-    const h = await cache.openHandle('@global-project-cache', 'test')
+    const h = await cache.openHandle('@local-cache', 'test')
     await h.set('k', 'local-val')
     expect(await h.get('k')).toBe('local-val')
   })
@@ -188,32 +188,32 @@ describe('createCacheUtils', () => {
     expect(spy).toHaveBeenCalledWith('cache.read', './my-dir::default')
   })
 
-  it('@global-project-cache calls checkPermission with @global-project-cache:name token', async () => {
+  it('@local-cache calls checkPermission with @local-cache:name token', async () => {
     const spy = vi.fn()
     const cache = createCacheUtils(tmp, spy)
-    const h = await cache.openHandle('@global-project-cache', 'myns')
+    const h = await cache.openHandle('@local-cache', 'myns')
     try { await h.set('k', 'v') } catch {}
-    expect(spy).toHaveBeenCalledWith('cache.write', '@global-project-cache::myns')
+    expect(spy).toHaveBeenCalledWith('cache.write', '@local-cache::myns')
   })
 
-  it('@global-project-cache/subdir calls checkPermission with subpath token', async () => {
+  it('@local-cache/subdir calls checkPermission with subpath token', async () => {
     const spy = vi.fn()
     const cache = createCacheUtils(tmp, spy)
-    const h = await cache.openHandle('@global-project-cache/data', 'myns')
+    const h = await cache.openHandle('@local-cache/data', 'myns')
     try { await h.get('k') } catch {}
-    expect(spy).toHaveBeenCalledWith('cache.read', '@global-project-cache/data::myns')
+    expect(spy).toHaveBeenCalledWith('cache.read', '@local-cache/data::myns')
   })
 
-  it('@global-project-cache/subdir stores and retrieves values', async () => {
+  it('@local-cache/subdir stores and retrieves values', async () => {
     const cache = createCacheUtils(tmp, null)
-    const h = await cache.openHandle('@global-project-cache/level1/level2', 'myns')
+    const h = await cache.openHandle('@local-cache/level1/level2', 'myns')
     await h.set('k', 42)
     expect(await h.get('k')).toBe(42)
   })
 
   it('subpath escape throws RangeError', async () => {
     const cache = createCacheUtils(tmp, null)
-    await expect(cache.openHandle('@global-project-cache/../etc', 'myns')).rejects.toThrow(RangeError)
+    await expect(cache.openHandle('@local-cache/../etc', 'myns')).rejects.toThrow(RangeError)
   })
 
   it('@global-plugin-cache permission granted via allow pattern passes check', async () => {

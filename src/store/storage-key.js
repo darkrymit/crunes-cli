@@ -5,11 +5,9 @@ function shortHash(str) {
 }
 
 const KEY_MATERIALS = {
-  'global-plugin':         ({ pluginId, name }) => `global-plugin|${pluginId}|${name}`,
-  'global-project':        ({ projectId, name }) => `global-project|${projectId}|${name}`,
-  'global-project-plugin': ({ projectId, pluginId, name }) => `global-project-plugin|${projectId}|${pluginId}|${name}`,
-  'local-project':         ({ projectId, name }) => `local-project|${projectId}|${name}`,
-  'local-project-plugin':  ({ projectId, pluginId, name }) => `local-project-plugin|${projectId}|${pluginId}|${name}`,
+  'global-plugin':  ({ pluginId, name }) => `global-plugin|${pluginId}|${name}`,
+  'local':          ({ projectId, name }) => `local|${projectId}|${name}`,
+  'local-plugin':   ({ projectId, pluginId, name }) => `local-plugin|${projectId}|${pluginId}|${name}`,
 }
 
 export function storageKey(type, { projectId, pluginId, name }) {

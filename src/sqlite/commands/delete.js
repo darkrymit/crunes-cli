@@ -1,19 +1,14 @@
 import * as p from '@clack/prompts'
 import { deleteSqliteDb } from '../index.js'
-import { ensureProjectIdentity } from '../../project/index.js'
 
-export async function handler({ id, yes, projectDir, global: isGlobal }) {
+export async function handler({ id, yes, projectDir }) {
   if (!yes) {
     const confirm = await p.confirm({ message: `Delete SQLite database matching "${id}"?` })
-    if (p.isCancel(confirm) || !confirm) {
-      p.cancel('Cancelled.')
-      process.exit(0)
-    }
+    if (p.isCancel(confirm) || !confirm) { p.cancel('Cancelled.'); process.exit(0) }
   }
-  const key = isGlobal ? undefined : (await ensureProjectIdentity(projectDir)).id
   let result
   try {
-    result = await deleteSqliteDb(id, key)
+    result = await deleteSqliteDb(id)
   } catch (err) {
     console.error(`Error: ${err.message}`)
     process.exit(1)

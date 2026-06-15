@@ -254,19 +254,17 @@ export function buildProgram() {
   jobs
     .command('list')
     .description('List background jobs for the current project')
-    .option('-g, --global', 'list jobs across all projects')
-    .action(async (opts) => {
+    .action(async () => {
       const { handler } = await import('../job/commands/list.js')
-      await handler({ projectDir: projectRoot(), global: !!opts.global })
+      await handler({ projectDir: projectRoot() })
     })
 
   jobs
     .command('kill <id>')
     .description('Send SIGTERM to a background job and remove its record')
-    .option('-g, --global', 'search for the job across all projects')
-    .action(async (id, opts) => {
+    .action(async (id) => {
       const { handler } = await import('../job/commands/kill.js')
-      await handler({ id, projectDir: projectRoot(), global: !!opts.global })
+      await handler({ id, projectDir: projectRoot() })
     })
 
   // Cache management commands
@@ -275,41 +273,37 @@ export function buildProgram() {
   cache
     .command('list')
     .description('List cache buckets for the current project')
-    .option('-g, --global', 'list all cache buckets across all projects and plugins')
     .option('-p, --plugin [pluginId]', 'filter to plugin-related buckets; pass a value to match a specific plugin')
     .action(async (opts) => {
       const { handler } = await import('../cache/commands/list.js')
-      await handler({ projectDir: projectRoot(), global: !!opts.global, plugin: opts.plugin })
+      await handler({ projectDir: projectRoot(), plugin: opts.plugin })
     })
 
   cache
     .command('clear <id>')
     .description('Remove expired keys from a cache bucket')
-    .option('-g, --global', 'resolve the id across all projects')
     .option('-p, --plugin [pluginId]', 'filter to plugin-related buckets')
     .action(async (id, opts) => {
       const { handler } = await import('../cache/commands/clear.js')
-      await handler({ id, projectDir: projectRoot(), global: !!opts.global, plugin: opts.plugin })
+      await handler({ id, projectDir: projectRoot(), plugin: opts.plugin })
     })
 
   cache
     .command('delete <id>')
     .description('Delete a cache bucket directory and deregister it')
-    .option('-g, --global', 'resolve the id across all projects')
     .option('-p, --plugin [pluginId]', 'filter to plugin-related buckets')
     .action(async (id, opts) => {
       const { handler } = await import('../cache/commands/delete.js')
-      await handler({ id, projectDir: projectRoot(), yes: !!program.opts().yes, global: !!opts.global, plugin: opts.plugin })
+      await handler({ id, projectDir: projectRoot(), yes: !!program.opts().yes, plugin: opts.plugin })
     })
 
   cache
     .command('unset <id> <key>')
     .description('Remove a single key from a cache bucket')
-    .option('-g, --global', 'resolve the id across all projects')
     .option('-p, --plugin [pluginId]', 'filter to plugin-related buckets')
     .action(async (id, key, opts) => {
       const { handler } = await import('../cache/commands/unset.js')
-      await handler({ id, key, projectDir: projectRoot(), global: !!opts.global, plugin: opts.plugin })
+      await handler({ id, key, projectDir: projectRoot(), plugin: opts.plugin })
     })
 
   // SQLite management commands
@@ -318,31 +312,28 @@ export function buildProgram() {
   sqlite
     .command('list')
     .description('List all registered SQLite databases')
-    .option('-g, --global', 'List databases from all projects (default: current project only)')
     .option('-p, --plugin [pluginId]', 'filter to plugin-related databases; pass a value to match a specific plugin')
     .action(async (opts) => {
       const { handler } = await import('../sqlite/commands/list.js')
-      await handler({ projectDir: projectRoot(), global: !!opts.global, plugin: opts.plugin })
+      await handler({ projectDir: projectRoot(), plugin: opts.plugin })
     })
 
   sqlite
     .command('delete <id>')
     .description('Delete a SQLite database file and deregister it')
-    .option('-g, --global', 'Match databases from all projects (default: current project only)')
     .option('-p, --plugin [pluginId]', 'filter to plugin-related databases')
     .action(async (id, opts) => {
       const { handler } = await import('../sqlite/commands/delete.js')
-      await handler({ id, yes: !!program.opts().yes, projectDir: projectRoot(), global: !!opts.global, plugin: opts.plugin })
+      await handler({ id, yes: !!program.opts().yes, projectDir: projectRoot(), plugin: opts.plugin })
     })
 
   sqlite
     .command('query <id> <sql>')
     .description('Run a SQL query against a registered SQLite database (readonly)')
-    .option('-g, --global', 'Match databases from all projects (default: current project only)')
     .option('-p, --plugin [pluginId]', 'filter to plugin-related databases')
     .action(async (id, sql, opts) => {
       const { handler } = await import('../sqlite/commands/query.js')
-      await handler({ id, sql, projectDir: projectRoot(), global: !!opts.global, plugin: opts.plugin })
+      await handler({ id, sql, projectDir: projectRoot(), plugin: opts.plugin })
     })
 
   program

@@ -1,12 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, rm, mkdir, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { upsertSqliteDb } from '../../../src/sqlite/index.js'
-import { ensureProjectIdentity } from '../../../src/project/index.js'
 import { handler } from '../../../src/sqlite/commands/list.js'
 
-const PROJ_KEY = 'abc123def456'
+const PLUGIN_ID = 'my-plugin@1.0.0'
 
 describe('sqlite list handler', () => {
   let tmp
@@ -22,29 +21,25 @@ describe('sqlite list handler', () => {
   })
 
   it('prints "No SQLite databases." when index is empty', async () => {
-    await handler({ projectDir: tmp, global: true })
+    await handler({ projectDir: tmp })
     expect(console.log).toHaveBeenCalledWith('No SQLite databases.')
   })
 
   it('prints a table with header and a row per database', async () => {
-    const dbPath = join(tmp, 'sqlite', 'projects', PROJ_KEY, 'notes.sqlite')
-    await upsertSqliteDb(dbPath, { scope: 'global-project', projectId: PROJ_KEY, pluginId: null, location: '@global-project-sqlite', name: 'notes' })
-    await handler({ projectDir: tmp, global: true })
+    const dbPath = join(tmp, 'sqlite', 'plugins', PLUGIN_ID, 'notes.sqlite')
+    await upsertSqliteDb(dbPath, { scope: 'global-plugin', projectId: null, pluginId: PLUGIN_ID, location: '@global-plugin-sqlite', name: 'notes' })
+    await handler({ projectDir: tmp })
     const lines = console.log.mock.calls.map(c => c[0])
     expect(lines.some(l => l.includes('KEY'))).toBe(true)
     expect(lines.some(l => l.includes('notes'))).toBe(true)
-    expect(lines.some(l => l.includes('project'))).toBe(true)
   })
 
-  it('scopes to current project when global: false', async () => {
-    const { id: projKey } = await ensureProjectIdentity(tmp)
-    const p1 = join(tmp, 'sqlite', 'projects', projKey, 'mine.sqlite')
-    const p2 = join(tmp, 'sqlite', 'projects', 'other-key', 'theirs.sqlite')
-    await upsertSqliteDb(p1, { scope: 'global-project', projectId: projKey, pluginId: null, location: '@global-project-sqlite', name: 'mine' })
-    await upsertSqliteDb(p2, { scope: 'global-project', projectId: 'other-key', pluginId: null, location: '@global-project-sqlite', name: 'theirs' })
-    await handler({ projectDir: tmp, global: false })
+  it('shows local-sqlite databases scanned from project dir', async () => {
+    const localPath = join(tmp, '.crunes', 'sqlite', 'project')
+    await mkdir(localPath, { recursive: true })
+    await writeFile(join(localPath, 'mylocal.sqlite'), '')
+    await handler({ projectDir: tmp })
     const lines = console.log.mock.calls.map(c => c[0])
-    expect(lines.some(l => l.includes('mine'))).toBe(true)
-    expect(lines.some(l => l.includes('theirs'))).toBe(false)
+    expect(lines.some(l => l.includes('mylocal'))).toBe(true)
   })
 })
