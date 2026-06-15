@@ -20,7 +20,7 @@ The registry tracks all buckets that have ever been created. It records metadata
 
 **Expiration via timestamps:** Each cache entry stores an expiration timestamp. Entries with no expiration timestamp persist indefinitely. Entries with an expiration timestamp in the past are considered stale. The clear operation removes only stale entries — permanent entries survive. This means permanent entries cannot be removed with clear; you must explicitly delete them with an unset operation or delete the entire bucket.
 
-**Five storage scopes:** Buckets can be stored in different locations depending on their scope. Global buckets live under the home directory. Project-local buckets live under the project's local config directory. Similarly, buckets can be scoped to plugins. The scope determines the filesystem location, and thus which data persists across projects and which is isolated per project.
+**Three storage scopes:** Buckets can be stored in three scopes: `local` (project-local, inside `.crunes/cache/project/`), `local-plugin` (project-local and plugin-scoped, inside `.crunes/cache/plugins/<pluginId>/`), and `global-plugin` (global and plugin-scoped, inside `~/.crunes/cache/plugins/<pluginId>/`). The scope determines the filesystem location, and thus which data persists across projects and which is isolated per project.
 
 **Prefix-based bucket resolution:** The registry maps bucket names to their full keys. When a rune refers to a bucket by name or partial key, the system tries an exact match first, then a prefix match. If zero or multiple buckets match the prefix, an error is raised. This allows short identifiers when they are unambiguous.
 

@@ -159,7 +159,7 @@ describe('handler (non-interactive)', () => {
       await handler({ ...BASE_OPTS, out, yes: true })
       const pj = JSON.parse(readFileSync(join(out, '.crunes-plugin', 'plugin.json'), 'utf8'))
       expect(pj.runes.example.permissions).toEqual({
-        use: { allow: [], deny: [] },
+        run: { allow: [], deny: [] },
       })
     })
 

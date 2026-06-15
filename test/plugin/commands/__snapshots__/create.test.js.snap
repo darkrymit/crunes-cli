@@ -30,6 +30,7 @@ export async function run(args) {
   // args._         — data positionals (command tokens stripped)
   // args.verbose   — named flag (if args export is defined above)
   // utils.fs.cwd() — absolute path to the user's project root
+  // To handle --help: check args.$raw.includes('--help') and return a help section
 
   return section.create('example', {
     type: 'markdown',
@@ -102,7 +103,7 @@ exports[`pluginJson > matches snapshot 1`] = `
       "name": "Example Rune",
       "description": "Replace with your rune description",
       "permissions": {
-        "use": {
+        "run": {
           "allow": [],
           "deny": []
         }

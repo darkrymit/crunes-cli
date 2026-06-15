@@ -20,7 +20,7 @@ The store location itself is configurable. In production it lives under the user
 
 **Selective directory creation:** Only two directories are created during initialization. All others are created when first written by the modules that own them. If a directory does not exist, it simply means that feature has never been used. This laziness keeps the store clean and makes it obvious which features have been exercised.
 
-**Bucket keys include a suffix for uniqueness:** When multiple projects each use a cache or database with the same name, their on-disk identifiers differ because each key includes a suffix derived from that project's identity. This means two projects can safely both use a bucket named "timestamps" — the keys will differ, data stays separate, and no application code needs to worry about collisions.
+**Bucket keys include a suffix for uniqueness:** When multiple projects each use a cache or database with the same name, their on-disk identifiers differ because each key's hash is derived from the storage scope and bucket name. `local` scope hashes just the name; `local-plugin` and `global-plugin` scopes also include the pluginId. This means two different plugins can safely both use a bucket named "data" — the keys will differ, data stays separate, and no application code needs to worry about collisions.
 
 ## Key Decisions
 
@@ -34,4 +34,4 @@ The store location itself is configurable. In production it lives under the user
 
 **Initialization does not create all directories:** Many developers expect that initialization creates all subdirectories. It creates only two — the entry points for plugin and marketplace operations. Other directories are created on first write by their owning modules. Code that assumes a directory exists before its module writes to it will fail. Either create the directory yourself or rely on the module to create it.
 
-**Suffix-based uniqueness protects against name collisions:** The mechanism that prevents two projects from corrupting each other's data relies on including a project-specific component in each key. If two developers accidentally share the same project identity (for example, by committing a project file to version control), their caches and databases will alias each other — writes from one project affect the other. This is why project identity files must be gitignored.
+**Suffix-based uniqueness protects against name collisions:** The mechanism that prevents two buckets from colliding relies on the hash suffix in each key. `local` scope keys hash only the bucket name, so the same name in the same scope always resolves to the same key — isolation is achieved by directory structure (each project's local data lives inside its own `.crunes/` directory). `local-plugin` and `global-plugin` keys additionally hash the pluginId, so different plugins cannot accidentally share data even with identical bucket names.

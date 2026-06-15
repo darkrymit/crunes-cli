@@ -103,9 +103,11 @@ function expandLocValue(value, absDir, { pluginId, pluginDir }, dir) {
   }
   const hasDot = v.startsWith('./')
   const rel    = hasDot ? v.slice(2) : v
-  const relIsGlob = rel === '**' || rel.startsWith('**/')
+  // rel === '**' is a bare wildcard — do not add it as a sibling (would match everything).
+  // rel.startsWith('**/') is a scoped glob like '**/.git' — safe to include bare form.
+  const isBareStarStar = rel === '**'
   return hasDot
-    ? (relIsGlob
+    ? (isBareStarStar
       ? [`./${rel}`, absDir + '/' + rel, `@project/${rel}`]
       : [`./${rel}`, rel, absDir + '/' + rel, `@project/${rel}`])
     : [`./${rel}`, rel, absDir + '/' + rel, `@project/${rel}`]

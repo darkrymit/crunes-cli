@@ -22,7 +22,7 @@ SQLite databases are stored as single files on disk. The database engine writes 
 
 **Read-only query interface:** The CLI provides a management command to query databases in read-only mode. Write operations throw errors. This read-only restriction prevents accidental mutation of data from management commands. The implementation uses synchronous database access because the query runs once and exits — asynchronous APIs would add unnecessary overhead.
 
-**Five storage scopes:** Like caches, databases can be global, project-local, or scoped to plugins. The scope determines where the database file lives and thus which projects see it. Global databases persist across projects; project-local databases are isolated to one project.
+**Three storage scopes:** Like caches, databases use three scopes: `local` (project-local, inside `.crunes/sqlite/project/`), `local-plugin` (project-local and plugin-scoped, inside `.crunes/sqlite/plugins/<pluginId>/`), and `global-plugin` (global and plugin-scoped, inside `~/.crunes/sqlite/plugins/<pluginId>/`). The scope determines where the database file lives and thus which projects see it.
 
 ## Key Decisions
 
