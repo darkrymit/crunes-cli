@@ -3,7 +3,7 @@ declare namespace rune {
   /**
    * Calls another rune as a subprocess and awaits completion.
    * Hard process boundary — safe for cross-author/plugin rune composition.
-   * Requires `rune.run:<key>` permission (or `rune.runRepl:<key>` when `repl: true`).
+   * Requires `rune.run:<key>` permission (or `rune.repl:<key>` when `repl: true`).
    * `*` matches any characters (e.g. `rune.run:myplugin:*`).
    *
    * When `repl: true`, `opts.stdin` is written to the child's stdin before awaiting exit.
@@ -13,7 +13,7 @@ declare namespace rune {
   /**
    * Spawns a rune as a streaming subprocess session.
    * Returns immediately with live stdout/stderr streams.
-   * Requires `rune.run:<key>` permission (or `rune.runRepl:<key>` when `repl: true`).
+   * Requires `rune.run:<key>` permission (or `rune.repl:<key>` when `repl: true`).
    * `*` matches any characters (e.g. `rune.run:myplugin:*`).
    *
    * When `repl: true`, the returned session exposes `write()`, `writeEof()`,
@@ -58,7 +58,7 @@ declare namespace rune {
   namespace job {
     /**
      * Starts a rune as a detached background job with log-backed stdout/stderr.
-     * Survives parent process exit. Requires `rune.job.start:<key>` permission (or `rune.runRepl:<key>` when `repl: true`).
+     * Survives parent process exit. Requires `rune.job.start:<key>` permission (or `rune.repl:<key>` when `repl: true`).
      * `*` matches any characters.
      *
      * When `repl: true`, the job's stdin is backed by a `stdin.log` file.

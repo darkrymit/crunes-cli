@@ -6,7 +6,7 @@ import { resolveCompletions } from '../../src/cli/commands/completions.js'
 import { buildProgram } from '../../src/cli/program.js'
 
 const program = buildProgram()
-const TOP = ['run','run-repl','docs','version','doctor','bench','list','job','cache','sqlite','init','create','plugin','template','marketplace','completions']
+const TOP = ['run','repl','docs','version','doctor','bench','list','job','cache','sqlite','init','create','plugin','template','marketplace','completions']
 
 describe('resolveCompletions — top level', () => {
   it('returns all subcommands when only crunes typed', () => {
@@ -18,7 +18,7 @@ describe('resolveCompletions — top level', () => {
   })
 
   it('filters subcommands by partial token', () => {
-    expect(resolveCompletions(['crunes', 'r'], program)).toEqual(['run', 'run-repl'])
+    expect(resolveCompletions(['crunes', 'r'], program)).toEqual(['run', 'repl'])
   })
 })
 
@@ -121,7 +121,7 @@ describe('resolveCompletions — docs subcommands', () => {
   it('completes docs subcommands including new repl lifecycle commands', () => {
     expect(resolveCompletions(['crunes', 'docs', ''], program)).toEqual([
       'rune', 'utils', 'globals', 'intro', 'args', 'run',
-      'run-repl', 'args-repl',
+      'repl', 'args-repl',
       'banner-repl', 'commands-repl', 'input-repl', 'complete-input-repl',
     ])
   })

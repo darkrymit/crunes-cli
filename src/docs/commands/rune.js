@@ -71,7 +71,7 @@ export async function handler({ keys, format = 'text', projectRoot = process.cwd
     const vars = entry.vars ?? {}
 
     const runEffective  = computeEffectivePermissions(basePerms, config.permissions?.[key], 'run')
-    const replEffective = computeEffectivePermissions(basePerms, config.permissions?.[key], 'runRepl')
+    const replEffective = computeEffectivePermissions(basePerms, config.permissions?.[key], 'repl')
 
     let schema = null
     try {
@@ -113,7 +113,7 @@ export async function handler({ keys, format = 'text', projectRoot = process.cwd
       const parts = []
       parts.push(formatHelp(r.schema, { key: r.key, name: r.name, description: r.description, relativePath: r.relativePath }))
       if (r.repl?.argsSchema) {
-        parts.push(formatHelp(r.repl.argsSchema, { key: r.key, name: r.name, description: r.description, relativePath: r.relativePath, lifecycle: 'runRepl' }))
+        parts.push(formatHelp(r.repl.argsSchema, { key: r.key, name: r.name, description: r.description, relativePath: r.relativePath, lifecycle: 'repl' }))
       }
       if (r.repl?.commandsSchema?.commands?.length) {
         parts.push(formatSlashCommands(r.repl.commandsSchema.commands))

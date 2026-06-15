@@ -1,7 +1,7 @@
 import { join } from 'node:path'
 import { loadRegistry, resolvePluginKey } from '../plugin/registry.js'
 import { loadPluginJson } from '../plugin/manifest.js'
-import { executePluginRune, runRuneInIsolate, runRuneInReplSession, getPluginRunePath } from './isolation/runner.js'
+import { executePluginRune, runRuneInIsolate, runRuneInRepl, getPluginRunePath } from './isolation/runner.js'
 import { computeEffectivePermissions } from './permissions/permissions.js'
 import { CircularRuneError } from '../core/errors.js'
 
@@ -187,14 +187,14 @@ export async function resolveRuneEntry(projectDir, config, key, configDir = proj
     const effective = computeEffectivePermissions(
       pluginJson.runes[runeKey]?.permissions ?? {},
       projectPerms ?? {},
-      'runRepl'
+      'repl'
     )
     const vars = { ...(pluginJson.runes[runeKey]?.vars ?? {}), ...(config.vars?.[`${pluginKey}:${runeKey}`] ?? {}) }
     return {
       createReplSession(args, opts = {}) {
         const runeFile = getPluginRunePath(pluginDir, runeKey, pluginJson)
         const nodeModulesDir = join(pluginCacheDir, 'node_modules')
-        return runRuneInReplSession(runeFile, effective, args, projectDir, {
+        return runRuneInRepl(runeFile, effective, args, projectDir, {
           nodeModulesDir,
           pluginDeps: pluginJson.dependencies ?? {},
           pluginDir,
@@ -212,11 +212,11 @@ export async function resolveRuneEntry(projectDir, config, key, configDir = proj
   const entry = getRune(config, key)
   if (entry && !entry.plugin) {
     const runeFile = join(configDir, entry.path ?? `.crunes/runes/${key}.js`)
-    const effective = computeEffectivePermissions(entry.permissions ?? {}, config.permissions?.[key], 'runRepl')
+    const effective = computeEffectivePermissions(entry.permissions ?? {}, config.permissions?.[key], 'repl')
     const vars = entry.vars ?? {}
     return {
       createReplSession(args, opts = {}) {
-        return runRuneInReplSession(runeFile, effective, args, projectDir, {
+        return runRuneInRepl(runeFile, effective, args, projectDir, {
           vars,
           runeKey: key,
           onEvent: opts.onEvent ?? null,
@@ -234,14 +234,14 @@ export async function resolveRuneEntry(projectDir, config, key, configDir = proj
     const effective = computeEffectivePermissions(
       pluginJson.runes[runeKey]?.permissions ?? {},
       projectPerms ?? {},
-      'runRepl'
+      'repl'
     )
     const vars = { ...(pluginJson.runes[runeKey]?.vars ?? {}), ...(config.vars?.[`${pluginKey}:${runeKey}`] ?? {}) }
     return {
       createReplSession(args, opts = {}) {
         const runeFile = getPluginRunePath(pluginDir, runeKey, pluginJson)
         const nodeModulesDir = join(pluginCacheDir, 'node_modules')
-        return runRuneInReplSession(runeFile, effective, args, projectDir, {
+        return runRuneInRepl(runeFile, effective, args, projectDir, {
           nodeModulesDir,
           pluginDeps: pluginJson.dependencies ?? {},
           pluginDir,

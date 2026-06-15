@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseReplReturn, parseSlashCommand, BUILTIN_SLASH_COMMANDS, parseJsonlInputLine, parseReplArgs } from '../../../src/rune/commands/run-repl.js'
+import { parseReplReturn, parseSlashCommand, BUILTIN_SLASH_COMMANDS, parseJsonlInputLine, parseReplArgs } from '../../../src/rune/commands/repl.js'
 
 describe('parseReplReturn', () => {
   it('undefined → continue with no prompt change', () => {

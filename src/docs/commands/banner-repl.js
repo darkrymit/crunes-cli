@@ -1,14 +1,14 @@
 export async function handler() {
   process.stdout.write(`# Docs: The bannerRepl(args) Export
 
-\`export function bannerRepl(args)\` prints a welcome message before the first prompt. It is called once after \`runRepl()\` resolves, so it can reference module-level state set up during initialization.
+\`export function bannerRepl(args)\` prints a welcome message before the first prompt. It is called once after \`repl()\` resolves, so it can reference module-level state set up during initialization.
 
 ## 1. When It Is Called
 
 Lifecycle order at session start:
 
 1. \`argsRepl(builder)\` — schema extracted (once, before startup)
-2. \`runRepl(args)\` — session initializer (open connections, set state)
+2. \`repl(args)\` — session initializer (open connections, set state)
 3. \`bannerRepl(args)\` — banner captured and printed to stderr
 4. First prompt shown
 
@@ -24,7 +24,7 @@ In JSONL mode it is emitted as \`{ type: "banner", message: "..." }\`.
 \`\`\`js
 let replDb = null
 
-export async function runRepl(args) {
+export async function repl(args) {
   replDb = await sqlite.open(args.db, 'books')
   return 'sqlite> '
 }

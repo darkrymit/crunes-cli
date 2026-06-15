@@ -56,23 +56,23 @@ describe('rune.exec — repl CLI args construction', () => {
     const args = ['--verbose']
     const repl = false
     const cliArgs = repl
-      ? [cliPath, '--cwd', projectDir, 'run-repl', '--format', 'jsonl', runeKey, ...args]
+      ? [cliPath, '--cwd', projectDir, 'repl', '--format', 'jsonl', runeKey, ...args]
       : [cliPath, '--cwd', projectDir, 'run', '--format', 'jsonl', runeKey, '--', ...args]
     expect(cliArgs).toContain('run')
-    expect(cliArgs).not.toContain('run-repl')
+    expect(cliArgs).not.toContain('repl')
     expect(cliArgs).toContain('--')
   })
 
-  it('repl builds run-repl command args without --', () => {
+  it('repl builds repl command args without --', () => {
     const cliPath = '/fake/cli.js'
     const projectDir = '/fake'
     const runeKey = 'worker'
     const args = ['--verbose']
     const repl = true
     const cliArgs = repl
-      ? [cliPath, '--cwd', projectDir, 'run-repl', '--format', 'jsonl', runeKey, ...args]
+      ? [cliPath, '--cwd', projectDir, 'repl', '--format', 'jsonl', runeKey, ...args]
       : [cliPath, '--cwd', projectDir, 'run', '--format', 'jsonl', runeKey, '--', ...args]
-    expect(cliArgs).toContain('run-repl')
+    expect(cliArgs).toContain('repl')
     expect(cliArgs).not.toContain('run')
     expect(cliArgs).not.toContain('--')
   })

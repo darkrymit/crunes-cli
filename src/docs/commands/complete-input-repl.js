@@ -36,12 +36,12 @@ export async function completeInputRepl(tokens) {
 
 ## 4. Dynamic Completions
 
-You can use module-level session state (set up in \`runRepl()\`) to return context-aware completions — for example, table names from the active database:
+You can use module-level session state (set up in \`repl()\`) to return context-aware completions — for example, table names from the active database:
 
 \`\`\`js
 let tableNames = []
 
-export async function runRepl(args) {
+export async function repl(args) {
   const db = await sqlite.open(args.db, 'main')
   const rows = await db.query("SELECT name FROM sqlite_master WHERE type='table'")
   tableNames = rows.map(r => r.name)

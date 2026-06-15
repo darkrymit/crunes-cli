@@ -62,21 +62,21 @@ export function buildProgram() {
     })
 
   program
-    .command('run-repl [args...]')
+    .command('repl [args...]')
     .description('Run a rune in interactive REPL mode (keeps isolate alive across inputs).')
     .addHelpText('after',
-      '\nImportant: Global flags (e.g. --cwd) MUST appear before the "run-repl" command.\n\n' +
+      '\nImportant: Global flags (e.g. --cwd) MUST appear before the "repl" command.\n\n' +
       'Syntax:\n' +
       '  [--format text|jsonl] <key>[-s s1,s2] [rune-args...]\n\n' +
       'Per-rune bracket flags (inside key[...]):\n' +
       '  -s, --section s1,s2  filter output sections for this rune\n\n' +
-      'The rune must export runRepl(args) and/or inputRepl(input).\n' +
+      'The rune must export repl(args) and/or inputRepl(input).\n' +
       'For rune argument documentation: crunes docs rune <key>'
     )
     .allowUnknownOption()
     .passThroughOptions()
     .action(async (args, _opts, _command) => {
-      const { handler, parseReplArgs } = await import('../rune/commands/run-repl.js')
+      const { handler, parseReplArgs } = await import('../rune/commands/repl.js')
       const { key, runeArgs, sections, format } = parseReplArgs(args)
       await handler({ key, runeArgs, sections, format, projectRoot: projectRoot(), configRoot: configRoot() })
     })
@@ -144,10 +144,10 @@ export function buildProgram() {
     })
 
   helpGroup
-    .command('run-repl')
-    .description('Show detailed documentation, conventions, and examples for the runRepl(args, input) export')
+    .command('repl')
+    .description('Show detailed documentation, conventions, and examples for the repl(args) export')
     .action(async () => {
-      const { handler } = await import('../docs/commands/run-repl.js')
+      const { handler } = await import('../docs/commands/repl.js')
       await handler()
     })
 

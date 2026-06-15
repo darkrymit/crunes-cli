@@ -30,7 +30,7 @@ declare namespace lifecycle {
 
   /**
    * Defines the argument and option schema for the REPL session.
-   * If absent, runRepl(args) receives an empty args object — it does NOT fall back to args().
+   * If absent, repl(args) receives an empty args object — it does NOT fall back to args().
    *
    * @param builder The schema builder to declare options, positionals, and examples.
    */
@@ -40,15 +40,15 @@ declare namespace lifecycle {
    * REPL session initializer. Called once at session start before the first prompt.
    * The right place to open connections and set up module-level state.
    * Returns the initial prompt string, or void for the default "> ".
-   * Requires a separate "runRepl" permission block in config.json — does not inherit from "run".
+   * Requires a separate "repl" permission block in config.json — does not inherit from "run".
    *
    * @param args Parsed args from argsRepl() schema.
    * @returns Initial prompt string, or void to use "> ".
    */
-  function runRepl(args: ParsedArgs): Promise<string | void> | string | void
+  function repl(args: ParsedArgs): Promise<string | void> | string | void
 
   /**
-   * Welcome banner. Called once after runRepl() resolves, before the first prompt.
+   * Welcome banner. Called once after repl() resolves, before the first prompt.
    * Printed to stderr in text mode; emitted as { type: "banner" } in JSONL mode.
    *
    * @param args Parsed args from argsRepl() schema.

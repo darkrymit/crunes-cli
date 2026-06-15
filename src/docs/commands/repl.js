@@ -1,25 +1,25 @@
 export async function handler() {
   process.stdout.write(`# Docs: The REPL Lifecycle Exports
 
-The REPL lifecycle is a family of six named exports. At minimum, export \`runRepl\` or \`inputRepl\` (or both).
+The REPL lifecycle is a family of six named exports. At minimum, export \`repl\` or \`inputRepl\` (or both).
 
 ## Lifecycle Export Family
 
 | Export | Role | Called | Returns |
 |---|---|---|---|
 | \`argsRepl(builder)\` | Session option schema | Once, before start | schema |
-| \`runRepl(args)\` | Session initializer | Once at session start | \`string | void\` — initial prompt |
-| \`bannerRepl(args)\` | Welcome banner | Once after \`runRepl\` | \`string | void\` — banner text |
+| \`repl(args)\` | Session initializer | Once at session start | \`string | void\` — initial prompt |
+| \`bannerRepl(args)\` | Welcome banner | Once after \`repl\` | \`string | void\` — banner text |
 | \`commandsRepl(builder)\` | Slash command schema | Once, before start | schema |
 | \`inputRepl(input)\` | Per-input dispatch | Once per \`InputEvent\` | \`ReplSignal | string | void\` |
 | \`completeInputRepl(tokens)\` | Tab completion | On Tab key | \`string[]\` |
 
-## 1. runRepl(args) — Session Initializer
+## 1. repl(args) — Session Initializer
 
 Called once at session start. Open connections, validate config, set up module-level state. Returns the initial prompt string, or void for the default \`"> "\`.
 
 \`\`\`js
-export async function runRepl(args) {
+export async function repl(args) {
   replDb = await sqlite.open(args.db, 'books')
   return 'sqlite> '
 }
@@ -27,7 +27,7 @@ export async function runRepl(args) {
 
 ## 2. bannerRepl(args) — Welcome Banner
 
-Called once after \`runRepl\` resolves. Printed to stderr before the first prompt. Can use module-level state set up by \`runRepl\`.
+Called once after \`repl\` resolves. Printed to stderr before the first prompt. Can use module-level state set up by \`repl\`.
 
 \`\`\`js
 export function bannerRepl(args) {
@@ -101,15 +101,15 @@ export async function completeInputRepl(tokens) {
 
 ## 6. Permissions
 
-\`runRepl\` uses a **separate permission namespace** from \`run\`. Declare a \`"runRepl"\` block in \`config.json\`:
+\`repl\` uses a **separate permission namespace** from \`run\`. Declare a \`"repl"\` block in \`config.json\`:
 
 \`\`\`json
 {
   "runes": {
     "my-shell": {
       "permissions": {
-        "run":     { "allow": ["sqlite.read:./state::db"] },
-        "runRepl": { "allow": ["sqlite.read:./state::db", "sqlite.write:./state::db"] }
+        "run":  { "allow": ["sqlite.read:./state::db"] },
+        "repl": { "allow": ["sqlite.read:./state::db", "sqlite.write:./state::db"] }
       }
     }
   }

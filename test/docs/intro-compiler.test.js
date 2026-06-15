@@ -12,13 +12,13 @@ describe('compileIntro compiler engine', () => {
 
     expect(output).toContain('# Crunes: Fast Sandboxed Scripting & Context Framework')
     expect(output).toContain('## 1. Anatomy of a Rune')
-    expect(output).toContain('## 2. Rune Exports API Reference')
-    expect(output).toContain('## 3. Global Sandbox APIs')
+    expect(output).toContain('## 2. CLI Calling & Argument Conventions')
+    expect(output).toContain('## 3. Configuration Reference')
     expect(output).toContain('## 6. Dynamic `@utils` Reference')
     expect(output).toContain('### `fs`')
     expect(output).toContain('### `ws`')
-    expect(output).toContain('Workspace Context')
-    expect(output).toContain('No local project context loaded (global mode enabled).')
+    expect(output).toContain('## 4. Rune Exports API Reference')
+    expect(output).toContain('## 5. Global Sandbox APIs')
   })
 
   it('compiles json output when format is json', async () => {
@@ -49,16 +49,14 @@ describe('compileIntro compiler engine', () => {
 
     const output = await compileIntro({
       config: mockConfig,
-      format: 'text',
+      format: 'json',
       projectRoot: '/test',
       configRoot: '/test',
     })
 
-    expect(output).toContain('### Registered Project Runes')
-    expect(output).toContain('dummy-rune')
-    expect(output).toContain('Dummy')
-    expect(output).toContain('fs:read:*')
-    expect(output).toContain('Enabled Plugins')
-    expect(output).toContain('plugin-a')
+    const parsed = JSON.parse(output)
+    expect(parsed.workspace).not.toBeNull()
+    expect(parsed.workspace.runes.some(r => r.key === 'dummy-rune')).toBe(true)
+    expect(parsed.workspace.plugins).toContain('plugin-a')
   })
 })

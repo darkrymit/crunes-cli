@@ -149,7 +149,7 @@ describe('help rune handler', () => {
     it('text output includes REPL args section when argsRepl exported', async () => {
       await handler({ keys: ['shell'], projectRoot: tmp, configRoot: tmp })
       const out = written.join('')
-      expect(out).toContain('crunes run-repl shell')
+      expect(out).toContain('crunes repl shell')
       expect(out).toContain('--db <path>')
     })
 

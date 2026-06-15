@@ -205,7 +205,7 @@ export function makePermissionChecker(effective, ctx = null) {
       case 'shell.run':
       case 'shell.job.start':
       case 'rune.run':
-      case 'rune.runRepl':
+      case 'rune.repl':
       case 'rune.job.start':
       case 'rune.spawn':
       case 'rune.kill':

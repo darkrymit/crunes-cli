@@ -28,7 +28,7 @@ import { sqlite, section, md } from '@utils'
 
 let replDb = null
 
-export async function runRepl(args) {
+export async function repl(args) {
   replDb = await sqlite.open(args.db, 'books')
   return 'sqlite> '
 }
@@ -72,6 +72,6 @@ Use \`console.log()\` for log lines — written to stderr in text mode, emitted 
 
 ## 5. Session State
 
-The isolate stays alive across all calls. JS module-level variables are the state store — assign to them in \`runRepl()\` and read them in \`inputRepl()\`.
+The isolate stays alive across all calls. JS module-level variables are the state store — assign to them in \`repl()\` and read them in \`inputRepl()\`.
 \n`)
 }

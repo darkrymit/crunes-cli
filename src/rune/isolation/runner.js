@@ -351,13 +351,13 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
   await jail.set('$__utils_rune_exec', asyncRef(async (runeKey, args, opts) => {
     const repl = opts?.repl === true
     if (repl) {
-      checkPermission('rune.runRepl', runeKey)
+      checkPermission('rune.repl', runeKey)
     } else {
       checkPermission('rune.run', runeKey)
     }
     const cliPath = process.argv[1]
     const cliArgs = repl
-      ? [cliPath, '--cwd', projectDir, 'run-repl', '--format', 'jsonl', runeKey, ...(args ?? [])]
+      ? [cliPath, '--cwd', projectDir, 'repl', '--format', 'jsonl', runeKey, ...(args ?? [])]
       : [cliPath, '--cwd', projectDir, 'run', '--format', 'jsonl', runeKey, ...(args ?? [])]
     const child = spawnProcess(
       process.execPath,
@@ -394,7 +394,7 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
   await jail.set('$__utils_rune_spawn_open', new ivm.Reference((runeKey, args, opts) => {
     const repl = opts?.repl === true
     if (repl) {
-      checkPermission('rune.runRepl', runeKey)
+      checkPermission('rune.repl', runeKey)
     } else {
       checkPermission('rune.run', runeKey)
     }
@@ -436,13 +436,13 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
   }))
   await jail.set('$__utils_rune_job_start', asyncRef(async (runeKey, args, opts) => {
     const repl = opts?.repl ?? false
-    checkPermission(repl ? 'rune.runRepl' : 'rune.job.start', runeKey)
+    checkPermission(repl ? 'rune.repl' : 'rune.job.start', runeKey)
     const cliPath = process.argv[1]
     const { id } = await createJob(null, { type: 'rune', spawnedBy: currentRuneKey, runeKey, projectDir, args: args ?? [] })
     const outFd = fsSync.openSync(jobStdoutPath(pKey, id), 'a')
     const errFd = fsSync.openSync(jobStderrPath(pKey, id), 'a')
     const cliArgs = repl
-      ? [cliPath, '--cwd', projectDir, 'run-repl', '--format', 'jsonl', runeKey, ...(args ?? [])]
+      ? [cliPath, '--cwd', projectDir, 'repl', '--format', 'jsonl', runeKey, ...(args ?? [])]
       : [cliPath, '--cwd', projectDir, 'run', '--format', 'jsonl', runeKey, ...(args ?? [])]
     let childEnv = { ...process.env, CRUNES_NO_TIMEOUT: '1' }
     if (repl) {
@@ -1553,11 +1553,11 @@ export async function executePluginRune({ pluginDir, pluginCacheDir, runeKey, pl
  * Boot a rune isolate for interactive REPL use. The isolate stays alive
  * across calls. Returns { step, dispose }.
  *
- * step(input)  — calls runRepl(parsedArgs, input) inside the isolate,
+ * step(input)  — calls repl(parsedArgs, input) inside the isolate,
  *                collects onEvent events, returns the raw return value.
  * dispose()    — tears down the isolate and cleans up utils resources.
  */
-export async function runRuneInReplSession(runeFile, effective, args, projectDir, {
+export async function runRuneInRepl(runeFile, effective, args, projectDir, {
   nodeModulesDir = null,
   pluginDeps = {},
   pluginDir = null,
@@ -1588,7 +1588,7 @@ export async function runRuneInReplSession(runeFile, effective, args, projectDir
   let helpText = null
   try {
     const { argsSchema } = await getReplSchema(runeFile, effective, [], projectDir, { vars, nodeModulesDir, pluginDeps, pluginDir })
-    if (argsSchema) helpText = formatHelp(argsSchema, { key: runeKey, name: runeKey, description: undefined, lifecycle: 'runRepl' })
+    if (argsSchema) helpText = formatHelp(argsSchema, { key: runeKey, name: runeKey, description: undefined, lifecycle: 'repl' })
   } catch { /* help unavailable, silently skip */ }
 
   const utilsMod = await injectUtils(isolate, context, utils, null, vars, projectDir, checkPermission, runeKey, null, wrappedOnEvent, helpText)
@@ -1599,7 +1599,7 @@ export async function runRuneInReplSession(runeFile, effective, args, projectDir
   const runeSrc = await fs.readFile(runeFile, 'utf8')
   assertNoDynamicImport(runeSrc, runeFile)
   const patchedSrc = runeSrc +
-    '\nif (typeof runRepl !== "undefined") globalThis.__crunes_runRepl = runRepl;\n' +
+    '\nif (typeof repl !== "undefined") globalThis.__crunes_repl = repl;\n' +
     '\nif (typeof argsRepl !== "undefined") globalThis.__crunes_argsRepl = argsRepl;\n' +
     '\nif (typeof inputRepl !== "undefined") globalThis.__crunes_inputRepl = inputRepl;\n' +
     '\nif (typeof bannerRepl !== "undefined") globalThis.__crunes_bannerRepl = bannerRepl;\n' +
@@ -1624,12 +1624,12 @@ export async function runRuneInReplSession(runeFile, effective, args, projectDir
   await runeMod.evaluate()
   await context.eval('delete globalThis.$__hostRequire')
 
-  const hasRunRepl   = await context.eval('typeof __crunes_runRepl !== "undefined"')
+  const hasRunRepl   = await context.eval('typeof __crunes_repl !== "undefined"')
   const hasInputRepl = await context.eval('typeof __crunes_inputRepl !== "undefined"')
   if (!hasRunRepl && !hasInputRepl) {
     await disposeUtils()
     isolate.dispose()
-    throw new Error(`Rune "${runeFile}" must export runRepl() or inputRepl() (or both).`)
+    throw new Error(`Rune "${runeFile}" must export repl() or inputRepl() (or both).`)
   }
 
   // Parse argsRepl schema if exported, else no schema
@@ -1680,18 +1680,18 @@ export async function runRuneInReplSession(runeFile, effective, args, projectDir
     parsedArgs = parseArgs(args, null)
   }
 
-  // Call runRepl(args) once as session initializer — captures initial prompt
+  // Call repl(args) once as session initializer — captures initial prompt
   let initialPrompt = null
   if (hasRunRepl) {
     const initResult = await context.evalClosure(
-      `return (async () => { return await __crunes_runRepl($0) })()`,
+      `return (async () => { return await __crunes_repl($0) })()`,
       [parsedArgs],
       { arguments: { copy: true }, result: { promise: true, copy: true } }
     )
     if (typeof initResult === 'string') initialPrompt = initResult
   }
 
-  // Call bannerRepl(args) once after runRepl — captures banner text
+  // Call bannerRepl(args) once after repl — captures banner text
   let banner = null
   if (await context.eval('typeof __crunes_bannerRepl !== "undefined"')) {
     const bannerResult = await context.evalClosure(

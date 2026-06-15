@@ -2,9 +2,9 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { join } from 'node:path'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { runRuneInReplSession } from '../../../src/rune/isolation/runner.js'
+import { runRuneInRepl } from '../../../src/rune/isolation/runner.js'
 
-describe('runRuneInReplSession — new session object', () => {
+describe('runRuneInRepl — new session object', () => {
   let tmp
 
   beforeEach(async () => { tmp = await mkdtemp(join(tmpdir(), 'crunes-repl-')) })
@@ -12,23 +12,23 @@ describe('runRuneInReplSession — new session object', () => {
 
   const effective = { allow: [], deny: [] }
 
-  it('initialPrompt from runRepl(args)', async () => {
+  it('initialPrompt from repl(args)', async () => {
     const f = join(tmp, 'rune.js')
     await writeFile(f, `
-      export async function runRepl(args) { return 'custom> ' }
+      export async function repl(args) { return 'custom> ' }
       export async function inputRepl(input) { return { type: 'done' } }
     `)
-    const session = await runRuneInReplSession(f, effective, [], tmp)
+    const session = await runRuneInRepl(f, effective, [], tmp)
     expect(session.initialPrompt).toBe('custom> ')
     await session.dispose()
   })
 
-  it('initialPrompt is null when runRepl absent', async () => {
+  it('initialPrompt is null when repl absent', async () => {
     const f = join(tmp, 'rune.js')
     await writeFile(f, `
       export async function inputRepl(input) { return { type: 'done' } }
     `)
-    const session = await runRuneInReplSession(f, effective, [], tmp)
+    const session = await runRuneInRepl(f, effective, [], tmp)
     expect(session.initialPrompt).toBeNull()
     await session.dispose()
   })
@@ -36,11 +36,11 @@ describe('runRuneInReplSession — new session object', () => {
   it('banner from bannerRepl(args)', async () => {
     const f = join(tmp, 'rune.js')
     await writeFile(f, `
-      export async function runRepl(args) {}
+      export async function repl(args) {}
       export function bannerRepl(args) { return 'Welcome!' }
       export async function inputRepl(input) { return { type: 'done' } }
     `)
-    const session = await runRuneInReplSession(f, effective, [], tmp)
+    const session = await runRuneInRepl(f, effective, [], tmp)
     expect(session.banner).toBe('Welcome!')
     await session.dispose()
   })
@@ -48,10 +48,10 @@ describe('runRuneInReplSession — new session object', () => {
   it('banner is null when bannerRepl absent', async () => {
     const f = join(tmp, 'rune.js')
     await writeFile(f, `
-      export async function runRepl(args) {}
+      export async function repl(args) {}
       export async function inputRepl(input) { return { type: 'done' } }
     `)
-    const session = await runRuneInReplSession(f, effective, [], tmp)
+    const session = await runRuneInRepl(f, effective, [], tmp)
     expect(session.banner).toBeNull()
     await session.dispose()
   })
@@ -59,13 +59,13 @@ describe('runRuneInReplSession — new session object', () => {
   it('commandsSchema from commandsRepl(builder)', async () => {
     const f = join(tmp, 'rune.js')
     await writeFile(f, `
-      export async function runRepl(args) {}
+      export async function repl(args) {}
       export function commandsRepl(b) {
         return b.command('tables', 'List tables').command('exit', 'Quit')
       }
       export async function inputRepl(input) { return { type: 'done' } }
     `)
-    const session = await runRuneInReplSession(f, effective, [], tmp)
+    const session = await runRuneInRepl(f, effective, [], tmp)
     expect(session.commandsSchema).not.toBeNull()
     expect(session.commandsSchema.commands).toHaveLength(2)
     expect(session.commandsSchema.commands[0].name).toBe('tables')
@@ -75,10 +75,10 @@ describe('runRuneInReplSession — new session object', () => {
   it('commandsSchema is null when commandsRepl absent', async () => {
     const f = join(tmp, 'rune.js')
     await writeFile(f, `
-      export async function runRepl(args) {}
+      export async function repl(args) {}
       export async function inputRepl(input) { return { type: 'done' } }
     `)
-    const session = await runRuneInReplSession(f, effective, [], tmp)
+    const session = await runRuneInRepl(f, effective, [], tmp)
     expect(session.commandsSchema).toBeNull()
     await session.dispose()
   })
@@ -86,13 +86,13 @@ describe('runRuneInReplSession — new session object', () => {
   it('step() calls inputRepl with InputEvent object', async () => {
     const f = join(tmp, 'rune.js')
     await writeFile(f, `
-      export async function runRepl(args) {}
+      export async function repl(args) {}
       export async function inputRepl(input) {
         if (input.type === 'line' && input.text === 'hello') return 'got-it> '
         return { type: 'done' }
       }
     `)
-    const session = await runRuneInReplSession(f, effective, [], tmp)
+    const session = await runRuneInRepl(f, effective, [], tmp)
     const result = await session.step({ type: 'line', text: 'hello' })
     expect(result).toBe('got-it> ')
     await session.dispose()
@@ -101,13 +101,13 @@ describe('runRuneInReplSession — new session object', () => {
   it('step() passes interrupt event to inputRepl', async () => {
     const f = join(tmp, 'rune.js')
     await writeFile(f, `
-      export async function runRepl(args) {}
+      export async function repl(args) {}
       export async function inputRepl(input) {
         if (input.type === 'interrupt') return { type: 'done', message: 'interrupted' }
         return undefined
       }
     `)
-    const session = await runRuneInReplSession(f, effective, [], tmp)
+    const session = await runRuneInRepl(f, effective, [], tmp)
     const result = await session.step({ type: 'interrupt', text: '' })
     expect(result).toMatchObject({ type: 'done', message: 'interrupted' })
     await session.dispose()
@@ -116,14 +116,14 @@ describe('runRuneInReplSession — new session object', () => {
   it('complete() calls completeInputRepl with tokens', async () => {
     const f = join(tmp, 'rune.js')
     await writeFile(f, `
-      export async function runRepl(args) {}
+      export async function repl(args) {}
       export async function inputRepl(input) { return { type: 'done' } }
       export async function completeInputRepl(tokens) {
         const partial = tokens[tokens.length - 1] ?? ''
         return ['SELECT', 'FROM', 'WHERE'].filter(k => k.startsWith(partial.toUpperCase()))
       }
     `)
-    const session = await runRuneInReplSession(f, effective, [], tmp)
+    const session = await runRuneInRepl(f, effective, [], tmp)
     expect(session.complete).not.toBeNull()
     const completions = await session.complete(['SE'])
     expect(completions).toEqual(['SELECT'])
@@ -133,18 +133,18 @@ describe('runRuneInReplSession — new session object', () => {
   it('complete is null when completeInputRepl absent', async () => {
     const f = join(tmp, 'rune.js')
     await writeFile(f, `
-      export async function runRepl(args) {}
+      export async function repl(args) {}
       export async function inputRepl(input) { return { type: 'done' } }
     `)
-    const session = await runRuneInReplSession(f, effective, [], tmp)
+    const session = await runRuneInRepl(f, effective, [], tmp)
     expect(session.complete).toBeNull()
     await session.dispose()
   })
 
-  it('throws if neither runRepl nor inputRepl exported', async () => {
+  it('throws if neither repl nor inputRepl exported', async () => {
     const f = join(tmp, 'rune.js')
     await writeFile(f, `export async function run() {}`)
-    await expect(runRuneInReplSession(f, effective, [], tmp)).rejects.toThrow()
+    await expect(runRuneInRepl(f, effective, [], tmp)).rejects.toThrow()
   })
 
   it('calls disposeRepl() when session.dispose() is called', async () => {
@@ -152,11 +152,11 @@ describe('runRuneInReplSession — new session object', () => {
     const flag = join(tmp, 'disposed.txt')
     await writeFile(f, `
       import { fs } from '@utils'
-      export async function runRepl(args) { return '> ' }
+      export async function repl(args) { return '> ' }
       export async function inputRepl(input) { return { type: 'done' } }
       export async function disposeRepl() { await fs.write('disposed.txt', 'yes') }
     `)
-    const session = await runRuneInReplSession(f, { allow: ['fs.write:./*'], deny: [] }, [], tmp)
+    const session = await runRuneInRepl(f, { allow: ['fs.write:./*'], deny: [] }, [], tmp)
     await session.dispose()
     const { readFile } = await import('node:fs/promises')
     expect(await readFile(flag, 'utf8')).toBe('yes')
@@ -165,21 +165,21 @@ describe('runRuneInReplSession — new session object', () => {
   it('swallows errors thrown by disposeRepl()', async () => {
     const f = join(tmp, 'rune.js')
     await writeFile(f, `
-      export async function runRepl(args) { return '> ' }
+      export async function repl(args) { return '> ' }
       export async function inputRepl(input) { return { type: 'done' } }
       export async function disposeRepl() { throw new Error('cleanup failed') }
     `)
-    const session = await runRuneInReplSession(f, effective, [], tmp)
+    const session = await runRuneInRepl(f, effective, [], tmp)
     await expect(session.dispose()).resolves.toBeUndefined()
   })
 
   it('does not require disposeRepl() export', async () => {
     const f = join(tmp, 'rune.js')
     await writeFile(f, `
-      export async function runRepl(args) { return '> ' }
+      export async function repl(args) { return '> ' }
       export async function inputRepl(input) { return { type: 'done' } }
     `)
-    const session = await runRuneInReplSession(f, effective, [], tmp)
+    const session = await runRuneInRepl(f, effective, [], tmp)
     await expect(session.dispose()).resolves.toBeUndefined()
   })
 })

@@ -56,7 +56,7 @@ export function formatHelp(schema, runeMeta) {
   }
 
   const hasCommands = (schema?.commands ?? []).length > 0
-  const cmd = runeMeta?.lifecycle === 'runRepl' ? 'run-repl' : 'run'
+  const cmd = runeMeta?.lifecycle === 'repl' ? 'repl' : 'run'
   lines.push(`Usage: crunes ${cmd} ${key} ${hasCommands ? '<command> ' : ''}[options]`)
   if (desc) { lines.push(''); lines.push(`  ${desc}`) }
 

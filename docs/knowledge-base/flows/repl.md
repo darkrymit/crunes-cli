@@ -1,7 +1,7 @@
 ---
 tags: [flow]
 ---
-# `crunes run-repl` Execution Flow
+# `crunes repl` Execution Flow
 
 > A rune REPL session starts, receives input events in a persistent isolate, and ends on Ctrl+D, `{ type: "done" }`, or signal teardown.
 
@@ -9,7 +9,7 @@ tags: [flow]
 
 ## Overview
 
-`crunes run-repl <key>` resolves the rune entry the same way `crunes run` does, but instead of calling `run()` and tearing down, it calls `runRepl()` once to initialize state, then enters an event loop that calls `inputRepl()` on each user input. The isolate stays alive across the entire session — JS module-level variables are session state. The host process manages readline, slash command dispatch, tab completion, and multiline buffering; the rune only sees cooked `InputEvent` objects.
+`crunes repl <key>` resolves the rune entry the same way `crunes run` does, but instead of calling `run()` and tearing down, it calls `repl()` once to initialize state, then enters an event loop that calls `inputRepl()` on each user input. The isolate stays alive across the entire session — JS module-level variables are session state. The host process manages readline, slash command dispatch, tab completion, and multiline buffering; the rune only sees cooked `InputEvent` objects.
 
 In JSONL mode (`--format jsonl`), stdin is read as newline-delimited JSON objects (`InputEvent`) and stdout emits JSON event objects — this is the wire protocol for programmatic clients and ACI hooks.
 
@@ -17,8 +17,8 @@ In JSONL mode (`--format jsonl`), stdin is read as newline-delimited JSON object
 
 ```mermaid
 flowchart TD
-    A([crunes run-repl key]) --> B[resolveRuneEntry\nsame tiered lookup as run]
-    B --> C[createReplSession\nrunRepl args\ncollects initialPrompt]
+    A([crunes repl key]) --> B[resolveRuneEntry\nsame tiered lookup as run]
+    B --> C[createReplSession\nrepl args\ncollects initialPrompt]
     C --> D{bannerRepl?}
     D -->|yes| E[print banner to stderr\nor emit type:banner in JSONL]
     D -->|no| F
@@ -46,7 +46,7 @@ flowchart TD
 
 ## Walkthrough
 
-**Session initialization:** `createReplSession` runs `runRepl(args)` in the isolate and captures the return value as the initial prompt string (or `"> "` if void). This is the only time `runRepl` is called — it is not called per-input. If `bannerRepl()` is exported, it is called next and the result is written to stderr (text) or emitted as `{ type: "banner" }` (JSONL) before the first prompt appears.
+**Session initialization:** `createReplSession` runs `repl(args)` in the isolate and captures the return value as the initial prompt string (or `"> "` if void). This is the only time `repl` is called — it is not called per-input. If `bannerRepl()` is exported, it is called next and the result is written to stderr (text) or emitted as `{ type: "banner" }` (JSONL) before the first prompt appears.
 
 **Async queue for piped input:** Readline fires all `line` events synchronously when stdin is a pipe, before any async handler has resolved. An explicit async queue (`let queue = Promise.resolve(); function enqueue(fn) { queue = queue.then(fn) }`) serializes all event handling, preventing interleaving. This is invisible to rune authors but critical for JSONL clients.
 
@@ -58,7 +58,7 @@ flowchart TD
 
 **JSONL input mode:** When `--format jsonl` and stdin is not a TTY, each line is parsed as a JSON `InputEvent` object (`{ type, text? }` or `{ type: 'command', args }`) instead of being treated as raw text. Invalid JSON lines produce `{ type: 'error' }` on stdout.
 
-**Programmatic spawning via `rune.spawn` / `rune.job.start`:** A parent rune can spawn a REPL session programmatically by passing `{ repl: true }` to `rune.spawn`, `rune.exec`, or `rune.job.start`. All three ultimately run `crunes run-repl --format jsonl <key>` — the same JSONL wire protocol described above. The parent communicates with the child using convenience methods that write JSONL `InputEvent` objects:
+**Programmatic spawning via `rune.spawn` / `rune.job.start`:** A parent rune can spawn a REPL session programmatically by passing `{ repl: true }` to `rune.spawn`, `rune.exec`, or `rune.job.start`. All three ultimately run `crunes repl --format jsonl <key>` — the same JSONL wire protocol described above. The parent communicates with the child using convenience methods that write JSONL `InputEvent` objects:
 
 - `session.write(text)` → `{"type":"line","text":"..."}` — a normal input line
 - `session.writeEof()` → `{"type":"eof","text":""}` — signals end of input (the child's REPL exits cleanly)
@@ -82,19 +82,19 @@ For detached jobs, `rune.job.write(id, text)` and `rune.job.writeEof(id)` append
 
 ## Key Decisions
 
-- **Isolate stays alive across inputs** — The isolate is created once at session start and torn down at session end. Module-level variables persist as session state between `inputRepl` calls. This is what makes the REPL pattern useful — a rune can open a DB connection in `runRepl()` and query it in every `inputRepl()` call.
+- **Isolate stays alive across inputs** — The isolate is created once at session start and torn down at session end. Module-level variables persist as session state between `inputRepl` calls. This is what makes the REPL pattern useful — a rune can open a DB connection in `repl()` and query it in every `inputRepl()` call.
 
-- **`argsRepl` is separate from `args`** — The REPL session uses `argsRepl()` to define its argument schema. If absent, `runRepl(args)` receives an empty args object — it does NOT fall back to the `args()` schema. This prevents REPL-specific options from appearing in `crunes run --help`.
+- **`argsRepl` is separate from `args`** — The REPL session uses `argsRepl()` to define its argument schema. If absent, `repl(args)` receives an empty args object — it does NOT fall back to the `args()` schema. This prevents REPL-specific options from appearing in `crunes run --help`.
 
-- **Permissions are the `runRepl` lifecycle block** — REPL sessions require permissions declared under `"runRepl": { "allow": [...] }` in config, not under `"run"`. The two lifecycle blocks are completely independent.
+- **Permissions are the `repl` lifecycle block** — REPL sessions require permissions declared under `"repl": { "allow": [...] }` in config, not under `"run"`. The two lifecycle blocks are completely independent.
 
-- **Section filter (`--section`) applies per-event** — Unlike `crunes run` which filters post-execution, `run-repl` filters section events as they arrive from `onEvent`, discarding non-matching sections before they reach stdout.
+- **Section filter (`--section`) applies per-event** — Unlike `crunes run` which filters post-execution, `repl` filters section events as they arrive from `onEvent`, discarding non-matching sections before they reach stdout.
 
 - **Ctrl+C on empty buffer fires interrupt** — If the readline line is empty and the buffer is empty, Ctrl+C enqueues `{ type: 'interrupt', text: '' }`. The rune decides what to do (e.g., cancel in-progress work, or exit). If the readline line has content, Ctrl+C clears it without sending an event (standard terminal behavior).
 
 ## Error Paths
 
-- **`runRepl()` throws** — The session fails to start; the error message is printed and the process exits 1. The isolate never enters the event loop.
+- **`repl()` throws** — The session fails to start; the error message is printed and the process exits 1. The isolate never enters the event loop.
 - **`inputRepl()` throws** — The error is caught, printed to stderr (text) or emitted as `{ type: 'error' }` (JSONL), and the prompt is re-shown. The session continues.
 - **Invalid JSONL input** — The offending line produces `{ type: 'error', message: 'Invalid JSONL input: ...' }` on stdout. The session continues.
 - **`disposeRepl()` throws** — The error is swallowed. Teardown always completes.
