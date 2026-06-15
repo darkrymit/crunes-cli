@@ -1,6 +1,5 @@
 import { spawn } from 'node:child_process'
 import fs from 'node:fs'
-import { tailStdin } from '../../job/stdin-tail.js'
 
 const ANSI_RE = /\x1b\[[0-9;]*m/g
 
@@ -227,47 +226,59 @@ export function createShellUtils(dir, checkPermission) {
     const { id } = await createJob(null, {
       type: 'shell', spawnedBy, runeKey: null, projectDir: jobProjectDir, args: [cmd],
     })
-    let stdinArg = 'ignore'
-    let tailHandle = null
+    const outFd = fs.openSync(jobStdoutPath(projectKey, id), 'a')
+    const errFd = fs.openSync(jobStderrPath(projectKey, id), 'a')
+    const childEnv = opts?.env ? { ...process.env, ...opts.env } : process.env
     if (repl) {
       const stdinLog = jobStdinPath(projectKey, id)
       fs.writeFileSync(stdinLog, '')
-      stdinArg = 'pipe'
-      const child = spawn(cmd, [], {
-        shell:       true,
-        detached:    process.platform !== 'win32',
-        stdio:       [stdinArg, 'pipe', 'pipe'],
+      // Wrapper process: tails stdinLog and feeds lines into the real child's stdin.
+      // Runs detached so it outlives the parent; kill(wrapperPid) kills the full tree.
+      const wrapperEnv = { ...childEnv, CRUNES_SHELL_CMD: cmd, CRUNES_SHELL_CWD: jobProjectDir, CRUNES_STDIN_LOG: stdinLog }
+      const wrapper = `
+const {spawn}=require('child_process'),{openSync,closeSync,statSync,readSync}=require('fs')
+const child=spawn(process.env.CRUNES_SHELL_CMD,[],{shell:true,cwd:process.env.CRUNES_SHELL_CWD,stdio:['pipe','inherit','inherit'],env:process.env,windowsHide:true})
+child.on('exit',code=>process.exit(code??0))
+const log=process.env.CRUNES_STDIN_LOG
+let offset=0,rem='',done=false
+function read(){
+  if(done)return
+  let fd
+  try{fd=openSync(log,'r');const sz=statSync(log).size;if(sz<=offset){sched();return}
+  const buf=Buffer.allocUnsafe(sz-offset);const n=readSync(fd,buf,0,buf.length,offset);offset+=n;rem+=buf.slice(0,n).toString()}
+  catch{sched();return}finally{try{if(fd!==undefined)closeSync(fd)}catch{}}
+  const lines=rem.split('\\n');rem=lines.pop()
+  for(const l of lines){if(l==='__CRUNES_STDIN_EOF__'){done=true;child.stdin.end();return}if(l.length>0)child.stdin.write(l+'\\n')}
+  sched()
+}
+function sched(){setTimeout(read,50)}
+sched()
+`
+      const wrapper_child = spawn(process.execPath, ['-e', wrapper], {
+        detached:    true,
+        stdio:       ['ignore', outFd, errFd],
         cwd:         jobProjectDir,
-        env:         opts?.env ? { ...process.env, ...opts.env } : process.env,
+        env:         wrapperEnv,
         windowsHide: true,
       })
-      const outStream = fs.createWriteStream(jobStdoutPath(projectKey, id), { flags: 'a' })
-      const errStream = fs.createWriteStream(jobStderrPath(projectKey, id), { flags: 'a' })
-      child.stdout.pipe(outStream)
-      child.stderr.pipe(errStream)
-      tailHandle = tailStdin(stdinLog, {
-        onLine: (line) => { child.stdin.write(line + '\n') },
-        onEof:  () => { child.stdin.end() },
-      })
-      child.on('exit', () => { if (tailHandle) tailHandle.stop() })
-      await updateJobPid(projectKey, id, child.pid)
-      child.unref()
+      await updateJobPid(projectKey, id, wrapper_child.pid)
+      wrapper_child.unref()
+      fs.closeSync(outFd)
+      fs.closeSync(errFd)
       return { id }
     }
     const child = spawn(cmd, [], {
       shell:       true,
-      detached:    process.platform !== 'win32',
-      stdio:       [stdinArg, 'pipe', 'pipe'],
+      detached:    true,
+      stdio:       ['ignore', outFd, errFd],
       cwd:         jobProjectDir,
-      env:         opts?.env ? { ...process.env, ...opts.env } : process.env,
+      env:         childEnv,
       windowsHide: true,
     })
-    const outStream = fs.createWriteStream(jobStdoutPath(projectKey, id), { flags: 'a' })
-    const errStream = fs.createWriteStream(jobStderrPath(projectKey, id), { flags: 'a' })
-    child.stdout.pipe(outStream)
-    child.stderr.pipe(errStream)
     await updateJobPid(projectKey, id, child.pid)
     child.unref()
+    fs.closeSync(outFd)
+    fs.closeSync(errFd)
     return { id }
   }
 
