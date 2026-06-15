@@ -3,7 +3,7 @@ import { loadRegistry, resolvePluginKey } from '../registry.js'
 import { resolveFromMarketplace } from '../../marketplace/marketplace.js'
 import { installPlugin } from '../install.js'
 
-export async function handler({ name, projectRoot }) {
+export async function handler({ name, projectRoot, configRoot }) {
   const registry = await loadRegistry()
 
   let plugins
@@ -49,7 +49,7 @@ export async function handler({ name, projectRoot }) {
     }
 
     try {
-      const result = await installPlugin(resolvedSource, projectRoot, provenance)
+      const result = await installPlugin(resolvedSource, configRoot ?? projectRoot, provenance)
       if (result.installed) {
         p.log.success(`Updated ${pluginName}@${result.version}`)
       } else {

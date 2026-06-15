@@ -364,7 +364,7 @@ export function buildProgram() {
     .description('Install a plugin from a configured marketplace in the format <marketplace>@<plugin>')
     .action(async (source) => {
       const { handler } = await import('../plugin/commands/install.js')
-      await handler({ source, projectRoot: projectRoot(), yes: !!program.opts().yes })
+      await handler({ source, projectRoot: projectRoot(), configRoot: configRoot(), yes: !!program.opts().yes })
     })
 
   plugin
@@ -372,7 +372,7 @@ export function buildProgram() {
     .description('Uninstall an installed plugin')
     .action(async (name) => {
       const { handler } = await import('../plugin/commands/uninstall.js')
-      await handler({ name, yes: !!program.opts().yes, projectRoot: projectRoot() })
+      await handler({ name, yes: !!program.opts().yes, projectRoot: projectRoot(), configRoot: configRoot() })
     })
 
   plugin
@@ -389,7 +389,7 @@ export function buildProgram() {
     .description('Update one or all installed plugins')
     .action(async (name) => {
       const { handler } = await import('../plugin/commands/update.js')
-      await handler({ name, projectRoot: projectRoot() })
+      await handler({ name, projectRoot: projectRoot(), configRoot: configRoot() })
     })
 
   plugin
@@ -397,7 +397,7 @@ export function buildProgram() {
     .description('Add a plugin to this project\'s enabled list')
     .action(async (name) => {
       const { handler } = await import('../plugin/commands/enable.js')
-      await handler({ name, projectRoot: projectRoot() })
+      await handler({ name, projectRoot: projectRoot(), configRoot: configRoot() })
     })
 
   plugin
@@ -405,7 +405,7 @@ export function buildProgram() {
     .description('Remove a plugin from this project\'s enabled list')
     .action(async (name) => {
       const { handler } = await import('../plugin/commands/disable.js')
-      await handler({ name, projectRoot: projectRoot() })
+      await handler({ name, projectRoot: projectRoot(), configRoot: configRoot() })
     })
 
   plugin
@@ -429,7 +429,7 @@ export function buildProgram() {
     .addOption(new Option('--format <format>', 'output format').choices(['text', 'json']).default('text'))
     .action(async (source, opts) => {
       const { handler } = await import('../template/commands/list.js')
-      await handler({ source, format: opts.format, plain: !!program.opts().plain, projectRoot: projectRoot() })
+      await handler({ source, format: opts.format, plain: !!program.opts().plain, projectRoot: projectRoot(), configRoot: configRoot() })
     })
 
   template
@@ -447,7 +447,7 @@ export function buildProgram() {
     .option('--description <description>', 'short description of what context this rune provides')
     .action(async (ref, opts) => {
       const { handler } = await import('../template/commands/apply.js')
-      await handler({ ref, key: opts.as, path: opts.path, name: opts.name, description: opts.description, yes: !!program.opts().yes, projectRoot: projectRoot() })
+      await handler({ ref, key: opts.as, path: opts.path, name: opts.name, description: opts.description, yes: !!program.opts().yes, projectRoot: projectRoot(), configRoot: configRoot() })
     })
 
   template

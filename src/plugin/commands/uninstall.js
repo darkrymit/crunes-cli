@@ -2,7 +2,7 @@ import * as p from '@clack/prompts'
 import { loadRegistry, resolvePluginKey } from '../registry.js'
 import { uninstallPlugin } from '../install.js'
 
-export async function handler({ name, yes, projectRoot }) {
+export async function handler({ name, yes, projectRoot, configRoot }) {
   let pluginKey
   try {
     const registry = await loadRegistry()
@@ -22,7 +22,7 @@ export async function handler({ name, yes, projectRoot }) {
   }
 
   try {
-    await uninstallPlugin(pluginKey, projectRoot)
+    await uninstallPlugin(pluginKey, configRoot ?? projectRoot)
     p.outro(`Uninstalled ${pluginKey}`)
   } catch (err) {
     p.cancel(`Failed: ${err.message}`)

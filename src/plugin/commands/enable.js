@@ -2,12 +2,12 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { loadRegistry, resolvePluginKey } from '../registry.js'
 
-export async function handler({ name, projectRoot }) {
+export async function handler({ name, projectRoot, configRoot }) {
   try {
     const registry = await loadRegistry()
     const pluginKey = resolvePluginKey(name, registry)
     if (!pluginKey) throw new Error(`Plugin "${name}" is not installed. Run: crunes plugin list`)
-    await setProjectPluginEnabled(projectRoot, pluginKey, true)
+    await setProjectPluginEnabled(configRoot ?? projectRoot, pluginKey, true)
     console.log(`Plugin "${pluginKey}" enabled.`)
   } catch (err) {
     console.error(`Error: ${err.message}`)
@@ -15,8 +15,8 @@ export async function handler({ name, projectRoot }) {
   }
 }
 
-async function setProjectPluginEnabled(projectRoot, pluginKey, enabled) {
-  const configPath = path.join(projectRoot, '.crunes', 'config.json')
+async function setProjectPluginEnabled(configRoot, pluginKey, enabled) {
+  const configPath = path.join(configRoot, '.crunes', 'config.json')
   let config
   try {
     config = JSON.parse(await fs.readFile(configPath, 'utf8'))

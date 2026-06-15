@@ -9,13 +9,14 @@ export async function handler({
   format = 'md',
   plain = false,
   projectRoot = process.cwd(),
+  configRoot,
 } = {}) {
   const results = []
 
   // Load project/shortcut templates from config.json
   if (!source || source === 'project') {
     let config = { templates: {} }
-    try { config = loadConfig(projectRoot) } catch {}
+    try { config = loadConfig(configRoot ?? projectRoot) } catch {}
     const templates = config.templates ?? {}
     for (const [name, entry] of Object.entries(templates)) {
       if (typeof entry === 'string') {

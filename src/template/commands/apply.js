@@ -65,6 +65,7 @@ export async function handler({
   description,
   yes = false,
   projectRoot = process.cwd(),
+  configRoot,
 } = {}) {
   const isNonInteractive = yes || !process.stdout.isTTY
 
@@ -77,7 +78,7 @@ export async function handler({
     templateName = ref.slice(colonIdx + 1)
   }
 
-  const resolved = await resolveTemplate(sourceName, templateName, projectRoot)
+  const resolved = await resolveTemplate(sourceName, templateName, configRoot ?? projectRoot)
 
   if (!resolved) {
     output.error(`Template "${templateName}" not found. Run: crunes template list`)
@@ -144,7 +145,7 @@ export async function handler({
   }
 
   // Register rune in config
-  const configPath = path.join(projectRoot, '.crunes', 'config.json')
+  const configPath = path.join(configRoot ?? projectRoot, '.crunes', 'config.json')
   let config = { runes: {} }
   try { config = JSON.parse(await fs.readFile(configPath, 'utf8')) } catch {}
 
