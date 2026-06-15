@@ -284,14 +284,14 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
     })
   }))
   await jail.set('$__utils_shell_job_write', asyncRef(async (id, text) => {
-    checkPermission('shell.job.read', null)
+    checkPermission('shell.job.write', null)
     const record = await getJob(pKey, id)
     if (!record) throw new Error(`Unknown job: ${id}`)
     const logPath = jobStdinPath(record.projectKey, id)
     await fsSync.promises.appendFile(logPath, text + '\n', 'utf8')
   }))
   await jail.set('$__utils_shell_job_write_eof', asyncRef(async (id) => {
-    checkPermission('shell.job.read', null)
+    checkPermission('shell.job.write', null)
     const record = await getJob(pKey, id)
     if (!record) throw new Error(`Unknown job: ${id}`)
     const logPath = jobStdinPath(record.projectKey, id)
@@ -509,14 +509,14 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
     return sections
   }))
   await jail.set('$__utils_rune_job_write', asyncRef(async (id, text) => {
-    checkPermission('rune.job.read', null)
+    checkPermission('rune.job.write', null)
     const record = await getJob(pKey, id)
     if (!record) throw new Error(`Unknown job: ${id}`)
     const logPath = jobStdinPath(record.projectKey, id)
     await fsSync.promises.appendFile(logPath, JSON.stringify({ type: 'line', text }) + '\n', 'utf8')
   }))
   await jail.set('$__utils_rune_job_write_eof', asyncRef(async (id) => {
-    checkPermission('rune.job.read', null)
+    checkPermission('rune.job.write', null)
     const record = await getJob(pKey, id)
     if (!record) throw new Error(`Unknown job: ${id}`)
     const logPath = jobStdinPath(record.projectKey, id)

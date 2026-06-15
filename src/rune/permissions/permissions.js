@@ -207,9 +207,6 @@ export function makePermissionChecker(effective, ctx = null) {
       case 'rune.run':
       case 'rune.repl':
       case 'rune.job.start':
-      case 'rune.spawn':
-      case 'rune.kill':
-      case 'rune.exists':
       case 'db.connect': {
         checkBatchAndThrow(capability, value, pvs => isWildcardMatch(value.replace(/\\/g, '/'), pvs))
         return
@@ -218,9 +215,11 @@ export function makePermissionChecker(effective, ctx = null) {
       case 'rune.job.kill':
       case 'rune.job.exists':
       case 'rune.job.read':
+      case 'rune.job.write':
       case 'shell.job.kill':
       case 'shell.job.exists':
-      case 'shell.job.read': {
+      case 'shell.job.read':
+      case 'shell.job.write': {
         const b = buckets.get(capability)
         if (!b?.allow.length || b.deny.length > 0) throw new PermissionError(capability, '')
         return

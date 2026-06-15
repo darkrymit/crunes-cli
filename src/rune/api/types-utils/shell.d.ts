@@ -104,13 +104,13 @@ declare namespace shell {
      * Appends a raw text line to the job's stdin log.
      * The job process tails the log and receives the line on its stdin.
      * Only works when the job was started with `repl: true`.
-     * Requires `shell.job.read` permission.
+     * Requires `shell.job.write` permission.
      */
     function write(id: string, text: string): Promise<void>
     /**
      * Appends the EOF sentinel to the job's stdin log, closing its stdin.
      * Only works when the job was started with `repl: true`.
-     * Requires `shell.job.read` permission.
+     * Requires `shell.job.write` permission.
      */
     function writeEof(id: string): Promise<void>
   }

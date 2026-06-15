@@ -101,14 +101,14 @@ declare namespace rune {
      * Appends a JSONL `{"type":"line","text":"..."}` event to the job's stdin log.
      * The job process tails the log and receives the line on its stdin.
      * Only works when the job was started with `repl: true`.
-     * Requires `rune.job.read` permission.
+     * Requires `rune.job.write` permission.
      */
     function write(id: string, text: string): Promise<void>
 
     /**
      * Appends a JSONL `{"type":"eof","text":""}` event to the job's stdin log, closing its stdin.
      * Only works when the job was started with `repl: true`.
-     * Requires `rune.job.read` permission.
+     * Requires `rune.job.write` permission.
      */
     function writeEof(id: string): Promise<void>
   }
