@@ -113,6 +113,106 @@ describe('createModuleResolver — @plugin/ imports', () => {
   })
 })
 
+describe('createModuleResolver — relative imports', () => {
+  let pluginRoot, projectDir, isolate
+
+  beforeEach(async () => {
+    pluginRoot = await mkdtemp(join(tmpdir(), 'crunes-resolver-plugin-'))
+    projectDir = await mkdtemp(join(tmpdir(), 'crunes-resolver-project-'))
+    await mkdir(join(pluginRoot, 'lib'), { recursive: true })
+    await writeFile(join(pluginRoot, 'lib/helper.js'), 'export const h = 1')
+    await mkdir(join(projectDir, 'src'), { recursive: true })
+    await writeFile(join(projectDir, 'src/utils.js'), 'export const u = 1')
+    isolate = makeMockIsolate()
+  })
+  afterEach(async () => {
+    await rm(pluginRoot, { recursive: true, force: true })
+    await rm(projectDir, { recursive: true, force: true })
+  })
+
+  it('plugin rune: resolves relative import within pluginRootDir', async () => {
+    const { resolve, register } = createModuleResolver(
+      isolate, pluginRoot, pluginRoot, {}, [], [], projectDir, pluginRoot
+    )
+    const runeFile = join(pluginRoot, 'rune.js')
+    await writeFile(runeFile, '')
+    const runeMod = await isolate.compileModule('', { filename: runeFile })
+    register(runeMod, runeFile)
+    await resolve('./lib/helper.js', runeMod)
+    expect(isolate.compileModule).toHaveBeenCalledWith(
+      'export const h = 1',
+      expect.objectContaining({ filename: join(pluginRoot, 'lib/helper.js') })
+    )
+  })
+
+  it('plugin rune: throws PermissionError when relative import escapes pluginRootDir', async () => {
+    const { resolve, register } = createModuleResolver(
+      isolate, pluginRoot, pluginRoot, {}, [], [], projectDir, pluginRoot
+    )
+    const runeFile = join(pluginRoot, 'rune.js')
+    await writeFile(runeFile, '')
+    const runeMod = await isolate.compileModule('', { filename: runeFile })
+    register(runeMod, runeFile)
+    await expect(resolve('../../outside.js', runeMod))
+      .rejects.toThrow('PermissionError')
+  })
+
+  it('plugin rune: throws PermissionError for absolute path outside pluginRootDir', async () => {
+    const { resolve } = createModuleResolver(
+      isolate, pluginRoot, pluginRoot, {}, [], [], projectDir, pluginRoot
+    )
+    await expect(resolve('/etc/passwd', null))
+      .rejects.toThrow('PermissionError')
+  })
+
+  it('project rune: resolves relative import within projectDir with fs.read permission', async () => {
+    const { resolve, register } = createModuleResolver(
+      isolate, projectDir, projectDir, {}, ['fs.read:./src/**'], [], projectDir, null
+    )
+    const runeFile = join(projectDir, 'rune.js')
+    await writeFile(runeFile, '')
+    const runeMod = await isolate.compileModule('', { filename: runeFile })
+    register(runeMod, runeFile)
+    await resolve('./src/utils.js', runeMod)
+    expect(isolate.compileModule).toHaveBeenCalledWith(
+      'export const u = 1',
+      expect.objectContaining({ filename: join(projectDir, 'src/utils.js') })
+    )
+  })
+
+  it('project rune: throws PermissionError when fs.read not granted', async () => {
+    const { resolve, register } = createModuleResolver(
+      isolate, projectDir, projectDir, {}, [], [], projectDir, null
+    )
+    const runeFile = join(projectDir, 'rune.js')
+    await writeFile(runeFile, '')
+    const runeMod = await isolate.compileModule('', { filename: runeFile })
+    register(runeMod, runeFile)
+    await expect(resolve('./src/utils.js', runeMod))
+      .rejects.toThrow('PermissionError')
+  })
+
+  it('project rune: throws PermissionError when relative import escapes projectDir', async () => {
+    const { resolve, register } = createModuleResolver(
+      isolate, projectDir, projectDir, {}, ['fs.read:**'], [], projectDir, null
+    )
+    const runeFile = join(projectDir, 'rune.js')
+    await writeFile(runeFile, '')
+    const runeMod = await isolate.compileModule('', { filename: runeFile })
+    register(runeMod, runeFile)
+    await expect(resolve('../../outside.js', runeMod))
+      .rejects.toThrow('PermissionError')
+  })
+
+  it('throws PermissionError when both pluginRootDir and projectDir are null', async () => {
+    const { resolve } = createModuleResolver(
+      isolate, pluginRoot, pluginRoot, {}, [], [], null, null
+    )
+    await expect(resolve('./anything.js', null))
+      .rejects.toThrow('PermissionError')
+  })
+})
+
 describe('createModuleResolver — virtualModules', () => {
   let tmp, isolate
 

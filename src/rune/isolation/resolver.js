@@ -70,12 +70,34 @@ export function createModuleResolver(isolate, pluginDir, pluginNodeModules, plug
       return compileFile(specifier, absPath)
     }
 
-    // Step 1 — relative or absolute path: plugin's own files
+    // Step 1 — relative or absolute path: confined to sandbox boundary
     if (specifier.startsWith('.') || specifier.startsWith('/')) {
       const referrerFile = referrer ? moduleFilenames.get(referrer) : undefined
       const baseDir = referrerFile ? path.dirname(referrerFile) : pluginDir
       const absPath = path.resolve(baseDir, specifier)
-      return compileFile(absPath, absPath) // Use absPath as cache key instead of specifier
+
+      if (pluginRootDir) {
+        const rel = path.relative(pluginRootDir, absPath)
+        if (rel.startsWith('..') || path.isAbsolute(rel)) {
+          throw new Error(`PermissionError: import '${specifier}' escapes plugin root`)
+        }
+      } else if (projectDir) {
+        const rel = path.relative(projectDir, absPath)
+        if (rel.startsWith('..') || path.isAbsolute(rel)) {
+          throw new Error(`PermissionError: import '${specifier}' escapes project directory`)
+        }
+        const normalizedRel = './' + rel.replace(/\\/g, '/')
+        const token = `fs.read:${normalizedRel}`
+        const allowed = isGlobMatch(token, effectiveAllow)
+        const denied = effectiveDeny.length > 0 && isGlobMatch(token, effectiveDeny)
+        if (!allowed || denied) {
+          throw new Error(`PermissionError: '${specifier}' — add 'fs.read:${normalizedRel}' to allow list.`)
+        }
+      } else {
+        throw new Error(`PermissionError: relative import '${specifier}' — no sandbox boundary available`)
+      }
+
+      return compileFile(absPath, absPath)
     }
 
 

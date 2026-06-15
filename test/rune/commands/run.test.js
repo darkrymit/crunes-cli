@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 vi.mock('../../../src/core/config.js', () => ({ loadConfig: vi.fn() }))
-vi.mock('../../../src/rune/resolver.js', () => ({ runRune: vi.fn() }))
+vi.mock('../../../src/rune/resolver.js', () => ({ runRune: vi.fn(), resolvePluginRune: vi.fn() }))
+vi.mock('../../../src/plugin/manifest.js', () => ({ loadPluginJson: vi.fn() }))
 
 import { loadConfig } from '../../../src/core/config.js'
 import { runRune } from '../../../src/rune/resolver.js'
@@ -505,6 +506,34 @@ describe('handler — batch permission enforcement', () => {
     await handler({ segments: [{ key: 'deploy', runeArgs: [], sections: null }], format: 'text', isBatch: false })
     expect(runRune).toHaveBeenCalled()
     exitSpy.mockRestore()
+  })
+
+  it('allows batch for plugin rune key when plugin.json declares batch.allow', async () => {
+    const { resolvePluginRune } = await import('../../../src/rune/resolver.js')
+    const { loadPluginJson } = await import('../../../src/plugin/manifest.js')
+    vi.mocked(resolvePluginRune).mockResolvedValue({ pluginKey: 'git', runeKey: 'status', pluginDir: '/fake/git' })
+    vi.mocked(loadPluginJson).mockResolvedValue({ runes: { status: { batch: { allow: ['*'] } } } })
+
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {})
+    await handler({ segments: [{ key: 'git:status', runeArgs: [], sections: null }], format: 'text', isBatch: true })
+    expect(exitSpy).not.toHaveBeenCalledWith(1)
+    exitSpy.mockRestore()
+  })
+
+  it('denies batch for plugin rune key when plugin.json has no batch block', async () => {
+    const { resolvePluginRune } = await import('../../../src/rune/resolver.js')
+    const { loadPluginJson } = await import('../../../src/plugin/manifest.js')
+    vi.mocked(resolvePluginRune).mockResolvedValue({ pluginKey: 'git', runeKey: 'status', pluginDir: '/fake/git' })
+    vi.mocked(loadPluginJson).mockResolvedValue({ runes: { status: {} } })
+
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {})
+    const { output } = await import('../../../src/shared/output.js')
+    const errorSpy = vi.spyOn(output, 'error').mockImplementation(() => {})
+    await handler({ segments: [{ key: 'git:status', runeArgs: [], sections: null }], format: 'text', isBatch: true })
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('Batch not permitted'))
+    expect(exitSpy).toHaveBeenCalledWith(1)
+    exitSpy.mockRestore()
+    errorSpy.mockRestore()
   })
 })
 

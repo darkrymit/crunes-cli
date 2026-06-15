@@ -126,8 +126,21 @@ export async function handler({
   }
 
   if (isBatch) {
+    const { resolvePluginRune } = await import('../resolver.js')
+    const { loadPluginJson } = await import('../../plugin/manifest.js')
     for (const seg of segments) {
-      const entry = config.runes?.[seg.key] ?? {}
+      let entry = config.runes?.[seg.key] ?? {}
+      if (!entry.batch && seg.key.includes(':')) {
+        try {
+          const match = await resolvePluginRune(config, seg.key)
+          if (match) {
+            const runeKey = seg.key.slice(seg.key.indexOf(':') + 1)
+            const pluginJson = await loadPluginJson(match.pluginDir)
+            const pluginRuneBatch = pluginJson.runes?.[runeKey]?.batch
+            if (pluginRuneBatch) entry = { batch: pluginRuneBatch }
+          }
+        } catch { /* plugin not installed — let checkBatchPermission deny */ }
+      }
       const matchString = buildMatchString(seg.key, seg.runeArgs)
       const result = checkBatchPermission(entry, matchString)
       if (!result.allowed) {

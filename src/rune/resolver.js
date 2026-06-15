@@ -15,7 +15,7 @@ export function getRune(config, key) {
   return normaliseRune(raw)
 }
 
-async function resolvePluginRune(config, key) {
+export async function resolvePluginRune(config, key) {
   const colonIdx = key.indexOf(':')
   if (colonIdx === -1) return null
 
