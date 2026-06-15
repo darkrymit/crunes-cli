@@ -16,4 +16,4 @@ Sandboxed VM lifecycle via `isolated-vm`. Manages isolate creation, script compi
 - `rune/api` — Provides `createUtils`; its methods are proxied through `utils-bootstrap.js`.
 - `rune/permissions` — `computeEffectivePermissions` and `makePermissionChecker` are called before each isolate run.
 - `job` — `createJob` and registry helpers are called when spawning background rune processes.
-- `project` — `ensureProjectIdentity` is called to establish project context inside the isolate.
+- `project` — `ensureProjectIdentity` + `upsertProject` are called fire-and-forget at rune start for observability.

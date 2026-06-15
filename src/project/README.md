@@ -9,6 +9,4 @@ Project identity and reverse-lookup index: maps a hashed project key to its real
 ## Related Modules
 
 - `store` — `getProjectsJsonPath()` resolves the location of `projects.json`.
-- `job` — `createJob` calls `upsertProject` to register the project on every job creation.
-- `cache` — `api/cache.js` calls `ensureProjectIdentity` and `upsertProject` when runes open cache handles.
-- `sqlite` — `api/sqlite.js` calls `ensureProjectIdentity` and `upsertProject` when runes open database handles.
+- `rune` — `isolation/runner.js` calls `ensureProjectIdentity` + `upsertProject` as a fire-and-forget observability call at rune start.

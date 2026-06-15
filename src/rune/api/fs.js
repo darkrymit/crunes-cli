@@ -44,7 +44,7 @@ export function createFsUtils(dir, checkPermission, pluginDir = null, pluginId =
       }
       if (checkPermission) checkPermission('fs.glob', pattern)
 
-      // Virtual-path patterns (e.g. @local-project-cache/vault/*.enc) must be
+      // Virtual-path patterns (e.g. @local-cache/vault/*.enc) must be
       // resolved to a real absolute base before passing to tinyglobby, which
       // has no knowledge of the virtual prefix scheme.
       let globPattern = pattern
@@ -57,7 +57,7 @@ export function createFsUtils(dir, checkPermission, pluginDir = null, pluginId =
         const lastSep = staticPart.lastIndexOf('/')
         globCwd = staticPart.slice(0, lastSep)
         globPattern = absPattern.slice(lastSep + 1)
-        // Derive the virtual prefix (e.g. "@local-project-cache") to reconstruct results
+        // Derive the virtual prefix (e.g. "@local-cache") to reconstruct results
         const slashIdx = pattern.indexOf('/')
         virtualPrefix = slashIdx === -1 ? pattern : pattern.slice(0, slashIdx)
       }

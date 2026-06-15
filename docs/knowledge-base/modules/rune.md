@@ -55,7 +55,7 @@ Rune execution begins with a single entry point that resolves a key through a ti
 
 ## Virtual Location Tokens
 
-Cache and sqlite operations use special tokens that resolve to different paths depending on context. Tokens like `@local-project-cache`, `@global-project-cache`, and plugin variants are available in different contexts (project vs. plugin runes). Consult `api/utils.js` for the complete token-to-path mapping.
+Cache and sqlite operations use special tokens that resolve to different paths depending on context. Three scopes are available: `@local-cache` / `@local-sqlite` (stored under `.crunes/cache|sqlite/project/` in the project dir), `@local-plugin-cache` / `@local-plugin-sqlite` (stored under `.crunes/cache|sqlite/plugins/<id>/`), and `@global-plugin-cache` / `@global-plugin-sqlite` (stored under `~/.crunes/cache|sqlite/plugins/<id>/`). Consult `api/utils.js` for the complete token-to-path mapping.
 
 ## Rune Authoring
 
@@ -152,7 +152,7 @@ export async function disposeRepl() { /* cleanup on session end */ }
 
 - **`cache.open` and `sqlite.open` are async:** Forgetting `await` before `open()` causes all subsequent operations to run on a Promise, silently failing. Always `await` the open call.
 
-- **`@local-project-plugin-cache` / `@local-project-plugin-sqlite` require a plugin context:** Calling these from a project rune throws an error. Use the project-scoped variants instead.
+- **`@local-plugin-cache` / `@local-plugin-sqlite` require a plugin context:** Calling these from a project rune throws an error. Use `@local-cache` / `@local-sqlite` instead.
 
 - **`env.read` silently fails for unpermitted keys:** If a key doesn't match any declared `env.read:` permission pattern, it returns `undefined` (or the fallback) without warning.
 
@@ -160,7 +160,7 @@ export async function disposeRepl() { /* cleanup on session end */ }
 
 - **`normalizePattern` prepends `./` to bare fs names:** `fs.read:package.json` is normalized to `fs.read:./package.json`. Both bare and `./`-prefixed forms in config produce the same pattern.
 
-- **`fs.*`, `cache.*`, and `sqlite.*` patterns are expanded into all sibling forms at checker build time:** When `makePermissionChecker` receives a `ctx` (`{ dir, pluginId?, pluginDir?, projectId? }`), every pattern value is expanded into all equivalent forms so runtime path values match regardless of how the rune author wrote them. A relative pattern like `fs.read:./src/**` also produces `src/**`, `<dir>/src/**`, and `@project/src/**`; an absolute path inside the project root emits relative siblings; a `@local-project-*` token resolves to its absolute path and also emits `./rel`, `rel`, and `@project/rel` siblings; `@global-*` and `@plugin` tokens emit only the resolved absolute sibling. `~/...` emits a HOME-expanded absolute sibling only. `../...` and absolute paths outside the project get no sibling. **Exception:** `./` patterns whose bare suffix would be `**` or `**/...` (i.e. `./**` or `./**/x`) do not emit the bare suffix — this preserves the semantic distinction between `./**` (repo-scoped) and `**` (unrestricted, matches absolute paths). Expansion happens in `makePermissionChecker`, not in `computeEffectivePermissions`. The same expansion covers `cache.*` and `sqlite.*` store patterns — `cache.read:@local-project-cache/vault::name` expands to all sibling location forms with `::name` reattached.
+- **`fs.*`, `cache.*`, and `sqlite.*` patterns are expanded into all sibling forms at checker build time:** When `makePermissionChecker` receives a `ctx` (`{ dir, pluginId?, pluginDir? }`), every pattern value is expanded into all equivalent forms so runtime path values match regardless of how the rune author wrote them. A relative pattern like `fs.read:./src/**` also produces `src/**`, `<dir>/src/**`, and `@project/src/**`; an absolute path inside the project root emits relative siblings; a `@local-*` token resolves to its absolute path and also emits `./rel`, `rel`, and `@project/rel` siblings; `@global-*` and `@plugin` tokens emit only the resolved absolute sibling. `~/...` emits a HOME-expanded absolute sibling only. `../...` and absolute paths outside the project get no sibling. **Exception:** `./` patterns whose bare suffix would be `**` or `**/...` (i.e. `./**` or `./**/x`) do not emit the bare suffix — this preserves the semantic distinction between `./**` (repo-scoped) and `**` (unrestricted, matches absolute paths). Expansion happens in `makePermissionChecker`, not in `computeEffectivePermissions`. The same expansion covers `cache.*` and `sqlite.*` store patterns — `cache.read:@local-cache/vault::name` expands to all sibling location forms with `::name` reattached.
 
 - **`http.fetch:` and `env.read:` parse values before matching:** These capabilities split the value into structured parts (method, URL, source, key) before matching. Each sub-matcher (`matchFetchPermission`, `matchEnvPermission`, etc.) accepts a full patterns array and loops internally — `checkPermission` passes the whole bucket array in one call rather than iterating with `.some` at the call site.
 
@@ -178,7 +178,7 @@ export async function disposeRepl() { /* cleanup on session end */ }
 
 - **`shell.spawn` and `rune.spawn` require an explicit `open()` call:** Both return a session object immediately without starting the subprocess. Register all handlers (`session.stdout.on`, `session.on('exit', ...)`, etc.) first, then call `session.open()` to start the process. Skipping `open()` means the process never starts and all reads hang indefinitely.
 
-- **All `fs.*` operations support virtual-path prefixes:** Paths starting with `@` (e.g. `@local-project-cache/vault/file.enc`) are resolved through the virtual location scheme via `resolvePath`. `fs.glob` additionally reconstructs results with the original `@prefix/...` form so callers get back virtual paths, not real absolute ones.
+- **All `fs.*` operations support virtual-path prefixes:** Paths starting with `@` (e.g. `@local-cache/vault/file.enc`) are resolved through the virtual location scheme via `resolvePath`. `fs.glob` additionally reconstructs results with the original `@prefix/...` form so callers get back virtual paths, not real absolute ones.
 
 - **`logger` is a global — no import needed:** The `logger` object is injected into every rune sandbox alongside `console`. Use `logger.info(message, meta?)`, `logger.warn(...)`, `logger.error(...)`, `logger.debug(...)` to emit structured log events. Each call emits `{ type: 'log', level, message, meta? }` through the event pipeline; in text mode these write to stderr, in JSONL mode they appear as JSON objects on stdout. The optional `meta` param is a plain object surfaced in JSONL output and in the `[level]` prefix in text output. `console.log/warn/error` also emit `{ type: 'log', level: 'log'/'warn'/'error' }` — the same unified event shape, just without the `meta` field.
 
