@@ -193,11 +193,23 @@ describe('createFsUtils — glob', () => {
     const fsUtils = createFsUtils(dir, null)
     await expect(fsUtils.glob('/etc/**')).rejects.toThrow('absolute')
   })
-  it('passes raw glob pattern to permission check', async () => {
+  it('cwd option scopes results to that subdirectory', async () => {
+    const fsUtils = createFsUtils(dir, null)
+    const results = await fsUtils.glob('*.ts', { cwd: 'src' })
+    expect(results).toContain('c.ts')
+    expect(results).not.toContain('a.ts')
+  })
+  it('passes pattern and resolved cwd to permission check', async () => {
     const spy = vi.fn()
     const fsUtils = createFsUtils(dir, spy)
     await fsUtils.glob('src/*.ts')
-    expect(spy).toHaveBeenCalledWith('fs.glob', 'src/*.ts')
+    expect(spy).toHaveBeenCalledWith('fs.glob', 'src/*.ts', dir)
+  })
+  it('passes resolved cwd option to permission check', async () => {
+    const spy = vi.fn()
+    const fsUtils = createFsUtils(dir, spy)
+    await fsUtils.glob('*.ts', { cwd: 'src' })
+    expect(spy).toHaveBeenCalledWith('fs.glob', '*.ts', path.join(dir, 'src'))
   })
 })
 

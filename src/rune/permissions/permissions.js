@@ -42,7 +42,7 @@ function expandPattern(perm, ctx) {
   const colonIdx = perm.indexOf(':')
   if (colonIdx === -1) return [perm]
   const cap = perm.slice(0, colonIdx)
-  const isFs    = cap === 'fs.read' || cap === 'fs.write' || cap === 'fs.exists' || cap === 'fs.glob'
+  const isFs    = cap === 'fs.read' || cap === 'fs.write' || cap === 'fs.exists'
   const isStore = cap === 'cache.read' || cap === 'cache.write' || cap === 'sqlite.read' || cap === 'sqlite.write'
   if (!isFs && !isStore) return [perm]
   if (!ctx?.dir) return [perm]
@@ -103,26 +103,62 @@ function expandLocValue(value, absDir, { pluginId, pluginDir }, dir) {
   }
   const hasDot = v.startsWith('./')
   const rel    = hasDot ? v.slice(2) : v
-  // rel === '**' is a bare wildcard — do not add it as a sibling (would match everything).
-  // rel.startsWith('**/') is a scoped glob like '**/.git' — safe to include bare form.
-  const isBareStarStar = rel === '**'
+  const relIsGlob = rel === '**' || rel.startsWith('**/')
   return hasDot
-    ? (isBareStarStar
+    ? (relIsGlob
       ? [`./${rel}`, absDir + '/' + rel, `@project/${rel}`]
       : [`./${rel}`, rel, absDir + '/' + rel, `@project/${rel}`])
     : [`./${rel}`, rel, absDir + '/' + rel, `@project/${rel}`]
 }
 
+// Parse a normalized fs.glob permission value (after "fs.glob:") into { cwd, pattern }.
+// After normalizePattern all fs.glob perms are in "cwd::pattern" form.
+function parseGlobPerm(value) {
+  const dColonIdx = value.indexOf('::')
+  return { cwd: value.slice(0, dColonIdx), pattern: value.slice(dColonIdx + 2) }
+}
+
+// Check a runtime fs.glob(pattern, absCwd) against the list of declared glob permission values.
+// Declared cwd is resolved to absolute and glob-matched against the runtime cwd.
+// Pattern is exact-matched (or '*' in declared pattern matches any runtime pattern).
+function matchGlobPermission(runtimePattern, runtimeAbsCwd, declaredValues, ctx) {
+  const normCwd = runtimeAbsCwd.replace(/\\/g, '/')
+  return declaredValues.some(val => {
+    const { cwd: declCwd, pattern: declPattern } = parseGlobPerm(val)
+    if (declPattern !== '*' && declPattern !== runtimePattern) return false
+    try {
+      const resolvedDeclCwd = resolvePath(declCwd, { dir: ctx.dir, pluginId: ctx.pluginId, pluginDir: ctx.pluginDir })
+        .replace(/\\/g, '/')
+      const sub = s => s.startsWith('./') ? '__DOT__/' + s.slice(2) : s
+      return isGlobMatch(sub(normCwd), [sub(resolvedDeclCwd)])
+    } catch { return false }
+  })
+}
+
+function normalizeFsPath(raw) {
+  const val = normalizeGitBashPath(raw.replace(/\\/g, '/'))
+  const v   = val.startsWith('@project/') ? './' + val.slice('@project/'.length) : val
+  const isAbsolute = v.startsWith('/') || /^[a-zA-Z]:/.test(v)
+  return (!v.startsWith('./') && !v.startsWith('../') && !v.startsWith('@') && !v.startsWith('~/') && !isAbsolute)
+    ? `./${v}`
+    : v
+}
+
 function normalizePattern(perm) {
-  if (perm.startsWith('fs.read:') || perm.startsWith('fs.write:') || perm.startsWith('fs.exists:') || perm.startsWith('fs.glob:')) {
+  if (perm.startsWith('fs.glob:')) {
+    const rest = perm.slice('fs.glob:'.length)
+    const dColonIdx = rest.indexOf('::')
+    if (dColonIdx === -1) {
+      // Convenience form: no cwd, whole value is pattern. cwd defaults to project root.
+      return `fs.glob:.::${rest}`
+    }
+    const rawCwd     = rest.slice(0, dColonIdx)
+    const pattern    = rest.slice(dColonIdx + 2)
+    return `fs.glob:${normalizeFsPath(rawCwd)}::${pattern}`
+  }
+  if (perm.startsWith('fs.read:') || perm.startsWith('fs.write:') || perm.startsWith('fs.exists:')) {
     const [cap, ...rest] = perm.split(':')
-    const raw = normalizeGitBashPath(rest.join(':').replace(/\\/g, '/'))
-    const val = raw.startsWith('@project/') ? './' + raw.slice('@project/'.length) : raw
-    const isAbsolute = val.startsWith('/') || /^[a-zA-Z]:/.test(val)
-    const v = (!val.startsWith('./') && !val.startsWith('../') && !val.startsWith('@') && !val.startsWith('~/') && !isAbsolute)
-      ? `./${val}`
-      : val
-    return `${cap}:${v}`
+    return `${cap}:${normalizeFsPath(rest.join(':'))}`
   }
   if (perm.startsWith('cache.read:') || perm.startsWith('cache.write:') ||
       perm.startsWith('sqlite.read:') || perm.startsWith('sqlite.write:')) {
@@ -175,10 +211,15 @@ export function makePermissionChecker(effective, ctx = null) {
     return buckets.get(cap)
   }
   const capOf = p => { const i = p.indexOf(':'); return i === -1 ? p : p.slice(0, i) }
+
+  // fs.glob perms are stored as-is (cwd::pattern form) and matched at check time.
+  const globBucket = { allow: [], deny: [] }
   for (const p of effective.allow) {
+    if (p.startsWith('fs.glob:')) { globBucket.allow.push(p.slice('fs.glob:'.length)); continue }
     for (const expanded of expandPattern(p, ctx)) getBucket(capOf(expanded)).allow.push(expanded)
   }
   for (const p of effective.deny) {
+    if (p.startsWith('fs.glob:')) { globBucket.deny.push(p.slice('fs.glob:'.length)); continue }
     for (const expanded of expandPattern(p, ctx)) getBucket(capOf(expanded)).deny.push(expanded)
   }
 
@@ -193,15 +234,24 @@ export function makePermissionChecker(effective, ctx = null) {
     if (!allowed || denied) throw new PermissionError(capability, value)
   }
 
-  return function checkPermission(capability, value) {
+  const absDir = ctx?.dir?.replace(/\\/g, '/') ?? ''
+  const globCtx = { pluginId: ctx?.pluginId ?? null, pluginDir: ctx?.pluginDir ?? null, dir: ctx?.dir ?? '' }
+
+  return function checkPermission(capability, value, absCwd) {
     switch (capability) {
       case 'fs.read':
       case 'fs.write':
-      case 'fs.exists':
-      case 'fs.glob': {
+      case 'fs.exists': {
         const sub = s => s.startsWith('./') ? '__DOT__/' + s.slice(2) : s
         const v   = sub(value.replace(/\\/g, '/'))
         checkBatchAndThrow(capability, value, pvs => isGlobMatch(v, pvs.map(sub)))
+        return
+      }
+      case 'fs.glob': {
+        const resolvedCwd = (absCwd ?? absDir).replace(/\\/g, '/')
+        const allowed = globBucket.allow.length > 0 && matchGlobPermission(value, resolvedCwd, globBucket.allow, globCtx)
+        const denied  = globBucket.deny.length  > 0 && matchGlobPermission(value, resolvedCwd, globBucket.deny,  globCtx)
+        if (!allowed || denied) throw new PermissionError(capability, value)
         return
       }
       case 'shell.run':

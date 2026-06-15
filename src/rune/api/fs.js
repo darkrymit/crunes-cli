@@ -38,32 +38,15 @@ export function createFsUtils(dir, checkPermission, pluginDir = null, pluginId =
       }
     },
 
-    async glob(pattern, { ignore = [], onlyDirectories = false, dot = false, expandDirectories = false } = {}) {
+    async glob(pattern, { cwd: cwdOpt, ignore = [], onlyDirectories = false, dot = false, expandDirectories = false } = {}) {
       if (path.isAbsolute(pattern)) {
         throw new Error('utils.fs.glob does not support absolute patterns — use a relative pattern.')
       }
-      if (checkPermission) checkPermission('fs.glob', pattern)
+      const resolvedCwd = cwdOpt ? resolvePath(cwdOpt, ctx()) : dir
+      if (checkPermission) checkPermission('fs.glob', pattern, resolvedCwd)
 
-      // Virtual-path patterns (e.g. @local-cache/vault/*.enc) must be
-      // resolved to a real absolute base before passing to tinyglobby, which
-      // has no knowledge of the virtual prefix scheme.
-      let globPattern = pattern
-      let globCwd = dir
-      let virtualPrefix = null
-      if (pattern.startsWith('@')) {
-        const absPattern = resolvePath(pattern, ctx()).replace(/\\/g, '/')
-        const firstGlob = absPattern.search(/[*?{[]/)
-        const staticPart = firstGlob === -1 ? absPattern : absPattern.slice(0, firstGlob)
-        const lastSep = staticPart.lastIndexOf('/')
-        globCwd = staticPart.slice(0, lastSep)
-        globPattern = absPattern.slice(lastSep + 1)
-        // Derive the virtual prefix (e.g. "@local-cache") to reconstruct results
-        const slashIdx = pattern.indexOf('/')
-        virtualPrefix = slashIdx === -1 ? pattern : pattern.slice(0, slashIdx)
-      }
-
-      const results = await glob(globPattern, {
-        cwd: globCwd,
+      const results = await glob(pattern, {
+        cwd: resolvedCwd,
         ignore,
         dot,
         expandDirectories,
@@ -71,13 +54,6 @@ export function createFsUtils(dir, checkPermission, pluginDir = null, pluginId =
         onlyDirectories,
       })
 
-      if (virtualPrefix) {
-        const absBase = resolvePath(virtualPrefix, ctx())
-        return results.map(r => {
-          const rel = path.relative(absBase, path.join(globCwd, r)).replace(/\\/g, '/')
-          return `${virtualPrefix}/${rel}`
-        })
-      }
       return results.map(r => r.replace(/\\/g, '/'))
     },
 

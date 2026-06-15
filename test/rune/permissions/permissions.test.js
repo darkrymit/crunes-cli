@@ -1,5 +1,7 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { join } from 'node:path'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import {
   computeEffectivePermissions,
   makePermissionChecker,
@@ -53,7 +55,7 @@ describe('computeEffectivePermissions', () => {
       { use: { allow: ['fs.glob:src/*.js'] } },
       'use'
     )
-    expect(result.allow).toEqual(['fs.glob:./src/*.js'])
+    expect(result.allow).toEqual(['fs.glob:.::src/*.js'])
 
     const result2 = computeEffectivePermissions(
       { use: { allow: ['fs.read:package.json'] } },
@@ -481,5 +483,62 @@ describe('makePermissionChecker — shell.run wildcard matching', () => {
     const check = makePermissionChecker({ allow: ['db.connect:postgres:*'], deny: [] })
     expect(() => check('db.connect', 'postgres:localhost:5432/mydb')).not.toThrow()
     expect(() => check('db.connect', 'mysql:localhost:3306/mydb')).toThrow(PermissionError)
+  })
+})
+
+describe('makePermissionChecker — fs.glob cwd::pattern matching', () => {
+  let dir
+
+  beforeEach(async () => {
+    dir = await mkdtemp(join(tmpdir(), 'crunes-glob-perm-'))
+  })
+  afterEach(async () => {
+    await rm(dir, { recursive: true, force: true })
+  })
+
+  it('convenience form fs.glob:*.sql permits pattern=*.sql from project root', () => {
+    const check = makePermissionChecker({ allow: ['fs.glob:.::*.sql'], deny: [] }, { dir })
+    expect(() => check('fs.glob', '*.sql', dir)).not.toThrow()
+  })
+
+  it('convenience form does not permit different pattern', () => {
+    const check = makePermissionChecker({ allow: ['fs.glob:.::*.sql'], deny: [] }, { dir })
+    expect(() => check('fs.glob', '*.js', dir)).toThrow(PermissionError)
+  })
+
+  it('fs.glob:./migrations::*.sql permits *.sql from migrations subdir', () => {
+    const check = makePermissionChecker({ allow: ['fs.glob:./migrations::*.sql'], deny: [] }, { dir })
+    expect(() => check('fs.glob', '*.sql', join(dir, 'migrations'))).not.toThrow()
+  })
+
+  it('fs.glob:./migrations::*.sql does not permit *.sql from project root', () => {
+    const check = makePermissionChecker({ allow: ['fs.glob:./migrations::*.sql'], deny: [] }, { dir })
+    expect(() => check('fs.glob', '*.sql', dir)).toThrow(PermissionError)
+  })
+
+  it('fs.glob:./migrations::*.sql does not permit *.js from migrations subdir', () => {
+    const check = makePermissionChecker({ allow: ['fs.glob:./migrations::*.sql'], deny: [] }, { dir })
+    expect(() => check('fs.glob', '*.js', join(dir, 'migrations'))).toThrow(PermissionError)
+  })
+
+  it('fs.glob:./**::* permits any pattern from any subdir', () => {
+    const check = makePermissionChecker({ allow: ['fs.glob:./**::*'], deny: [] }, { dir })
+    expect(() => check('fs.glob', '*.sql', join(dir, 'migrations'))).not.toThrow()
+    expect(() => check('fs.glob', '*.yml', join(dir, '.github', 'workflows'))).not.toThrow()
+    expect(() => check('fs.glob', '*.ts', dir)).not.toThrow()
+  })
+
+  it('fs.glob:./**::* does not permit cwd outside project dir', () => {
+    const check = makePermissionChecker({ allow: ['fs.glob:./**::*'], deny: [] }, { dir })
+    expect(() => check('fs.glob', '*.conf', '/etc')).toThrow(PermissionError)
+  })
+
+  it('deny blocks matching cwd+pattern even when allow permits', () => {
+    const check = makePermissionChecker(
+      { allow: ['fs.glob:./**::*'], deny: ['fs.glob:./secrets::*'] },
+      { dir }
+    )
+    expect(() => check('fs.glob', '*.key', join(dir, 'migrations'))).not.toThrow()
+    expect(() => check('fs.glob', '*.key', join(dir, 'secrets'))).toThrow(PermissionError)
   })
 })
