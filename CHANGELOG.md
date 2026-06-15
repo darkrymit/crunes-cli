@@ -5,6 +5,46 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] - 2026-06-16
+
+### Breaking Changes
+- **`repl` command**: `crunes run-repl` renamed to `crunes repl`; runner export `runRepl` renamed to `repl`; all internal types, resolver, and CLI wiring updated
+- **Store scopes removed**: Global (`-g`) and project-scoped (`--project-id`) flags dropped from all store commands; storage keys no longer include a project or global prefix
+- **Sandbox import boundary enforced**: Relative imports that escape the rune's plugin or project directory are now blocked at resolve time
+- **`check` command removed**: `crunes check` dropped; use `crunes help` instead
+- **Permission matchers accept arrays**: `matchers` in permission declarations now take arrays of patterns; `.some()` wrappers removed from all call sites
+
+### Added
+- **`repl` lifecycle**: Production-ready REPL with `bannerRepl`, `commandsRepl`, `inputRepl`, `completeInputRepl`; readline history, Ctrl+C, tab completion, slash commands
+- **`dispose()` / `disposeRepl()`**: Guaranteed teardown lifecycle exports; called automatically after `run()` and REPL session end
+- **`RuneSession` repl mode**: Cross-platform job spawn with fd-based stdio; `RuneSession` handles repl context and cleanup
+- **`shell.job.start` non-blocking**: Background jobs no longer block parent process exit; detached wrapper for REPL stdin
+- **`rune.job.write` / `shell.job.write`**: Write-capability tokens gate `writeEof` and stdin writes on background jobs
+- **`fs.glob` `cwd` option**: `{ cwd: '/abs/path' }` option and `cwd::pattern` permission syntax for explicit base directory scoping
+- **Batch permission enforcement**: `run -b` gating via `checkBatchPermission`; batch blocks in `m`, `kb`, `release` rune configs
+- **`logger` global**: `console.warn` event; unified `{ type: 'log', level }` console event shape inside isolates
+- **`isWildcardMatch`**: New match utility; `isMatch` renamed to `isGlobMatch` across all call sites
+- **Build-time permission pattern expansion**: `fs`, `cache`, `sqlite` patterns expand to all sibling forms at build time; `isWildcardMatch` for `shell`/`rune`/`db`/`env`/`store`
+- **Bracket token syntax**: `parseBracketKey` and `bracket parseSegment` across `run`, `repl`, `bench`; `--` separator dropped; `--help` interception removed; `help` global injected
+- **`docs repl` commands**: `docs run-repl`, `docs args-repl`, `docs banner-repl`, `docs commands-repl`, `docs input-repl`, `docs complete-input-repl` added; sqlite bridge fixed
+- **`--ccd` propagated to all subcommands**: `plugin install/enable/disable/uninstall/update` and `template list/apply` now read and write config from `configRoot` when `--ccd` is set
+- **Batch plugin auth**: Plugin runes receive a single batch permission pre-flight check via ACI hook-wrapper
+
+### Changed
+- **Console events unified**: Isolate-side `console` emits `{ type: 'log', level }` shape for all log levels
+- **Wildcard semantics documented**: All permission `Requires` lines document wildcard behaviour; `isMatch` → `isGlobMatch` rename propagated
+- **Stale CLI refs purged**: Outdated token/flag references removed from CLI help text, docs, and knowledge-base entries
+
+### Fixed
+- **REPL piped input race**: Async queue prevents race condition when consuming piped stdin in REPL mode
+- **`shell.job.start` blocking**: Parent process no longer hangs waiting for background job exit
+- **Permissions `**/<subpath>` bare rel sibling**: Restored bare relative sibling resolution for double-wildcard glob patterns
+- **Runtime stdin buffer corruption**: Fixed stdin data loss when switching between raw and cooked modes
+- **REPL JSONL metadata loss**: Section metadata no longer dropped when serializing JSONL output
+- **Raw mode leak**: TTY raw mode always restored on REPL exit, even on abrupt termination
+
+---
+
 ## [0.7.2] - 2026-06-10
 
 ### Added
