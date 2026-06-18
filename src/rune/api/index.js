@@ -5,6 +5,7 @@ import { createShellUtils } from './shell.js'
 import { createJsonUtils } from './json.js'
 import { createYamlUtils } from './yaml.js'
 import { createXmlUtils } from './xml.js'
+import { createCsvUtils } from './csv.js'
 import { createHttpUtils } from './http.js'
 import { createEnvUtils } from './env.js'
 import { createVarsUtils } from './vars.js'
@@ -45,6 +46,7 @@ export function createUtils(dir, checkPermission = null, pluginDir = null, permi
     json:    createJsonUtils(dir, fs),
     yaml:    createYamlUtils(dir, fs),
     xml:     createXmlUtils(dir, fs),
+    csv:     createCsvUtils(dir, fs),
     http:    createHttpUtils(checkPermission),
     env:     createEnvUtils(dir, checkPermission, permissions),
     vars:    createVarsUtils(vars),

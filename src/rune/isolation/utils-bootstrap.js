@@ -732,6 +732,83 @@ globalThis.utils = {
       await globalThis.utils.xml.write(filepath, result !== undefined ? result : data, { indent })
     },
   },
+  csv: {
+    read:              (p, o)    => $__utils_csv_read.apply(undefined, [p, o], { arguments: { copy: true }, result: { promise: true, copy: true } }),
+    readObjects:       (p, o)    => $__utils_csv_read_objects.apply(undefined, [p, o], { arguments: { copy: true }, result: { promise: true, copy: true } }),
+    write:             (p, d, o) => $__utils_csv_write.apply(undefined, [p, d, o], { arguments: { copy: true }, result: { promise: true } }),
+    writeObjects:      (p, d, o) => $__utils_csv_write_objects.apply(undefined, [p, d, o], { arguments: { copy: true }, result: { promise: true } }),
+    parse:             (c, o)    => $__utils_csv_parse.applySync(undefined, [c, o], { arguments: { copy: true }, result: { copy: true } }),
+    parseObjects:      (c, o)    => $__utils_csv_parse_objects.applySync(undefined, [c, o], { arguments: { copy: true }, result: { copy: true } }),
+    stringify:         (r, o)    => $__utils_csv_stringify.applySync(undefined, [r, o], { arguments: { copy: true }, result: { copy: true } }),
+    stringifyObjects:  (d, o)    => $__utils_csv_stringify_objects.applySync(undefined, [d, o], { arguments: { copy: true }, result: { copy: true } }),
+    readStream: (p, o) => {
+      let streamId = null
+      return new ReadableStream({
+        async start() {
+          streamId = await $__utils_csv_readStream.apply(undefined, [p, o], { arguments: { copy: true }, result: { promise: true } })
+        },
+        async pull(controller) {
+          const row = await $__utils_csv_readStream_next.apply(undefined, [streamId], { result: { promise: true, copy: true } })
+          if (row === null) controller.close()
+          else controller.enqueue(row)
+        }
+      })
+    },
+    readObjectsStream: (p, o) => {
+      let streamId = null
+      let columnsResolve, aliasesResolve
+      const columnsPromise = new Promise(res => { columnsResolve = res })
+      const aliasesPromise = new Promise(res => { aliasesResolve = res })
+      const rows = new ReadableStream({
+        async start() {
+          streamId = await $__utils_csv_readObjectsStream.apply(undefined, [p, o], { arguments: { copy: true }, result: { promise: true } })
+          const meta = await $__utils_csv_readObjectsStream_meta.apply(undefined, [streamId], { result: { promise: true, copy: true } })
+          columnsResolve(meta.columns)
+          aliasesResolve(meta.aliases)
+        },
+        async pull(controller) {
+          const row = await $__utils_csv_readObjectsStream_next.apply(undefined, [streamId], { result: { promise: true, copy: true } })
+          if (row === null) controller.close()
+          else controller.enqueue(row)
+        }
+      })
+      return { columns: columnsPromise, aliases: aliasesPromise, rows }
+    },
+    writeStream: (p, o) => {
+      let streamId = null
+      return new WritableStream({
+        async start() {
+          streamId = await $__utils_csv_writeStream.apply(undefined, [p, o], { arguments: { copy: true }, result: { promise: true } })
+        },
+        async write(row) {
+          await $__utils_csv_writeStream_write.apply(undefined, [streamId, row], { arguments: { copy: true }, result: { promise: true } })
+        },
+        async close() {
+          if (streamId !== null) await $__utils_csv_writeStream_close.apply(undefined, [streamId], { result: { promise: true } })
+        },
+        async abort() {
+          if (streamId !== null) await $__utils_csv_writeStream_close.apply(undefined, [streamId], { result: { promise: true } })
+        }
+      })
+    },
+    writeObjectsStream: (p, o) => {
+      let streamId = null
+      return new WritableStream({
+        async start() {
+          streamId = await $__utils_csv_writeObjectsStream.apply(undefined, [p, o], { arguments: { copy: true }, result: { promise: true } })
+        },
+        async write(record) {
+          await $__utils_csv_writeObjectsStream_write.apply(undefined, [streamId, record], { arguments: { copy: true }, result: { promise: true } })
+        },
+        async close() {
+          if (streamId !== null) await $__utils_csv_writeObjectsStream_close.apply(undefined, [streamId], { result: { promise: true } })
+        },
+        async abort() {
+          if (streamId !== null) await $__utils_csv_writeObjectsStream_close.apply(undefined, [streamId], { result: { promise: true } })
+        }
+      })
+    },
+  },
   http: {
     fetch: async (input, init = {}) => {
       let url, method, reqHeaders, reqBody
@@ -1541,7 +1618,7 @@ globalThis.utils = {
   tree,
 }
 
-export const { fs, shell, section, rune, json, yaml, xml, http, env, vars, archive, cache, sqlite, db, crypto, codec, ws, time } = globalThis.utils
+export const { fs, shell, section, rune, json, yaml, xml, csv, http, env, vars, archive, cache, sqlite, db, crypto, codec, ws, time } = globalThis.utils
 export { md, tree, help }
 
 // ─── Global Sandbox Timers ───────────────────────────────────────────────────

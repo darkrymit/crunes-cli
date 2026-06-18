@@ -551,6 +551,106 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
   await jail.set('$__utils_xml_write', new ivm.Reference(async (relPath, data, opts) => {
     await utils.xml.write(relPath, data, opts)
   }))
+
+  // csv streams share the same streams Map as fs streams
+  await jail.set('$__utils_csv_read', new ivm.Reference(async (relPath, opts) => {
+    return utils.csv.read(relPath, opts)
+  }))
+  await jail.set('$__utils_csv_read_objects', new ivm.Reference(async (relPath, opts) => {
+    return utils.csv.readObjects(relPath, opts)
+  }))
+  await jail.set('$__utils_csv_write', new ivm.Reference(async (relPath, rows, opts) => {
+    await utils.csv.write(relPath, rows, opts)
+  }))
+  await jail.set('$__utils_csv_write_objects', new ivm.Reference(async (relPath, data, opts) => {
+    await utils.csv.writeObjects(relPath, data, opts)
+  }))
+  await jail.set('$__utils_csv_parse', new ivm.Reference((content, opts) => {
+    return utils.csv.parse(content, opts)
+  }))
+  await jail.set('$__utils_csv_parse_objects', new ivm.Reference((content, opts) => {
+    return utils.csv.parseObjects(content, opts)
+  }))
+  await jail.set('$__utils_csv_stringify', new ivm.Reference((rows, opts) => {
+    return utils.csv.stringify(rows, opts)
+  }))
+  await jail.set('$__utils_csv_stringify_objects', new ivm.Reference((data, opts) => {
+    return utils.csv.stringifyObjects(data, opts)
+  }))
+  await jail.set('$__utils_csv_readStream', new ivm.Reference(async (relPath, opts) => {
+    const iter = utils.csv.readStreamIter(relPath, opts)[Symbol.asyncIterator]()
+    const id = nextStreamId++
+    streams.set(id, iter)
+    return id
+  }))
+  await jail.set('$__utils_csv_readStream_next', new ivm.Reference(async (id) => {
+    const iter = streams.get(id)
+    if (!iter) throw new Error(`Invalid csv read stream ID: ${id}`)
+    const { value, done } = await iter.next()
+    if (done) {
+      streams.delete(id)
+      return null
+    }
+    return value
+  }))
+  await jail.set('$__utils_csv_readObjectsStream', new ivm.Reference(async (relPath, opts) => {
+    const { columns, aliases, rows } = utils.csv.readObjectsStreamIter(relPath, opts)
+    const id = nextStreamId++
+    const iter = rows[Symbol.asyncIterator]()
+    streams.set(id, { iter, columns, aliases })
+    return id
+  }))
+  await jail.set('$__utils_csv_readObjectsStream_meta', new ivm.Reference(async (id) => {
+    const entry = streams.get(id)
+    if (!entry) throw new Error(`Invalid csv read objects stream ID: ${id}`)
+    const [columns, aliases] = await Promise.all([entry.columns, entry.aliases])
+    return { columns, aliases }
+  }))
+  await jail.set('$__utils_csv_readObjectsStream_next', new ivm.Reference(async (id) => {
+    const entry = streams.get(id)
+    if (!entry) throw new Error(`Invalid csv read objects stream ID: ${id}`)
+    const { value, done } = await entry.iter.next()
+    if (done) {
+      streams.delete(id)
+      return null
+    }
+    return value
+  }))
+  await jail.set('$__utils_csv_writeStream', new ivm.Reference(async (relPath, opts) => {
+    const ref = utils.csv.writeStreamRef(relPath, opts)
+    const id = nextStreamId++
+    streams.set(id, ref)
+    return id
+  }))
+  await jail.set('$__utils_csv_writeStream_write', new ivm.Reference(async (id, row) => {
+    const ref = streams.get(id)
+    if (!ref) throw new Error(`Invalid csv write stream ID: ${id}`)
+    await ref.write(row)
+  }))
+  await jail.set('$__utils_csv_writeStream_close', new ivm.Reference(async (id) => {
+    const ref = streams.get(id)
+    if (!ref) throw new Error(`Invalid csv write stream ID: ${id}`)
+    await ref.close()
+    streams.delete(id)
+  }))
+  await jail.set('$__utils_csv_writeObjectsStream', new ivm.Reference(async (relPath, opts) => {
+    const ref = utils.csv.writeObjectsStreamRef(relPath, opts)
+    const id = nextStreamId++
+    streams.set(id, ref)
+    return id
+  }))
+  await jail.set('$__utils_csv_writeObjectsStream_write', new ivm.Reference(async (id, record) => {
+    const ref = streams.get(id)
+    if (!ref) throw new Error(`Invalid csv write objects stream ID: ${id}`)
+    await ref.write(record)
+  }))
+  await jail.set('$__utils_csv_writeObjectsStream_close', new ivm.Reference(async (id) => {
+    const ref = streams.get(id)
+    if (!ref) throw new Error(`Invalid csv write objects stream ID: ${id}`)
+    await ref.close()
+    streams.delete(id)
+  }))
+
   await jail.set('$__utils_http_fetch', new ivm.Reference(async (urlRef, optsRef, onChunk, onEnd, onError, signalListenerRef) => {
     const url  = urlRef.copySync()
     const opts = optsRef.copySync()
