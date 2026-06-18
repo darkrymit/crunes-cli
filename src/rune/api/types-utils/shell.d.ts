@@ -1,7 +1,7 @@
 /** Run shell commands from the project directory */
 declare namespace shell {
   /**
-   * Runs a shell command asynchronously and returns its output.
+   * Runs a shell command asynchronously and returns its output as a string.
    * Requires `shell.run:<command>` permission. `*` matches any characters (e.g. `shell.run:bash *`).
    *
    * @param cmd Shell command to execute
@@ -11,7 +11,6 @@ declare namespace shell {
    * @param opts.timeout Timeout in milliseconds (default: 30000).
    * @param opts.env Key-value pairs of environment variables to inject.
    * @param opts.stdin Input string, buffer, or ReadableStream piped to stdin.
-   * @param opts.binary Return stdout as raw Uint8Array instead of string (default: false).
    */
   export function exec(
     cmd: string,
@@ -21,16 +20,36 @@ declare namespace shell {
       timeout?: number
       env?: Record<string, string>
       stdin?: ReadableStream<Uint8Array | string> | Uint8Array | string
-      binary?: boolean
     }
-  ): Promise<ShellResult>
+  ): Promise<ShellResult<string>>
 
-  interface ShellResult {
+  /**
+   * Runs a shell command and returns stdout as raw Uint8Array bytes.
+   * Requires `shell.run:<command>` permission. `*` matches any characters (e.g. `shell.run:bash *`).
+   *
+   * @param cmd Shell command to execute
+   * @param opts Option object to configure shell execution
+   * @param opts.throw Throw a ShellError on non-zero exit codes (default: true).
+   * @param opts.timeout Timeout in milliseconds (default: 30000).
+   * @param opts.env Key-value pairs of environment variables to inject.
+   * @param opts.stdin Input string, buffer, or ReadableStream piped to stdin.
+   */
+  export function execBinary(
+    cmd: string,
+    opts?: {
+      throw?: boolean
+      timeout?: number
+      env?: Record<string, string>
+      stdin?: ReadableStream<Uint8Array | string> | Uint8Array | string
+    }
+  ): Promise<ShellResult<Uint8Array>>
+
+  interface ShellResult<T extends string | Uint8Array = string> {
     /**
      * The standard output (stdout) of the process.
-     * If `opts.binary` is true, this is a `Uint8Array`; otherwise, a string.
+     * For `exec` this is a string; for `execBinary` this is a `Uint8Array`.
      */
-    stdout: string | Uint8Array
+    stdout: T
     /** The standard error (stderr) of the process (always a string). */
     stderr: string
     /** The exit status code of the process. */
@@ -40,28 +59,44 @@ declare namespace shell {
   }
 
   /**
-   * Spawns an interactive shell session, allowing progressive streaming and real-time stdin/stdout interaction.
+   * Spawns an interactive shell session, yielding text chunks on stdout and stderr.
    * Requires `shell.run:<command>` permission. `*` matches any characters (e.g. `shell.run:npm *`).
    *
    * @param cmd Shell command to spawn
    * @param opts Option object to configure interactive execution
    * @param opts.env Key-value pairs of environment variables to inject.
    * @param opts.signal AbortSignal to kill the session and its child process tree.
-   * @param opts.binary Stream stdout/stderr chunks as Uint8Array instead of string (default: false).
    */
   export function spawn(
     cmd: string,
     opts?: {
       env?: Record<string, string>
       signal?: AbortSignal
-      binary?: boolean
     }
-  ): ShellSession
+  ): ShellSession<string>
 
-  interface ShellSession {
+  /**
+   * Spawns an interactive shell session, yielding raw Uint8Array chunks on stdout.
+   * stderr always yields string chunks regardless of binary mode.
+   * Requires `shell.run:<command>` permission. `*` matches any characters (e.g. `shell.run:npm *`).
+   *
+   * @param cmd Shell command to spawn
+   * @param opts Option object to configure interactive execution
+   * @param opts.env Key-value pairs of environment variables to inject.
+   * @param opts.signal AbortSignal to kill the session and its child process tree.
+   */
+  export function spawnBinary(
+    cmd: string,
+    opts?: {
+      env?: Record<string, string>
+      signal?: AbortSignal
+    }
+  ): ShellSession<Uint8Array>
+
+  interface ShellSession<T extends string | Uint8Array = string> {
     readonly stdin: ShellSessionWritableStream
-    readonly stdout: ShellSessionReadableStream
-    readonly stderr: ShellSessionReadableStream
+    readonly stdout: ShellSessionReadableStream<T>
+    readonly stderr: ShellSessionReadableStream<string>
 
     on(event: 'exit', callback: (code: number) => void): void
     on(event: 'error', callback: (err: string) => void): void
@@ -76,8 +111,8 @@ declare namespace shell {
     end(): void
   }
 
-  interface ShellSessionReadableStream extends ReadableStream<Uint8Array | string> {
-    on(event: 'data', callback: (chunk: string | Uint8Array) => void): void
+  interface ShellSessionReadableStream<T extends string | Uint8Array = string> extends ReadableStream<T> {
+    on(event: 'data', callback: (chunk: T) => void): void
     on(event: 'end', callback: () => void): void
   }
 

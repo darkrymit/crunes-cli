@@ -284,7 +284,9 @@ sched()
 
   return {
     exec,
+    execBinary: (cmd, opts = {}) => exec(cmd, { ...opts, binary: true }),
     spawn: execInSession,
+    spawnBinary: (cmd, opts = {}) => execInSession(cmd, { ...opts, binary: true }),
     createShellJob,
     dispose() {
       for (const session of activeSessions) {

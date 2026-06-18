@@ -100,11 +100,11 @@ describe('shell utils', () => {
       }
     })
 
-    it('execInSession stdout/stderr act as binary streams when binary is true', async () => {
+    it('execInSession stdout/stderr act as binary streams when using spawnBinary', async () => {
       const script = `
         import { shell } from '@utils'
         export async function run() {
-          const session = shell.spawn('node -e "process.stdout.write(Buffer.from([65, 66, 67]))"', { binary: true })
+          const session = shell.spawnBinary('node -e "process.stdout.write(Buffer.from([65, 66, 67]))"')
           const reader = session.stdout.getReader()
           session.open()
           const { value } = await reader.read()
@@ -156,11 +156,11 @@ describe('shell utils', () => {
       }
     })
 
-    it('regular exec returns raw Uint8Array when binary is true', async () => {
+    it('execBinary returns raw Uint8Array stdout', async () => {
       const script = `
         import { shell } from '@utils'
         export async function run() {
-          const { stdout: res } = await shell.exec('node -e "process.stdout.write(Buffer.from([10, 20, 30]))"', { binary: true })
+          const { stdout: res } = await shell.execBinary('node -e "process.stdout.write(Buffer.from([10, 20, 30]))"')
           return {
             isUint8: res instanceof Uint8Array,
             length: res.length,

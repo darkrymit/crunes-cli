@@ -399,7 +399,7 @@ describe('createFsUtils — append', () => {
   })
 })
 
-describe('createFsUtils — appendAsBytes', () => {
+describe('createFsUtils — appendBytes', () => {
   let dir
 
   beforeEach(async () => { dir = await makeTempDir() })
@@ -408,14 +408,14 @@ describe('createFsUtils — appendAsBytes', () => {
   it('appends binary bytes to an existing file', async () => {
     await fs.writeFile(path.join(dir, 'data.bin'), Buffer.from([1, 2]))
     const fsUtils = createFsUtils(dir, null)
-    await fsUtils.appendAsBytes('data.bin', new Uint8Array([3, 4]))
+    await fsUtils.appendBytes('data.bin', new Uint8Array([3, 4]))
     const result = await fs.readFile(path.join(dir, 'data.bin'))
     expect(Array.from(result)).toEqual([1, 2, 3, 4])
   })
 
   it('requires fs.write permission', async () => {
     const fsUtils = createFsUtils(dir, checkerFor([]))
-    await expect(fsUtils.appendAsBytes('data.bin', new Uint8Array([1]))).rejects.toThrow(PermissionError)
+    await expect(fsUtils.appendBytes('data.bin', new Uint8Array([1]))).rejects.toThrow(PermissionError)
   })
 })
 
@@ -438,7 +438,7 @@ describe('createFsUtils — chmod', () => {
   })
 })
 
-describe('createFsUtils — remove, move, stat, mkdir, readAsBytes, writeAsBytes', () => {
+describe('createFsUtils — remove, move, stat, mkdir, readBytes, writeBytes', () => {
   let dir
 
   beforeEach(async () => {
@@ -517,24 +517,24 @@ describe('createFsUtils — remove, move, stat, mkdir, readAsBytes, writeAsBytes
     expect(spy).toHaveBeenCalledWith('fs.write', './empty/nested/dir')
   })
 
-  it('fs.readAsBytes and fs.writeAsBytes handle raw binary bytes', async () => {
+  it('fs.readBytes and fs.writeBytes handle raw binary bytes', async () => {
     const fsUtils = createFsUtils(dir, null)
     const bytes = new Uint8Array([72, 69, 76, 76, 79])
-    
-    await fsUtils.writeAsBytes('bin.dat', bytes)
-    const readBytes = await fsUtils.readAsBytes('bin.dat')
-    expect(readBytes).toEqual(bytes)
+
+    await fsUtils.writeBytes('bin.dat', bytes)
+    const result = await fsUtils.readBytes('bin.dat')
+    expect(result).toEqual(bytes)
   })
 
-  it('fs.readAsBytes and fs.writeAsBytes check permissions', async () => {
+  it('fs.readBytes and fs.writeBytes check permissions', async () => {
     const spy = vi.fn()
     const fsUtils = createFsUtils(dir, spy)
     const bytes = new Uint8Array([1, 2, 3])
-    
-    await fsUtils.writeAsBytes('bin.dat', bytes).catch(() => {})
+
+    await fsUtils.writeBytes('bin.dat', bytes).catch(() => {})
     expect(spy).toHaveBeenCalledWith('fs.write', 'bin.dat')
 
-    await fsUtils.readAsBytes('bin.dat').catch(() => {})
+    await fsUtils.readBytes('bin.dat').catch(() => {})
     expect(spy).toHaveBeenCalledWith('fs.read', 'bin.dat')
   })
 })

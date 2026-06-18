@@ -116,7 +116,7 @@ export function createFsUtils(dir, checkPermission, pluginDir = null, pluginId =
       await fsPromises.mkdir(abs, { recursive: true })
     },
 
-    async readAsBytes(relPath, { throw: shouldThrow = true } = {}) {
+    async readBytes(relPath, { throw: shouldThrow = true } = {}) {
       const abs   = resolvePath(relPath, ctx())
       if (checkPermission) checkPermission('fs.read', relPath)
       try {
@@ -128,7 +128,7 @@ export function createFsUtils(dir, checkPermission, pluginDir = null, pluginId =
       }
     },
 
-    async writeAsBytes(relPath, content) {
+    async writeBytes(relPath, content) {
       const abs   = resolvePath(relPath, ctx())
       if (checkPermission) checkPermission('fs.write', relPath)
       await fsPromises.mkdir(path.dirname(abs), { recursive: true })
@@ -142,7 +142,7 @@ export function createFsUtils(dir, checkPermission, pluginDir = null, pluginId =
       await fsPromises.appendFile(abs, content, 'utf8')
     },
 
-    async appendAsBytes(relPath, content) {
+    async appendBytes(relPath, content) {
       const abs   = resolvePath(relPath, ctx())
       if (checkPermission) checkPermission('fs.write', relPath)
       await fsPromises.mkdir(path.dirname(abs), { recursive: true })
@@ -159,6 +159,44 @@ export function createFsUtils(dir, checkPermission, pluginDir = null, pluginId =
       const abs   = resolvePath(relPath, ctx())
       if (checkPermission) checkPermission('fs.read', relPath)
       return createReadStream(abs)
+    },
+
+    async appendStreamRef(relPath) {
+      const abs   = resolvePath(relPath, ctx())
+      if (checkPermission) checkPermission('fs.write', relPath)
+
+      await fsPromises.mkdir(path.dirname(abs), { recursive: true })
+      const stream = createWriteStream(abs, { flags: 'a' })
+      return {
+        write(chunk) {
+          return new Promise((resolve, reject) => {
+            const onDrain = () => {
+              stream.removeListener('error', onError)
+              resolve()
+            }
+            const onError = (err) => {
+              stream.removeListener('drain', onDrain)
+              reject(err)
+            }
+            if (!stream.write(chunk)) {
+              stream.once('drain', onDrain)
+              stream.once('error', onError)
+            } else {
+              resolve()
+            }
+          })
+        },
+        close() {
+          return new Promise((resolve, reject) => {
+            const onError = (err) => reject(err)
+            stream.once('error', onError)
+            stream.end(() => {
+              stream.removeListener('error', onError)
+              resolve()
+            })
+          })
+        }
+      }
     },
 
     async writeStreamRef(relPath) {

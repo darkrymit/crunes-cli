@@ -106,7 +106,7 @@ declare namespace fs {
    * @param path Relative file path
    * @param opts Options
    */
-  function readAsBytes(path: string, opts?: { throw?: boolean }): Promise<Uint8Array | null>
+  function readBytes(path: string, opts?: { throw?: boolean }): Promise<Uint8Array | null>
 
   /**
    * Writes raw binary bytes to a file, creating parent directories as needed.
@@ -114,7 +114,7 @@ declare namespace fs {
    * @param path Relative file path
    * @param content Raw binary Uint8Array bytes
    */
-  function writeAsBytes(path: string, content: Uint8Array): Promise<void>
+  function writeBytes(path: string, content: Uint8Array): Promise<void>
 
   /**
    * Appends UTF-8 text to a file, creating parent directories if needed.
@@ -130,7 +130,7 @@ declare namespace fs {
    * @param path Relative file path
    * @param content Raw binary Uint8Array bytes to append
    */
-  function appendAsBytes(path: string, content: Uint8Array): Promise<void>
+  function appendBytes(path: string, content: Uint8Array): Promise<void>
 
   /**
    * Changes file permissions.
@@ -160,12 +160,19 @@ declare namespace fs {
    * Requires `fs.read:<path>` permission.
    * @param path Relative file path
    */
-  function readStreamAsBytes(path: string): ReadableStream<Uint8Array>
+  function readBytesStream(path: string): ReadableStream<Uint8Array>
 
   /**
    * Writes to a file chunk-by-chunk using a raw binary byte stream.
    * Requires `fs.write:<path>` permission.
    * @param path Relative file path
    */
-  function writeStreamAsBytes(path: string): WritableStream<Uint8Array>
+  function writeBytesStream(path: string): WritableStream<Uint8Array>
+
+  /**
+   * Appends raw binary bytes to a file chunk-by-chunk using a writable byte stream.
+   * Requires `fs.write:<path>` permission.
+   * @param path Relative file path
+   */
+  function appendBytesStream(path: string): WritableStream<Uint8Array>
 }

@@ -364,6 +364,78 @@ function _makeResponse(meta, responseHeaders, bytesPromise, bodyStream, consumeG
   }
 }
 
+function _makeShellSession(cmd, o, binaryMode) {
+  const id = $__utils_shell_spawn_open.applySync(undefined, [cmd, o], { arguments: { copy: true } })
+
+  const createHybridReadable = (streamType, binary) => {
+    let controller
+    const listeners = []
+
+    const stream = new ReadableStream({
+      start(c) { controller = c }
+    })
+
+    stream.on = (event, callback) => {
+      listeners.push({ event, callback })
+    }
+
+    const handleData = (ab) => {
+      const chunk = binary ? new Uint8Array(ab) : new TextDecoder().decode(ab)
+      if (controller) { try { controller.enqueue(chunk) } catch (e) {} }
+      for (const l of listeners) { if (l.event === 'data') l.callback(chunk) }
+    }
+
+    const handleEnd = () => {
+      if (controller) { try { controller.close() } catch (e) {} }
+      for (const l of listeners) { if (l.event === 'end') l.callback() }
+    }
+
+    $__utils_shell_spawn_on.applySync(undefined, [id, streamType, 'data', handleData], { arguments: { reference: true } })
+    $__utils_shell_spawn_on.applySync(undefined, [id, streamType, 'end', handleEnd], { arguments: { reference: true } })
+
+    return stream
+  }
+
+  const stdoutStream = createHybridReadable('stdout', binaryMode)
+  const stderrStream = createHybridReadable('stderr', false)
+
+  const stdinStream = new WritableStream({
+    async write(chunk) {
+      let rawChunk = chunk
+      if (rawChunk instanceof Uint8Array) rawChunk = rawChunk.buffer
+      await $__utils_shell_spawn_write.apply(undefined, [id, rawChunk], { arguments: { copy: true }, result: { promise: true } })
+    },
+    async close() {
+      await $__utils_shell_spawn_end.apply(undefined, [id], { result: { promise: true } })
+    }
+  })
+
+  stdinStream.write = (text) => {
+    let rawChunk = text
+    if (rawChunk instanceof Uint8Array) rawChunk = rawChunk.buffer
+    $__utils_shell_spawn_write.applySync(undefined, [id, rawChunk], { arguments: { copy: true } })
+  }
+  stdinStream.end = () => {
+    $__utils_shell_spawn_end.applySync(undefined, [id])
+  }
+
+  const session = {
+    stdin: stdinStream,
+    stdout: stdoutStream,
+    stderr: stderrStream,
+    on(event, callback) {
+      $__utils_shell_spawn_on.applySync(undefined, [id, 'session', event, callback], { arguments: { reference: true } })
+    },
+    open: () => $__utils_shell_spawn_start.applySync(undefined, [id]),
+    kill: (signal) => $__utils_shell_spawn_kill.applySync(undefined, [id, signal ?? null])
+  }
+
+  if (o && o.signal) {
+    o.signal.addEventListener('abort', () => session.kill('SIGTERM'))
+  }
+  return session
+}
+
 globalThis.utils = {
   fs: {
     cwd:    ()           => $__projectDir,
@@ -377,11 +449,11 @@ globalThis.utils = {
     move:   (src, dest)  => $__utils_fs_move.apply(undefined, [src, dest], { result: { promise: true } }),
     stat:   (path)       => $__utils_fs_stat.apply(undefined, [path], { result: { promise: true, copy: true } }),
     mkdir:  (path)       => $__utils_fs_mkdir.apply(undefined, [path], { result: { promise: true } }),
-    readAsBytes: async (path, opts) => {
+    readBytes: async (path, opts) => {
       const ab = await $__utils_fs_read_bytes.apply(undefined, [path, opts], { arguments: { copy: true }, result: { promise: true, copy: true } })
       return ab ? new Uint8Array(ab) : null
     },
-    readStreamAsBytes: (path) => {
+    readBytesStream: (path) => {
       let streamId = null
       return new ReadableStream({
         async start() {
@@ -395,16 +467,16 @@ globalThis.utils = {
       })
     },
     readStream: (path) => {
-      return globalThis.utils.fs.readStreamAsBytes(path).pipeThrough(new TextDecoderStream())
+      return globalThis.utils.fs.readBytesStream(path).pipeThrough(new TextDecoderStream())
     },
-    writeStreamAsBytes: (path) => {
+    writeBytesStream: (path) => {
       let streamId = null
       return new WritableStream({
         async start() {
           streamId = await $__utils_fs_writeStream.apply(undefined, [path], { result: { promise: true } })
         },
         async write(chunk) {
-          if (!(chunk instanceof Uint8Array)) throw new TypeError('writeStreamAsBytes requires Uint8Array chunks')
+          if (!(chunk instanceof Uint8Array)) throw new TypeError('writeBytesStream requires Uint8Array chunks')
           await $__utils_fs_writeStream_write.apply(undefined, [streamId, chunk.buffer, chunk.byteOffset, chunk.byteLength], { arguments: { copy: true }, result: { promise: true } })
         },
         async close() {
@@ -420,7 +492,7 @@ globalThis.utils = {
       })
     },
     writeStream: (path) => {
-      const wsBytes = globalThis.utils.fs.writeStreamAsBytes(path)
+      const wsBytes = globalThis.utils.fs.writeBytesStream(path)
       const writer = wsBytes.getWriter()
       const encoder = new TextEncoder()
       return new WritableStream({
@@ -435,14 +507,36 @@ globalThis.utils = {
         }
       })
     },
-    writeAsBytes: (path, content) => {
-      if (!(content instanceof Uint8Array)) throw new TypeError('writeAsBytes requires a Uint8Array')
+    writeBytes: (path, content) => {
+      if (!(content instanceof Uint8Array)) throw new TypeError('writeBytes requires a Uint8Array')
       return $__utils_fs_write_bytes.apply(undefined, [path, content.buffer, content.byteOffset, content.byteLength], { arguments: { copy: true }, result: { promise: true } })
     },
     append: (p, c) => $__utils_fs_append.apply(undefined, [p, c], { arguments: { copy: true }, result: { promise: true } }),
-    appendAsBytes: async (p, content) => {
-      if (!(content instanceof Uint8Array)) throw new TypeError('appendAsBytes requires a Uint8Array')
+    appendBytes: async (p, content) => {
+      if (!(content instanceof Uint8Array)) throw new TypeError('appendBytes requires a Uint8Array')
       return $__utils_fs_append_bytes.apply(undefined, [p, content.buffer, content.byteOffset, content.byteLength], { arguments: { copy: true }, result: { promise: true } })
+    },
+    appendBytesStream: (path) => {
+      let streamId = null
+      return new WritableStream({
+        async start() {
+          streamId = await $__utils_fs_appendStream.apply(undefined, [path], { result: { promise: true } })
+        },
+        async write(chunk) {
+          if (!(chunk instanceof Uint8Array)) throw new TypeError('appendBytesStream requires Uint8Array chunks')
+          await $__utils_fs_writeStream_write.apply(undefined, [streamId, chunk.buffer, chunk.byteOffset, chunk.byteLength], { arguments: { copy: true }, result: { promise: true } })
+        },
+        async close() {
+          if (streamId !== null) {
+            await $__utils_fs_writeStream_close.apply(undefined, [streamId], { result: { promise: true } })
+          }
+        },
+        async abort() {
+          if (streamId !== null) {
+            await $__utils_fs_writeStream_close.apply(undefined, [streamId], { result: { promise: true } })
+          }
+        }
+      })
     },
     chmod: (p, mode) => $__utils_fs_chmod.apply(undefined, [p, mode], { arguments: { copy: true }, result: { promise: true } }),
     replace: async (p, regex, replacement) => {
@@ -505,116 +599,59 @@ globalThis.utils = {
         pump()
       }
       
+      return await promise
+    },
+    execBinary: async (cmd, o) => {
+      let stdinStreamId = null
+      let opts = { ...o, binary: true }
+      const hasStdinStream = o && o.stdin && typeof o.stdin.getReader === 'function'
+
+      if (hasStdinStream) {
+        stdinStreamId = 'shell_stdin_' + Math.random().toString(36).slice(2)
+        delete opts.stdin
+      } else if (o && o.stdin instanceof Uint8Array) {
+        opts.stdin = { type: 'Buffer', data: Array.from(o.stdin) }
+      } else if (o && o.stdin && typeof o.stdin === 'object' && o.stdin.buffer) {
+        opts.stdin = { type: 'Buffer', data: Array.from(new Uint8Array(o.stdin.buffer)) }
+      }
+
+      const promise = $__utils_shell_exec.apply(
+        undefined,
+        [cmd, opts, stdinStreamId],
+        { arguments: { copy: true }, result: { promise: true, copy: true } }
+      )
+
+      if (hasStdinStream) {
+        const reader = o.stdin.getReader()
+        const pump = async () => {
+          try {
+            while (true) {
+              const { value, done } = await reader.read()
+              if (done) break
+              let chunk = value
+              if (typeof chunk === 'string') chunk = new TextEncoder().encode(chunk)
+              if (!(chunk instanceof Uint8Array)) throw new TypeError('stdin stream must yield string or Uint8Array chunks')
+              await $__utils_fs_writeStream_write.apply(
+                undefined,
+                [stdinStreamId, chunk.buffer, chunk.byteOffset, chunk.byteLength],
+                { arguments: { copy: true }, result: { promise: true } }
+              )
+            }
+          } finally {
+            await $__utils_fs_writeStream_close.apply(undefined, [stdinStreamId], { result: { promise: true } })
+          }
+        }
+        pump()
+      }
+
       const res = await promise
       if (res && res.stdout instanceof ArrayBuffer) {
         return { ...res, stdout: new Uint8Array(res.stdout) }
       }
       return res
     },
-    spawn: (cmd, o) => {
-      const binaryMode = !!(o && o.binary)
-      const id = $__utils_shell_spawn_open.applySync(undefined, [cmd, o], { arguments: { copy: true } })
-      
-      const createHybridReadable = (streamType) => {
-        let controller
-        const listeners = []
-        
-        const stream = new ReadableStream({
-          start(c) {
-            controller = c
-          }
-        })
-        
-        stream.on = (event, callback) => {
-          listeners.push({ event, callback })
-        }
-        
-        const handleData = (ab) => {
-          let chunk
-          if (binaryMode) {
-            chunk = new Uint8Array(ab)
-          } else {
-            chunk = new TextDecoder().decode(ab)
-          }
-          
-          if (controller) {
-            try { controller.enqueue(chunk) } catch (e) {}
-          }
-          for (const l of listeners) {
-            if (l.event === 'data') {
-              l.callback(chunk)
-            }
-          }
-        }
-        
-        const handleEnd = () => {
-          if (controller) {
-            try { controller.close() } catch (e) {}
-          }
-          for (const l of listeners) {
-            if (l.event === 'end') {
-              l.callback()
-            }
-          }
-        }
-        
-        $__utils_shell_spawn_on.applySync(undefined, [id, streamType, 'data', handleData], { arguments: { reference: true } })
-        $__utils_shell_spawn_on.applySync(undefined, [id, streamType, 'end', handleEnd], { arguments: { reference: true } })
-        
-        return stream
-      }
-      
-      const stdoutStream = createHybridReadable('stdout')
-      const stderrStream = createHybridReadable('stderr')
-
-      const stdinStream = new WritableStream({
-        async write(chunk) {
-          let rawChunk = chunk
-          if (rawChunk instanceof Uint8Array) {
-            rawChunk = rawChunk.buffer
-          }
-          await $__utils_shell_spawn_write.apply(
-            undefined,
-            [id, rawChunk],
-            { arguments: { copy: true }, result: { promise: true } }
-          )
-        },
-        async close() {
-          await $__utils_shell_spawn_end.apply(
-            undefined,
-            [id],
-            { result: { promise: true } }
-          )
-        }
-      })
-      
-      stdinStream.write = (text) => {
-        let rawChunk = text
-        if (rawChunk instanceof Uint8Array) {
-          rawChunk = rawChunk.buffer
-        }
-        $__utils_shell_spawn_write.applySync(undefined, [id, rawChunk], { arguments: { copy: true } })
-      }
-      stdinStream.end = () => {
-        $__utils_shell_spawn_end.applySync(undefined, [id])
-      }
-      
-      const session = {
-        stdin: stdinStream,
-        stdout: stdoutStream,
-        stderr: stderrStream,
-        on(event, callback) {
-          $__utils_shell_spawn_on.applySync(undefined, [id, 'session', event, callback], { arguments: { reference: true } })
-        },
-        open: () => $__utils_shell_spawn_start.applySync(undefined, [id]),
-        kill: (signal) => $__utils_shell_spawn_kill.applySync(undefined, [id, signal ?? null])
-      }
-      
-      if (o && o.signal) {
-        o.signal.addEventListener('abort', () => session.kill('SIGTERM'))
-      }
-      return session
-    },
+    spawn: (cmd, o) => _makeShellSession(cmd, o, false),
+    spawnBinary: (cmd, o) => _makeShellSession(cmd, o, true),
     job: {
       start:     (cmd, opts) => $__utils_shell_job_start.apply(undefined, [cmd, opts], { arguments: { copy: true }, result: { promise: true, copy: true } }),
       kill:      (id, signal) => $__utils_shell_job_kill.apply(undefined, [id, signal ?? null], { arguments: { copy: true }, result: { promise: true } }),

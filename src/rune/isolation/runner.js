@@ -102,7 +102,7 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
     return utils.fs.mkdir(relPath)
   }))
   await jail.set('$__utils_fs_read_bytes', new ivm.Reference(async (relPath, opts) => {
-    const bytes = await utils.fs.readAsBytes(relPath, opts)
+    const bytes = await utils.fs.readBytes(relPath, opts)
     if (!bytes) return null
     const copy = new Uint8Array(bytes.length)
     copy.set(bytes)
@@ -110,14 +110,14 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
   }))
   await jail.set('$__utils_fs_write_bytes', new ivm.Reference(async (relPath, arrayBuffer, byteOffset, byteLength) => {
     const bytes = new Uint8Array(arrayBuffer, byteOffset ?? 0, byteLength ?? arrayBuffer.byteLength)
-    return utils.fs.writeAsBytes(relPath, bytes)
+    return utils.fs.writeBytes(relPath, bytes)
   }))
   await jail.set('$__utils_fs_append', new ivm.Reference(async (relPath, content) => {
     return utils.fs.append(relPath, content)
   }))
   await jail.set('$__utils_fs_append_bytes', new ivm.Reference(async (relPath, arrayBuffer, byteOffset, byteLength) => {
     const bytes = new Uint8Array(arrayBuffer, byteOffset ?? 0, byteLength ?? arrayBuffer.byteLength)
-    return utils.fs.appendAsBytes(relPath, bytes)
+    return utils.fs.appendBytes(relPath, bytes)
   }))
   await jail.set('$__utils_fs_chmod', new ivm.Reference(async (relPath, mode) => {
     return utils.fs.chmod(relPath, mode)
@@ -147,6 +147,12 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
 
   await jail.set('$__utils_fs_writeStream', new ivm.Reference(async (relPath) => {
     const ref = await utils.fs.writeStreamRef(relPath)
+    const id = nextStreamId++
+    streams.set(id, ref)
+    return id
+  }))
+  await jail.set('$__utils_fs_appendStream', new ivm.Reference(async (relPath) => {
+    const ref = await utils.fs.appendStreamRef(relPath)
     const id = nextStreamId++
     streams.set(id, ref)
     return id
