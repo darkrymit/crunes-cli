@@ -42,7 +42,8 @@
         "run": {
           "allow": [
             "fs.read:src/**",
-            "fs.glob:src/**",
+            "fs.glob:src/**::*",
+            "fs.glob:src/**::**/*.js",
             "fs.exists:src/**"
           ]
         }
@@ -59,7 +60,7 @@
         "run": {
           "allow": [
             "fs.read:docs/knowledge-base/**",
-            "fs.glob:docs/knowledge-base/**",
+            "fs.glob:docs/knowledge-base/**::*.md",
             "fs.exists:docs/knowledge-base/**"
           ]
         }

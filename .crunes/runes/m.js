@@ -82,11 +82,8 @@ async function buildReadmeSection(targetRel) {
 }
 
 async function buildFileTree(targetRel) {
-  const entries = await fs.glob(`${targetRel}/**/*.js`)
-  const prefix = `${targetRel}/`
-  const paths = entries
-    .sort()
-    .map(e => e.startsWith(prefix) ? e.slice(prefix.length) : e)
+  const entries = await fs.glob('**/*.js', { cwd: targetRel })
+  const paths = entries.sort()
   const content = `// base: ${targetRel}/\n${paths.join('\n')}`
   return { type: 'markdown', content }
 }
@@ -102,11 +99,8 @@ async function buildChildren(parentRel) {
 }
 
 async function listImmediateDirs(relPath) {
-  const entries = await fs.glob(`${relPath}/*`, { onlyDirectories: true })
-  return entries
-    .map(e => e.replace(/\/$/, '').split('/').pop())
-    .filter(Boolean)
-    .sort()
+  const entries = await fs.glob('*', { cwd: relPath, onlyDirectories: true })
+  return entries.map(e => e.replace(/\/$/, '')).filter(Boolean).sort()
 }
 
 async function extractDescription(readmePath) {

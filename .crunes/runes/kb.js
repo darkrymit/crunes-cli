@@ -36,10 +36,10 @@ async function buildRoot() {
 
 async function buildTypeSection(type, allowedNames) {
   const dirPath = `${KB_ROOT}/${TYPE_DIRS[type]}`
-  let files = await fs.glob(`${dirPath}/*.md`, { throw: false })
+  let files = await fs.glob('*.md', { cwd: dirPath })
   if (!files || files.length === 0) return null
 
-  files = files.map(f => f.split('/').pop().replace(/\.md$/, '')).sort()
+  files = files.map(f => f.replace(/\.md$/, '')).sort()
 
   if (allowedNames.length > 0) {
     files = files.filter(name => allowedNames.includes(name))
