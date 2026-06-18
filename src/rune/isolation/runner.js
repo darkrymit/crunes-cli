@@ -565,6 +565,18 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
   await jail.set('$__utils_csv_write_objects', new ivm.Reference(async (relPath, data, opts) => {
     await utils.csv.writeObjects(relPath, data, opts)
   }))
+  await jail.set('$__utils_csv_headers', new ivm.Reference(async (relPath, opts) => {
+    return utils.csv.headers(relPath, opts)
+  }))
+  await jail.set('$__utils_csv_count', new ivm.Reference(async (relPath, opts) => {
+    return utils.csv.count(relPath, opts)
+  }))
+  await jail.set('$__utils_csv_append', new ivm.Reference(async (relPath, rows, opts) => {
+    await utils.csv.append(relPath, rows, opts)
+  }))
+  await jail.set('$__utils_csv_append_objects', new ivm.Reference(async (relPath, data, opts) => {
+    await utils.csv.appendObjects(relPath, data, opts)
+  }))
   await jail.set('$__utils_csv_parse', new ivm.Reference((content, opts) => {
     return utils.csv.parse(content, opts)
   }))

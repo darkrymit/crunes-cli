@@ -14,6 +14,7 @@ function makeFsUtils(files = {}) {
     }),
     exists: vi.fn(async (relPath) => relPath in store),
     write: vi.fn(async (relPath, content) => { store[relPath] = content }),
+    append: vi.fn(async (relPath, content) => { store[relPath] = (store[relPath] ?? '') + content }),
   }
 }
 
@@ -281,5 +282,125 @@ describe('csv.writeObjectsStreamRef', () => {
     await ref.close()
     const written = fsUtils.write.mock.calls[0][1]
     expect(written).toBe('name,age\nAlice,30\nBob,25\n')
+  })
+})
+
+const FIVE_CSV = `a,b\n1,2\n3,4\n5,6\n7,8\n9,10\n`
+
+describe('csv.read from/to slicing', () => {
+  it('from: 2 skips first data row', async () => {
+    const fs = makeFsUtils({ 'data.csv': FIVE_CSV })
+    const csv = createCsvUtils('/project', fs)
+    const rows = await csv.read('data.csv', { skipHeader: true, from: 2 })
+    expect(rows[0]).toEqual(['3', '4'])
+    expect(rows).toHaveLength(4)
+  })
+
+  it('to: 2 returns first two data rows', async () => {
+    const fs = makeFsUtils({ 'data.csv': FIVE_CSV })
+    const csv = createCsvUtils('/project', fs)
+    const rows = await csv.read('data.csv', { skipHeader: true, to: 2 })
+    expect(rows).toEqual([['1','2'],['3','4']])
+  })
+
+  it('from/to range returns slice', async () => {
+    const fs = makeFsUtils({ 'data.csv': FIVE_CSV })
+    const csv = createCsvUtils('/project', fs)
+    const rows = await csv.read('data.csv', { skipHeader: true, from: 2, to: 4 })
+    expect(rows).toEqual([['3','4'],['5','6'],['7','8']])
+  })
+
+  it('negative from counts from end', async () => {
+    const fs = makeFsUtils({ 'data.csv': FIVE_CSV })
+    const csv = createCsvUtils('/project', fs)
+    const rows = await csv.read('data.csv', { skipHeader: true, from: -2 })
+    expect(rows).toEqual([['7','8'],['9','10']])
+  })
+
+  it('negative to counts from end', async () => {
+    const fs = makeFsUtils({ 'data.csv': FIVE_CSV })
+    const csv = createCsvUtils('/project', fs)
+    const rows = await csv.read('data.csv', { skipHeader: true, to: -2 })
+    expect(rows).toEqual([['1','2'],['3','4'],['5','6'],['7','8']])
+  })
+})
+
+describe('csv.readObjects from/to slicing', () => {
+  it('from/to slices rows while preserving columns and aliases', async () => {
+    const fs = makeFsUtils({ 'data.csv': FIVE_CSV })
+    const csv = createCsvUtils('/project', fs)
+    const result = await csv.readObjects('data.csv', { from: 1, to: 2 })
+    expect(result.columns).toEqual(['a', 'b'])
+    expect(result.rows).toHaveLength(2)
+    expect(result.rows[0]).toEqual({ a: '1', b: '2' })
+  })
+})
+
+describe('csv.headers', () => {
+  it('returns header row without reading full file', async () => {
+    const fs = makeFsUtils({ 'data.csv': SIMPLE_CSV })
+    const csv = createCsvUtils('/project', fs)
+    expect(await csv.headers('data.csv')).toEqual(['name', 'age', 'city'])
+  })
+
+  it('returns null when file missing and throw: false', async () => {
+    const fs = makeFsUtils({})
+    const csv = createCsvUtils('/project', fs)
+    expect(await csv.headers('missing.csv', { throw: false })).toBeNull()
+  })
+})
+
+describe('csv.count', () => {
+  it('returns number of data rows excluding header', async () => {
+    const fs = makeFsUtils({ 'data.csv': SIMPLE_CSV })
+    const csv = createCsvUtils('/project', fs)
+    expect(await csv.count('data.csv')).toBe(2)
+  })
+
+  it('returns null when file missing and throw: false', async () => {
+    const fs = makeFsUtils({})
+    const csv = createCsvUtils('/project', fs)
+    expect(await csv.count('missing.csv', { throw: false })).toBeNull()
+  })
+})
+
+describe('csv.append', () => {
+  it('appends raw rows without header', async () => {
+    const fsUtils = makeFsUtils({ 'data.csv': 'name,age\nAlice,30\n' })
+    const csv = createCsvUtils('/project', fsUtils)
+    await csv.append('data.csv', [['Bob', '25']])
+    const result = fsUtils.append.mock.calls[0][1]
+    expect(result).toBe('Bob,25\n')
+  })
+
+  it('uses custom delimiter', async () => {
+    const fsUtils = makeFsUtils({ 'data.tsv': 'name\tage\n' })
+    const csv = createCsvUtils('/project', fsUtils)
+    await csv.append('data.tsv', [['Alice', '30']], { delimiter: '\t' })
+    expect(fsUtils.append.mock.calls[0][1]).toBe('Alice\t30\n')
+  })
+})
+
+describe('csv.appendObjects', () => {
+  it('appends object rows using existing file headers for column order', async () => {
+    const fsUtils = makeFsUtils({ 'data.csv': 'name,age\nAlice,30\n' })
+    const csv = createCsvUtils('/project', fsUtils)
+    await csv.appendObjects('data.csv', [{ age: 25, name: 'Bob' }])
+    expect(fsUtils.append.mock.calls[0][1]).toBe('Bob,25\n')
+  })
+
+  it('appends CsvObject rows using original header order', async () => {
+    const fsUtils = makeFsUtils({ 'chat.csv': 'Chat App,Age\nhello,30\n' })
+    const csv = createCsvUtils('/project', fsUtils)
+    const data = await csv.readObjects('chat.csv', { aliases: { 'Chat App': 'chat' } })
+    await csv.appendObjects('chat.csv', { ...data, rows: [{ chat: 'world', age: '25' }] })
+    expect(fsUtils.append.mock.calls[0][1]).toBe('world,25\n')
+  })
+
+  it('behaves like writeObjects when file is empty', async () => {
+    const fsUtils = makeFsUtils()
+    const csv = createCsvUtils('/project', fsUtils)
+    await csv.appendObjects('new.csv', [{ name: 'Alice', age: 30 }])
+    expect(fsUtils.append.mock.calls[0][1]).toBe('Alice,30\n')
   })
 })

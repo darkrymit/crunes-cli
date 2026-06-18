@@ -34,6 +34,10 @@ declare namespace csv {
     skipHeader?: boolean
     /** Throw on parse failure (default: true). false returns null on total failure. */
     throw?: boolean
+    /** Start row (1-indexed). Negative counts from end. */
+    from?: number
+    /** End row (1-indexed, inclusive). Negative counts from end. */
+    to?: number
   }
 
   interface CsvReadObjectsOpts extends CsvReadOpts {
@@ -78,6 +82,31 @@ declare namespace csv {
    * Requires `fs.write:<path>` permission.
    */
   function writeObjects(path: string, data: CsvObject | Record<string, unknown>[], opts?: CsvWriteOpts): Promise<void>
+
+  /**
+   * Returns the header row of a CSV file without reading the full file.
+   * Requires `fs.read:<path>` permission.
+   */
+  function headers(path: string, opts?: { delimiter?: string; quote?: string; throw?: boolean }): Promise<string[] | null>
+
+  /**
+   * Returns the number of data rows (excludes header).
+   * Requires `fs.read:<path>` permission.
+   */
+  function count(path: string, opts?: { delimiter?: string; quote?: string; throw?: boolean }): Promise<number | null>
+
+  /**
+   * Appends raw row arrays to a CSV file without writing a header.
+   * Requires `fs.write:<path>` permission.
+   */
+  function append(path: string, rows: string[][], opts?: CsvWriteOpts): Promise<void>
+
+  /**
+   * Appends objects to a CSV file. Reads existing headers to preserve column order.
+   * Accepts a CsvObject or plain Record array. Never writes a header row.
+   * Requires `fs.read:<path>` and `fs.write:<path>` permissions.
+   */
+  function appendObjects(path: string, data: CsvObject | Record<string, unknown>[], opts?: CsvWriteOpts): Promise<void>
 
   /** Parse a CSV string into row arrays (synchronous). */
   function parse(content: string, opts?: CsvReadOpts): string[][] | null
