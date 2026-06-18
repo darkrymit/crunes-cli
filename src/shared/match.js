@@ -1,8 +1,6 @@
-import micromatch from 'micromatch'
+import picomatch from 'picomatch'
 
-const OPTS = { dot: true, noextglob: true, nonegate: true, nobrace: true, nobracket: true }
-
-export const isGlobMatch = (value, pattern) => micromatch.isMatch(value, pattern, OPTS)
+export const isGlobMatch = (value, pattern) => picomatch.isMatch(value, pattern, { dot: true })
 
 function wildcardToRegex(pattern) {
   const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&')
