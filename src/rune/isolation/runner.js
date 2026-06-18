@@ -567,6 +567,9 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
   await jail.set('$__utils_json_write', new ivm.Reference(async (relPath, data, opts) => {
     await utils.json.write(relPath, data, opts)
   }))
+  await jail.set('$__utils_json_writePath', new ivm.Reference(async (relPath, jsonPath, value, opts) => {
+    await utils.json.writePath(relPath, jsonPath, value, opts)
+  }))
   await jail.set('$__utils_yaml_read', new ivm.Reference(async (relPath, opts) => {
     return utils.yaml.read(relPath, opts)
   }))

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { createJsonUtils } from '../../../src/rune/api/json.js'
+import { createJsonUtils, detectFormat, parseJsonc, stringifyJsonc, parseJson5, stringifyJson5 } from '../../../src/rune/api/json.js'
 
 function makeFsUtils(files = {}) {
   const store = { ...files }
@@ -215,5 +215,255 @@ describe('json.modify', () => {
     await json.modify('a.json', async (d) => { d.y = 2 }, { spaces: 4 })
     const content = fsUtils.write.mock.calls[0][1]
     expect(content).toContain('    "x"')
+  })
+})
+
+describe('detectFormat', () => {
+  it('returns json for .json extension', () => {
+    expect(detectFormat('config.json')).toBe('json')
+  })
+
+  it('returns jsonc for .jsonc extension', () => {
+    expect(detectFormat('tsconfig.jsonc')).toBe('jsonc')
+  })
+
+  it('returns json5 for .json5 extension', () => {
+    expect(detectFormat('config.json5')).toBe('json5')
+  })
+
+  it('returns json for unknown extension', () => {
+    expect(detectFormat('Makefile')).toBe('json')
+  })
+
+  it('opts.format overrides extension', () => {
+    expect(detectFormat('config.json', 'jsonc')).toBe('jsonc')
+    expect(detectFormat('config.jsonc', 'json')).toBe('json')
+    expect(detectFormat('config.json', 'json5')).toBe('json5')
+  })
+})
+
+describe('parseJsonc', () => {
+  it('parses plain JSONC without comments', () => {
+    expect(parseJsonc('{"a":1}', 'test.jsonc')).toEqual({ a: 1 })
+  })
+
+  it('encodes top-level comment as #head', () => {
+    const result = parseJsonc('// file header\n{"a":1}', 'test.jsonc')
+    expect(result['#head']).toBe('file header')
+    expect(result.a).toBe(1)
+  })
+
+  it('encodes before-key comment as #comment:key', () => {
+    const result = parseJsonc('{\n  // the name\n  "name": "test"\n}', 'test.jsonc')
+    expect(result['#comment:name']).toBe('the name')
+    expect(result.name).toBe('test')
+  })
+
+  it('encodes inline comment as #inline:key', () => {
+    const result = parseJsonc('{"version":"1.0" // semver\n}', 'test.jsonc')
+    expect(result['#inline:version']).toBe('semver')
+  })
+
+  it('throws JsonParseError on invalid JSONC', () => {
+    expect(() => parseJsonc('{bad}', 'test.jsonc')).toThrow('Failed to parse')
+  })
+})
+
+describe('stringifyJsonc', () => {
+  it('round-trips plain object', () => {
+    const out = stringifyJsonc({ a: 1 }, 2)
+    expect(JSON.parse(out)).toEqual({ a: 1 })
+  })
+
+  it('writes #head as top-level comment', () => {
+    const out = stringifyJsonc({ '#head': 'generated', a: 1 }, 2)
+    expect(out).toContain('// generated')
+    expect(JSON.parse(out.replace(/\/\/[^\n]*/g, '').trim())).toEqual({ a: 1 })
+  })
+
+  it('writes #comment:key as before-key comment', () => {
+    const out = stringifyJsonc({ '#comment:name': 'the name', name: 'test' }, 2)
+    expect(out).toContain('// the name')
+    expect(out).toContain('"name"')
+  })
+
+  it('writes #inline:key as inline comment', () => {
+    const out = stringifyJsonc({ version: '1.0', '#inline:version': 'semver' }, 2)
+    expect(out).toContain('// semver')
+  })
+
+  it('round-trips comments through parse → stringify', () => {
+    const src = '// top\n{\n  // the name\n  "name": "test" // inline\n}'
+    const parsed = parseJsonc(src, 'test.jsonc')
+    const out = stringifyJsonc(parsed, 2)
+    expect(out).toContain('// top')
+    expect(out).toContain('// the name')
+    expect(out).toContain('// inline')
+  })
+
+  it('#-prefixed keys are not written as JSON properties', () => {
+    const out = stringifyJsonc({ '#head': 'top', name: 'test' }, 2)
+    expect(out).not.toContain('"#head"')
+  })
+})
+
+describe('parseJson5', () => {
+  it('parses standard JSON', () => {
+    expect(parseJson5('{"a":1}', 'test.json5')).toEqual({ a: 1 })
+  })
+
+  it('parses unquoted keys', () => {
+    expect(parseJson5('{a: 1}', 'test.json5')).toEqual({ a: 1 })
+  })
+
+  it('parses single-quoted strings', () => {
+    expect(parseJson5("{name: 'test'}", 'test.json5')).toEqual({ name: 'test' })
+  })
+
+  it('parses trailing commas', () => {
+    expect(parseJson5('{a: 1,}', 'test.json5')).toEqual({ a: 1 })
+  })
+
+  it('parses comments (strips them)', () => {
+    expect(parseJson5('// comment\n{a: 1}', 'test.json5')).toEqual({ a: 1 })
+  })
+
+  it('throws JsonParseError on invalid JSON5', () => {
+    expect(() => parseJson5('{bad json5!!!}', 'test.json5')).toThrow('Failed to parse')
+  })
+})
+
+describe('stringifyJson5', () => {
+  it('serializes to JSON5 format', () => {
+    const out = stringifyJson5({ a: 1, b: 'hello' }, 2)
+    expect(parseJson5(out, 'test.json5')).toEqual({ a: 1, b: 'hello' })
+  })
+
+  it('always appends trailing newline', () => {
+    expect(stringifyJson5({ a: 1 }, 2).endsWith('\n')).toBe(true)
+  })
+})
+
+describe('json.read — multi-format', () => {
+  it('reads .jsonc file preserving comment keys', async () => {
+    const fs = makeFsUtils({ 'cfg.jsonc': '// top\n{"a":1}' })
+    const json = createJsonUtils('/project', fs)
+    const result = await json.read('cfg.jsonc')
+    expect(result['#head']).toBe('top')
+    expect(result.a).toBe(1)
+  })
+
+  it('reads .json5 file with unquoted keys', async () => {
+    const fs = makeFsUtils({ 'cfg.json5': '{a: 1}' })
+    const json = createJsonUtils('/project', fs)
+    expect(await json.read('cfg.json5')).toEqual({ a: 1 })
+  })
+
+  it('opts.format overrides extension', async () => {
+    const fs = makeFsUtils({ 'tsconfig.json': '// comment\n{"strict":true}' })
+    const json = createJsonUtils('/project', fs)
+    const result = await json.read('tsconfig.json', { format: 'jsonc' })
+    expect(result['#head']).toBe('comment')
+    expect(result.strict).toBe(true)
+  })
+})
+
+describe('json.write — multi-format', () => {
+  it('writes .jsonc file with comment keys as JSONC comments', async () => {
+    const fsUtils = makeFsUtils()
+    const json = createJsonUtils('/project', fsUtils)
+    await json.write('cfg.jsonc', { '#head': 'generated', name: 'test' })
+    const written = fsUtils.write.mock.calls[0][1]
+    expect(written).toContain('// generated')
+    expect(written).toContain('"name"')
+  })
+
+  it('writes .json5 file as JSON5', async () => {
+    const fsUtils = makeFsUtils()
+    const json = createJsonUtils('/project', fsUtils)
+    await json.write('cfg.json5', { a: 1 })
+    const written = fsUtils.write.mock.calls[0][1]
+    expect(parseJson5(written, 'cfg.json5')).toEqual({ a: 1 })
+  })
+
+  it('opts.format: jsonc writes JSONC to .json file', async () => {
+    const fsUtils = makeFsUtils()
+    const json = createJsonUtils('/project', fsUtils)
+    await json.write('tsconfig.json', { '#head': 'ts config', strict: true }, { format: 'jsonc' })
+    const written = fsUtils.write.mock.calls[0][1]
+    expect(written).toContain('// ts config')
+  })
+})
+
+describe('json.modify — multi-format', () => {
+  it('preserves JSONC comments through modify cycle', async () => {
+    const fsUtils = makeFsUtils({ 'cfg.jsonc': '// top\n{"version":"1.0"}' })
+    const json = createJsonUtils('/project', fsUtils)
+    await json.modify('cfg.jsonc', (data) => { data.version = '2.0' })
+    const written = fsUtils.write.mock.calls[0][1]
+    expect(written).toContain('// top')
+    expect(written).toContain('"2.0"')
+  })
+})
+
+describe('json.writePath', () => {
+  it('sets an existing top-level key', async () => {
+    const fsUtils = makeFsUtils({ 'pkg.json': '{"name":"old"}' })
+    const json = createJsonUtils('/project', fsUtils)
+    await json.writePath('pkg.json', '$.name', 'new')
+    expect(JSON.parse(fsUtils.write.mock.calls[0][1])).toEqual({ name: 'new' })
+  })
+
+  it('sets a nested key', async () => {
+    const fsUtils = makeFsUtils({ 'pkg.json': '{"scripts":{"build":"tsc"}}' })
+    const json = createJsonUtils('/project', fsUtils)
+    await json.writePath('pkg.json', '$.scripts.test', 'vitest')
+    expect(JSON.parse(fsUtils.write.mock.calls[0][1])).toEqual({ scripts: { build: 'tsc', test: 'vitest' } })
+  })
+
+  it('creates intermediate nodes when missing', async () => {
+    const fsUtils = makeFsUtils({ 'pkg.json': '{}' })
+    const json = createJsonUtils('/project', fsUtils)
+    await json.writePath('pkg.json', '$.scripts.build', 'tsc')
+    expect(JSON.parse(fsUtils.write.mock.calls[0][1])).toEqual({ scripts: { build: 'tsc' } })
+  })
+
+  it('creates file when missing', async () => {
+    const fsUtils = makeFsUtils()
+    const json = createJsonUtils('/project', fsUtils)
+    await json.writePath('pkg.json', '$.version', '1.0.0')
+    expect(JSON.parse(fsUtils.write.mock.calls[0][1])).toEqual({ version: '1.0.0' })
+  })
+
+  it('deletes a key when value is undefined', async () => {
+    const fsUtils = makeFsUtils({ 'pkg.json': '{"name":"test","version":"1.0"}' })
+    const json = createJsonUtils('/project', fsUtils)
+    await json.writePath('pkg.json', '$.version', undefined)
+    expect(JSON.parse(fsUtils.write.mock.calls[0][1])).toEqual({ name: 'test' })
+  })
+
+  it('no-op when deleting from missing file', async () => {
+    const fsUtils = makeFsUtils()
+    const json = createJsonUtils('/project', fsUtils)
+    await json.writePath('missing.json', '$.version', undefined)
+    expect(fsUtils.write).not.toHaveBeenCalled()
+  })
+
+  it('preserves JSONC comments through writePath', async () => {
+    const fsUtils = makeFsUtils({ 'cfg.jsonc': '// top\n{"version":"1.0"}' })
+    const json = createJsonUtils('/project', fsUtils)
+    await json.writePath('cfg.jsonc', '$.version', '2.0')
+    const written = fsUtils.write.mock.calls[0][1]
+    expect(written).toContain('// top')
+    expect(written).toContain('"2.0"')
+  })
+
+  it('passes format opt through to read/write', async () => {
+    const fsUtils = makeFsUtils({ 'tsconfig.json': '// comment\n{"strict":true}' })
+    const json = createJsonUtils('/project', fsUtils)
+    await json.writePath('tsconfig.json', '$.strict', false, { format: 'jsonc' })
+    const written = fsUtils.write.mock.calls[0][1]
+    expect(written).toContain('// comment')
+    expect(written).toContain('false')
   })
 })

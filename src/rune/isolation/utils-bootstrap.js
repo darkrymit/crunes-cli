@@ -735,15 +735,16 @@ globalThis.utils = {
     readPath:    (p, q, d) => $__utils_json_readPath.apply(undefined, [p, q, d], { arguments: { copy: true }, result: { promise: true, copy: true } }),
     readPathAll: (p, q, d) => $__utils_json_readPathAll.apply(undefined, [p, q, d], { arguments: { copy: true }, result: { promise: true, copy: true } }),
     write:       (p, d, o) => $__utils_json_write.apply(undefined, [p, d, o], { arguments: { copy: true }, result: { promise: true } }),
+    writePath:   (p, q, v, o) => $__utils_json_writePath.apply(undefined, [p, q, v, o], { arguments: { copy: true }, result: { promise: true } }),
     modify: async (filepath, callback, opts = {}) => {
-      const { initial, spaces = 2 } = opts
+      const { initial, spaces = 2, format } = opts
       const missing = !(await globalThis.utils.fs.exists(filepath))
       if (missing && initial === undefined) {
-        await globalThis.utils.json.read(filepath)
+        await globalThis.utils.json.read(filepath, { format })
       }
-      const data = missing ? JSON.parse(JSON.stringify(initial)) : await globalThis.utils.json.read(filepath)
+      const data = missing ? JSON.parse(JSON.stringify(initial)) : await globalThis.utils.json.read(filepath, { format })
       const result = await callback(data, { exists: !missing })
-      await globalThis.utils.json.write(filepath, result !== undefined ? result : data, { spaces })
+      await globalThis.utils.json.write(filepath, result !== undefined ? result : data, { spaces, format })
     },
   },
   yaml: {
