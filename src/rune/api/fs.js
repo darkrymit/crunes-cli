@@ -2,21 +2,36 @@ import fsPromises from 'node:fs/promises'
 import { createReadStream, createWriteStream } from 'node:fs'
 import path from 'node:path'
 import { glob } from 'tinyglobby'
+import chokidar from 'chokidar'
+import picomatch from 'picomatch'
 import { resolvePath } from './utils.js'
 
 function stripBom(str) {
   return str.charCodeAt(0) === 0xfeff ? str.slice(1) : str
 }
 
+function sliceLines(content, from, to) {
+  if (from == null && to == null) return content
+  const hadTrailing = content.endsWith('\n')
+  const lines = hadTrailing ? content.slice(0, -1).split('\n') : content.split('\n')
+  const len = lines.length
+  const start = from == null ? 0 : from >= 0 ? from - 1 : Math.max(0, len + from)
+  const end   = to   == null ? len : to >= 0 ? to : Math.max(0, len + to + 1)
+  const sliced = lines.slice(start, end)
+  if (sliced.length === 0) return ''
+  return sliced.join('\n') + (hadTrailing ? '\n' : '')
+}
+
 export function createFsUtils(dir, checkPermission, pluginDir = null, pluginId = null, storeDir = null) {
   const ctx = () => ({ dir, pluginDir, pluginId, storeDir })
 
   return {
-    async read(relPath, { throw: shouldThrow = true } = {}) {
+    async read(relPath, { throw: shouldThrow = true, from, to } = {}) {
       const abs   = resolvePath(relPath, ctx())
       if (checkPermission) checkPermission('fs.read', relPath)
       try {
-        return stripBom(await fsPromises.readFile(abs, 'utf8'))
+        const content = stripBom(await fsPromises.readFile(abs, 'utf8'))
+        return sliceLines(content, from, to)
       } catch (err) {
         if (!shouldThrow && err.code === 'ENOENT') return null
         throw err
@@ -142,6 +157,20 @@ export function createFsUtils(dir, checkPermission, pluginDir = null, pluginId =
       await fsPromises.appendFile(abs, content, 'utf8')
     },
 
+    async prepend(relPath, content) {
+      const abs   = resolvePath(relPath, ctx())
+      if (checkPermission) checkPermission('fs.read', relPath)
+      if (checkPermission) checkPermission('fs.write', relPath)
+      let existing = ''
+      try {
+        existing = await fsPromises.readFile(abs, 'utf8')
+      } catch (err) {
+        if (err.code !== 'ENOENT') throw err
+      }
+      await fsPromises.mkdir(path.dirname(abs), { recursive: true })
+      await fsPromises.writeFile(abs, content + existing, 'utf8')
+    },
+
     async appendBytes(relPath, content) {
       const abs   = resolvePath(relPath, ctx())
       if (checkPermission) checkPermission('fs.write', relPath)
@@ -235,6 +264,40 @@ export function createFsUtils(dir, checkPermission, pluginDir = null, pluginId =
             })
           })
         }
+      }
+    },
+
+    watch(pattern, callback, { debounce = 50 } = {}) {
+      if (checkPermission) checkPermission('fs.read', pattern)
+      const isGlob = /[*?{}\[\]!]/.test(pattern)
+      const watchRoot = isGlob
+        ? path.join(dir, pattern.replace(/[*?{}\[\]!].*$/, '').replace(/\/$/, '') || '.')
+        : path.isAbsolute(pattern) ? pattern : path.join(dir, pattern)
+      const isMatch = isGlob ? picomatch(pattern) : null
+      const timers = new Map()
+
+      const fire = (type, filePath) => {
+        const rel = path.relative(dir, filePath).replace(/\\/g, '/')
+        if (isMatch && !isMatch(rel)) return
+        const key = `${type}:${rel}`
+        if (timers.has(key)) clearTimeout(timers.get(key))
+        timers.set(key, setTimeout(() => {
+          timers.delete(key)
+          callback({ type, path: rel })
+        }, debounce))
+      }
+
+      const watcher = chokidar.watch(watchRoot, {
+        ignoreInitial: true,
+        persistent: false,
+      })
+
+      watcher.on('add',    p => fire('create', p))
+      watcher.on('change', p => fire('modify', p))
+      watcher.on('unlink', p => fire('delete', p))
+
+      return {
+        stop() { watcher.close() }
       }
     },
   }

@@ -122,6 +122,28 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
   await jail.set('$__utils_fs_chmod', new ivm.Reference(async (relPath, mode) => {
     return utils.fs.chmod(relPath, mode)
   }))
+  await jail.set('$__utils_fs_prepend', new ivm.Reference(async (relPath, content) => {
+    return utils.fs.prepend(relPath, content)
+  }))
+  const watchers = new Map()
+  let nextWatcherId = 1
+  await jail.set('$__utils_fs_watch', new ivm.Reference((patternRef, callbackRef, optsRef) => {
+    const pattern = typeof patternRef === 'object' && patternRef.copySync ? patternRef.copySync() : patternRef
+    const opts    = typeof optsRef    === 'object' && optsRef.copySync    ? optsRef.copySync()    : (optsRef ?? {})
+    const id = nextWatcherId++
+    const handle = utils.fs.watch(pattern, (event) => {
+      callbackRef.apply(undefined, [event], { arguments: { copy: true } }).catch(() => {})
+    }, opts)
+    watchers.set(id, handle)
+    return id
+  }))
+  await jail.set('$__utils_fs_watch_stop', new ivm.Reference((id) => {
+    const handle = watchers.get(id)
+    if (handle) {
+      handle.stop()
+      watchers.delete(id)
+    }
+  }))
 
   const streams = new Map()
   let nextStreamId = 1

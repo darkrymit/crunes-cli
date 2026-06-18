@@ -13,9 +13,10 @@ declare namespace fs {
    * Reads a file as a UTF-8 string. Returns null if not found and throw is false.
    * Requires `fs.read:<path>` permission.
    * @param path Relative file path
-   * @param opts Options
+   * @param opts.from Start line (1-indexed). Negative counts from end.
+   * @param opts.to End line (1-indexed, inclusive). Negative counts from end.
    */
-  function read(path: string, opts?: { throw?: boolean }): Promise<string | null>
+  function read(path: string, opts?: { throw?: boolean; from?: number; to?: number }): Promise<string | null>
 
   /**
    * Returns true if the path exists.
@@ -140,6 +141,30 @@ declare namespace fs {
    * @param mode Permission mode string (e.g. "755", "a+x") or numeric octal (e.g. 0o755)
    */
   function chmod(path: string, mode: string | number): Promise<void>
+
+  /**
+   * Prepends content to a file. Creates the file if it does not exist.
+   * Requires `fs.read:<path>` and `fs.write:<path>` permissions.
+   * @param path Relative file path
+   * @param content UTF-8 string to prepend
+   */
+  function prepend(path: string, content: string): Promise<void>
+
+  interface WatchEvent {
+    type: 'create' | 'modify' | 'delete'
+    /** Relative path from project root */
+    path: string
+  }
+
+  /**
+   * Watches a file or glob pattern for changes. Returns a handle with `stop()`.
+   * Fires semantic events: 'create', 'modify', 'delete'.
+   * Requires `fs.read:<pattern>` permission.
+   * @param pattern Relative glob or single path
+   * @param callback Called with a WatchEvent on each change
+   * @param opts.debounce Debounce ms (default: 50)
+   */
+  function watch(pattern: string, callback: (event: WatchEvent) => void, opts?: { debounce?: number }): { stop(): void }
 
   /**
    * Reads a file chunk-by-chunk as a UTF-8 string stream.

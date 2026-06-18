@@ -539,6 +539,13 @@ globalThis.utils = {
       })
     },
     chmod: (p, mode) => $__utils_fs_chmod.apply(undefined, [p, mode], { arguments: { copy: true }, result: { promise: true } }),
+    prepend: (p, c) => $__utils_fs_prepend.apply(undefined, [p, c], { arguments: { copy: true }, result: { promise: true } }),
+    watch: (pattern, callback, opts) => {
+      const id = $__utils_fs_watch.applySync(undefined, [pattern, callback, opts ?? {}], { arguments: { reference: true } })
+      return {
+        stop: () => $__utils_fs_watch_stop.applySync(undefined, [id])
+      }
+    },
     replace: async (p, regex, replacement) => {
       const content = await globalThis.utils.fs.read(p);
       const newContent = content.replace(regex, replacement);

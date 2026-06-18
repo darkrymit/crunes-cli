@@ -399,6 +399,144 @@ describe('createFsUtils — append', () => {
   })
 })
 
+describe('createFsUtils — read with from/to slicing', () => {
+  let dir
+
+  beforeEach(async () => {
+    dir = await makeTempDir()
+    await writeFile(dir, 'lines.txt', 'a\nb\nc\nd\ne\n')
+  })
+
+  afterEach(async () => { await fs.rm(dir, { recursive: true, force: true }) })
+
+  it('no opts returns full content', async () => {
+    expect(await createFsUtils(dir, null).read('lines.txt')).toBe('a\nb\nc\nd\ne\n')
+  })
+
+  it('from:2 returns lines 2 onward', async () => {
+    expect(await createFsUtils(dir, null).read('lines.txt', { from: 2 })).toBe('b\nc\nd\ne\n')
+  })
+
+  it('to:3 returns first 3 lines', async () => {
+    expect(await createFsUtils(dir, null).read('lines.txt', { to: 3 })).toBe('a\nb\nc\n')
+  })
+
+  it('from:2, to:4 returns middle slice', async () => {
+    expect(await createFsUtils(dir, null).read('lines.txt', { from: 2, to: 4 })).toBe('b\nc\nd\n')
+  })
+
+  it('from:-2 returns last 2 lines', async () => {
+    expect(await createFsUtils(dir, null).read('lines.txt', { from: -2 })).toBe('d\ne\n')
+  })
+
+  it('to:-1 returns all lines (last line inclusive)', async () => {
+    expect(await createFsUtils(dir, null).read('lines.txt', { to: -1 })).toBe('a\nb\nc\nd\ne\n')
+  })
+
+  it('to:-2 excludes last line', async () => {
+    expect(await createFsUtils(dir, null).read('lines.txt', { to: -2 })).toBe('a\nb\nc\nd\n')
+  })
+
+  it('from:-3, to:-2 slices from negative both ends', async () => {
+    expect(await createFsUtils(dir, null).read('lines.txt', { from: -3, to: -2 })).toBe('c\nd\n')
+  })
+
+  it('preserves absence of trailing newline', async () => {
+    await writeFile(dir, 'no-nl.txt', 'a\nb\nc')
+    expect(await createFsUtils(dir, null).read('no-nl.txt', { from: 2 })).toBe('b\nc')
+  })
+})
+
+describe('createFsUtils — prepend', () => {
+  let dir
+
+  beforeEach(async () => { dir = await makeTempDir() })
+  afterEach(async () => { await fs.rm(dir, { recursive: true, force: true }) })
+
+  it('prepends content to existing file', async () => {
+    await writeFile(dir, 'file.txt', 'existing\n')
+    await createFsUtils(dir, null).prepend('file.txt', 'header\n')
+    expect(await fs.readFile(path.join(dir, 'file.txt'), 'utf8')).toBe('header\nexisting\n')
+  })
+
+  it('creates file when missing', async () => {
+    await createFsUtils(dir, null).prepend('new.txt', 'hello')
+    expect(await fs.readFile(path.join(dir, 'new.txt'), 'utf8')).toBe('hello')
+  })
+
+  it('creates parent directories', async () => {
+    await createFsUtils(dir, null).prepend('deep/dir/file.txt', 'x')
+    expect(await fs.readFile(path.join(dir, 'deep/dir/file.txt'), 'utf8')).toBe('x')
+  })
+
+  it('requires fs.read permission', async () => {
+    await writeFile(dir, 'file.txt', 'existing')
+    const fsUtils = createFsUtils(dir, checkerFor(['fs.write:./**']))
+    await expect(fsUtils.prepend('file.txt', 'x')).rejects.toThrow(PermissionError)
+  })
+
+  it('requires fs.write permission', async () => {
+    await writeFile(dir, 'file.txt', 'existing')
+    const fsUtils = createFsUtils(dir, checkerFor(['fs.read:./**']))
+    await expect(fsUtils.prepend('file.txt', 'x')).rejects.toThrow(PermissionError)
+  })
+
+  it('checks both read and write tokens', async () => {
+    const spy = vi.fn()
+    await createFsUtils(dir, spy).prepend('file.txt', 'x').catch(() => {})
+    expect(spy).toHaveBeenCalledWith('fs.read', 'file.txt')
+    expect(spy).toHaveBeenCalledWith('fs.write', 'file.txt')
+  })
+})
+
+describe('createFsUtils — watch', () => {
+  let dir
+
+  beforeEach(async () => { dir = await makeTempDir() })
+  afterEach(async () => { await fs.rm(dir, { recursive: true, force: true }) })
+
+  it('fires create event when a file is added', async () => {
+    const events = []
+    const fsUtils = createFsUtils(dir, null)
+    const handle = fsUtils.watch('*.txt', e => events.push(e), { debounce: 10 })
+    await new Promise(r => setTimeout(r, 50))
+    await writeFile(dir, 'new.txt', 'hello')
+    const deadline = Date.now() + 2000
+    while (events.length === 0 && Date.now() < deadline) await new Promise(r => setTimeout(r, 20))
+    handle.stop()
+    expect(events[0].type).toBe('create')
+    expect(events[0].path).toBe('new.txt')
+  })
+
+  it('fires modify event when a file changes', async () => {
+    await writeFile(dir, 'watch.txt', 'initial')
+    const events = []
+    const fsUtils = createFsUtils(dir, null)
+    const handle = fsUtils.watch('watch.txt', e => events.push(e), { debounce: 10 })
+    await new Promise(r => setTimeout(r, 50))
+    await fs.writeFile(path.join(dir, 'watch.txt'), 'updated', 'utf8')
+    const deadline = Date.now() + 2000
+    while (events.length === 0 && Date.now() < deadline) await new Promise(r => setTimeout(r, 20))
+    handle.stop()
+    expect(events[0].type).toBe('modify')
+  })
+
+  it('stop() prevents further events', async () => {
+    const events = []
+    const fsUtils = createFsUtils(dir, null)
+    const handle = fsUtils.watch('*.txt', e => events.push(e), { debounce: 10 })
+    handle.stop()
+    await writeFile(dir, 'new.txt', 'hello')
+    await new Promise(r => setTimeout(r, 200))
+    expect(events).toHaveLength(0)
+  })
+
+  it('requires fs.read permission', async () => {
+    const fsUtils = createFsUtils(dir, checkerFor([]))
+    expect(() => fsUtils.watch('*.txt', () => {})).toThrow(PermissionError)
+  })
+})
+
 describe('createFsUtils — appendBytes', () => {
   let dir
 
