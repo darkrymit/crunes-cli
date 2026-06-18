@@ -26,14 +26,16 @@ declare namespace fs {
 
   /**
    * Returns file paths matching a glob pattern. Relative patterns only.
-   * Requires `fs.glob:<pattern>` permission.
-   * @param pattern Glob pattern (e.g., 'src/**\/*.js')
+   * Requires `fs.glob:<cwd>::<pattern>` permission (convenience form: `fs.glob:<pattern>` sets cwd to project root).
+   * When `cwd` is set, returned paths are relative to `cwd`. Without `cwd`, paths are relative to project root.
+   * @param pattern Glob pattern (e.g., '**\/*.js')
+   * @param opts.cwd Base directory for the glob (relative to project root). Affects permission matching and returned paths.
    * @param opts.ignore Array of patterns to ignore
    * @param opts.onlyDirectories Return directories instead of files
    * @param opts.dot Include dotfiles and dot-directories in the results
    * @param opts.expandDirectories Expand directories to include their contents (defaults to false)
    */
-  function glob(pattern: string, opts?: { ignore?: string[]; onlyDirectories?: boolean; dot?: boolean; expandDirectories?: boolean }): Promise<string[]>
+  function glob(pattern: string, opts?: { cwd?: string; ignore?: string[]; onlyDirectories?: boolean; dot?: boolean; expandDirectories?: boolean }): Promise<string[]>
 
   /**
    * Writes content to a file, creating parent directories as needed.
