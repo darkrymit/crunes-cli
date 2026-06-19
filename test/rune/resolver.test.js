@@ -102,24 +102,14 @@ describe('runRune — configDir', () => {
   })
 })
 
-describe('runRune — pluginDeps from config.dependencies', () => {
+describe('runRune — local npm imports via .crunes/node_modules', () => {
   beforeEach(() => vi.clearAllMocks())
 
-  it('passes config.dependencies as pluginDeps when present', async () => {
-    const config = {
-      runes: { hello: { path: 'runes/hello.js' } },
-      dependencies: { semver: '^7.8.4' },
-    }
-    await runRune('/project', config, 'hello', [])
-    const opts = runRuneInIsolate.mock.calls[0][4]
-    expect(opts.pluginDeps).toEqual({ semver: '^7.8.4' })
-  })
-
-  it('passes empty object as pluginDeps when config.dependencies is absent', async () => {
+  it('passes null as pluginDeps (allow-list is the only gate)', async () => {
     const config = { runes: { hello: { path: 'runes/hello.js' } } }
     await runRune('/project', config, 'hello', [])
     const opts = runRuneInIsolate.mock.calls[0][4]
-    expect(opts.pluginDeps).toEqual({})
+    expect(opts.pluginDeps).toBeNull()
   })
 
   it('passes <configDir>/.crunes/node_modules as nodeModulesDir', async () => {

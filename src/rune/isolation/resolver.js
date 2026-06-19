@@ -102,10 +102,10 @@ export function createModuleResolver(isolate, pluginDir, pluginNodeModules, plug
 
 
 
-    // Step 3 — declared npm dep: must be in effectiveAllow AND in pluginDeps
+    // Step 3 — declared npm dep: must be in effectiveAllow; if pluginDeps is non-null, must also be declared there
     const moduleToken = `module:${specifier}`
     const isAllowed = isGlobMatch(moduleToken, effectiveAllow)
-    const isDeclared = pluginDeps && Object.prototype.hasOwnProperty.call(pluginDeps, specifier)
+    const isDeclared = pluginDeps === null || Object.prototype.hasOwnProperty.call(pluginDeps, specifier)
     if (isAllowed && isDeclared) {
       const pkgDir = path.join(pluginNodeModules, specifier)
       const pkgJsonPath = path.join(pkgDir, 'package.json')

@@ -164,7 +164,7 @@ export async function runRune(dir, config, key, args, opts = {}, _callStack = []
     onEvent: opts.onEvent ?? null,
     instanceId,
     nodeModulesDir: join(configDir, '.crunes', 'node_modules'),
-    pluginDeps: config.dependencies ?? {},
+    pluginDeps: null,
   })
   return normaliseResult(result)
 }
@@ -224,7 +224,7 @@ export async function resolveRuneEntry(projectDir, config, key, configDir = proj
           onEvent: opts.onEvent ?? null,
           instanceId: opts.instanceId ?? '1',
           nodeModulesDir: join(configDir, '.crunes', 'node_modules'),
-          pluginDeps: config.dependencies ?? {},
+          pluginDeps: null,
         })
       }
     }
