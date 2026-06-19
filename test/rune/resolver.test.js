@@ -101,3 +101,38 @@ describe('runRune — configDir', () => {
     expect(projectDirArg).toBe('/project')
   })
 })
+
+describe('runRune — pluginDeps from config.dependencies', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('passes config.dependencies as pluginDeps when present', async () => {
+    const config = {
+      runes: { hello: { path: 'runes/hello.js' } },
+      dependencies: { semver: '^7.8.4' },
+    }
+    await runRune('/project', config, 'hello', [])
+    const opts = runRuneInIsolate.mock.calls[0][4]
+    expect(opts.pluginDeps).toEqual({ semver: '^7.8.4' })
+  })
+
+  it('passes empty object as pluginDeps when config.dependencies is absent', async () => {
+    const config = { runes: { hello: { path: 'runes/hello.js' } } }
+    await runRune('/project', config, 'hello', [])
+    const opts = runRuneInIsolate.mock.calls[0][4]
+    expect(opts.pluginDeps).toEqual({})
+  })
+
+  it('passes <configDir>/.crunes/node_modules as nodeModulesDir', async () => {
+    const config = { runes: { hello: { path: 'runes/hello.js' } } }
+    await runRune('/project', config, 'hello', [])
+    const opts = runRuneInIsolate.mock.calls[0][4]
+    expect(opts.nodeModulesDir).toBe(join('/project', '.crunes', 'node_modules'))
+  })
+
+  it('nodeModulesDir uses configDir when provided', async () => {
+    const config = { runes: { hello: { path: 'runes/hello.js' } } }
+    await runRune('/project', config, 'hello', [], { configDir: '/config' })
+    const opts = runRuneInIsolate.mock.calls[0][4]
+    expect(opts.nodeModulesDir).toBe(join('/config', '.crunes', 'node_modules'))
+  })
+})
