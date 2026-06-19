@@ -558,11 +558,11 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
   await jail.set('$__utils_json_read', new ivm.Reference(async (relPath, opts) => {
     return utils.json.read(relPath, opts)
   }))
-  await jail.set('$__utils_json_readPath', new ivm.Reference(async (relPath, jsonPath, defaultVal) => {
-    return utils.json.readPath(relPath, jsonPath, defaultVal)
+  await jail.set('$__utils_json_readPath', new ivm.Reference(async (relPath, jsonPath, fallback, opts) => {
+    return utils.json.readPath(relPath, jsonPath, fallback, opts)
   }))
-  await jail.set('$__utils_json_readPathAll', new ivm.Reference(async (relPath, jsonPath, defaultVal) => {
-    return utils.json.readPathAll(relPath, jsonPath, defaultVal)
+  await jail.set('$__utils_json_readPathAll', new ivm.Reference(async (relPath, jsonPath, fallback, opts) => {
+    return utils.json.readPathAll(relPath, jsonPath, fallback, opts)
   }))
   await jail.set('$__utils_json_write', new ivm.Reference(async (relPath, data, opts) => {
     await utils.json.write(relPath, data, opts)

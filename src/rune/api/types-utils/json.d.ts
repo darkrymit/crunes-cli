@@ -13,13 +13,13 @@ declare namespace json {
    * Returns the first value matching a JSONPath query.
    * Requires `fs.read:<path>` permission.
    */
-  function readPath(path: string, jsonPath: string, defaultValue?: unknown, opts?: { format?: Format }): Promise<unknown>
+  function readPath(path: string, jsonPath: string, fallback?: unknown, opts?: { format?: Format }): Promise<unknown>
 
   /**
    * Returns all values matching a JSONPath query.
    * Requires `fs.read:<path>` permission.
    */
-  function readPathAll(path: string, jsonPath: string, defaultValue?: unknown, opts?: { format?: Format }): Promise<unknown[]>
+  function readPathAll(path: string, jsonPath: string, fallback?: unknown, opts?: { format?: Format }): Promise<unknown[]>
 
   /**
    * Serializes and writes a value to a JSON/JSONC/JSON5 file. Format is auto-detected from extension.

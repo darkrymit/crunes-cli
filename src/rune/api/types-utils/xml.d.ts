@@ -24,5 +24,5 @@ declare namespace xml {
    * @param callback Receives (data, { exists }) and returns modified data
    * @param opts Options
    */
-  function modify(path: string, callback: (data: object, meta: { exists: boolean }) => object, opts?: { initial?: object; indent?: number }): Promise<void>
+  function modify(path: string, callback: (data: unknown, meta: { exists: boolean }) => unknown, opts?: { initial?: unknown; indent?: number }): Promise<void>
 }

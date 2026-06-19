@@ -732,8 +732,8 @@ globalThis.utils = {
   },
   json: {
     read:        (p, o) => $__utils_json_read.apply(undefined, [p, o], { arguments: { copy: true }, result: { promise: true, copy: true } }),
-    readPath:    (p, q, d) => $__utils_json_readPath.apply(undefined, [p, q, d], { arguments: { copy: true }, result: { promise: true, copy: true } }),
-    readPathAll: (p, q, d) => $__utils_json_readPathAll.apply(undefined, [p, q, d], { arguments: { copy: true }, result: { promise: true, copy: true } }),
+    readPath:    (p, q, f, o) => $__utils_json_readPath.apply(undefined, [p, q, f, o], { arguments: { copy: true }, result: { promise: true, copy: true } }),
+    readPathAll: (p, q, f, o) => $__utils_json_readPathAll.apply(undefined, [p, q, f, o], { arguments: { copy: true }, result: { promise: true, copy: true } }),
     write:       (p, d, o) => $__utils_json_write.apply(undefined, [p, d, o], { arguments: { copy: true }, result: { promise: true } }),
     writePath:   (p, q, v, o) => $__utils_json_writePath.apply(undefined, [p, q, v, o], { arguments: { copy: true }, result: { promise: true } }),
     modify: async (filepath, callback, opts = {}) => {

@@ -142,18 +142,18 @@ export function createJsonUtils(dir, fsUtils) {
       return _parse(text, fmt, path.join(dir, relPath))
     },
 
-    async readPath(relPath, jsonPath, defaultValue = undefined, { format } = {}) {
+    async readPath(relPath, jsonPath, fallback = undefined, { format } = {}) {
       const obj = await this.read(relPath, { throw: false, format })
-      if (obj === null) return defaultValue
+      if (obj === null) return fallback
       const results = JSONPath({ path: jsonPath, json: obj, wrap: true })
-      return results.length === 0 ? defaultValue : results[0]
+      return results.length === 0 ? fallback : results[0]
     },
 
-    async readPathAll(relPath, jsonPath, defaultValue = [], { format } = {}) {
+    async readPathAll(relPath, jsonPath, fallback = [], { format } = {}) {
       const obj = await this.read(relPath, { throw: false, format })
-      if (obj === null) return defaultValue
+      if (obj === null) return fallback
       const results = JSONPath({ path: jsonPath, json: obj, wrap: true })
-      return results.length === 0 ? defaultValue : results
+      return results.length === 0 ? fallback : results
     },
 
     async write(relPath, data, { spaces = 2, format } = {}) {
