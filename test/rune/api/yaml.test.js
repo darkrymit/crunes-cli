@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { createYamlUtils } from '../../../src/rune/api/yaml.js'
+import { createYamlUtils, parseYaml, stringifyYaml } from '../../../src/rune/api/yaml.js'
 
 function makeFsUtils(files = {}) {
   const store = { ...files }
@@ -381,5 +381,161 @@ describe('yaml.modify — enriched metadata', () => {
     const content = fsUtils.write.mock.calls[0][1]
     expect(content).not.toContain('# should be removed')
     expect(content).toContain('replicas: 3')
+  })
+})
+
+describe('parseYaml', () => {
+  it('parses plain YAML string', () => {
+    expect(parseYaml('name: test\nversion: 1')).toEqual({ name: 'test', version: 1 })
+  })
+
+  it('encodes top document comment as #head when separated by blank line', () => {
+    const result = parseYaml('# file header\n\nname: test')
+    expect(result['#head']).toBe('file header')
+    expect(result.name).toBe('test')
+  })
+
+  it('encodes before-key comment as #comment:key', () => {
+    const result = parseYaml('# the name\nname: test')
+    expect(result['#comment:name']).toBe('the name')
+  })
+
+  it('encodes inline comment as #inline:key', () => {
+    const result = parseYaml('version: 1 # semver')
+    expect(result['#inline:version']).toBe('semver')
+  })
+
+  it('encodes literal block scalar style as #style:key', () => {
+    const result = parseYaml('content: |\n  line1\n  line2')
+    expect(result['#style:content']).toBe('literal')
+  })
+
+  it('defaults displayPath to <string> in error message', () => {
+    expect(() => parseYaml(': bad: yaml: {')).toThrow('Failed to parse <string>')
+  })
+})
+
+describe('stringifyYaml', () => {
+  it('round-trips plain object through parse', () => {
+    const out = stringifyYaml({ name: 'test', version: 1 })
+    expect(parseYaml(out)).toEqual({ name: 'test', version: 1 })
+  })
+
+  it('writes #head as document-level comment', () => {
+    const out = stringifyYaml({ '#head': 'generated', name: 'test' })
+    expect(out).toContain('# generated')
+  })
+
+  it('writes #comment:key as before-key comment', () => {
+    const out = stringifyYaml({ '#comment:name': 'the name', name: 'test' })
+    expect(out).toContain('# the name')
+  })
+
+  it('writes #inline:key as inline comment', () => {
+    const out = stringifyYaml({ version: 1, '#inline:version': 'semver' })
+    expect(out).toContain('# semver')
+  })
+
+  it('does not write #-prefixed keys as YAML properties', () => {
+    const out = stringifyYaml({ '#head': 'top', name: 'test' })
+    expect(out).not.toContain('#head:')
+  })
+
+  it('always ends with newline', () => {
+    expect(stringifyYaml({ a: 1 }).endsWith('\n')).toBe(true)
+  })
+})
+
+describe('yaml.readPath', () => {
+  it('returns first JSONPath match', async () => {
+    const fs = makeFsUtils({ 'ci.yml': 'jobs:\n  ci:\n    runs-on: ubuntu-latest' })
+    const yaml = createYamlUtils('/project', fs)
+    expect(await yaml.readPath('ci.yml', '$.jobs.ci.runs-on')).toBe('ubuntu-latest')
+  })
+
+  it('returns fallback when no match', async () => {
+    const fs = makeFsUtils({ 'ci.yml': 'name: CI' })
+    const yaml = createYamlUtils('/project', fs)
+    expect(await yaml.readPath('ci.yml', '$.missing', 'default')).toBe('default')
+  })
+
+  it('returns undefined when no match and no fallback', async () => {
+    const fs = makeFsUtils({ 'ci.yml': 'name: CI' })
+    const yaml = createYamlUtils('/project', fs)
+    expect(await yaml.readPath('ci.yml', '$.missing')).toBeUndefined()
+  })
+
+  it('returns fallback when file missing', async () => {
+    const fs = makeFsUtils()
+    const yaml = createYamlUtils('/project', fs)
+    expect(await yaml.readPath('missing.yml', '$.name', 'fallback')).toBe('fallback')
+  })
+})
+
+describe('yaml.readPathAll', () => {
+  it('returns all matches', async () => {
+    const fs = makeFsUtils({ 'cfg.yml': 'items:\n  - a\n  - b\n  - c' })
+    const yaml = createYamlUtils('/project', fs)
+    expect(await yaml.readPathAll('cfg.yml', '$.items[*]')).toEqual(['a', 'b', 'c'])
+  })
+
+  it('returns fallback when no matches', async () => {
+    const fs = makeFsUtils({ 'cfg.yml': 'name: test' })
+    const yaml = createYamlUtils('/project', fs)
+    expect(await yaml.readPathAll('cfg.yml', '$.missing[*]', ['none'])).toEqual(['none'])
+  })
+
+  it('returns [] when file missing and no fallback', async () => {
+    const fs = makeFsUtils()
+    const yaml = createYamlUtils('/project', fs)
+    expect(await yaml.readPathAll('missing.yml', '$.*')).toEqual([])
+  })
+})
+
+describe('yaml.writePath', () => {
+  it('sets an existing key', async () => {
+    const fs = makeFsUtils({ 'cfg.yml': 'version: 1' })
+    const yaml = createYamlUtils('/project', fs)
+    await yaml.writePath('cfg.yml', '$.version', 2)
+    expect(parseYaml(fs.write.mock.calls[0][1])).toEqual({ version: 2 })
+  })
+
+  it('creates intermediate nodes', async () => {
+    const fs = makeFsUtils({ 'cfg.yml': '{}' })
+    const yaml = createYamlUtils('/project', fs)
+    await yaml.writePath('cfg.yml', '$.server.port', 3000)
+    expect(parseYaml(fs.write.mock.calls[0][1])).toEqual({ server: { port: 3000 } })
+  })
+
+  it('creates file when missing', async () => {
+    const fs = makeFsUtils()
+    const yaml = createYamlUtils('/project', fs)
+    await yaml.writePath('cfg.yml', '$.name', 'test')
+    expect(parseYaml(fs.write.mock.calls[0][1])).toEqual({ name: 'test' })
+  })
+
+  it('deletes a key when value is undefined', async () => {
+    const fs = makeFsUtils({ 'cfg.yml': 'name: test\nversion: 1' })
+    const yaml = createYamlUtils('/project', fs)
+    await yaml.writePath('cfg.yml', '$.version', undefined)
+    const result = parseYaml(fs.write.mock.calls[0][1])
+    expect(result.version).toBeUndefined()
+    expect(result.name).toBe('test')
+  })
+
+  it('no-op when deleting from missing file', async () => {
+    const fs = makeFsUtils()
+    const yaml = createYamlUtils('/project', fs)
+    await yaml.writePath('missing.yml', '$.version', undefined)
+    expect(fs.write).not.toHaveBeenCalled()
+  })
+
+  it('preserves comments through writePath', async () => {
+    const fs = makeFsUtils({ 'cfg.yml': '# top\nversion: 1\n' })
+    const yaml = createYamlUtils('/project', fs)
+    await yaml.writePath('cfg.yml', '$.version', 2)
+    const written = fs.write.mock.calls[0][1]
+    expect(written).toContain('# top')
+    expect(written).toContain('2')
   })
 })

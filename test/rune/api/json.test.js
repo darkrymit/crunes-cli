@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { createJsonUtils, detectFormat, parseJsonc, stringifyJsonc, parseJson5, stringifyJson5 } from '../../../src/rune/api/json.js'
+import { createJsonUtils, detectFormat, parseJsonc, stringifyJsonc, parseJson5, stringifyJson5, parseJsonText, stringifyJsonText } from '../../../src/rune/api/json.js'
 
 function makeFsUtils(files = {}) {
   const store = { ...files }
@@ -465,5 +465,55 @@ describe('json.writePath', () => {
     const written = fsUtils.write.mock.calls[0][1]
     expect(written).toContain('// comment')
     expect(written).toContain('false')
+  })
+})
+
+describe('json.parse (parseJsonText)', () => {
+  it('parses plain JSON string', () => {
+    expect(parseJsonText('{"a":1}')).toEqual({ a: 1 })
+  })
+
+  it('parses JSONC with comment keys when format:jsonc', () => {
+    const result = parseJsonText('// top\n{"a":1}', { format: 'jsonc' })
+    expect(result['#head']).toBe('top')
+    expect(result.a).toBe(1)
+  })
+
+  it('parses JSON5 with unquoted keys when format:json5', () => {
+    expect(parseJsonText('{a: 1}', { format: 'json5' })).toEqual({ a: 1 })
+  })
+
+  it('defaults to json format', () => {
+    expect(parseJsonText('"hello"')).toBe('hello')
+  })
+
+  it('throws on invalid JSON', () => {
+    expect(() => parseJsonText('{bad}')).toThrow('Failed to parse')
+  })
+})
+
+describe('json.stringify (stringifyJsonText)', () => {
+  it('stringifies to plain JSON by default', () => {
+    expect(JSON.parse(stringifyJsonText({ a: 1 }))).toEqual({ a: 1 })
+  })
+
+  it('writes JSONC comments when format:jsonc', () => {
+    const out = stringifyJsonText({ '#head': 'top', a: 1 }, { format: 'jsonc' })
+    expect(out).toContain('// top')
+    expect(out).toContain('"a"')
+  })
+
+  it('writes JSON5 when format:json5', () => {
+    const out = stringifyJsonText({ a: 1 }, { format: 'json5' })
+    expect(parseJson5(out, 'test.json5')).toEqual({ a: 1 })
+  })
+
+  it('respects spaces opt', () => {
+    const out = stringifyJsonText({ a: 1 }, { spaces: 4 })
+    expect(out).toContain('    "a"')
+  })
+
+  it('always ends with newline', () => {
+    expect(stringifyJsonText({ a: 1 }).endsWith('\n')).toBe(true)
   })
 })

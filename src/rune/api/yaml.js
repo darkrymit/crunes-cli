@@ -1,5 +1,6 @@
 import path from 'node:path'
 import { parseDocument, Document, isMap, isSeq, isScalar, isAlias, Pair } from 'yaml'
+import { JSONPath } from 'jsonpath-plus'
 
 class YamlParseError extends Error {
   constructor(message, filePath) {
@@ -119,7 +120,7 @@ function buildNode(doc, data, arrayItemComments = {}) {
   return doc.createNode(data)
 }
 
-function parseWithComments(text, displayPath) {
+export function parseYaml(text, displayPath = '<string>') {
   let doc
   try { doc = parseDocument(text) } catch (err) { wrapParseError(err, displayPath) }
   if (doc.errors.length > 0) wrapParseError(doc.errors[0], displayPath)
@@ -131,7 +132,7 @@ function parseWithComments(text, displayPath) {
   return result
 }
 
-function buildDoc(data, { indent = 2 } = {}) {
+export function stringifyYaml(data, { indent = 2 } = {}) {
   const doc = new Document()
   let head = null
   let tail = null
@@ -148,15 +149,17 @@ function buildDoc(data, { indent = 2 } = {}) {
 
 export function createYamlUtils(dir, fsUtils) {
   return {
+    parse: parseYaml,
+    stringify: stringifyYaml,
+
     async read(relPath, { throw: shouldThrow = true } = {}) {
       const text = await fsUtils.read(relPath, { throw: shouldThrow })
       if (text === null) return null
-      const displayPath = path.join(dir, relPath)
-      return parseWithComments(text, displayPath)
+      return parseYaml(text, path.join(dir, relPath))
     },
 
     async write(relPath, data, { indent = 2 } = {}) {
-      const content = buildDoc(data, { indent })
+      const content = stringifyYaml(data, { indent })
       await fsUtils.write(relPath, content)
     },
 
@@ -170,6 +173,58 @@ export function createYamlUtils(dir, fsUtils) {
         : await this.read(relPath)
       const result = await callback(data, { exists: !missing })
       await this.write(relPath, result !== undefined ? result : data, { indent })
+    },
+
+    async readPath(relPath, jsonPath, fallback = undefined) {
+      const obj = await this.read(relPath, { throw: false })
+      if (obj === null) return fallback
+      const results = JSONPath({ path: jsonPath, json: obj, wrap: true })
+      return results.length === 0 ? fallback : results[0]
+    },
+
+    async readPathAll(relPath, jsonPath, fallback = []) {
+      const obj = await this.read(relPath, { throw: false })
+      if (obj === null) return fallback
+      const results = JSONPath({ path: jsonPath, json: obj, wrap: true })
+      return results.length === 0 ? fallback : results
+    },
+
+    async writePath(relPath, jsonPath, value, { indent = 2 } = {}) {
+      const missing = !(await fsUtils.exists(relPath))
+      if (missing && value === undefined) return
+
+      const data = missing ? {} : await this.read(relPath)
+
+      let matched = false
+      JSONPath({
+        path: jsonPath,
+        json: data,
+        resultType: 'all',
+        callback(_, __, payload) {
+          if (value === undefined) {
+            delete payload.parent[payload.parentProperty]
+          } else {
+            payload.parent[payload.parentProperty] = value
+          }
+          matched = true
+        },
+      })
+
+      if (!matched && value !== undefined) {
+        const segments = jsonPath
+          .replace(/^\$\.?/, '')
+          .split(/\.|\[(\d+)\]/)
+          .filter(s => s != null && s !== '')
+        let node = data
+        for (let i = 0; i < segments.length - 1; i++) {
+          const seg = segments[i]
+          if (node[seg] == null || typeof node[seg] !== 'object') node[seg] = {}
+          node = node[seg]
+        }
+        node[segments[segments.length - 1]] = value
+      }
+
+      await this.write(relPath, data, { indent })
     },
   }
 }

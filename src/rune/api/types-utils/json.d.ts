@@ -43,4 +43,16 @@ declare namespace json {
    * Requires `fs.read:<path>` and `fs.write:<path>` permissions.
    */
   function writePath(path: string, jsonPath: string, value: unknown, opts?: { spaces?: number; format?: Format }): Promise<void>
+
+  /**
+   * Parses a JSON/JSONC/JSON5 string to a JS value. Defaults to plain JSON.
+   * JSONC comment metadata encoded as `#head`, `#tail`, `#comment:key`, `#inline:key` when format is 'jsonc'.
+   */
+  function parse(text: string, opts?: { format?: Format }): unknown
+
+  /**
+   * Serializes a JS value to a JSON/JSONC/JSON5 string. Defaults to plain JSON.
+   * JSONC comment metadata (`#head`, `#tail`, `#comment:key`, `#inline:key`) written as comments when format is 'jsonc'.
+   */
+  function stringify(data: unknown, opts?: { spaces?: number; format?: Format }): string
 }

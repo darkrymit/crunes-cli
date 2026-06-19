@@ -736,6 +736,8 @@ globalThis.utils = {
     readPathAll: (p, q, f, o) => $__utils_json_readPathAll.apply(undefined, [p, q, f, o], { arguments: { copy: true }, result: { promise: true, copy: true } }),
     write:       (p, d, o) => $__utils_json_write.apply(undefined, [p, d, o], { arguments: { copy: true }, result: { promise: true } }),
     writePath:   (p, q, v, o) => $__utils_json_writePath.apply(undefined, [p, q, v, o], { arguments: { copy: true }, result: { promise: true } }),
+    parse:       (t, o) => $__utils_json_parse.applySync(undefined, [t, o], { arguments: { copy: true }, result: { copy: true } }),
+    stringify:   (d, o) => $__utils_json_stringify.applySync(undefined, [d, o], { arguments: { copy: true }, result: { copy: true } }),
     modify: async (filepath, callback, opts = {}) => {
       const { initial, spaces = 2, format } = opts
       const missing = !(await globalThis.utils.fs.exists(filepath))
@@ -748,8 +750,13 @@ globalThis.utils = {
     },
   },
   yaml: {
-    read:   (p, o) => $__utils_yaml_read.apply(undefined, [p, o], { arguments: { copy: true }, result: { promise: true, copy: true } }),
-    write:  (p, d, o) => $__utils_yaml_write.apply(undefined, [p, d, o], { arguments: { copy: true }, result: { promise: true } }),
+    parse:       (t) => $__utils_yaml_parse.applySync(undefined, [t], { arguments: { copy: true }, result: { copy: true } }),
+    stringify:   (d, o) => $__utils_yaml_stringify.applySync(undefined, [d, o], { arguments: { copy: true }, result: { copy: true } }),
+    read:        (p, o) => $__utils_yaml_read.apply(undefined, [p, o], { arguments: { copy: true }, result: { promise: true, copy: true } }),
+    write:       (p, d, o) => $__utils_yaml_write.apply(undefined, [p, d, o], { arguments: { copy: true }, result: { promise: true } }),
+    readPath:    (p, q, f) => $__utils_yaml_readPath.apply(undefined, [p, q, f], { arguments: { copy: true }, result: { promise: true, copy: true } }),
+    readPathAll: (p, q, f) => $__utils_yaml_readPathAll.apply(undefined, [p, q, f], { arguments: { copy: true }, result: { promise: true, copy: true } }),
+    writePath:   (p, q, v, o) => $__utils_yaml_writePath.apply(undefined, [p, q, v, o], { arguments: { copy: true }, result: { promise: true } }),
     modify: async (filepath, callback, opts = {}) => {
       const { initial, indent = 2 } = opts
       const missing = !(await globalThis.utils.fs.exists(filepath))
@@ -764,8 +771,13 @@ globalThis.utils = {
     },
   },
   xml: {
-    read:   (p, o) => $__utils_xml_read.apply(undefined, [p, o], { arguments: { copy: true }, result: { promise: true, copy: true } }),
-    write:  (p, d, o) => $__utils_xml_write.apply(undefined, [p, d, o], { arguments: { copy: true }, result: { promise: true } }),
+    parse:       (t) => $__utils_xml_parse.applySync(undefined, [t], { arguments: { copy: true }, result: { copy: true } }),
+    stringify:   (d, o) => $__utils_xml_stringify.applySync(undefined, [d, o], { arguments: { copy: true }, result: { copy: true } }),
+    read:        (p, o) => $__utils_xml_read.apply(undefined, [p, o], { arguments: { copy: true }, result: { promise: true, copy: true } }),
+    write:       (p, d, o) => $__utils_xml_write.apply(undefined, [p, d, o], { arguments: { copy: true }, result: { promise: true } }),
+    readPath:    (p, q, f) => $__utils_xml_readPath.apply(undefined, [p, q, f], { arguments: { copy: true }, result: { promise: true, copy: true } }),
+    readPathAll: (p, q, f) => $__utils_xml_readPathAll.apply(undefined, [p, q, f], { arguments: { copy: true }, result: { promise: true, copy: true } }),
+    writePath:   (p, q, v, o) => $__utils_xml_writePath.apply(undefined, [p, q, v, o], { arguments: { copy: true }, result: { promise: true } }),
     modify: async (filepath, callback, opts = {}) => {
       const { initial, indent = 2 } = opts
       const missing = !(await globalThis.utils.fs.exists(filepath))

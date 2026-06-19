@@ -133,6 +133,14 @@ function _stringify(data, format, spaces) {
   return JSON.stringify(data, null, spaces) + '\n'
 }
 
+export function parseJsonText(text, { format = 'json' } = {}) {
+  return _parse(text, format, '<string>')
+}
+
+export function stringifyJsonText(data, { format = 'json', spaces = 2 } = {}) {
+  return _stringify(data, format, spaces)
+}
+
 export function createJsonUtils(dir, fsUtils) {
   return {
     async read(relPath, { throw: shouldThrow = true, format } = {}) {
@@ -208,6 +216,14 @@ export function createJsonUtils(dir, fsUtils) {
       }
 
       await this.write(relPath, data, { spaces, format })
+    },
+
+    parse(text, opts = {}) {
+      return parseJsonText(text, opts)
+    },
+
+    stringify(data, opts = {}) {
+      return stringifyJsonText(data, opts)
     },
   }
 }

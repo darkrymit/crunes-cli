@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { createXmlUtils } from '../../../src/rune/api/xml.js'
+import { createXmlUtils, parseXml, stringifyXml } from '../../../src/rune/api/xml.js'
 
 function makeFsUtils(files = {}) {
   const store = { ...files }
@@ -219,5 +219,128 @@ describe('xml.modify', () => {
     await xml.modify('cfg.xml', async (d) => { d.root.child.extra = 2 }, { indent: 4 })
     const content = fsUtils.write.mock.calls[0][1]
     expect(content).toContain('    <child>')
+  })
+})
+
+describe('parseXml', () => {
+  it('parses simple XML to JS object', () => {
+    const result = parseXml('<root><name>test</name><tag>stable</tag></root>')
+    expect(result.root.name).toBe('test')
+    expect(result.root.tag).toBe('stable')
+  })
+
+  it('exposes attributes with @_ prefix', () => {
+    const result = parseXml('<root id="42"><name>test</name></root>')
+    expect(result.root['@_id']).toBe('42')
+  })
+
+  it('collects comments as #comment array', () => {
+    const result = parseXml('<root><!-- note --><name>test</name></root>')
+    expect(Array.isArray(result.root['#comment'])).toBe(true)
+    expect(result.root['#comment'].some(c => c.includes('note'))).toBe(true)
+  })
+
+  it('defaults displayPath to <string> in error message', () => {
+    expect(() => parseXml('<unclosed>')).toThrow('Failed to parse <string>')
+  })
+})
+
+describe('stringifyXml', () => {
+  it('round-trips simple XML', () => {
+    const parsed = parseXml('<root><name>test</name><tag>stable</tag></root>')
+    const out = stringifyXml(parsed)
+    const back = parseXml(out)
+    expect(back.root.name).toBe('test')
+    expect(back.root.tag).toBe('stable')
+  })
+
+  it('round-trips attributes', () => {
+    const parsed = parseXml('<root id="42"><name>test</name></root>')
+    const out = stringifyXml(parsed)
+    expect(parseXml(out).root['@_id']).toBe('42')
+  })
+
+  it('always ends with newline', () => {
+    const parsed = parseXml('<root><name>test</name></root>')
+    expect(stringifyXml(parsed).endsWith('\n')).toBe(true)
+  })
+})
+
+describe('xml.readPath', () => {
+  it('returns first JSONPath match', async () => {
+    const fsUtils = makeFsUtils({ 'pom.xml': SIMPLE_XML })
+    const xml = createXmlUtils('/project', fsUtils)
+    expect(await xml.readPath('pom.xml', '$.project.version')).toBe('1.0.0')
+  })
+
+  it('returns fallback when no match', async () => {
+    const fsUtils = makeFsUtils({ 'pom.xml': SIMPLE_XML })
+    const xml = createXmlUtils('/project', fsUtils)
+    expect(await xml.readPath('pom.xml', '$.project.missing', 'default')).toBe('default')
+  })
+
+  it('returns undefined when no match and no fallback', async () => {
+    const fsUtils = makeFsUtils({ 'pom.xml': SIMPLE_XML })
+    const xml = createXmlUtils('/project', fsUtils)
+    expect(await xml.readPath('pom.xml', '$.project.missing')).toBeUndefined()
+  })
+
+  it('returns fallback when file missing', async () => {
+    const fsUtils = makeFsUtils()
+    const xml = createXmlUtils('/project', fsUtils)
+    expect(await xml.readPath('missing.xml', '$.project.version', 'fallback')).toBe('fallback')
+  })
+})
+
+describe('xml.readPathAll', () => {
+  it('returns all matches', async () => {
+    const fsUtils = makeFsUtils({ 'data.xml': '<root><item>a</item><item>b</item></root>' })
+    const xml = createXmlUtils('/project', fsUtils)
+    const results = await xml.readPathAll('data.xml', '$.root.item[*]')
+    expect(Array.isArray(results)).toBe(true)
+    expect(results).toContain('a')
+    expect(results).toContain('b')
+  })
+
+  it('returns fallback when no matches', async () => {
+    const fsUtils = makeFsUtils({ 'pom.xml': SIMPLE_XML })
+    const xml = createXmlUtils('/project', fsUtils)
+    expect(await xml.readPathAll('pom.xml', '$.project.missing', ['none'])).toEqual(['none'])
+  })
+
+  it('returns [] when file missing and no fallback', async () => {
+    const fsUtils = makeFsUtils()
+    const xml = createXmlUtils('/project', fsUtils)
+    expect(await xml.readPathAll('missing.xml', '$.*')).toEqual([])
+  })
+})
+
+describe('xml.writePath', () => {
+  it('sets an existing node', async () => {
+    const fsUtils = makeFsUtils({ 'pom.xml': SIMPLE_XML })
+    const xml = createXmlUtils('/project', fsUtils)
+    await xml.writePath('pom.xml', '$.project.version', '2.0.0')
+    expect(parseXml(fsUtils.write.mock.calls[0][1]).project.version).toBe('2.0.0')
+  })
+
+  it('creates intermediate nodes', async () => {
+    const fsUtils = makeFsUtils({ 'pom.xml': '<root></root>' })
+    const xml = createXmlUtils('/project', fsUtils)
+    await xml.writePath('pom.xml', '$.root.meta.author', 'test')
+    expect(parseXml(fsUtils.write.mock.calls[0][1]).root.meta.author).toBe('test')
+  })
+
+  it('deletes a node when value is undefined', async () => {
+    const fsUtils = makeFsUtils({ 'pom.xml': SIMPLE_XML })
+    const xml = createXmlUtils('/project', fsUtils)
+    await xml.writePath('pom.xml', '$.project.version', undefined)
+    const result = parseXml(fsUtils.write.mock.calls[0][1])
+    expect(result.project.version).toBeUndefined()
+  })
+
+  it('throws when file is missing', async () => {
+    const fsUtils = makeFsUtils()
+    const xml = createXmlUtils('/project', fsUtils)
+    await expect(xml.writePath('missing.xml', '$.root.name', 'test')).rejects.toThrow('missing XML file')
   })
 })

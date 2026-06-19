@@ -570,17 +570,53 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
   await jail.set('$__utils_json_writePath', new ivm.Reference(async (relPath, jsonPath, value, opts) => {
     await utils.json.writePath(relPath, jsonPath, value, opts)
   }))
+  await jail.set('$__utils_json_parse', new ivm.Reference((text, opts) => {
+    return utils.json.parse(text, opts)
+  }))
+  await jail.set('$__utils_json_stringify', new ivm.Reference((data, opts) => {
+    return utils.json.stringify(data, opts)
+  }))
   await jail.set('$__utils_yaml_read', new ivm.Reference(async (relPath, opts) => {
     return utils.yaml.read(relPath, opts)
   }))
   await jail.set('$__utils_yaml_write', new ivm.Reference(async (relPath, data, opts) => {
     await utils.yaml.write(relPath, data, opts)
   }))
+  await jail.set('$__utils_yaml_parse', new ivm.Reference((text) => {
+    return utils.yaml.parse(text)
+  }))
+  await jail.set('$__utils_yaml_stringify', new ivm.Reference((data, opts) => {
+    return utils.yaml.stringify(data, opts)
+  }))
+  await jail.set('$__utils_yaml_readPath', new ivm.Reference(async (relPath, jsonPath, fallback) => {
+    return utils.yaml.readPath(relPath, jsonPath, fallback)
+  }))
+  await jail.set('$__utils_yaml_readPathAll', new ivm.Reference(async (relPath, jsonPath, fallback) => {
+    return utils.yaml.readPathAll(relPath, jsonPath, fallback)
+  }))
+  await jail.set('$__utils_yaml_writePath', new ivm.Reference(async (relPath, jsonPath, value, opts) => {
+    await utils.yaml.writePath(relPath, jsonPath, value, opts)
+  }))
   await jail.set('$__utils_xml_read', new ivm.Reference(async (relPath, opts) => {
     return utils.xml.read(relPath, opts)
   }))
   await jail.set('$__utils_xml_write', new ivm.Reference(async (relPath, data, opts) => {
     await utils.xml.write(relPath, data, opts)
+  }))
+  await jail.set('$__utils_xml_parse', new ivm.Reference((text) => {
+    return utils.xml.parse(text)
+  }))
+  await jail.set('$__utils_xml_stringify', new ivm.Reference((data, opts) => {
+    return utils.xml.stringify(data, opts)
+  }))
+  await jail.set('$__utils_xml_readPath', new ivm.Reference(async (relPath, jsonPath, fallback) => {
+    return utils.xml.readPath(relPath, jsonPath, fallback)
+  }))
+  await jail.set('$__utils_xml_readPathAll', new ivm.Reference(async (relPath, jsonPath, fallback) => {
+    return utils.xml.readPathAll(relPath, jsonPath, fallback)
+  }))
+  await jail.set('$__utils_xml_writePath', new ivm.Reference(async (relPath, jsonPath, value, opts) => {
+    await utils.xml.writePath(relPath, jsonPath, value, opts)
   }))
 
   // csv streams share the same streams Map as fs streams
