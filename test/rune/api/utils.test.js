@@ -93,17 +93,17 @@ describe('resolvePath', () => {
   })
 
   // local prefixes
-  it('@local-cache resolves inside .crunes/cache/project', () => {
+  it('@local-cache resolves inside .crunes/caches/project', () => {
     expect(resolvePath('@local-cache', { dir: tmp }))
-      .toBe(join(tmp, '.crunes', 'cache', 'project'))
+      .toBe(join(tmp, '.crunes', 'caches', 'project'))
   })
   it('@local-sqlite resolves inside .crunes/sqlite/project', () => {
     expect(resolvePath('@local-sqlite', { dir: tmp }))
       .toBe(join(tmp, '.crunes', 'sqlite', 'project'))
   })
-  it('@local-plugin-cache resolves inside .crunes/cache/plugins/<pluginId>', () => {
+  it('@local-plugin-cache resolves inside .crunes/caches/plugins/<pluginId>', () => {
     expect(resolvePath('@local-plugin-cache', { dir: tmp, pluginId: 'plug@1.0' }))
-      .toBe(join(tmp, '.crunes', 'cache', 'plugins', 'plug@1.0'))
+      .toBe(join(tmp, '.crunes', 'caches', 'plugins', 'plug@1.0'))
   })
   it('@local-plugin-sqlite without pluginId throws', () => {
     expect(() => resolvePath('@local-plugin-sqlite', { dir: tmp }))

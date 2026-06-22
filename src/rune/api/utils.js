@@ -37,10 +37,10 @@ function virtualStoreBase(prefix, { dir, pluginId }) {
       if (!pluginId) throw new Error('@global-plugin-sqlite requires a plugin context')
       return getSqlitePluginDir(pluginId)
     case '@local-cache':
-      return path.join(dir, '.crunes', 'cache', 'project')
+      return path.join(dir, '.crunes', 'caches', 'project')
     case '@local-plugin-cache':
       if (!pluginId) throw new Error('@local-plugin-cache requires a plugin context')
-      return path.join(dir, '.crunes', 'cache', 'plugins', pluginId)
+      return path.join(dir, '.crunes', 'caches', 'plugins', pluginId)
     case '@local-sqlite':
       return path.join(dir, '.crunes', 'sqlite', 'project')
     case '@local-plugin-sqlite':

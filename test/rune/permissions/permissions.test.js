@@ -304,8 +304,8 @@ describe('makePermissionChecker — expandPattern siblings (ctx)', () => {
       { allow: ['fs.read:@local-cache/**'], deny: [] },
       ctx
     )
-    // The real path for @local-cache is <dir>/.crunes/cache/project
-    expect(() => check('fs.read', `${dir}/.crunes/cache/project/vault/file.enc`)).not.toThrow()
+    // The real path for @local-cache is <dir>/.crunes/caches/project
+    expect(() => check('fs.read', `${dir}/.crunes/caches/project/vault/file.enc`)).not.toThrow()
   })
 
   it('@local-cache/sub/** pattern matches absolute subpath', () => {
@@ -313,8 +313,8 @@ describe('makePermissionChecker — expandPattern siblings (ctx)', () => {
       { allow: ['fs.read:@local-cache/vault/**'], deny: [] },
       ctx
     )
-    expect(() => check('fs.read', `${dir}/.crunes/cache/project/vault/secret.json`)).not.toThrow()
-    expect(() => check('fs.read', `${dir}/.crunes/cache/project/other/file`)).toThrow(PermissionError)
+    expect(() => check('fs.read', `${dir}/.crunes/caches/project/vault/secret.json`)).not.toThrow()
+    expect(() => check('fs.read', `${dir}/.crunes/caches/project/other/file`)).toThrow(PermissionError)
   })
 
   it('no ctx — no sibling expansion, original pattern still checked', () => {
@@ -387,7 +387,7 @@ describe('expandPattern — full sibling coverage via makePermissionChecker', ()
   })
 
   it('cache @local-cache pattern matches raw token, absolute, ./rel, bare, @project/ forms', () => {
-    // @local-cache resolves to <dir>/.crunes/cache/project
+    // @local-cache resolves to <dir>/.crunes/caches/project
     const check = makePermissionChecker(
       { allow: ['cache.read:@local-cache/vault::mydb'], deny: [] },
       ctx
@@ -395,13 +395,13 @@ describe('expandPattern — full sibling coverage via makePermissionChecker', ()
     // raw token form
     expect(() => check('cache.read', '@local-cache/vault::mydb')).not.toThrow()
     // absolute form
-    expect(() => check('cache.read', `${dir}/.crunes/cache/project/vault::mydb`)).not.toThrow()
+    expect(() => check('cache.read', `${dir}/.crunes/caches/project/vault::mydb`)).not.toThrow()
     // ./rel form
-    expect(() => check('cache.read', './.crunes/cache/project/vault::mydb')).not.toThrow()
+    expect(() => check('cache.read', './.crunes/caches/project/vault::mydb')).not.toThrow()
     // bare form
-    expect(() => check('cache.read', '.crunes/cache/project/vault::mydb')).not.toThrow()
+    expect(() => check('cache.read', '.crunes/caches/project/vault::mydb')).not.toThrow()
     // @project/ form
-    expect(() => check('cache.read', '@project/.crunes/cache/project/vault::mydb')).not.toThrow()
+    expect(() => check('cache.read', '@project/.crunes/caches/project/vault::mydb')).not.toThrow()
   })
 
   it('sqlite @local-sqlite pattern matches raw token and absolute form', () => {
@@ -421,12 +421,12 @@ describe('expandPattern — full sibling coverage via makePermissionChecker', ()
     // raw token still works
     expect(() => check('cache.read', '@global-plugin-cache/ns::bucket')).not.toThrow()
     // ./rel form should NOT match (global resolves outside dir)
-    expect(() => check('cache.read', './.crunes/cache/ns::bucket')).toThrow(PermissionError)
+    expect(() => check('cache.read', './.crunes/caches/ns::bucket')).toThrow(PermissionError)
   })
 
   it('raw absolute cache location matches @local-cache pattern', () => {
     // The core scenario: rune passes absolute path to cache.open
-    const absLoc = `${dir}/.crunes/cache/project`
+    const absLoc = `${dir}/.crunes/caches/project`
     const check = makePermissionChecker(
       { allow: ['cache.read:@local-cache::vault'], deny: [] },
       ctx

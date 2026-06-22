@@ -41,7 +41,7 @@ export async function listCacheBuckets() {
 
 export async function listLocalCacheBuckets(projectDir) {
   const results = []
-  const localCacheDir = path.join(projectDir, '.crunes', 'cache')
+  const localCacheDir = path.join(projectDir, '.crunes', 'caches')
 
   async function scanScope(scopeDir, scope, pluginId = null) {
     let entries

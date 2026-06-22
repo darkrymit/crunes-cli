@@ -41,7 +41,7 @@ describe('cache list handler', () => {
   })
 
   it('shows local-cache buckets scanned from project dir', async () => {
-    const localPath = join(tmp, '.crunes', 'cache', 'project', 'mylocal')
+    const localPath = join(tmp, '.crunes', 'caches', 'project', 'mylocal')
     await mkdir(localPath, { recursive: true })
     await handler({ projectDir: tmp })
     const lines = console.log.mock.calls.map(c => c[0])
