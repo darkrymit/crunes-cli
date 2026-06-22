@@ -174,11 +174,11 @@ describe('parseArgs nested commands', () => {
     expect(parsed._).toEqual([])
   })
 
-  it('does not set $command/$commands when no subcommand matched', () => {
+  it('sets $command to empty string and $commands to empty array when no subcommand matched', () => {
     const schemaNoCmd = { options: [], positionals: [] }
     const parsed = parseArgs(['hello'], schemaNoCmd)
-    expect(parsed.$command).toBeUndefined()
-    expect(parsed.$commands).toBeUndefined()
+    expect(parsed.$command).toBe('')
+    expect(parsed.$commands).toEqual([])
   })
 
   it('does not expose legacy command/commands/subcommand/subcommands keys', () => {

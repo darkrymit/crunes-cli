@@ -137,10 +137,8 @@ export function parseArgs(rawArgs, schema) {
   parsed.$raw = rawArgs
 
   // 3. Expose Unified Command Properties
-  if (commandsMatched.length > 0) {
-    parsed.$command = commandsMatched.join(' ')
-    parsed.$commands = commandsMatched
-  }
+  parsed.$command = commandsMatched.join(' ')
+  parsed.$commands = commandsMatched
 
   // 4. Strip command tokens from args._ so it contains only data positionals
   parsed._ = parsed._.slice(commandsMatched.length)

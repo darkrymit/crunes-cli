@@ -6,8 +6,8 @@ The entrypoint \`export async function run(args)\` executes the rune's main scri
 ## 1. Parsed Arguments Structure
 
 Inside \`run(args)\`, the \`args\` parameter contains:
-- **\`args.$command\`** *(string)*: The space-separated matched command path (e.g. \`"remote add"\` or \`""\` for the root).
-- **\`args.$commands\`** *(string[])*: The array of matched command levels (e.g. \`["remote", "add"]\` or \`[]\` for the root).
+- **\`args.$command\`** *(string)*: The space-separated matched command path (e.g. \`"remote add"\`). Always present — \`""\` at the root level.
+- **\`args.$commands\`** *(string[])*: The array of matched command levels (e.g. \`["remote", "add"]\`). Always present — \`[]\` at the root level.
 - **\`args._\`** *(string[])*: All data positionals (command tokens are stripped, so \`args._[0]\` is always the first positional argument after the matched command path).
 - **\`args.$rest\`** *(string[])*: Unmapped positional arguments that were not bound to named positionals.
 - **\`args.$raw\`** *(string[])*: The exact raw string array before parsing.
@@ -49,7 +49,7 @@ import { section } from '@utils'
 
 export async function run(args) {
   // 1. Root level command logic
-  if (args.$command === '') {
+  if (!args.$command) {
     return section.create('root', { type: 'markdown', content: 'Root command' })
   }
 
