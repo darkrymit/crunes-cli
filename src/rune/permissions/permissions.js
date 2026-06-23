@@ -271,7 +271,8 @@ export function makePermissionChecker(effective, ctx = null) {
       case 'shell.job.kill':
       case 'shell.job.exists':
       case 'shell.job.read':
-      case 'shell.job.write': {
+      case 'shell.job.write':
+      case 'notify.send': {
         const b = buckets.get(capability)
         if (!b?.allow.length || b.deny.length > 0) throw new PermissionError(capability, '')
         return

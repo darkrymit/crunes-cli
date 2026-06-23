@@ -9,6 +9,7 @@ export async function _execNotify(cmd, args) {
   return execFileAsync(cmd, args)
 }
 
+
 function escapeArg(str) {
   return String(str).replace(/"/g, '\\"')
 }
@@ -17,20 +18,23 @@ function getPlatform() {
   return process.env.CRUNES_NOTIFY_PLATFORM ?? os.platform()
 }
 
+const WIN_APP_ID = 'crunes'
+const WIN_REG_KEY = `HKCU:\\Software\\Classes\\AppUserModelId\\${WIN_APP_ID}`
+
 async function dispatchWindows(title, message, urgency) {
-  const scenario = urgency === 'critical' ? 'alarm' : 'default'
   const t = escapeArg(title)
   const m = escapeArg(message)
   const script = [
     `[Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType=WindowsRuntime] | Out-Null`,
     `[Windows.Data.Xml.Dom.XmlDocument, Windows.Data.Xml.Dom.XmlDocument, ContentType=WindowsRuntime] | Out-Null`,
+    `if (-not (Test-Path '${WIN_REG_KEY}')) { New-Item -Path '${WIN_REG_KEY}' -Force | Out-Null; New-ItemProperty -Path '${WIN_REG_KEY}' -Name DisplayName -Value 'crunes' -Force | Out-Null }`,
     `$template = [Windows.UI.Notifications.ToastTemplateType]::ToastText02`,
     `$xml = [Windows.UI.Notifications.ToastNotificationManager]::GetTemplateContent($template)`,
-    `$xml.GetElementsByTagName('text')[0].AppendChild($xml.CreateTextNode("${t}")) | Out-Null`,
-    `$xml.GetElementsByTagName('text')[1].AppendChild($xml.CreateTextNode("${m}")) | Out-Null`,
+    `$nodes = $xml.GetElementsByTagName('text')`,
+    `$nodes.Item(0).AppendChild($xml.CreateTextNode("${t}")) | Out-Null`,
+    `$nodes.Item(1).AppendChild($xml.CreateTextNode("${m}")) | Out-Null`,
     `$toast = [Windows.UI.Notifications.ToastNotification]::new($xml)`,
-    `$toast.Scenario = [Windows.UI.Notifications.ToastScenario]::${scenario === 'alarm' ? 'Alarm' : 'Default'}`,
-    `[Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('crunes').Show($toast)`,
+    `[Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('${WIN_APP_ID}').Show($toast)`,
   ].join('; ')
   await self._execNotify('powershell', ['-NoProfile', '-NonInteractive', '-Command', script])
 }
