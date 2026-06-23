@@ -19,6 +19,7 @@ import * as EMBEDDED from './embedded.js'
 import { parseArgs } from '../api/args-parser.js'
 import { RuneSession } from '../api/rune.js'
 import { formatHelp } from '../../docs/formatter.js'
+import { readSchemaCache, writeSchemaCache } from '../schema-cache.js'
 
 const __isolationDir = path.dirname(fileURLToPath(import.meta.url))
 
@@ -1309,7 +1310,7 @@ export async function runRuneInIsolate(runeFile, effective, args, projectDir, {
     let runeContext = { key: runeKey, helpText: null, argsSchema: null, commandsSchema: null }
     if (lifecycle === 'run') {
       try {
-        const schema = await getArgsSchema(runeFile, effective, projectDir, { vars, nodeModulesDir, pluginDeps, pluginDir, pluginId })
+        const schema = await getArgsSchema(runeFile, effective, projectDir, { vars, nodeModulesDir, pluginDeps, pluginDir, pluginId, runeKey })
         runeContext.argsSchema = schema
         runeContext.helpText = formatHelp(schema, { key: runeKey, name: runeKey, description: undefined })
       } catch { /* help unavailable, silently skip */ }
@@ -1477,7 +1478,12 @@ export async function getArgsSchema(runeFile, effective, projectDir, {
   isolateMemoryMb = 128,
   isolateTimeoutMs = 30_000,
   vars = {},
+  runeKey = null,
 } = {}) {
+  if (runeKey !== null) {
+    const cached = await readSchemaCache(runeKey, 'args', runeFile, vars, projectDir)
+    if (cached !== undefined) return cached
+  }
   const augmented = {
     allow: [...effective.allow, ...getAutoPermits({ pluginId: null, pluginDir })],
     deny: effective.deny,
@@ -1516,7 +1522,12 @@ export async function getArgsSchema(runeFile, effective, projectDir, {
     await context.eval('delete globalThis.$__hostRequire')
 
     const hasArgsExport = await context.eval('typeof __crunes_args !== "undefined"')
-    if (!hasArgsExport) return null
+    if (!hasArgsExport) {
+      if (runeKey !== null) {
+        await writeSchemaCache(runeKey, 'args', runeFile, vars, null, projectDir).catch(() => {})
+      }
+      return null
+    }
 
     const schema = await context.evalClosure(
       `return (async () => {
@@ -1562,6 +1573,9 @@ export async function getArgsSchema(runeFile, effective, projectDir, {
       [],
       { timeout: isolateTimeoutMs, result: { promise: true, copy: true } }
     )
+    if (runeKey !== null) {
+      await writeSchemaCache(runeKey, 'args', runeFile, vars, schema, projectDir).catch(() => {})
+    }
     return schema
   } finally {
     await dispose()
@@ -1576,7 +1590,15 @@ export async function getReplSchema(runeFile, effective, args, projectDir, {
   isolateMemoryMb = 128,
   isolateTimeoutMs = 30_000,
   vars = {},
+  runeKey = null,
 } = {}) {
+  if (runeKey !== null) {
+    const cachedArgs = await readSchemaCache(runeKey, 'argsRepl', runeFile, vars, projectDir)
+    const cachedCmds = await readSchemaCache(runeKey, 'commandsRepl', runeFile, vars, projectDir)
+    if (cachedArgs !== undefined && cachedCmds !== undefined) {
+      return { argsSchema: cachedArgs, commandsSchema: cachedCmds }
+    }
+  }
   const augmented = {
     allow: [...effective.allow, ...getAutoPermits({ pluginId: null, pluginDir })],
     deny: effective.deny,
@@ -1706,6 +1728,12 @@ export async function getReplSchema(runeFile, effective, args, projectDir, {
       )
     }
 
+    if (runeKey !== null) {
+      await Promise.all([
+        writeSchemaCache(runeKey, 'argsRepl', runeFile, vars, argsSchema, projectDir).catch(() => {}),
+        writeSchemaCache(runeKey, 'commandsRepl', runeFile, vars, commandsSchema, projectDir).catch(() => {}),
+      ])
+    }
     return { argsSchema, commandsSchema }
   } finally {
     await dispose()
@@ -1773,7 +1801,7 @@ export async function runRuneInRepl(runeFile, effective, args, projectDir, {
 
   let runeContext = { key: runeKey, helpText: null, argsSchema: null, commandsSchema: null }
   try {
-    const { argsSchema, commandsSchema } = await getReplSchema(runeFile, effective, [], projectDir, { vars, nodeModulesDir, pluginDeps, pluginDir })
+    const { argsSchema, commandsSchema } = await getReplSchema(runeFile, effective, [], projectDir, { vars, nodeModulesDir, pluginDeps, pluginDir, runeKey })
     runeContext.argsSchema = argsSchema ?? null
     runeContext.commandsSchema = commandsSchema ?? null
     if (argsSchema) runeContext.helpText = formatHelp(argsSchema, { key: runeKey, name: runeKey, description: undefined, lifecycle: 'repl' })

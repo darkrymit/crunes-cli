@@ -21,21 +21,19 @@ describe('compileIntro compiler engine', () => {
     expect(output).toContain('## 5. Global Sandbox APIs')
   })
 
-  it('compiles json output when format is json', async () => {
+  it('includes ecosystem utils reference in text output', async () => {
     const output = await compileIntro({
       config: null,
-      format: 'json',
       projectRoot: '/test',
       configRoot: '/test',
     })
 
-    const parsed = JSON.parse(output)
-    expect(parsed.ecosystem).toBeDefined()
-    expect(parsed.ecosystem.namespaces.some(n => n.name === 'fs')).toBe(true)
-    expect(parsed.workspace).toBeNull()
+    expect(output).toContain('### `fs`')
+    expect(output).toContain('### `ws`')
+    expect(output).toContain('### `json`')
   })
 
-  it('includes active runes and schema detailed info when config exists', async () => {
+  it('compiles without error when config with runes exists', async () => {
     const mockConfig = {
       runes: {
         'dummy-rune': {
@@ -49,14 +47,10 @@ describe('compileIntro compiler engine', () => {
 
     const output = await compileIntro({
       config: mockConfig,
-      format: 'json',
       projectRoot: '/test',
       configRoot: '/test',
     })
 
-    const parsed = JSON.parse(output)
-    expect(parsed.workspace).not.toBeNull()
-    expect(parsed.workspace.runes.some(r => r.key === 'dummy-rune')).toBe(true)
-    expect(parsed.workspace.plugins).toContain('plugin-a')
+    expect(output).toContain('# Crunes: Fast Sandboxed Scripting & Context Framework')
   })
 })

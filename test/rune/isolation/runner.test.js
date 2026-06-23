@@ -4,7 +4,7 @@ import { mkdtemp, rm, writeFile, mkdir } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { createServer } from 'node:http'
 import { WebSocketServer } from 'ws'
-import { getPluginRunePath, runRuneInIsolate, getArgsSchema } from '../../../src/rune/isolation/runner.js'
+import { getPluginRunePath, runRuneInIsolate, getArgsSchema, getReplSchema } from '../../../src/rune/isolation/runner.js'
 import { createJob } from '../../../src/job/registry.js'
 
 vi.mock('pg', () => {
@@ -984,6 +984,109 @@ export async function run() {
 `)
     const result = await runRuneInIsolate(f, effective, [], tmp, { runeKey: 'test-rune' })
     expect(result[0].data.content).toBe('yes')
+  })
+})
+
+describe('getArgsSchema — schema cache', () => {
+  let tmp
+
+  beforeEach(async () => { tmp = await mkdtemp(join(tmpdir(), 'crunes-sc-runner-')) })
+  afterEach(async () => { await rm(tmp, { recursive: true, force: true }) })
+
+  const effective = { allow: [], deny: [] }
+
+  it('caches args schema and returns it on second call', async () => {
+    const f = join(tmp, 'rune.js')
+    await writeFile(f, `export function args(b) { return b.option('--verbose', 'v', false) }`)
+
+    const schema1 = await getArgsSchema(f, effective, tmp, { runeKey: 'test-rune', vars: {} })
+    expect(schema1).not.toBeNull()
+    expect(schema1.options[0].flags).toBe('--verbose')
+
+    const schema2 = await getArgsSchema(f, effective, tmp, { runeKey: 'test-rune', vars: {} })
+    expect(schema2).toEqual(schema1)
+
+    const { listSchemaCaches } = await import('../../../src/rune/schema-cache.js')
+    const entries = await listSchemaCaches(tmp)
+    expect(entries.some(e => e.type === 'args')).toBe(true)
+  })
+
+  it('caches null schema when rune has no args() export', async () => {
+    const f = join(tmp, 'rune.js')
+    await writeFile(f, `export async function run() {}`)
+
+    const schema1 = await getArgsSchema(f, effective, tmp, { runeKey: 'test-rune', vars: {} })
+    expect(schema1).toBeNull()
+
+    const schema2 = await getArgsSchema(f, effective, tmp, { runeKey: 'test-rune', vars: {} })
+    expect(schema2).toBeNull()
+
+    const { listSchemaCaches } = await import('../../../src/rune/schema-cache.js')
+    const entries = await listSchemaCaches(tmp)
+    expect(entries.some(e => e.type === 'args')).toBe(true)
+  })
+
+  it('misses cache when vars change', async () => {
+    const f = join(tmp, 'rune.js')
+    await writeFile(f, `export function args(b) { return b.option('--verbose', 'v', false) }`)
+
+    await getArgsSchema(f, effective, tmp, { runeKey: 'test-rune', vars: { env: 'prod' } })
+
+    const schema2 = await getArgsSchema(f, effective, tmp, { runeKey: 'test-rune', vars: { env: 'dev' } })
+    expect(schema2).not.toBeNull()
+  })
+
+  it('skips cache when runeKey is null', async () => {
+    const f = join(tmp, 'rune.js')
+    await writeFile(f, `export function args(b) { return b.option('--verbose', 'v', false) }`)
+
+    await getArgsSchema(f, effective, tmp, { runeKey: null, vars: {} })
+
+    const { listSchemaCaches } = await import('../../../src/rune/schema-cache.js')
+    const entries = await listSchemaCaches(tmp)
+    expect(entries).toHaveLength(0)
+  })
+})
+
+describe('getReplSchema — schema cache', () => {
+  let tmp
+
+  beforeEach(async () => { tmp = await mkdtemp(join(tmpdir(), 'crunes-sc-repl-')) })
+  afterEach(async () => { await rm(tmp, { recursive: true, force: true }) })
+
+  const effective = { allow: [], deny: [] }
+
+  it('caches argsRepl and commandsRepl and returns them on second call', async () => {
+    const f = join(tmp, 'rune.js')
+    await writeFile(f, `
+export function argsRepl(b) { return b.option('--verbose', 'v', false) }
+export function commandsRepl(b) { return b.command('run', 'Run it') }
+export async function repl() {}
+export async function inputRepl(input) { return { type: 'done' } }
+`)
+    const r1 = await getReplSchema(f, effective, [], tmp, { runeKey: 'test-rune', vars: {} })
+    expect(r1.argsSchema.options[0].flags).toBe('--verbose')
+    expect(r1.commandsSchema.commands[0].name).toBe('run')
+
+    const r2 = await getReplSchema(f, effective, [], tmp, { runeKey: 'test-rune', vars: {} })
+    expect(r2).toEqual(r1)
+
+    const { listSchemaCaches } = await import('../../../src/rune/schema-cache.js')
+    const entries = await listSchemaCaches(tmp)
+    expect(entries.map(e => e.type).sort()).toEqual(['argsRepl', 'commandsRepl'].sort())
+  })
+
+  it('caches null schemas when repl has no argsRepl/commandsRepl exports', async () => {
+    const f = join(tmp, 'rune.js')
+    await writeFile(f, `export async function repl() {} export async function inputRepl() { return { type: 'done' } }`)
+
+    const r1 = await getReplSchema(f, effective, [], tmp, { runeKey: 'test-rune', vars: {} })
+    expect(r1.argsSchema).toBeNull()
+    expect(r1.commandsSchema).toBeNull()
+
+    const { listSchemaCaches } = await import('../../../src/rune/schema-cache.js')
+    const entries = await listSchemaCaches(tmp)
+    expect(entries.map(e => e.type).sort()).toEqual(['argsRepl', 'commandsRepl'].sort())
   })
 })
 

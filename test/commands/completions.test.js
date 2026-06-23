@@ -6,7 +6,7 @@ import { resolveCompletions } from '../../src/cli/commands/completions.js'
 import { buildProgram } from '../../src/cli/program.js'
 
 const program = buildProgram()
-const TOP = ['run','repl','docs','version','doctor','bench','list','job','cache','sqlite','init','create','plugin','template','marketplace','completions']
+const TOP = ['run','repl','docs','version','doctor','bench','list','job','cache','schema','sqlite','init','create','plugin','template','marketplace','completions']
 
 describe('resolveCompletions — top level', () => {
   it('returns all subcommands when only crunes typed', () => {

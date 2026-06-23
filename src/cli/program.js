@@ -306,6 +306,25 @@ export function buildProgram() {
       await handler({ id, key, projectDir: projectRoot(), plugin: opts.plugin })
     })
 
+  // Schema cache management commands
+  const schema = program.command('schema').description('Manage schema cache')
+
+  schema
+    .command('list')
+    .description('List cached schemas for the current project')
+    .action(async () => {
+      const { handler } = await import('../rune/commands/schema/list.js')
+      await handler({ projectDir: projectRoot() })
+    })
+
+  schema
+    .command('delete <rune-key>')
+    .description('Delete cached schema files for a rune key')
+    .action(async (runeKey) => {
+      const { handler } = await import('../rune/commands/schema/delete.js')
+      await handler({ runeKey, projectDir: projectRoot() })
+    })
+
   // SQLite management commands
   const sqlite = program.command('sqlite').description('Manage SQLite databases')
 

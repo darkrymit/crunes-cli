@@ -75,14 +75,14 @@ export async function handler({ keys, format = 'text', projectRoot = process.cwd
 
     let schema = null
     try {
-      schema = await getArgsSchema(runeFile, runEffective, projectRoot, { vars })
+      schema = await getArgsSchema(runeFile, runEffective, projectRoot, { vars, runeKey: key })
     } catch (err) {
       output.warn(`Could not load args schema for "${key}": ${err.message}`)
     }
 
     let repl = null
     try {
-      const { argsSchema, commandsSchema } = await getReplSchema(runeFile, replEffective, [], projectRoot, { vars })
+      const { argsSchema, commandsSchema } = await getReplSchema(runeFile, replEffective, [], projectRoot, { vars, runeKey: key })
       if (argsSchema !== null || commandsSchema !== null) {
         repl = { argsSchema, commandsSchema }
       }

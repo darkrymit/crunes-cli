@@ -3,11 +3,7 @@ import lifecycleApiData from './generated/lifecycle-api.json' assert { type: 'js
 import globalsApiData from './generated/globals-api.json' assert { type: 'json' }
 import { walk } from './ts-walker.js'
 import { formatNode, formatMembers } from './ts-formatter.js'
-import { getRune } from '../rune/resolver.js'
-import { getArgsSchema } from '../rune/isolation/runner.js'
 import { formatHelp } from './formatter.js'
-import { computeEffectivePermissions } from '../rune/permissions/permissions.js'
-import { resolve } from 'node:path'
 
 const NAMESPACE_RECIPES = {
   fs: `\`\`\`javascript
@@ -143,57 +139,8 @@ export async function run() {
 \`\`\``
 }
 
-export async function compileIntro({ config, format, projectRoot, configRoot, hasProjectError }) {
+export async function compileIntro() {
   const namespaces = walk(utilsApiData)
-
-  const activeRunes = []
-  if (config && !hasProjectError) {
-    const runesList = Object.entries(config.runes ?? {})
-    for (const [key, entry] of runesList) {
-      const runeFile = resolve(configRoot, entry.path ?? `.crunes/runes/${key}.js`)
-      const basePerms = entry.permissions ?? { allow: [], deny: [] }
-      const effective = computeEffectivePermissions(basePerms, config.permissions?.[key], 'args')
-
-      let schema = null
-      let schemaError = null
-      try {
-        schema = await getArgsSchema(runeFile, effective, projectRoot, { vars: entry.vars ?? {} })
-      } catch (err) {
-        schemaError = err.message
-      }
-
-      activeRunes.push({
-        key,
-        name: entry.name ?? key,
-        description: entry.description ?? null,
-        path: entry.path ?? `.crunes/runes/${key}.js`,
-        permissions: entry.permissions ?? { allow: [], deny: [] },
-        schema,
-        schemaError,
-      })
-    }
-  }
-
-  if (format === 'json') {
-    return JSON.stringify(
-      {
-        ecosystem: {
-          namespaces,
-        },
-        workspace: config
-          ? {
-              projectRoot,
-              configRoot,
-              runes: activeRunes,
-              plugins: config.plugins ?? [],
-            }
-          : null,
-        error: hasProjectError ?? null,
-      },
-      null,
-      2
-    )
-  }
 
   const lines = []
 
