@@ -319,6 +319,45 @@ declare namespace globals {
   /** Pre-injected structured logger. Emits { type: 'log', level, message, meta? } events.
    *  Available globally — no import required. */
   const logger: Logger
+
+  interface CryptoKey {
+    readonly type: 'public' | 'private' | 'secret'
+    readonly extractable: boolean
+    readonly algorithm: object
+    readonly usages: string[]
+  }
+
+  interface CryptoKeyPair {
+    readonly privateKey: CryptoKey
+    readonly publicKey: CryptoKey
+  }
+
+  type JsonWebKey = Record<string, unknown>
+
+  interface SubtleCrypto {
+    digest(algorithm: string | object, data: ArrayBuffer | Uint8Array): Promise<ArrayBuffer>
+    sign(algorithm: string | object, key: CryptoKey, data: ArrayBuffer | Uint8Array): Promise<ArrayBuffer>
+    verify(algorithm: string | object, key: CryptoKey, signature: ArrayBuffer | Uint8Array, data: ArrayBuffer | Uint8Array): Promise<boolean>
+    encrypt(algorithm: string | object, key: CryptoKey, data: ArrayBuffer | Uint8Array): Promise<ArrayBuffer>
+    decrypt(algorithm: string | object, key: CryptoKey, data: ArrayBuffer | Uint8Array): Promise<ArrayBuffer>
+    generateKey(algorithm: object, extractable: boolean, keyUsages: string[]): Promise<CryptoKey | CryptoKeyPair>
+    importKey(format: string, keyData: ArrayBuffer | Uint8Array | JsonWebKey, algorithm: string | object, extractable: boolean, keyUsages: string[]): Promise<CryptoKey>
+    exportKey(format: 'raw' | 'pkcs8' | 'spki', key: CryptoKey): Promise<ArrayBuffer>
+    exportKey(format: 'jwk', key: CryptoKey): Promise<JsonWebKey>
+    deriveKey(algorithm: object, baseKey: CryptoKey, derivedKeyAlgorithm: object, extractable: boolean, keyUsages: string[]): Promise<CryptoKey>
+    deriveBits(algorithm: object, baseKey: CryptoKey, length: number): Promise<ArrayBuffer>
+    wrapKey(format: string, key: CryptoKey, wrappingKey: CryptoKey, wrapAlgorithm: string | object): Promise<ArrayBuffer>
+    unwrapKey(format: string, wrappedKey: ArrayBuffer | Uint8Array, unwrappingKey: CryptoKey, unwrapAlgorithm: string | object, unwrappedKeyAlgorithm: string | object, extractable: boolean, keyUsages: string[]): Promise<CryptoKey>
+  }
+
+  interface Crypto {
+    readonly subtle: SubtleCrypto
+    getRandomValues<T extends ArrayBufferView>(array: T): T
+    randomUUID(): string
+  }
+
+  /** The Web Crypto API — available globally without import. Compatible with npm packages using crypto.subtle.* */
+  const crypto: Crypto
 }
 
 // Top-level type aliases so rune API .d.ts files can reference these types
@@ -339,3 +378,8 @@ type ReadableStreamDefaultReader<R = any> = globals.ReadableStreamDefaultReader<
 type WritableStreamDefaultWriter<W = any> = globals.WritableStreamDefaultWriter<W>
 type Response = globals.Response
 type RuneSection = globals.RuneSection
+type CryptoKey = globals.CryptoKey
+type CryptoKeyPair = globals.CryptoKeyPair
+type SubtleCrypto = globals.SubtleCrypto
+type Crypto = globals.Crypto
+type JsonWebKey = globals.JsonWebKey

@@ -560,6 +560,98 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
   await jail.set('$__utils_notify_send', new ivm.Reference(async (title, message, opts) => {
     return utils.notify.send(title, message, opts)
   }))
+
+  // Web Crypto bridge — CryptoKey handle map (keys never cross ivm boundary)
+  const cryptoKeyHandles = new Map()
+  let nextCryptoKeyId = 1
+  const subtle = globalThis.crypto.subtle
+
+  function storeCryptoKey(key) {
+    const id = nextCryptoKeyId++
+    cryptoKeyHandles.set(id, key)
+    return { __cryptoKeyHandle: id, type: key.type, extractable: key.extractable, algorithm: key.algorithm, usages: key.usages }
+  }
+
+  function resolveKey(handle) {
+    if (handle?.__cryptoKeyHandle == null) throw new Error('Invalid CryptoKey handle')
+    const key = cryptoKeyHandles.get(handle.__cryptoKeyHandle)
+    if (!key) throw new Error(`Unknown CryptoKey handle: ${handle.__cryptoKeyHandle}`)
+    return key
+  }
+
+  await jail.set('$__webcrypto_random_uuid', new ivm.Reference(() => globalThis.crypto.randomUUID()))
+
+  await jail.set('$__webcrypto_get_random_values', new ivm.Reference((arrayBuffer) => {
+    const arr = new Uint8Array(arrayBuffer)
+    globalThis.crypto.getRandomValues(arr)
+    return arr.buffer
+  }))
+
+  await jail.set('$__webcrypto_subtle_digest', new ivm.Reference(async (algorithm, data) => {
+    return subtle.digest(algorithm, data)
+  }))
+
+  await jail.set('$__webcrypto_subtle_sign', new ivm.Reference(async (algorithm, keyHandle, data) => {
+    const key = resolveKey(keyHandle)
+    return subtle.sign(algorithm, key, data)
+  }))
+
+  await jail.set('$__webcrypto_subtle_verify', new ivm.Reference(async (algorithm, keyHandle, signature, data) => {
+    const key = resolveKey(keyHandle)
+    return subtle.verify(algorithm, key, signature, data)
+  }))
+
+  await jail.set('$__webcrypto_subtle_encrypt', new ivm.Reference(async (algorithm, keyHandle, data) => {
+    const key = resolveKey(keyHandle)
+    return subtle.encrypt(algorithm, key, data)
+  }))
+
+  await jail.set('$__webcrypto_subtle_decrypt', new ivm.Reference(async (algorithm, keyHandle, data) => {
+    const key = resolveKey(keyHandle)
+    return subtle.decrypt(algorithm, key, data)
+  }))
+
+  await jail.set('$__webcrypto_subtle_generate_key', new ivm.Reference(async (algorithm, extractable, usages) => {
+    const result = await subtle.generateKey(algorithm, extractable, usages)
+    if (result.privateKey) {
+      return { privateKey: storeCryptoKey(result.privateKey), publicKey: storeCryptoKey(result.publicKey) }
+    }
+    return storeCryptoKey(result)
+  }))
+
+  await jail.set('$__webcrypto_subtle_import_key', new ivm.Reference(async (format, keyData, algorithm, extractable, usages) => {
+    const key = await subtle.importKey(format, keyData, algorithm, extractable, usages)
+    return storeCryptoKey(key)
+  }))
+
+  await jail.set('$__webcrypto_subtle_export_key', new ivm.Reference(async (format, keyHandle) => {
+    const key = resolveKey(keyHandle)
+    return subtle.exportKey(format, key)
+  }))
+
+  await jail.set('$__webcrypto_subtle_derive_key', new ivm.Reference(async (algorithm, baseKeyHandle, derivedKeyAlg, extractable, usages) => {
+    const baseKey = resolveKey(baseKeyHandle)
+    const key = await subtle.deriveKey(algorithm, baseKey, derivedKeyAlg, extractable, usages)
+    return storeCryptoKey(key)
+  }))
+
+  await jail.set('$__webcrypto_subtle_derive_bits', new ivm.Reference(async (algorithm, baseKeyHandle, length) => {
+    const baseKey = resolveKey(baseKeyHandle)
+    return subtle.deriveBits(algorithm, baseKey, length)
+  }))
+
+  await jail.set('$__webcrypto_subtle_wrap_key', new ivm.Reference(async (format, keyHandle, wrappingKeyHandle, wrapAlgorithm) => {
+    const key = resolveKey(keyHandle)
+    const wrappingKey = resolveKey(wrappingKeyHandle)
+    return subtle.wrapKey(format, key, wrappingKey, wrapAlgorithm)
+  }))
+
+  await jail.set('$__webcrypto_subtle_unwrap_key', new ivm.Reference(async (format, wrappedData, unwrappingKeyHandle, unwrapAlg, unwrappedAlg, extractable, usages) => {
+    const unwrappingKey = resolveKey(unwrappingKeyHandle)
+    const key = await subtle.unwrapKey(format, wrappedData, unwrappingKey, unwrapAlg, unwrappedAlg, extractable, usages)
+    return storeCryptoKey(key)
+  }))
+
   await jail.set('$__utils_json_read', new ivm.Reference(async (relPath, opts) => {
     return utils.json.read(relPath, opts)
   }))

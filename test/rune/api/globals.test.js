@@ -111,6 +111,85 @@ describe('Global Sandbox APIs', () => {
     expect(result[0].data.content).toBe('true')
   })
 
+  describe('Web Crypto API (globalThis.crypto)', () => {
+    it('crypto.randomUUID() returns a valid UUID v4', async () => {
+      const runeFile = join(tmp, 'rune.js')
+      await writeFile(runeFile, [
+        'import { section } from "@utils"',
+        'export async function run() {',
+        '  const id = crypto.randomUUID()',
+        '  return [section.create("r", { type: "markdown", content: id })]',
+        '}',
+      ].join('\n'))
+      const result = await runRuneInIsolate(runeFile, { allow: [], deny: [] }, [], tmp)
+      expect(result[0].data.content).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/)
+    })
+
+    it('crypto.getRandomValues() fills a typed array with random bytes', async () => {
+      const runeFile = join(tmp, 'rune.js')
+      await writeFile(runeFile, [
+        'import { section } from "@utils"',
+        'export async function run() {',
+        '  const arr = new Uint8Array(16)',
+        '  crypto.getRandomValues(arr)',
+        '  return [section.create("r", { type: "markdown", content: JSON.stringify(Array.from(arr)) })]',
+        '}',
+      ].join('\n'))
+      const result = await runRuneInIsolate(runeFile, { allow: [], deny: [] }, [], tmp)
+      const bytes = JSON.parse(result[0].data.content)
+      expect(bytes).toHaveLength(16)
+      expect(bytes.some(b => b !== 0)).toBe(true)
+    })
+
+    it('crypto.subtle.digest() hashes data with SHA-256', async () => {
+      const runeFile = join(tmp, 'rune.js')
+      await writeFile(runeFile, [
+        'import { section } from "@utils"',
+        'export async function run() {',
+        '  const data = new TextEncoder().encode("hello")',
+        '  const buf = await crypto.subtle.digest("SHA-256", data)',
+        '  const hex = Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("")',
+        '  return [section.create("r", { type: "markdown", content: hex })]',
+        '}',
+      ].join('\n'))
+      const result = await runRuneInIsolate(runeFile, { allow: [], deny: [] }, [], tmp)
+      expect(result[0].data.content).toBe('2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824')
+    })
+
+    it('crypto.subtle.generateKey() + sign() + verify() round-trip with HMAC', async () => {
+      const runeFile = join(tmp, 'rune.js')
+      await writeFile(runeFile, [
+        'import { section } from "@utils"',
+        'export async function run() {',
+        '  const key = await crypto.subtle.generateKey({ name: "HMAC", hash: "SHA-256" }, false, ["sign", "verify"])',
+        '  const data = new TextEncoder().encode("hello")',
+        '  const sig = await crypto.subtle.sign("HMAC", key, data)',
+        '  const valid = await crypto.subtle.verify("HMAC", key, sig, data)',
+        '  return [section.create("r", { type: "markdown", content: String(valid) })]',
+        '}',
+      ].join('\n'))
+      const result = await runRuneInIsolate(runeFile, { allow: [], deny: [] }, [], tmp)
+      expect(result[0].data.content).toBe('true')
+    })
+
+    it('crypto.subtle.importKey() + exportKey() round-trip for raw AES key', async () => {
+      const runeFile = join(tmp, 'rune.js')
+      await writeFile(runeFile, [
+        'import { section } from "@utils"',
+        'export async function run() {',
+        '  const raw = new Uint8Array(32)',
+        '  crypto.getRandomValues(raw)',
+        '  const key = await crypto.subtle.importKey("raw", raw, { name: "AES-GCM", length: 256 }, true, ["encrypt", "decrypt"])',
+        '  const exported = await crypto.subtle.exportKey("raw", key)',
+        '  const match = Array.from(new Uint8Array(exported)).join() === Array.from(raw).join()',
+        '  return [section.create("r", { type: "markdown", content: String(match) })]',
+        '}',
+      ].join('\n'))
+      const result = await runRuneInIsolate(runeFile, { allow: [], deny: [] }, [], tmp)
+      expect(result[0].data.content).toBe('true')
+    })
+  })
+
   it('TextEncoder and TextDecoder are exposed and operate correctly', async () => {
     const runeFile = join(tmp, 'rune.js')
     await writeFile(runeFile, [

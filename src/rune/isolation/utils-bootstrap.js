@@ -436,6 +436,56 @@ function _makeShellSession(cmd, o, binaryMode) {
   return session
 }
 
+globalThis.crypto = {
+  randomUUID: () => $__webcrypto_random_uuid.applySync(undefined, []),
+  getRandomValues(array) {
+    const buf = $__webcrypto_get_random_values.applySync(undefined, [array.buffer], { arguments: { copy: true }, result: { copy: true } })
+    array.set(new array.constructor(buf))
+    return array
+  },
+  subtle: {
+    digest: (alg, data) => {
+      const buf = data instanceof ArrayBuffer ? data : data.buffer
+      return $__webcrypto_subtle_digest.apply(undefined, [alg, buf], { arguments: { copy: true }, result: { promise: true, copy: true } })
+    },
+    sign: (alg, key, data) => {
+      const buf = data instanceof ArrayBuffer ? data : data.buffer
+      return $__webcrypto_subtle_sign.apply(undefined, [alg, key, buf], { arguments: { copy: true }, result: { promise: true, copy: true } })
+    },
+    verify: (alg, key, sig, data) => {
+      const sigBuf = sig instanceof ArrayBuffer ? sig : sig.buffer
+      const dataBuf = data instanceof ArrayBuffer ? data : data.buffer
+      return $__webcrypto_subtle_verify.apply(undefined, [alg, key, sigBuf, dataBuf], { arguments: { copy: true }, result: { promise: true, copy: true } })
+    },
+    encrypt: (alg, key, data) => {
+      const buf = data instanceof ArrayBuffer ? data : data.buffer
+      return $__webcrypto_subtle_encrypt.apply(undefined, [alg, key, buf], { arguments: { copy: true }, result: { promise: true, copy: true } })
+    },
+    decrypt: (alg, key, data) => {
+      const buf = data instanceof ArrayBuffer ? data : data.buffer
+      return $__webcrypto_subtle_decrypt.apply(undefined, [alg, key, buf], { arguments: { copy: true }, result: { promise: true, copy: true } })
+    },
+    generateKey: (alg, extractable, usages) =>
+      $__webcrypto_subtle_generate_key.apply(undefined, [alg, extractable, usages], { arguments: { copy: true }, result: { promise: true, copy: true } }),
+    importKey: (format, keyData, alg, extractable, usages) => {
+      const data = keyData instanceof ArrayBuffer ? keyData : (ArrayBuffer.isView(keyData) ? keyData.buffer : keyData)
+      return $__webcrypto_subtle_import_key.apply(undefined, [format, data, alg, extractable, usages], { arguments: { copy: true }, result: { promise: true, copy: true } })
+    },
+    exportKey: (format, key) =>
+      $__webcrypto_subtle_export_key.apply(undefined, [format, key], { arguments: { copy: true }, result: { promise: true, copy: true } }),
+    deriveKey: (alg, baseKey, derivedAlg, extractable, usages) =>
+      $__webcrypto_subtle_derive_key.apply(undefined, [alg, baseKey, derivedAlg, extractable, usages], { arguments: { copy: true }, result: { promise: true, copy: true } }),
+    deriveBits: (alg, baseKey, length) =>
+      $__webcrypto_subtle_derive_bits.apply(undefined, [alg, baseKey, length], { arguments: { copy: true }, result: { promise: true, copy: true } }),
+    wrapKey: (format, key, wrappingKey, wrapAlg) =>
+      $__webcrypto_subtle_wrap_key.apply(undefined, [format, key, wrappingKey, wrapAlg], { arguments: { copy: true }, result: { promise: true, copy: true } }),
+    unwrapKey: (format, wrappedData, unwrappingKey, unwrapAlg, unwrappedAlg, extractable, usages) => {
+      const buf = wrappedData instanceof ArrayBuffer ? wrappedData : wrappedData.buffer
+      return $__webcrypto_subtle_unwrap_key.apply(undefined, [format, buf, unwrappingKey, unwrapAlg, unwrappedAlg, extractable, usages], { arguments: { copy: true }, result: { promise: true, copy: true } })
+    },
+  },
+}
+
 globalThis.utils = {
   fs: {
     cwd:    ()           => $__projectDir,
