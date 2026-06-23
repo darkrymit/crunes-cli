@@ -1675,11 +1675,14 @@ globalThis.utils = {
   time: {
     after: (ms) => $__utils_time_after_ref.apply(undefined, [ms], { result: { promise: true } }),
   },
+  notify: {
+    send: (title, message, opts) => $__utils_notify_send.apply(undefined, [title, message, opts], { arguments: { copy: true }, result: { promise: true, copy: true } }),
+  },
   md,
   tree,
 }
 
-export const { fs, shell, section, rune, json, yaml, xml, csv, http, env, vars, archive, cache, sqlite, db, crypto, codec, ws, time } = globalThis.utils
+export const { fs, shell, section, rune, json, yaml, xml, csv, http, env, vars, archive, cache, sqlite, db, crypto, codec, ws, time, notify } = globalThis.utils
 export { md, tree, help }
 
 // ─── Global Sandbox Timers ───────────────────────────────────────────────────

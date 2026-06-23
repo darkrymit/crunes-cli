@@ -557,6 +557,9 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
   await jail.set('$__utils_time_after_ref', new ivm.Reference((ms) => {
     return new Promise(resolve => setTimeout(resolve, ms))
   }))
+  await jail.set('$__utils_notify_send', new ivm.Reference(async (title, message, opts) => {
+    return utils.notify.send(title, message, opts)
+  }))
   await jail.set('$__utils_json_read', new ivm.Reference(async (relPath, opts) => {
     return utils.json.read(relPath, opts)
   }))

@@ -14,6 +14,7 @@ import { createCacheUtils } from './cache.js'
 import { createSqliteUtils } from './sqlite.js'
 import { createWsUtils } from './ws.js'
 import { createDbUtils } from './db.js'
+import { createNotifyUtils } from './notify.js'
 import { isGlobMatch } from '../../shared/match.js'
 
 export function createSectionUtils(patterns) {
@@ -55,6 +56,7 @@ export function createUtils(dir, checkPermission = null, pluginDir = null, permi
     sqlite,
     ws,
     db,
+    notify:  createNotifyUtils(checkPermission),
   }
   return {
     utils,
