@@ -11,7 +11,7 @@ import {
   randomBase64,
   encrypt,
   decrypt,
-} from '../../../src/rune/api/crypto.js'
+} from '../../../src/rune/api/crypt.js'
 import { runRuneInIsolate } from '../../../src/rune/isolation/runner.js'
 import path from 'node:path'
 import fs from 'node:fs/promises'
@@ -88,7 +88,7 @@ describe('randomizer utilities', () => {
 describe('sandboxed streaming hashing and ciphers', () => {
   it('hashStream matches whole-buffer hash digest', async () => {
     const script = `
-      import { crypto, codec } from '@utils'
+      import { crypt, codec } from '@utils'
       export async function run() {
         const stream = new ReadableStream({
           start(c) {
@@ -96,13 +96,13 @@ describe('sandboxed streaming hashing and ciphers', () => {
             c.close()
           }
         })
-        const hashOut = await stream.pipeThrough(crypto.hashStream('sha256'))
+        const hashOut = await stream.pipeThrough(crypt.hashStream('sha256'))
         const reader = hashOut.getReader()
         const { value } = await reader.read()
         return codec.toHex(value)
       }
     `
-    const scriptPath = path.join(process.cwd(), 'scratch_test_crypto.js')
+    const scriptPath = path.join(process.cwd(), 'scratch_test_crypt.js')
     await fs.writeFile(scriptPath, script)
     try {
       const result = await runRuneInIsolate(scriptPath, { allow: [], deny: [] }, [], process.cwd())
@@ -114,10 +114,10 @@ describe('sandboxed streaming hashing and ciphers', () => {
 
   it('encryptStream and decryptStream roundtrip matches exactly', async () => {
     const script = `
-      import { crypto, codec } from '@utils'
+      import { crypt, codec } from '@utils'
       export async function run() {
-        const key = crypto.randomBytes(32)
-        const iv = crypto.randomBytes(12)
+        const key = crypt.randomBytes(32)
+        const iv = crypt.randomBytes(12)
         const plaintext = codec.fromUtf8("this is a super secret streaming payload of considerable size")
         
         const stream = new ReadableStream({
@@ -129,8 +129,8 @@ describe('sandboxed streaming hashing and ciphers', () => {
           }
         })
         
-        const encStream = crypto.encryptStream('aes-256-gcm', key, iv)
-        const decStream = crypto.decryptStream('aes-256-gcm', key, iv)
+        const encStream = crypt.encryptStream('aes-256-gcm', key, iv)
+        const decStream = crypt.decryptStream('aes-256-gcm', key, iv)
         
         const piped = stream.pipeThrough(encStream).pipeThrough(decStream)
         const reader = piped.getReader()
@@ -154,7 +154,7 @@ describe('sandboxed streaming hashing and ciphers', () => {
         return codec.toUtf8(merged)
       }
     `
-    const scriptPath = path.join(process.cwd(), 'scratch_test_crypto_roundtrip.js')
+    const scriptPath = path.join(process.cwd(), 'scratch_test_crypt_roundtrip.js')
     await fs.writeFile(scriptPath, script)
     try {
       const result = await runRuneInIsolate(scriptPath, { allow: [], deny: [] }, [], process.cwd())

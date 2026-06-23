@@ -1,5 +1,5 @@
 /** Cryptographic hashing and random value generation */
-declare namespace crypto {
+declare namespace crypt {
   /**
    * Hashes data and returns raw Uint8Array bytes.
    * @param algorithm Hash algorithm e.g. sha256, md5

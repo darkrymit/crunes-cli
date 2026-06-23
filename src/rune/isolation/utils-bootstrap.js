@@ -1269,53 +1269,53 @@ globalThis.utils = {
       return client
     },
   },
-  crypto: {
+  crypt: {
     hash: (algorithm, data) => {
-      return $__utils_crypto_hash.apply(undefined, [algorithm, data], { arguments: { copy: true }, result: { promise: true, copy: true } })
+      return $__utils_crypt_hash.apply(undefined, [algorithm, data], { arguments: { copy: true }, result: { promise: true, copy: true } })
     },
     hashAsHex: (algorithm, data) => {
-      return $__utils_crypto_hash_hex.apply(undefined, [algorithm, data], { arguments: { copy: true }, result: { promise: true, copy: true } })
+      return $__utils_crypt_hash_hex.apply(undefined, [algorithm, data], { arguments: { copy: true }, result: { promise: true, copy: true } })
     },
     hashAsBase64: (algorithm, data) => {
-      return $__utils_crypto_hash_base64.apply(undefined, [algorithm, data], { arguments: { copy: true }, result: { promise: true, copy: true } })
+      return $__utils_crypt_hash_base64.apply(undefined, [algorithm, data], { arguments: { copy: true }, result: { promise: true, copy: true } })
     },
-    uuid:         ()     => $__utils_crypto_uuid.applySync(undefined,   []),
-    randomHex:    (size) => $__utils_crypto_random_hex.applySync(undefined,    [size]),
-    randomBase64: (size) => $__utils_crypto_random_base64.applySync(undefined, [size]),
+    uuid:         ()     => $__utils_crypt_uuid.applySync(undefined,   []),
+    randomHex:    (size) => $__utils_crypt_random_hex.applySync(undefined,    [size]),
+    randomBase64: (size) => $__utils_crypt_random_base64.applySync(undefined, [size]),
     randomBytes:  (size) => {
-      return $__utils_crypto_random_bytes.applySync(undefined, [size], { result: { copy: true } })
+      return $__utils_crypt_random_bytes.applySync(undefined, [size], { result: { copy: true } })
     },
 
     hmac: (algorithm, key, data) => {
-      return $__utils_crypto_hmac.apply(undefined, [algorithm, key, data], { arguments: { copy: true }, result: { promise: true, copy: true } })
+      return $__utils_crypt_hmac.apply(undefined, [algorithm, key, data], { arguments: { copy: true }, result: { promise: true, copy: true } })
     },
     hmacAsHex: (algorithm, key, data) => {
-      return $__utils_crypto_hmac_hex.apply(undefined, [algorithm, key, data], { arguments: { copy: true }, result: { promise: true, copy: true } })
+      return $__utils_crypt_hmac_hex.apply(undefined, [algorithm, key, data], { arguments: { copy: true }, result: { promise: true, copy: true } })
     },
     hmacAsBase64: (algorithm, key, data) => {
-      return $__utils_crypto_hmac_base64.apply(undefined, [algorithm, key, data], { arguments: { copy: true }, result: { promise: true, copy: true } })
+      return $__utils_crypt_hmac_base64.apply(undefined, [algorithm, key, data], { arguments: { copy: true }, result: { promise: true, copy: true } })
     },
 
     encrypt: (algorithm, key, iv, data) => {
-      return $__utils_crypto_encrypt.apply(undefined, [algorithm, key, iv, data], { arguments: { copy: true }, result: { promise: true, copy: true } })
+      return $__utils_crypt_encrypt.apply(undefined, [algorithm, key, iv, data], { arguments: { copy: true }, result: { promise: true, copy: true } })
     },
 
     decrypt: (algorithm, key, iv, ciphertext) => {
-      return $__utils_crypto_decrypt.apply(undefined, [algorithm, key, iv, ciphertext], { arguments: { copy: true }, result: { promise: true, copy: true } })
+      return $__utils_crypt_decrypt.apply(undefined, [algorithm, key, iv, ciphertext], { arguments: { copy: true }, result: { promise: true, copy: true } })
     },
     hashStream: (algorithm) => {
       let id = null
       return new TransformStream({
         async start() {
-          id = await $__utils_crypto_hash_init.apply(undefined, [algorithm], { result: { promise: true } })
+          id = await $__utils_crypt_hash_init.apply(undefined, [algorithm], { result: { promise: true } })
         },
         async transform(chunk, controller) {
           if (!(chunk instanceof Uint8Array)) throw new TypeError('hashStream requires Uint8Array chunks')
           const buf = chunk.slice().buffer
-          await $__utils_crypto_hash_update.apply(undefined, [id, buf], { arguments: { copy: true }, result: { promise: true } })
+          await $__utils_crypt_hash_update.apply(undefined, [id, buf], { arguments: { copy: true }, result: { promise: true } })
         },
         async flush(controller) {
-          const ab = await $__utils_crypto_hash_digest.apply(undefined, [id], { result: { promise: true, copy: true } })
+          const ab = await $__utils_crypt_hash_digest.apply(undefined, [id], { result: { promise: true, copy: true } })
           if (ab) controller.enqueue(new Uint8Array(ab))
         }
       })
@@ -1327,16 +1327,16 @@ globalThis.utils = {
       }
       return new TransformStream({
         async start() {
-          id = await $__utils_crypto_cipher_init.apply(undefined, [algorithm, key.buffer, iv.buffer, true], { arguments: { copy: true }, result: { promise: true } })
+          id = await $__utils_crypt_cipher_init.apply(undefined, [algorithm, key.buffer, iv.buffer, true], { arguments: { copy: true }, result: { promise: true } })
         },
         async transform(chunk, controller) {
           if (!(chunk instanceof Uint8Array)) throw new TypeError('encryptStream requires Uint8Array chunks')
           const buf = chunk.slice().buffer
-          const ab = await $__utils_crypto_cipher_update.apply(undefined, [id, buf], { arguments: { copy: true }, result: { promise: true, copy: true } })
+          const ab = await $__utils_crypt_cipher_update.apply(undefined, [id, buf], { arguments: { copy: true }, result: { promise: true, copy: true } })
           if (ab) controller.enqueue(new Uint8Array(ab))
         },
         async flush(controller) {
-          const ab = await $__utils_crypto_cipher_final.apply(undefined, [id], { result: { promise: true, copy: true } })
+          const ab = await $__utils_crypt_cipher_final.apply(undefined, [id], { result: { promise: true, copy: true } })
           if (ab) controller.enqueue(new Uint8Array(ab))
         }
       })
@@ -1348,16 +1348,16 @@ globalThis.utils = {
       }
       return new TransformStream({
         async start() {
-          id = await $__utils_crypto_cipher_init.apply(undefined, [algorithm, key.buffer, iv.buffer, false], { arguments: { copy: true }, result: { promise: true } })
+          id = await $__utils_crypt_cipher_init.apply(undefined, [algorithm, key.buffer, iv.buffer, false], { arguments: { copy: true }, result: { promise: true } })
         },
         async transform(chunk, controller) {
           if (!(chunk instanceof Uint8Array)) throw new TypeError('decryptStream requires Uint8Array chunks')
           const buf = chunk.slice().buffer
-          const ab = await $__utils_crypto_cipher_update.apply(undefined, [id, buf], { arguments: { copy: true }, result: { promise: true, copy: true } })
+          const ab = await $__utils_crypt_cipher_update.apply(undefined, [id, buf], { arguments: { copy: true }, result: { promise: true, copy: true } })
           if (ab) controller.enqueue(new Uint8Array(ab))
         },
         async flush(controller) {
-          const ab = await $__utils_crypto_cipher_final.apply(undefined, [id], { result: { promise: true, copy: true } })
+          const ab = await $__utils_crypt_cipher_final.apply(undefined, [id], { result: { promise: true, copy: true } })
           if (ab) controller.enqueue(new Uint8Array(ab))
         }
       })
@@ -1682,7 +1682,7 @@ globalThis.utils = {
   tree,
 }
 
-export const { fs, shell, section, rune, json, yaml, xml, csv, http, env, vars, archive, cache, sqlite, db, crypto, codec, ws, time, notify } = globalThis.utils
+export const { fs, shell, section, rune, json, yaml, xml, csv, http, env, vars, archive, cache, sqlite, db, crypt, codec, ws, time, notify } = globalThis.utils
 export { md, tree, help }
 
 // ─── Global Sandbox Timers ───────────────────────────────────────────────────

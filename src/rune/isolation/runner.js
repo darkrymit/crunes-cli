@@ -12,7 +12,7 @@ import { updateJobPid, jobStdoutPath, jobStderrPath, jobStdinPath } from '../../
 import { EOF_SENTINEL } from '../../job/stdin-tail.js'
 import fsSync from 'node:fs'
 import { ensureProjectIdentity, upsertProject } from '../../project/index.js'
-import { hash, hashAsHex, hashAsBase64, hmac, hmacAsHex, hmacAsBase64, encrypt, decrypt, uuid as cryptoUuid, randomHex as cryptoHex, randomBase64 as cryptoBase64, randomBytesFn } from '../api/crypto.js'
+import { hash, hashAsHex, hashAsBase64, hmac, hmacAsHex, hmacAsBase64, encrypt, decrypt, uuid as cryptoUuid, randomHex as cryptoHex, randomBase64 as cryptoBase64, randomBytesFn } from '../api/crypt.js'
 import { computeEffectivePermissions, makePermissionChecker } from '../permissions/permissions.js'
 import { isVerbose } from '../../shared/output.js'
 import * as EMBEDDED from './embedded.js'
@@ -1040,56 +1040,56 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
     dbHandles.delete(id)
   }))
 
-  await jail.set('$__utils_crypto_hash', new ivm.Reference((algorithm, data) => {
+  await jail.set('$__utils_crypt_hash', new ivm.Reference((algorithm, data) => {
     return hash(algorithm, data)
   }))
-  await jail.set('$__utils_crypto_hash_hex', new ivm.Reference((algorithm, data) => {
+  await jail.set('$__utils_crypt_hash_hex', new ivm.Reference((algorithm, data) => {
     return hashAsHex(algorithm, data)
   }))
-  await jail.set('$__utils_crypto_hash_base64', new ivm.Reference((algorithm, data) => {
+  await jail.set('$__utils_crypt_hash_base64', new ivm.Reference((algorithm, data) => {
     return hashAsBase64(algorithm, data)
   }))
-  await jail.set('$__utils_crypto_uuid', new ivm.Reference(cryptoUuid))
-  await jail.set('$__utils_crypto_random_hex', new ivm.Reference(cryptoHex))
-  await jail.set('$__utils_crypto_random_base64', new ivm.Reference(cryptoBase64))
-  await jail.set('$__utils_crypto_random_bytes', new ivm.Reference((size) => {
+  await jail.set('$__utils_crypt_uuid', new ivm.Reference(cryptoUuid))
+  await jail.set('$__utils_crypt_random_hex', new ivm.Reference(cryptoHex))
+  await jail.set('$__utils_crypt_random_base64', new ivm.Reference(cryptoBase64))
+  await jail.set('$__utils_crypt_random_bytes', new ivm.Reference((size) => {
     return randomBytesFn(size)
   }))
   
-  await jail.set('$__utils_crypto_hmac', new ivm.Reference((algorithm, key, data) => {
+  await jail.set('$__utils_crypt_hmac', new ivm.Reference((algorithm, key, data) => {
     return hmac(algorithm, key, data)
   }))
-  await jail.set('$__utils_crypto_hmac_hex', new ivm.Reference((algorithm, key, data) => {
+  await jail.set('$__utils_crypt_hmac_hex', new ivm.Reference((algorithm, key, data) => {
     return hmacAsHex(algorithm, key, data)
   }))
-  await jail.set('$__utils_crypto_hmac_base64', new ivm.Reference((algorithm, key, data) => {
+  await jail.set('$__utils_crypt_hmac_base64', new ivm.Reference((algorithm, key, data) => {
     return hmacAsBase64(algorithm, key, data)
   }))
 
-  await jail.set('$__utils_crypto_encrypt', new ivm.Reference((algorithm, key, iv, data) => {
+  await jail.set('$__utils_crypt_encrypt', new ivm.Reference((algorithm, key, iv, data) => {
     return encrypt(algorithm, key, iv, data)
   }))
 
-  await jail.set('$__utils_crypto_decrypt', new ivm.Reference((algorithm, key, iv, ciphertext) => {
+  await jail.set('$__utils_crypt_decrypt', new ivm.Reference((algorithm, key, iv, ciphertext) => {
     return decrypt(algorithm, key, iv, ciphertext)
   }))
 
   // Streaming Cryptography Host Bridges
   const hashStates = new Map()
   let nextHashId = 1
-  await jail.set('$__utils_crypto_hash_init', new ivm.Reference(async (algorithm) => {
+  await jail.set('$__utils_crypt_hash_init', new ivm.Reference(async (algorithm) => {
     const { createHash } = await import('node:crypto')
     const h = createHash(algorithm)
     const id = nextHashId++
     hashStates.set(id, h)
     return id
   }))
-  await jail.set('$__utils_crypto_hash_update', new ivm.Reference((id, arrayBuffer) => {
+  await jail.set('$__utils_crypt_hash_update', new ivm.Reference((id, arrayBuffer) => {
     const h = hashStates.get(id)
     if (!h) throw new Error(`Invalid hash stream ID: ${id}`)
     h.update(Buffer.from(arrayBuffer))
   }))
-  await jail.set('$__utils_crypto_hash_digest', new ivm.Reference((id) => {
+  await jail.set('$__utils_crypt_hash_digest', new ivm.Reference((id) => {
     const h = hashStates.get(id)
     if (!h) throw new Error(`Invalid hash stream ID: ${id}`)
     const digest = h.digest()
@@ -1101,7 +1101,7 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
 
   const cipherStates = new Map()
   let nextCipherId = 1
-  await jail.set('$__utils_crypto_cipher_init', new ivm.Reference(async (algorithm, keyRef, ivRef, isEncrypt) => {
+  await jail.set('$__utils_crypt_cipher_init', new ivm.Reference(async (algorithm, keyRef, ivRef, isEncrypt) => {
     const { createCipheriv, createDecipheriv } = await import('node:crypto')
     const key = Buffer.from(keyRef)
     const iv = Buffer.from(ivRef)
@@ -1118,7 +1118,7 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
     cipherStates.set(id, state)
     return id
   }))
-  await jail.set('$__utils_crypto_cipher_update', new ivm.Reference((id, arrayBuffer) => {
+  await jail.set('$__utils_crypt_cipher_update', new ivm.Reference((id, arrayBuffer) => {
     const state = cipherStates.get(id)
     if (!state) throw new Error(`Invalid cipher stream ID: ${id}`)
     const chunk = Buffer.from(arrayBuffer)
@@ -1152,7 +1152,7 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
       }
     }
   }))
-  await jail.set('$__utils_crypto_cipher_final', new ivm.Reference((id) => {
+  await jail.set('$__utils_crypt_cipher_final', new ivm.Reference((id) => {
     const state = cipherStates.get(id)
     if (!state) throw new Error(`Invalid cipher stream ID: ${id}`)
     
