@@ -1745,14 +1745,18 @@ globalThis.clearInterval = function(id) {
 
 globalThis.fetch = (input, init) => globalThis.utils.http.fetch(input, init)
 
-const __helpText = typeof $__help_text !== 'undefined' ? $__help_text : null
+const __runeKey            = typeof $__rune_key !== 'undefined' ? $__rune_key : null
+const __runeHelpText       = typeof $__rune_help_text !== 'undefined' ? $__rune_help_text : null
+const __runeArgsSchema     = typeof $__rune_args_schema !== 'undefined' ? JSON.parse($__rune_args_schema) : null
+const __runeCommandsSchema = typeof $__rune_commands_schema !== 'undefined' ? JSON.parse($__rune_commands_schema) : null
+
+globalThis.utils.rune.key            = () => __runeKey
+globalThis.utils.rune.helpText       = () => __runeHelpText ?? ''
+globalThis.utils.rune.helpSection    = () => globalThis.utils.section.create('help', { type: 'markdown', content: __runeHelpText ?? '' })
+globalThis.utils.rune.argsSchema     = () => __runeArgsSchema
+globalThis.utils.rune.commandsSchema = () => __runeCommandsSchema?.commands ?? null
 
 const help = {
-  text() {
-    return __helpText ?? ''
-  },
-  section() {
-    const { section } = globalThis.utils
-    return section.create('help', { type: 'markdown', content: __helpText ?? '' })
-  },
+  text:    () => globalThis.utils.rune.helpText(),
+  section: () => globalThis.utils.rune.helpSection(),
 }

@@ -896,3 +896,94 @@ export async function run() { logger.info('global works') }
   })
 })
 
+describe('rune self-inspection', () => {
+  let tmp
+  beforeEach(async () => { tmp = await mkdtemp(join(tmpdir(), 'crunes-self-')) })
+  afterEach(async () => { await rm(tmp, { recursive: true, force: true }) })
+
+  const effective = { allow: [], deny: [] }
+
+  it('rune.key() returns the runeKey passed at invocation', async () => {
+    const f = join(tmp, 'rune.js')
+    await writeFile(f, `
+import { section, rune } from '@utils'
+export async function run() {
+  return [section.create('result', { type: 'markdown', content: rune.key() ?? 'null' })]
+}
+`)
+    const result = await runRuneInIsolate(f, effective, [], tmp, { runeKey: 'test-rune' })
+    expect(result[0].data.content).toBe('test-rune')
+  })
+
+  it('rune.argsSchema() returns the parsed args schema during run()', async () => {
+    const f = join(tmp, 'rune.js')
+    await writeFile(f, `
+import { section, rune } from '@utils'
+export function args(b) {
+  return b.option('--count <n>', 'Count', 1)
+}
+export async function run() {
+  const s = rune.argsSchema()
+  return [section.create('result', { type: 'markdown', content: JSON.stringify(s?.options?.[0]?.flags ?? null) })]
+}
+`)
+    const result = await runRuneInIsolate(f, effective, [], tmp, { runeKey: 'test-rune' })
+    expect(result[0].data.content).toBe('"--count <n>"')
+  })
+
+  it('rune.argsSchema() returns null when no args() export', async () => {
+    const f = join(tmp, 'rune.js')
+    await writeFile(f, `
+import { section, rune } from '@utils'
+export async function run() {
+  return [section.create('result', { type: 'markdown', content: rune.argsSchema() === null ? 'null' : 'not-null' })]
+}
+`)
+    const result = await runRuneInIsolate(f, effective, [], tmp, { runeKey: 'test-rune' })
+    expect(result[0].data.content).toBe('null')
+  })
+
+  it('rune.helpText() returns non-empty string when args() is defined', async () => {
+    const f = join(tmp, 'rune.js')
+    await writeFile(f, `
+import { section, rune } from '@utils'
+export function args(b) {
+  return b.option('--verbose', 'Verbose output', false)
+}
+export async function run() {
+  return [section.create('result', { type: 'markdown', content: rune.helpText().length > 0 ? 'yes' : 'no' })]
+}
+`)
+    const result = await runRuneInIsolate(f, effective, [], tmp, { runeKey: 'test-rune' })
+    expect(result[0].data.content).toBe('yes')
+  })
+
+  it('rune.commandsSchema() returns null during run lifecycle', async () => {
+    const f = join(tmp, 'rune.js')
+    await writeFile(f, `
+import { section, rune } from '@utils'
+export async function run() {
+  return [section.create('result', { type: 'markdown', content: rune.commandsSchema() === null ? 'null' : 'not-null' })]
+}
+`)
+    const result = await runRuneInIsolate(f, effective, [], tmp, { runeKey: 'test-rune' })
+    expect(result[0].data.content).toBe('null')
+  })
+
+  it('help.text() still works as deprecated alias for rune.helpText()', async () => {
+    const f = join(tmp, 'rune.js')
+    await writeFile(f, `
+import { section } from '@utils'
+import { help } from '@utils'
+export function args(b) {
+  return b.option('--verbose', 'Verbose', false)
+}
+export async function run() {
+  return [section.create('result', { type: 'markdown', content: help.text().length > 0 ? 'yes' : 'no' })]
+}
+`)
+    const result = await runRuneInIsolate(f, effective, [], tmp, { runeKey: 'test-rune' })
+    expect(result[0].data.content).toBe('yes')
+  })
+})
+

@@ -60,7 +60,8 @@ async function compileStaticModule(isolate, key) {
  */
 const VALID_SIGNALS = new Set(['SIGTERM', 'SIGKILL', 'SIGINT', 'SIGHUP', 'SIGUSR1', 'SIGUSR2'])
 
-async function injectUtils(isolate, context, utils, _runeCallback, vars, projectDir, checkPermission, currentRuneKey, sections, onEvent, helpText) {
+async function injectUtils(isolate, context, utils, _runeCallback, vars, projectDir, checkPermission, sections, onEvent, runeContext) {
+  const currentRuneKey = runeContext?.key ?? null
   const jail = context.global
   // Wrap async Reference callbacks so their rejected promises are caught on the
   // host side, preventing Node unhandledRejection events. ivm still receives the
@@ -1205,7 +1206,10 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
 
   await jail.set('$__vars', JSON.stringify(vars))
   await jail.set('$__projectDir', projectDir)
-  await jail.set('$__help_text', helpText ?? null)
+  await jail.set('$__rune_key',             runeContext?.key ?? null)
+  await jail.set('$__rune_help_text',       runeContext?.helpText ?? null)
+  await jail.set('$__rune_args_schema',     JSON.stringify(runeContext?.argsSchema ?? null))
+  await jail.set('$__rune_commands_schema', JSON.stringify(runeContext?.commandsSchema ?? null))
 
   const [mdMod, treeMod, utilsMod] = await Promise.all([
     compileStaticModule(isolate, 'md'),
@@ -1302,15 +1306,15 @@ export async function runRuneInIsolate(runeFile, effective, args, projectDir, {
     }))
 
     if (isVerbose) console.error(`[crunes:debug] injecting utils and console...`)
-    let helpText = null
+    let runeContext = { key: runeKey, helpText: null, argsSchema: null, commandsSchema: null }
     if (lifecycle === 'run') {
       try {
         const schema = await getArgsSchema(runeFile, effective, projectDir, { vars, nodeModulesDir, pluginDeps, pluginDir, pluginId })
-        const entry = { name: runeKey, description: undefined }
-        helpText = formatHelp(schema, { key: runeKey, name: entry.name, description: entry.description })
+        runeContext.argsSchema = schema
+        runeContext.helpText = formatHelp(schema, { key: runeKey, name: runeKey, description: undefined })
       } catch { /* help unavailable, silently skip */ }
     }
-    const utilsMod = await injectUtils(isolate, context, utils, runeCallback, vars, projectDir, checkPermission, runeKey, sections, wrappedOnEvent, helpText)
+    const utilsMod = await injectUtils(isolate, context, utils, runeCallback, vars, projectDir, checkPermission, sections, wrappedOnEvent, runeContext)
     await injectConsole(isolate, context, wrappedOnEvent)
 
     if (pluginDir != null) {
@@ -1767,13 +1771,15 @@ export async function runRuneInRepl(runeFile, effective, args, projectDir, {
     throw new Error(`PermissionError: ${msg}`)
   }))
 
-  let helpText = null
+  let runeContext = { key: runeKey, helpText: null, argsSchema: null, commandsSchema: null }
   try {
-    const { argsSchema } = await getReplSchema(runeFile, effective, [], projectDir, { vars, nodeModulesDir, pluginDeps, pluginDir })
-    if (argsSchema) helpText = formatHelp(argsSchema, { key: runeKey, name: runeKey, description: undefined, lifecycle: 'repl' })
+    const { argsSchema, commandsSchema } = await getReplSchema(runeFile, effective, [], projectDir, { vars, nodeModulesDir, pluginDeps, pluginDir })
+    runeContext.argsSchema = argsSchema ?? null
+    runeContext.commandsSchema = commandsSchema ?? null
+    if (argsSchema) runeContext.helpText = formatHelp(argsSchema, { key: runeKey, name: runeKey, description: undefined, lifecycle: 'repl' })
   } catch { /* help unavailable, silently skip */ }
 
-  const utilsMod = await injectUtils(isolate, context, utils, null, vars, projectDir, checkPermission, runeKey, null, wrappedOnEvent, helpText)
+  const utilsMod = await injectUtils(isolate, context, utils, null, vars, projectDir, checkPermission, null, wrappedOnEvent, runeContext)
   await injectConsole(isolate, context, wrappedOnEvent)
 
   if (pluginDir != null) await context.global.set('CRUNES_PLUGIN_ROOT', pluginDir)

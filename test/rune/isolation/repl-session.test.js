@@ -183,3 +183,82 @@ describe('runRuneInRepl — new session object', () => {
     await expect(session.dispose()).resolves.toBeUndefined()
   })
 })
+
+describe('runRuneInRepl — rune self-inspection', () => {
+  let tmp
+
+  beforeEach(async () => { tmp = await mkdtemp(join(tmpdir(), 'crunes-repl-self-')) })
+  afterEach(async () => { await rm(tmp, { recursive: true, force: true }) })
+
+  const effective = { allow: [], deny: [] }
+
+  it('rune.key() returns runeKey during repl', async () => {
+    const f = join(tmp, 'rune.js')
+    await writeFile(f, `
+import { section, rune } from '@utils'
+export async function repl() { return '> ' }
+export async function inputRepl(input) {
+  if (input.type === 'line') {
+    section.emit(section.create('result', { type: 'markdown', content: rune.key() ?? 'null' }))
+    return { type: 'done' }
+  }
+}
+`)
+    const sections = []
+    const session = await runRuneInRepl(f, effective, [], tmp, {
+      runeKey: 'my-repl-rune',
+      onEvent(e) { if (e.type === 'section') sections.push(e.section) },
+    })
+    await session.step({ type: 'line', text: 'hello' })
+    await session.dispose()
+    expect(sections[0]?.data?.content).toBe('my-repl-rune')
+  })
+
+  it('rune.argsSchema() returns argsRepl schema during repl', async () => {
+    const f = join(tmp, 'rune.js')
+    await writeFile(f, `
+import { section, rune } from '@utils'
+export function argsRepl(b) { return b.option('--verbose', 'Verbose', false) }
+export async function repl() { return '> ' }
+export async function inputRepl(input) {
+  if (input.type === 'line') {
+    const s = rune.argsSchema()
+    section.emit(section.create('result', { type: 'markdown', content: JSON.stringify(s?.options?.[0]?.flags ?? null) }))
+    return { type: 'done' }
+  }
+}
+`)
+    const sections = []
+    const session = await runRuneInRepl(f, effective, [], tmp, {
+      runeKey: 'my-repl-rune',
+      onEvent(e) { if (e.type === 'section') sections.push(e.section) },
+    })
+    await session.step({ type: 'line', text: 'hello' })
+    await session.dispose()
+    expect(sections[0]?.data?.content).toBe('"--verbose"')
+  })
+
+  it('rune.commandsSchema() returns commandsRepl schema during repl', async () => {
+    const f = join(tmp, 'rune.js')
+    await writeFile(f, `
+import { section, rune } from '@utils'
+export function commandsRepl(b) { return b.command('run', 'Run something') }
+export async function repl() { return '> ' }
+export async function inputRepl(input) {
+  if (input.type === 'line') {
+    const cs = rune.commandsSchema()
+    section.emit(section.create('result', { type: 'markdown', content: JSON.stringify(cs?.[0]?.name ?? null) }))
+    return { type: 'done' }
+  }
+}
+`)
+    const sections = []
+    const session = await runRuneInRepl(f, effective, [], tmp, {
+      runeKey: 'my-repl-rune',
+      onEvent(e) { if (e.type === 'section') sections.push(e.section) },
+    })
+    await session.step({ type: 'line', text: 'hello' })
+    await session.dispose()
+    expect(sections[0]?.data?.content).toBe('"run"')
+  })
+})

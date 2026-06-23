@@ -61,9 +61,9 @@ declare namespace lifecycle {
    * Only .command() declarations at the root level are used — .option() and .positional() at root are ignored.
    * Matched commands are dispatched to inputRepl() as { type: "command", args: ParsedArgs }.
    *
-   * @param builder The schema builder — use only .command() at root level.
+   * @param builder The command builder — use only .command() at root level.
    */
-  function commandsRepl(builder: ArgBuilder): void | ArgBuilder | any | Promise<void | ArgBuilder | any>
+  function commandsRepl(builder: CommandBuilder): void | CommandBuilder | any | Promise<void | CommandBuilder | any>
 
   /**
    * Per-input handler. Called once per InputEvent for the lifetime of the REPL session.
@@ -104,6 +104,12 @@ declare namespace lifecycle {
   type ReplSignal =
     | { type: 'prompt'; value?: string }   // continue with optional custom prompt
     | { type: 'done'; message?: string }   // end the session
+
+  /** Fluent builder for declaring REPL slash commands. Only .command() at root is meaningful — .option(), .positional(), .example() at root are ignored by the runtime. */
+  interface CommandBuilder {
+    command(name: string, description: string, callback?: (sub: ArgBuilder) => void): this
+    build(): any
+  }
 
   /** Fluent builder for defining rune options, positionals, and examples. */
   interface ArgBuilder {
@@ -158,10 +164,10 @@ declare namespace lifecycle {
     /** Original raw arguments passed to the rune. */
     $raw: string[]
 
-    /** Space-separated matched command path string (e.g. 'remote add'). Only present when a subcommand matched. */
-    $command?: string
+    /** Space-separated matched command path. Empty string at root level. Always present. */
+    $command: string
 
-    /** Array of matched command path levels (e.g. ['remote', 'add']). Only present when a subcommand matched. */
-    $commands?: string[]
+    /** Array of matched command path levels. Empty array at root level. Always present. */
+    $commands: string[]
   }
 }

@@ -1,5 +1,42 @@
-/** Inter-rune call utilities */
+/** Inter-rune call utilities and self-inspection */
 declare namespace rune {
+  /** Returns the current rune's key (e.g. 'my-rune' or 'myplugin:my-rune'). null in bootstrap contexts. */
+  function key(): string | null
+
+  /** Returns the formatted CLI help text for the current rune. Empty string if no args schema. */
+  function helpText(): string
+
+  /** Creates a markdown section containing the formatted CLI help text. */
+  function helpSection(): RuneSection
+
+  /**
+   * Returns the raw arg schema object for the current rune.
+   * Source is args() during run lifecycle, argsRepl() during repl lifecycle.
+   * null if the rune exports no args/argsRepl function.
+   */
+  function argsSchema(): ArgSchema | null
+
+  /**
+   * Returns the raw commandsRepl schema for the current rune.
+   * null during run lifecycle or if commandsRepl() is not exported.
+   */
+  function commandsSchema(): CommandSchema[] | null
+
+  /** Root-level arg schema — no name or description (those belong to CommandSchema). */
+  interface ArgSchema {
+    options:     { flags: string; description: string; def?: any }[]
+    positionals: { spec: string; description: string }[]
+    examples:    { usage: string; description: string }[]
+    commands:    CommandSchema[]
+  }
+
+  /** Subcommand schema — extends ArgSchema with name and description. */
+  interface CommandSchema extends ArgSchema {
+    name:        string
+    description: string
+  }
+
+
   /**
    * Calls another rune as a subprocess and awaits completion.
    * Hard process boundary — safe for cross-author/plugin rune composition.
