@@ -50,7 +50,7 @@ await esbuild.build({
   outdir: 'dist',
   splitting: true,
   chunkNames: 'chunks/[name]-[hash]',
-  external: ['isolated-vm', 'better-sqlite3', '@aws-sdk/client-s3'],
+  external: ['isolated-vm', 'better-sqlite3', '@aws-sdk/client-s3', 'esbuild'],
   inject: ['./require-shim.js'],
   plugins: [embedIsolateSourcesPlugin],
 })
