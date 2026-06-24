@@ -246,6 +246,16 @@ async function runGit() {
   console.log(`⚡ Creating git tag "v${targetVersion}"...`)
   await shell.exec(`git tag v${targetVersion}`)
 
+  const { stdout: tagCheck } = await shell.exec(`git tag -l v${targetVersion}`, { throw: false, trim: true })
+  if (tagCheck !== `v${targetVersion}`) {
+    console.log(`⚠ Tag not found after first attempt — retrying...`)
+    await shell.exec(`git tag v${targetVersion}`, { throw: false })
+    const { stdout: tagRetry } = await shell.exec(`git tag -l v${targetVersion}`, { throw: false, trim: true })
+    if (tagRetry !== `v${targetVersion}`) {
+      throw new Error(`⚠ Tag verification failed after retry: "v${targetVersion}" was not found. Run "git tag v${targetVersion}" manually.`)
+    }
+  }
+
   console.log(`🎉 Successfully automated release commit and tag for v${targetVersion}!`)
   return section.create('git-status', {
     type: 'markdown',
