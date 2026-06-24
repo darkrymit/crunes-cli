@@ -16,24 +16,47 @@ globalThis.TransformStream = TransformStream
 globalThis.ByteLengthQueuingStrategy = ByteLengthQueuingStrategy
 globalThis.CountQueuingStrategy = CountQueuingStrategy
 
-class AbortSignal {
-  constructor() {
-    this.aborted = false
-    this._listeners = []
-  }
-  addEventListener(type, listener) {
-    if (type === 'abort') this._listeners.push(listener)
-  }
-  removeEventListener(type, listener) {
-    if (type === 'abort') this._listeners = this._listeners.filter(l => l !== listener)
+class EventTarget {
+  constructor() { this._listeners = {} }
+  addEventListener(type, fn) { (this._listeners[type] ??= []).push(fn) }
+  removeEventListener(type, fn) {
+    this._listeners[type] = (this._listeners[type] ?? []).filter(f => f !== fn)
   }
   dispatchEvent(event) {
-    if (event.type === 'abort') {
-      this.aborted = true
-      for (const listener of this._listeners) {
-        try { listener(event) } catch (e) {}
-      }
-    }
+    for (const fn of (this._listeners[event.type] ?? [])) fn.call(this, event)
+    return true
+  }
+}
+class Event {
+  constructor(type, init = {}) {
+    this.type = type
+    this.bubbles = !!init.bubbles
+    this.cancelable = !!init.cancelable
+    this.defaultPrevented = false
+  }
+  preventDefault() { if (this.cancelable) this.defaultPrevented = true }
+}
+class CustomEvent extends Event {
+  constructor(type, init = {}) { super(type, init); this.detail = init.detail ?? null }
+}
+globalThis.EventTarget = EventTarget
+globalThis.Event = Event
+globalThis.CustomEvent = CustomEvent
+
+class AbortSignal extends EventTarget {
+  constructor() {
+    super()
+    this.aborted = false
+    this.reason = undefined
+  }
+  _abort(reason) {
+    if (this.aborted) return
+    this.aborted = true
+    this.reason = reason ?? new Error('AbortError')
+    this.dispatchEvent(new Event('abort'))
+  }
+  throwIfAborted() {
+    if (this.aborted) throw this.reason
   }
 }
 
@@ -41,22 +64,25 @@ class AbortController {
   constructor() {
     this.signal = new AbortSignal()
   }
-  abort() {
-    if (!this.signal.aborted) {
-      this.signal.dispatchEvent({ type: 'abort' })
-    }
+  abort(reason) {
+    this.signal._abort(reason)
   }
+}
+AbortSignal.abort = (reason) => {
+  const s = new AbortSignal()
+  s._abort(reason)
+  return s
+}
+AbortSignal.timeout = (ms) => {
+  const ctrl = new AbortController()
+  setTimeout(() => ctrl.abort(), ms)
+  return ctrl.signal
 }
 
 globalThis.TextEncoder = TextEncoder
 globalThis.TextDecoder = TextDecoder
 globalThis.AbortController = AbortController
 globalThis.AbortSignal = AbortSignal
-AbortSignal.timeout = (ms) => {
-  const ctrl = new AbortController()
-  setTimeout(() => ctrl.abort(), ms)
-  return ctrl.signal
-}
 
 class Blob {
   constructor(parts = [], { type = '' } = {}) {
