@@ -1733,7 +1733,7 @@ globalThis.utils = {
 }
 
 export const { fs, shell, section, rune, json, yaml, xml, csv, http, env, vars, archive, cache, sqlite, db, crypt, codec, ws, time, notify } = globalThis.utils
-export { md, tree, help }
+export { md, tree }
 
 // ─── Global Sandbox Timers ───────────────────────────────────────────────────
 const timers = new Map()
@@ -1809,7 +1809,3 @@ globalThis.utils.rune.helpSection    = () => globalThis.utils.section.create('he
 globalThis.utils.rune.argsSchema     = () => __runeArgsSchema
 globalThis.utils.rune.commandsSchema = () => __runeCommandsSchema?.commands ?? null
 
-const help = {
-  text:    () => globalThis.utils.rune.helpText(),
-  section: () => globalThis.utils.rune.helpSection(),
-}

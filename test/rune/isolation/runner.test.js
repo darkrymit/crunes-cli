@@ -970,21 +970,6 @@ export async function run() {
     expect(result[0].data.content).toBe('null')
   })
 
-  it('help.text() still works as deprecated alias for rune.helpText()', async () => {
-    const f = join(tmp, 'rune.js')
-    await writeFile(f, `
-import { section } from '@utils'
-import { help } from '@utils'
-export function args(b) {
-  return b.option('--verbose', 'Verbose', false)
-}
-export async function run() {
-  return [section.create('result', { type: 'markdown', content: help.text().length > 0 ? 'yes' : 'no' })]
-}
-`)
-    const result = await runRuneInIsolate(f, effective, [], tmp, { runeKey: 'test-rune' })
-    expect(result[0].data.content).toBe('yes')
-  })
 })
 
 describe('getArgsSchema — schema cache', () => {
