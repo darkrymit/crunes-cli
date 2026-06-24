@@ -1300,6 +1300,7 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
     return id
   }))
 
+  await jail.set('$__performance_now', new ivm.Reference(() => performance.now()))
   await jail.set('$__vars', JSON.stringify(vars))
   await jail.set('$__projectDir', projectDir)
   await jail.set('$__rune_key',             runeContext?.key ?? null)
