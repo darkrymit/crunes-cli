@@ -1,6 +1,6 @@
 {
   "name": "@darkrymit/crunes-cli",
-  "version": "0.8.2",
+  "version": "0.8.3",
   "description": "CLI tool for querying crunes enrichers",
   "type": "module",
   "bin": {
@@ -15,6 +15,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "esbuild": "^0.28.0",
     "isolated-vm": "^6.1.2"
   },
   "optionalDependencies": {
@@ -31,7 +32,6 @@
     "csv-parse": "^7.0.0",
     "csv-stringify": "^6.8.0",
     "dotenv": "^17.4.2",
-    "esbuild": "^0.28.0",
     "fast-text-encoding": "^1.0.6",
     "fast-xml-parser": "^5.8.0",
     "json5": "^2.2.3",
