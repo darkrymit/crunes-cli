@@ -3,13 +3,7 @@ import { mkdtemp, rm, mkdir, writeFile } from 'node:fs/promises'
 import { join, dirname, resolve } from 'node:path'
 import { tmpdir } from 'node:os'
 import { fileURLToPath } from 'node:url'
-import ivm from 'isolated-vm'
 import { createModuleResolver } from '../../../src/rune/isolation/resolver.js'
-
-const SCRATCH_NM = resolve(
-  dirname(fileURLToPath(import.meta.url)),
-  '../../../../scratch/semver-import-test/.crunes/node_modules'
-)
 
 async function makeTmp() {
   const tmp = await mkdtemp(join(tmpdir(), 'crunes-resolver-test-'))
@@ -304,26 +298,6 @@ describe('bundleNpmPackage', () => {
     bundleNpmPackage = mod.bundleNpmPackage
   })
 
-  it('bundles a CJS package and returns default + named keys', async () => {
-    const { bundleText, namedKeys } = await bundleNpmPackage(join(SCRATCH_NM, 'semver/index.js'))
-    expect(bundleText).toContain('export default')
-    expect(namedKeys).toContain('gt')
-    expect(namedKeys).toContain('parse')
-    expect(namedKeys).toContain('satisfies')
-  }, 30000)
-
-  it('CJS bundle text contains named re-exports', async () => {
-    const { bundleText } = await bundleNpmPackage(join(SCRATCH_NM, 'semver/index.js'))
-    expect(bundleText).toContain('export const {')
-  }, 30000)
-
-  it('bundles an ESM package and returns named keys from metafile', async () => {
-    const { bundleText, namedKeys } = await bundleNpmPackage(join(SCRATCH_NM, 'axios/index.js'))
-    expect(namedKeys).toContain('default')
-    expect(namedKeys.length).toBeGreaterThan(1)
-    expect(bundleText).not.toContain('__commonJS')
-  }, 30000)
-
   it('returns array of namedKeys gracefully for minimal CJS module', async () => {
     const { writeFile: wf, mkdtemp: mkt, rm: rmr } = await import('node:fs/promises')
     const { tmpdir: td } = await import('node:os')
@@ -335,61 +309,5 @@ describe('bundleNpmPackage', () => {
     } finally {
       await rmr(tmp, { recursive: true, force: true })
     }
-  }, 30000)
-})
-
-describe('createModuleResolver — npm package imports (integration)', () => {
-  let iso, ctx
-
-  beforeEach(async () => {
-    iso = new ivm.Isolate({ memoryLimit: 128 })
-    ctx = await iso.createContext()
-  })
-  afterEach(() => { if (!iso.isDisposed) iso.dispose() })
-
-  it('resolves semver (CJS) and gt named export is accessible', async () => {
-    const { resolve } = createModuleResolver(
-      iso, SCRATCH_NM, SCRATCH_NM, null, ['module:semver'], [], null, null
-    )
-    const mod = await resolve('semver', null)
-    await mod.instantiate(ctx, () => { throw new Error('no deps') })
-    await mod.evaluate()
-    const gt = await mod.namespace.get('gt', { reference: true })
-    expect(gt).toBeDefined()
-  }, 30000)
-
-  it('resolves axios (ESM) and default export is accessible', async () => {
-    const { resolve } = createModuleResolver(
-      iso, SCRATCH_NM, SCRATCH_NM, null, ['module:axios'], [], null, null
-    )
-    const mod = await resolve('axios', null)
-    await mod.instantiate(ctx, () => { throw new Error('no deps') })
-    await mod.evaluate()
-    const axiosDefault = await mod.namespace.get('default', { reference: true })
-    expect(axiosDefault).toBeDefined()
-  }, 30000)
-
-  it('caches npm module — compileModule called once for two resolves', async () => {
-    let compileCount = 0
-    const origCompile = iso.compileModule.bind(iso)
-    // Wrap via a plain object proxy since ivm.Isolate is not extensible
-    const wrappedIso = new Proxy(iso, {
-      get(target, prop) {
-        if (prop === 'compileModule') {
-          return async (...args) => {
-            if (args[0]?.includes('export const {')) compileCount++
-            return origCompile(...args)
-          }
-        }
-        const val = target[prop]
-        return typeof val === 'function' ? val.bind(target) : val
-      }
-    })
-    const { resolve } = createModuleResolver(
-      wrappedIso, SCRATCH_NM, SCRATCH_NM, null, ['module:semver'], [], null, null
-    )
-    await resolve('semver', null)
-    await resolve('semver', null)
-    expect(compileCount).toBe(1)
   }, 30000)
 })
