@@ -5,6 +5,7 @@ project.local.json
 # run logs
 logs/
 
-# local caches and databases (gitignored by default)
+# local caches, databases, and schema cache (gitignored by default)
 caches/
+schemas/
 sqlite/
