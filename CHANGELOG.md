@@ -5,6 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.1] - 2026-06-24
+
+### Breaking Changes
+- **`help` namespace removed**: `import { help } from '@utils'` now throws. Migrate to `rune.helpSection()` and `rune.helpText()`.
+- **`utils.crypto` renamed to `utils.crypt`**: `import { crypto } from '@utils'` now throws. Rename to `crypt`.
+- **`.crunes/cache` → `.crunes/caches`**: Local cache directory renamed; delete old `.crunes/cache/` if present.
+
+### Added
+- **`notify` namespace**: OS desktop notifications — Windows Toast (WinRT), macOS (`osascript`), Linux (`notify-send`). Permission token: `notify.send`.
+- **`globalThis.crypto` (Web Crypto API)**: Full `SubtleCrypto` surface (`digest`, `sign`, `verify`, `encrypt`, `decrypt`, `generateKey`, `importKey`, `exportKey`, `deriveKey`, `deriveBits`, `wrapKey`, `unwrapKey`) injected into the isolate. `CryptoKey` objects are opaque handle-mapped host-side and never cross the ivm boundary.
+- **`csv` namespace**: Read/write/stream CSV and TSV; `headers`, `count`, `append`, `appendObjects`; `from`/`to` line slicing on `read`/`readObjects`.
+- **`fs.read` line slicing**: `from`/`to` options (1-indexed, negative = from end) on `fs.read` and `fs.prepend`.
+- **`fs.prepend`**: Prepend content to a file; creates the file if missing.
+- **`fs.watch`**: Chokidar-backed file watcher; fires `create`/`modify`/`delete` events; returns `{ stop() }`.
+- **`json` improvements**: Multi-format support, JSONC comment round-trips, `writePath`.
+- **`yaml` / `xml` improvements**: `parse`, `stringify`, `readPath`, `readPathAll`, `writePath`; `xml.modify` type corrected; `readPath`/`readPathAll` `defaultValue` → `fallback`.
+- **`json.parse` / `json.stringify`**: Exposed on the `json` namespace.
+- **`rune` self-inspection**: `rune.key`, `rune.argsSchema`, `rune.commandsSchema`, `rune.helpText`.
+- **`rune.helpSection()` / `rune.helpText()`**: Moved from deprecated `help` namespace onto `rune`.
+- **npm package imports**: `exports` field resolution + esbuild CJS bundling for npm packages inside the isolate.
+- **Schema caching**: `args`/`argsRepl`/`commandsRepl` schemas cached to skip isolate spin-up on repeated invocations.
+
+### Changed
+- **`utils.crypto` → `utils.crypt`**: Renamed to free `crypto` name for `globalThis.crypto`.
+- **`config.dependencies` dropped**: The allow-list is the sole gate for local npm imports; `dependencies` key removed from config.
+
+### Fixed
+- **`$command` / `$commands` always assigned**: Args builder now always sets these fields even when no subcommand is matched.
+- **WinRT toast AppID registration**: Lazy HKCU AppID registration for persistent Windows notifications.
+
+---
+
 ## [0.8.0] - 2026-06-16
 
 ### Breaking Changes
