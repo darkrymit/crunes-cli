@@ -290,6 +290,13 @@ class TextDecoderStream {
 globalThis.TextEncoderStream = TextEncoderStream
 globalThis.TextDecoderStream = TextDecoderStream
 
+globalThis.structuredClone = (val) => JSON.parse(JSON.stringify(val))
+globalThis.queueMicrotask = (fn) => Promise.resolve().then(fn)
+globalThis.btoa = (str) => Buffer.from(str, 'binary').toString('base64')
+globalThis.atob = (b64) => Buffer.from(b64, 'base64').toString('binary')
+globalThis.performance = { now: () => $__performance_now.applySync(undefined, []) }
+globalThis.Buffer = Buffer
+
 class Request {
   constructor(input, init = {}) {
     if (input instanceof Request) {
