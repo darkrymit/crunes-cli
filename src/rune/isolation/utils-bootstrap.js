@@ -9,6 +9,7 @@ const __vars = JSON.parse($__vars)
 
 import { TextEncoder, TextDecoder } from 'fast-text-encoding'
 import { ReadableStream, WritableStream, TransformStream, ByteLengthQueuingStrategy, CountQueuingStrategy } from 'web-streams-polyfill'
+import { Buffer } from 'buffer'
 
 globalThis.ReadableStream = ReadableStream
 globalThis.WritableStream = WritableStream
@@ -191,12 +192,13 @@ class URLSearchParams {
         else { this._params.push([decodeURIComponent(pair.slice(0, eq)), decodeURIComponent(pair.slice(eq + 1))]) }
       }
     } else if (Array.isArray(init)) {
-      for (const [k, v] of init) this._params.push([k, v])
+      for (const [k, v] of init) this._params.push([String(k), String(v)])
     } else if (init && typeof init === 'object') {
       for (const [k, v] of Object.entries(init)) this._params.push([k, String(v)])
     }
   }
   append(name, value) { this._params.push([name, String(value)]) }
+  delete(name) { this._params = this._params.filter(([k]) => k !== name) }
   get(name) { return (this._params.find(([k]) => k === name) ?? [null, null])[1] }
   getAll(name) { return this._params.filter(([k]) => k === name).map(([, v]) => v) }
   has(name) { return this._params.some(([k]) => k === name) }
@@ -209,16 +211,51 @@ class URLSearchParams {
       this._params.push([name, String(value)])
     }
   }
-  delete(name) { this._params = this._params.filter(([k]) => k !== name) }
-  toString() {
-    return this._params.map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join('&')
-  }
+  toString() { return this._params.map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join('&') }
   entries() { return this._params[Symbol.iterator]() }
   keys() { return this._params.map(([k]) => k)[Symbol.iterator]() }
   values() { return this._params.map(([, v]) => v)[Symbol.iterator]() }
   [Symbol.iterator]() { return this._params[Symbol.iterator]() }
 }
 globalThis.URLSearchParams = URLSearchParams
+
+class URL {
+  constructor(input, base) {
+    const str = String(input)
+    let full = str
+    if (base !== undefined) {
+      const b = base instanceof URL ? base.href : String(base)
+      if (/^https?:\/\//i.test(str)) { full = str }
+      else if (str.startsWith('//')) { full = b.match(/^https?:/i)?.[0] + str }
+      else if (str.startsWith('/')) { full = b.replace(/^(https?:\/\/[^/]+).*/i, '$1') + str }
+      else { full = b.replace(/[^/]*$/, '') + str }
+    }
+    const m = full.match(/^([a-z][a-z0-9+\-.]*):\/\/([^/?#]*)([^?#]*)(\?[^#]*)?(#.*)?$/i)
+    if (!m) throw new TypeError(`Invalid URL: ${str}`)
+    this._protocol = m[1].toLowerCase() + ':'
+    const host = m[2] || ''
+    const ci = host.indexOf(':')
+    this._hostname = ci === -1 ? host : host.slice(0, ci)
+    this._port = ci === -1 ? '' : host.slice(ci + 1)
+    this._pathname = m[3] || '/'
+    this._search = m[4] || ''
+    this._hash = m[5] || ''
+    this._searchParams = new URLSearchParams(this._search)
+  }
+  get protocol() { return this._protocol }
+  get hostname() { return this._hostname }
+  get port() { return this._port }
+  get host() { return this._port ? `${this._hostname}:${this._port}` : this._hostname }
+  get pathname() { return this._pathname }
+  get search() { return this._searchParams.toString() ? '?' + this._searchParams.toString() : '' }
+  get searchParams() { return this._searchParams }
+  get hash() { return this._hash }
+  get origin() { return `${this._protocol}//${this.host}` }
+  get href() { return `${this._protocol}//${this.host}${this._pathname}${this.search}${this._hash}` }
+  toString() { return this.href }
+  toJSON() { return this.href }
+}
+globalThis.URL = URL
 
 class TextEncoderStream {
   constructor() {
