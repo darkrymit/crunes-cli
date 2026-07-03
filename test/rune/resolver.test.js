@@ -7,7 +7,7 @@ vi.mock('../../src/rune/isolation/runner.js', () => ({
 }))
 vi.mock('../../src/plugin/registry.js', () => ({
   loadRegistry: vi.fn().mockResolvedValue({ plugins: {} }),
-  resolvePluginKey: vi.fn().mockReturnValue(null),
+  resolvePluginKeyScoped: vi.fn().mockReturnValue(null),
 }))
 vi.mock('../../src/plugin/manifest.js', () => ({
   loadPluginJson: vi.fn(),
@@ -15,7 +15,7 @@ vi.mock('../../src/plugin/manifest.js', () => ({
 
 import { runRune } from '../../src/rune/resolver.js'
 import { runRuneInIsolate, executePluginRune } from '../../src/rune/isolation/runner.js'
-import { loadRegistry, resolvePluginKey } from '../../src/plugin/registry.js'
+import { loadRegistry, resolvePluginKeyScoped } from '../../src/plugin/registry.js'
 import { loadPluginJson } from '../../src/plugin/manifest.js'
 
 const baseConfig = {
@@ -136,7 +136,7 @@ describe('runRune — plugin rune permission/vars override via runes["plugin:run
   beforeEach(() => vi.clearAllMocks())
 
   it('passes runes["plugin:rune"].permissions/.vars as projectPerms/projectVars to executePluginRune', async () => {
-    resolvePluginKey.mockReturnValue('my-plugin')
+    resolvePluginKeyScoped.mockReturnValue('my-plugin')
     loadRegistry.mockResolvedValue({
       plugins: { 'my-plugin': { path: '/plugins/my-plugin', cacheDir: '/plugins/my-plugin' } }
     })
@@ -167,9 +167,9 @@ describe('runRune — plugin rune permission/vars override via runes["plugin:run
   })
 
   it('auto-discovered bare-key plugin rune also picks up runes["plugin:rune"] override', async () => {
-    // Note: a bare key (no colon) never reaches resolvePluginKey — resolvePluginRune()
+    // Note: a bare key (no colon) never reaches resolvePluginKeyScoped — resolvePluginRune()
     // short-circuits on `colonIdx === -1` and resolveRuneFromPlugins() (the actual
-    // auto-discovery path) doesn't call resolvePluginKey at all. No mock needed for it here.
+    // auto-discovery path) doesn't call resolvePluginKeyScoped at all. No mock needed for it here.
     loadRegistry.mockResolvedValue({
       plugins: { 'my-plugin': { path: '/plugins/my-plugin', cacheDir: '/plugins/my-plugin' } }
     })
@@ -197,5 +197,27 @@ describe('runRune — plugin rune permission/vars override via runes["plugin:run
         projectVars: { region: 'eu-west-1' },
       })
     )
+  })
+
+  it('resolves a bare plugin:rune key correctly even when a same-named plugin is installed but not enabled elsewhere', async () => {
+    resolvePluginKeyScoped.mockImplementation((name, registry, enabledPlugins) => {
+      // Simulate registry.js's real scoping logic for this one test, proving resolver.js
+      // passes config.plugins through as enabledPlugins correctly.
+      if (name === 'my-plugin' && enabledPlugins.includes('my-org@my-plugin')) return 'my-org@my-plugin'
+      throw new Error('scoping not applied correctly')
+    })
+    loadRegistry.mockResolvedValue({
+      plugins: { 'my-org@my-plugin': { path: '/plugins/my-plugin', cacheDir: '/plugins/my-plugin' } }
+    })
+    loadPluginJson.mockResolvedValue({
+      name: 'my-org@my-plugin',
+      version: '1.0.0',
+      runes: { deploy: { permissions: {}, vars: {} } }
+    })
+
+    const config = { plugins: ['my-org@my-plugin'], runes: {} }
+    await runRune('/project', config, 'my-plugin:deploy', [])
+
+    expect(executePluginRune).toHaveBeenCalled()
   })
 })

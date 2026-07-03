@@ -1,5 +1,5 @@
 import { join } from 'node:path'
-import { loadRegistry, resolvePluginKey } from '../plugin/registry.js'
+import { loadRegistry, resolvePluginKeyScoped } from '../plugin/registry.js'
 import { loadPluginJson } from '../plugin/manifest.js'
 import { executePluginRune, runRuneInIsolate, runRuneInRepl, getPluginRunePath } from './isolation/runner.js'
 import { computeEffectivePermissions } from './permissions/permissions.js'
@@ -32,7 +32,7 @@ export async function resolvePluginRune(config, key) {
     return null
   }
 
-  const pluginKey = resolvePluginKey(pluginPart, registry)
+  const pluginKey = resolvePluginKeyScoped(pluginPart, registry, enabledPlugins)
   if (!pluginKey) return null
 
   if (!enabledPlugins.includes(pluginKey)) return null
