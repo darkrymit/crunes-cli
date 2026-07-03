@@ -55,3 +55,31 @@ export function resolvePluginKey(nameOrKey, registry) {
   return matches[0] ?? null
 }
 
+/**
+ * Resolves a bare plugin name scoped to the project's enabled plugins first.
+ * A fully-qualified "marketplace@plugin" key is returned unchanged.
+ * Throws if 2+ enabled plugins share the bare name, or if the name isn't
+ * enabled in this project but exists globally (names the real candidates).
+ * Returns null if the name doesn't exist anywhere.
+ */
+export function resolvePluginKeyScoped(nameOrKey, registry, enabledPlugins) {
+  if (nameOrKey.includes('@')) return nameOrKey
+
+  const allMatches = Object.keys(registry.plugins ?? {})
+    .filter(k => k.slice(k.indexOf('@') + 1) === nameOrKey)
+  const scopedMatches = allMatches.filter(k => enabledPlugins.includes(k))
+
+  if (scopedMatches.length === 1) return scopedMatches[0]
+
+  if (scopedMatches.length > 1) {
+    throw new Error(`Ambiguous plugin "${nameOrKey}". Use the full key: ${scopedMatches.join(', ')}`)
+  }
+
+  if (allMatches.length === 0) return null
+
+  throw new Error(
+    `Plugin "${nameOrKey}" is not enabled in this project (installed as ${allMatches.join(', ')}). ` +
+    `Run: crunes plugin enable ${allMatches.length === 1 ? allMatches[0] : '<one of the above>'}`
+  )
+}
+
