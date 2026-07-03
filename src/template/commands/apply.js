@@ -41,13 +41,14 @@ export async function resolveTemplate(sourceName, templateName, projectRoot) {
     try { pluginJson = await loadPluginJson(pluginEntry.path) } catch { continue }
     const templateMeta = (pluginJson.templates ?? {})[templateName]
     if (templateMeta) {
-      matches.push({ pluginName, pluginEntry, pluginJson, templateMeta })
+      matches.push({ pluginKey, pluginName, pluginEntry, pluginJson, templateMeta })
     }
   }
 
   if (matches.length > 1) {
-    const sources = matches.map(m => m.pluginName).join(', ')
-    output.error(`"${templateName}" matches templates in multiple sources: ${sources}. Use source:${templateName}.`)
+    const sources = matches.map(m => m.pluginKey).join(', ')
+    const options = matches.map(m => `${m.pluginKey}:${templateName}`).join(' or ')
+    output.error(`"${templateName}" matches templates in multiple sources: ${sources}. Use ${options}.`)
     process.exit(1)
   }
   if (matches.length === 1) {

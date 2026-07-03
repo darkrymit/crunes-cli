@@ -112,3 +112,36 @@ describe('resolveTemplate — plugin template custom path', () => {
     expect(result.templateMeta.path).toBe('lib/templates/greeting.js')
   })
 })
+
+describe('resolveTemplate — ambiguity message shows full keys', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('lists full marketplace@name:template forms, not bare names or a placeholder', async () => {
+    vi.mocked(loadRegistry).mockResolvedValue({
+      plugins: {
+        'sole-market@git': { path: '/plugins/git' },
+        'other-market@docker-tools': { path: '/plugins/docker' },
+      }
+    })
+    vi.mocked(loadPluginJson).mockImplementation(async (dir) => {
+      if (dir === '/plugins/git') return { templates: { info: { name: 'Git Info' } } }
+      if (dir === '/plugins/docker') return { templates: { info: { name: 'Docker Info' } } }
+      throw new Error('unexpected dir')
+    })
+
+    const { output } = await import('../../src/shared/output.js')
+    const errorSpy = vi.spyOn(output, 'error').mockImplementation(() => {})
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {})
+
+    await resolveTemplate(null, 'info', '/project')
+
+    expect(errorSpy).toHaveBeenCalledWith(
+      '"info" matches templates in multiple sources: sole-market@git, other-market@docker-tools. ' +
+      'Use sole-market@git:info or other-market@docker-tools:info.'
+    )
+    expect(exitSpy).toHaveBeenCalledWith(1)
+
+    errorSpy.mockRestore()
+    exitSpy.mockRestore()
+  })
+})
