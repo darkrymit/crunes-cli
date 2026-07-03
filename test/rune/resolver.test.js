@@ -9,9 +9,14 @@ vi.mock('../../src/plugin/registry.js', () => ({
   loadRegistry: vi.fn().mockResolvedValue({ plugins: {} }),
   resolvePluginKey: vi.fn().mockReturnValue(null),
 }))
+vi.mock('../../src/plugin/manifest.js', () => ({
+  loadPluginJson: vi.fn(),
+}))
 
 import { runRune } from '../../src/rune/resolver.js'
-import { runRuneInIsolate } from '../../src/rune/isolation/runner.js'
+import { runRuneInIsolate, executePluginRune } from '../../src/rune/isolation/runner.js'
+import { loadRegistry, resolvePluginKey } from '../../src/plugin/registry.js'
+import { loadPluginJson } from '../../src/plugin/manifest.js'
 
 const baseConfig = {
   runes: {
@@ -124,5 +129,73 @@ describe('runRune — local npm imports via .crunes/node_modules', () => {
     await runRune('/project', config, 'hello', [], { configDir: '/config' })
     const opts = runRuneInIsolate.mock.calls[0][4]
     expect(opts.nodeModulesDir).toBe(join('/config', '.crunes', 'node_modules'))
+  })
+})
+
+describe('runRune — plugin rune permission/vars override via runes["plugin:rune"]', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('passes runes["plugin:rune"].permissions/.vars as projectPerms/projectVars to executePluginRune', async () => {
+    resolvePluginKey.mockReturnValue('my-plugin')
+    loadRegistry.mockResolvedValue({
+      plugins: { 'my-plugin': { path: '/plugins/my-plugin', cacheDir: '/plugins/my-plugin' } }
+    })
+    loadPluginJson.mockResolvedValue({
+      name: 'my-plugin',
+      version: '1.0.0',
+      runes: { deploy: { permissions: {}, vars: {} } }
+    })
+
+    const config = {
+      plugins: ['my-plugin'],
+      runes: {
+        'my-plugin:deploy': {
+          vars: { region: 'us-east-1' },
+          permissions: { run: { allow: ['fs.read:src/**'] } }
+        }
+      }
+    }
+
+    await runRune('/project', config, 'my-plugin:deploy', [])
+
+    expect(executePluginRune).toHaveBeenCalledWith(
+      expect.objectContaining({
+        projectPerms: { run: { allow: ['fs.read:src/**'] } },
+        projectVars: { region: 'us-east-1' },
+      })
+    )
+  })
+
+  it('auto-discovered bare-key plugin rune also picks up runes["plugin:rune"] override', async () => {
+    // Note: a bare key (no colon) never reaches resolvePluginKey — resolvePluginRune()
+    // short-circuits on `colonIdx === -1` and resolveRuneFromPlugins() (the actual
+    // auto-discovery path) doesn't call resolvePluginKey at all. No mock needed for it here.
+    loadRegistry.mockResolvedValue({
+      plugins: { 'my-plugin': { path: '/plugins/my-plugin', cacheDir: '/plugins/my-plugin' } }
+    })
+    loadPluginJson.mockResolvedValue({
+      name: 'my-plugin',
+      version: '1.0.0',
+      runes: { deploy: { permissions: {}, vars: {} } }
+    })
+
+    const config = {
+      plugins: ['my-plugin'],
+      runes: {
+        'my-plugin:deploy': {
+          vars: { region: 'eu-west-1' },
+          permissions: { run: { allow: ['fs.read:dist/**'] } }
+        }
+      }
+    }
+
+    await runRune('/project', config, 'deploy', [])
+
+    expect(executePluginRune).toHaveBeenCalledWith(
+      expect.objectContaining({
+        projectPerms: { run: { allow: ['fs.read:dist/**'] } },
+        projectVars: { region: 'eu-west-1' },
+      })
+    )
   })
 })
