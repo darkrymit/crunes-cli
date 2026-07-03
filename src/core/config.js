@@ -58,6 +58,20 @@ export function validateConfig(config, fileName = 'config.json') {
           }
         }
       }
+
+      if (entry && typeof entry === 'object' && !entry.path && !entry.plugin) {
+        const colonIdx = runeKey.indexOf(':')
+        if (colonIdx !== -1) {
+          const pluginPart = runeKey.slice(0, colonIdx)
+          if (!pluginPart.includes('@')) {
+            throw new Error(
+              `${fileName}: runes["${runeKey}"] has no path or plugin, so it can only be a plugin-rune ` +
+              `override — but "${pluginPart}" is missing the marketplace prefix. Use the full ` +
+              `"marketplace@plugin:${runeKey.slice(colonIdx + 1)}" form.`
+            )
+          }
+        }
+      }
     }
   }
 }

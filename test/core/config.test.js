@@ -33,6 +33,55 @@ describe('validateConfig', () => {
     expect(spy).toHaveBeenCalled()
     spy.mockRestore()
   })
+
+  it('throws on a plugin-rune override key missing the marketplace prefix', () => {
+    const config = {
+      runes: {
+        'git:status': { vars: { region: 'us-east-1' } }
+      }
+    }
+    expect(() => validateConfig(config)).toThrow(
+      'config.json: runes["git:status"] has no path or plugin, so it can only be a plugin-rune ' +
+      'override — but "git" is missing the marketplace prefix. Use the full ' +
+      '"marketplace@plugin:status" form.'
+    )
+  })
+
+  it('does not throw on a fully-qualified plugin-rune override key', () => {
+    const config = {
+      runes: {
+        'my-org@git:status': { vars: { region: 'us-east-1' } }
+      }
+    }
+    expect(() => validateConfig(config)).not.toThrow()
+  })
+
+  it('does not throw on a local rune entry whose key happens to contain a colon, if it has a path', () => {
+    const config = {
+      runes: {
+        'weird:name': { path: '.crunes/runes/weird-name.js' }
+      }
+    }
+    expect(() => validateConfig(config)).not.toThrow()
+  })
+
+  it('does not throw on a plugin alias entry whose key contains a colon', () => {
+    const config = {
+      runes: {
+        'my-alias:thing': { plugin: 'my-org@git:status' }
+      }
+    }
+    expect(() => validateConfig(config)).not.toThrow()
+  })
+
+  it('does not throw on an ordinary local rune key with no colon at all', () => {
+    const config = {
+      runes: {
+        myrune: { path: '.crunes/runes/myrune.js' }
+      }
+    }
+    expect(() => validateConfig(config)).not.toThrow()
+  })
 })
 
 describe('mergeConfigs', () => {
