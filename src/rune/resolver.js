@@ -43,7 +43,7 @@ export async function resolvePluginRune(config, key) {
   return { pluginKey, runeKey, pluginDir: entry.path, pluginCacheDir: entry.cacheDir ?? entry.path }
 }
 
-async function resolveRuneFromPlugins(config, runeKey) {
+export async function resolveRuneFromPlugins(config, runeKey) {
   const enabledPlugins = config.plugins ?? []
   if (enabledPlugins.length === 0) return null
 
@@ -62,8 +62,9 @@ async function resolveRuneFromPlugins(config, runeKey) {
   }
 
   if (matches.length > 1) {
-    const names = matches.map(m => m.pluginKey.slice(m.pluginKey.indexOf('@') + 1)).join(', ')
-    throw new Error(`"${runeKey}" matches runes in multiple plugins: ${names}. Use plugin:${runeKey} to specify one.`)
+    const names = matches.map(m => m.pluginKey).join(', ')
+    const options = matches.map(m => `${m.pluginKey}:${runeKey}`).join(' or ')
+    throw new Error(`"${runeKey}" matches runes in multiple plugins: ${names}. Use ${options} to specify one.`)
   }
   return matches[0] ?? null
 }

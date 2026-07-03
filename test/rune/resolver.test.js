@@ -221,3 +221,28 @@ describe('runRune — plugin rune permission/vars override via runes["plugin:run
     expect(executePluginRune).toHaveBeenCalled()
   })
 })
+
+describe('resolveRuneFromPlugins — ambiguity message shows full keys', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('lists full marketplace@name:rune forms, not bare names or a placeholder', async () => {
+    loadRegistry.mockResolvedValue({
+      plugins: {
+        'sole-market@git': { path: '/plugins/git', cacheDir: '/plugins/git' },
+        'other-market@docker-tools': { path: '/plugins/docker', cacheDir: '/plugins/docker' },
+      }
+    })
+    loadPluginJson.mockImplementation(async (dir) => {
+      if (dir === '/plugins/git') return { name: 'git', version: '1.0.0', runes: { info: {} } }
+      if (dir === '/plugins/docker') return { name: 'docker-tools', version: '1.0.0', runes: { info: {} } }
+      throw new Error('unexpected dir')
+    })
+
+    const config = { plugins: ['sole-market@git', 'other-market@docker-tools'], runes: {} }
+
+    await expect(runRune('/project', config, 'info', [])).rejects.toThrow(
+      '"info" matches runes in multiple plugins: sole-market@git, other-market@docker-tools. ' +
+      'Use sole-market@git:info or other-market@docker-tools:info to specify one.'
+    )
+  })
+})
