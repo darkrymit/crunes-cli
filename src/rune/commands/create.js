@@ -72,9 +72,13 @@ export async function handler({
       output.error('Missing required argument: <key>')
       process.exit(1)
     }
-    if (!format || !VALID_FORMATS.includes(format)) {
-      output.error(`Missing or invalid --format. Must be one of: ${VALID_FORMATS.join(', ')}`)
+    if (format && !VALID_FORMATS.includes(format)) {
+      output.error(`Invalid --format. Must be one of: ${VALID_FORMATS.join(', ')}`)
       process.exit(1)
+    }
+    if (!format) {
+      format = 'markdown'
+      output.info('--format not specified, defaulting to "markdown"')
     }
   } else {
     intro('crunes create')

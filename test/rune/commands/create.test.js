@@ -76,16 +76,21 @@ describe('handler (non-interactive)', () => {
       expect(exitSpy).toHaveBeenCalledWith(1)
     })
 
-    it('exits 1 when format is missing', async () => {
-      await expect(handler({ key: 'myrune', yes: true, projectRoot: tmp, configRoot: tmp }))
-        .rejects.toThrow('process.exit(1)')
-      expect(exitSpy).toHaveBeenCalledWith(1)
-    })
-
     it('exits 1 when format is invalid', async () => {
       await expect(handler({ key: 'myrune', format: 'xml', yes: true, projectRoot: tmp, configRoot: tmp }))
         .rejects.toThrow('process.exit(1)')
       expect(exitSpy).toHaveBeenCalledWith(1)
+    })
+
+    it('defaults format to markdown and prints an info message when format is omitted', async () => {
+      const { output } = await import('../../../src/shared/output.js')
+      const infoSpy = vi.spyOn(output, 'info').mockImplementation(() => {})
+      await handler({ key: 'myrune', yes: true, projectRoot: tmp, configRoot: tmp })
+      expect(existsSync(join(tmp, '.crunes', 'runes', 'myrune.js'))).toBe(true)
+      const content = readFileSync(join(tmp, '.crunes', 'runes', 'myrune.js'), 'utf8')
+      expect(content).toContain('md.h3')
+      expect(infoSpy).toHaveBeenCalledWith(expect.stringContaining('markdown'))
+      infoSpy.mockRestore()
     })
   })
 
