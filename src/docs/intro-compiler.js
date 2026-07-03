@@ -127,14 +127,19 @@ export async function run() {
 import { shell, section } from '@utils'
 
 export async function run() {
-  // Run command relative to the project directory
-  const stdout = await shell.exec('git status --short');
-  return [
-    section.create('git-status', {
+  // Run command relative to the project directory.
+  // { throw: false } returns { stdout, stderr, exitCode, ok } instead of throwing on a non-zero exit.
+  const result = await shell.exec('git status --short', { throw: false });
+  if (!result.ok) {
+    return section.create('git-status', {
       type: 'markdown',
-      content: \`\\\`\\\`\\\`\\n\${stdout}\\n\\\`\\\`\\\`\`
-    })
-  ];
+      content: \`Failed (exit \${result.exitCode}): \${result.stderr}\`
+    });
+  }
+  return section.create('git-status', {
+    type: 'markdown',
+    content: \`\\\`\\\`\\\`\\n\${result.stdout}\\n\\\`\\\`\\\`\`
+  });
 }
 \`\`\``
 }
