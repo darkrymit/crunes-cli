@@ -133,7 +133,10 @@ export async function handler({
 
   if (isNonInteractive) {
     if (!name) { output.error('Missing required argument: <name>'); process.exit(1) }
-    if (!description) { output.error('Missing required option: --description'); process.exit(1) }
+    if (!description) {
+      description = `${name} — a crunes plugin`
+      output.info(`--description not specified, defaulting to "${description}"`)
+    }
     author = author ?? getGitAuthor()
     license = license ?? 'MIT'
   } else {

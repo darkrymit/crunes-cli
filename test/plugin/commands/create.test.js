@@ -88,9 +88,23 @@ describe('handler (non-interactive)', () => {
       expect(exitSpy).toHaveBeenCalledWith(1)
     })
 
-    it('exits 1 when description is missing', async () => {
-      await expect(handler({ name: 'x', yes: true })).rejects.toThrow('process.exit(1)')
-      expect(exitSpy).toHaveBeenCalledWith(1)
+    it('defaults description and prints an info message when description is omitted', async () => {
+      const tmp = makeTmp()
+      const out = join(tmp, 'my-plugin')
+      const { output } = await import('../../../src/shared/output.js')
+      const infoSpy = vi.spyOn(output, 'info').mockImplementation(() => {})
+      try {
+        await handler({ name: 'my-plugin', out, yes: true })
+        const mj = JSON.parse(readFileSync(join(out, '.crunes-plugin', 'marketplace.json'), 'utf8'))
+        expect(mj.description).toBe('my-plugin — a crunes plugin')
+        expect(mj.plugins[0].description).toBe('my-plugin — a crunes plugin')
+        const readme = readFileSync(join(out, 'README.md'), 'utf8')
+        expect(readme).toContain('my-plugin — a crunes plugin')
+        expect(infoSpy).toHaveBeenCalledWith(expect.stringContaining('my-plugin — a crunes plugin'))
+      } finally {
+        infoSpy.mockRestore()
+        rmSync(tmp, { recursive: true, force: true })
+      }
     })
   })
 
