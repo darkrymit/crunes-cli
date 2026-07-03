@@ -68,3 +68,43 @@ describe('disable handler — configRoot', () => {
     ).rejects.toThrow()
   })
 })
+
+describe('disable handler — scoped resolution, no global registry lookup', () => {
+  it('resolves a bare name using only config.plugins, ignoring a same-named globally-installed-but-not-enabled plugin', async () => {
+    const tmp1 = await mkdtemp(join(tmpdir(), 'crunes-disable-scoped-'))
+    await mkdir(join(tmp1, '.crunes'), { recursive: true })
+    await writeFile(
+      join(tmp1, '.crunes', 'config.json'),
+      JSON.stringify({ plugins: ['my-org@git'] }, null, 2)
+    )
+
+    // loadRegistry mock (from the outer beforeEach) would normally report crunes-plugins@git too,
+    // but disable must not need to consult it at all — this succeeds using only config.plugins.
+    await disableHandler({ name: 'git', projectRoot: tmp1, configRoot: tmp1 })
+
+    const written = JSON.parse(await import('node:fs/promises').then(fs => fs.readFile(join(tmp1, '.crunes', 'config.json'), 'utf8')))
+    expect(written.plugins).not.toContain('my-org@git')
+
+    await rm(tmp1, { recursive: true, force: true })
+  })
+
+  it('throws ambiguous with full keys when config.plugins itself has two matches', async () => {
+    const tmp2 = await mkdtemp(join(tmpdir(), 'crunes-disable-ambiguous-'))
+    await mkdir(join(tmp2, '.crunes'), { recursive: true })
+    await writeFile(
+      join(tmp2, '.crunes', 'config.json'),
+      JSON.stringify({ plugins: ['my-org@git', 'crunes-plugins@git'] }, null, 2)
+    )
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {})
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    await disableHandler({ name: 'git', projectRoot: tmp2, configRoot: tmp2 })
+
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('Ambiguous plugin "git". Use the full key: my-org@git, crunes-plugins@git'))
+    expect(exitSpy).toHaveBeenCalledWith(1)
+
+    exitSpy.mockRestore()
+    errorSpy.mockRestore()
+    await rm(tmp2, { recursive: true, force: true })
+  })
+})
