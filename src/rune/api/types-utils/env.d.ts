@@ -2,7 +2,7 @@
 declare namespace env {
   /**
    * Returns the value of an environment variable, or fallback if absent.
-   * Requires `env.read:<source>::<key>` permission (where source is `process` or a .env filename like `.env`). `*` matches any characters in the key (e.g. `env.read:process::GITHUB_*`).
+   * Requires `env.read:<key>` (no source prefix — checks `process.env`, then `.env.local`, then `.env`, in that order, returning the first match) or the source-scoped `env.read:<source>::<key>` (where source is `process` or any .env filename, e.g. a custom `.env.production`) permission. `*` matches any characters in the key (e.g. `env.read:GITHUB_*` or `env.read:process::GITHUB_*`).
    * @param key Environment variable name
    * @param fallback Value returned if key is absent
    */
@@ -10,7 +10,7 @@ declare namespace env {
 
   /**
    * Returns true if the environment variable exists and is permitted.
-   * Requires `env.read:<source>::<key>` permission (where source is `process` or a .env filename like `.env`). `*` matches any characters in the key (e.g. `env.read:process::GITHUB_*`).
+   * Requires `env.read:<key>` (no source prefix — checks `process.env`, then `.env.local`, then `.env`, in that order, returning true on the first match) or the source-scoped `env.read:<source>::<key>` (where source is `process` or any .env filename, e.g. a custom `.env.production`) permission. `*` matches any characters in the key (e.g. `env.read:GITHUB_*` or `env.read:process::GITHUB_*`).
    * @param key Environment variable name
    */
   function has(key: string): Promise<boolean>
