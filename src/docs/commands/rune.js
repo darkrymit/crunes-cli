@@ -70,8 +70,8 @@ export async function handler({ keys, format = 'text', projectRoot = process.cwd
     const basePerms = entry.permissions ?? { allow: [], deny: [] }
     const vars = entry.vars ?? {}
 
-    const runEffective  = computeEffectivePermissions(basePerms, config.permissions?.[key], 'run')
-    const replEffective = computeEffectivePermissions(basePerms, config.permissions?.[key], 'repl')
+    const runEffective  = computeEffectivePermissions(basePerms, undefined, 'run')
+    const replEffective = computeEffectivePermissions(basePerms, undefined, 'repl')
 
     let schema = null
     try {
