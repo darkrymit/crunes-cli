@@ -9,8 +9,6 @@ describe('program cli registration for intro', () => {
     const intro = docs.commands.find(c => c.name() === 'intro')
     expect(intro).toBeDefined()
     
-    expect(intro.options.map(o => o.flags).join(',')).toContain('--global')
     expect(intro.options.map(o => o.flags).join(',')).toContain('--out')
-    expect(intro.options.map(o => o.flags).join(',')).toContain('--format')
   })
 })
