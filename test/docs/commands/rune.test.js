@@ -2,7 +2,18 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { join } from 'node:path'
 import { mkdtemp, rm, mkdir, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
+
+vi.mock('../../../src/plugin/registry.js', () => ({
+  loadRegistry: vi.fn().mockResolvedValue({ plugins: {} }),
+  resolvePluginKeyScoped: vi.fn().mockReturnValue(null),
+}))
+vi.mock('../../../src/plugin/manifest.js', () => ({
+  loadPluginJson: vi.fn(),
+}))
+
 import { handler } from '../../../src/docs/commands/rune.js'
+import { loadRegistry, resolvePluginKeyScoped } from '../../../src/plugin/registry.js'
+import { loadPluginJson } from '../../../src/plugin/manifest.js'
 
 describe('help rune handler', () => {
   let tmp
@@ -176,5 +187,84 @@ describe('help rune handler', () => {
       const parsed = JSON.parse(out)
       expect(parsed[0].repl).toBeNull()
     })
+  })
+})
+
+describe('help rune handler — plugin runes', () => {
+  let tmp
+  let written
+
+  beforeEach(async () => {
+    tmp = await mkdtemp(join(tmpdir(), 'crunes-help-plugin-'))
+    await mkdir(join(tmp, '.crunes'), { recursive: true })
+    written = []
+    vi.spyOn(process.stdout, 'write').mockImplementation((chunk) => { written.push(chunk); return true })
+    vi.clearAllMocks()
+    loadRegistry.mockResolvedValue({ plugins: {} })
+    resolvePluginKeyScoped.mockReturnValue(null)
+  })
+
+  afterEach(async () => {
+    vi.restoreAllMocks()
+    await rm(tmp, { recursive: true, force: true })
+  })
+
+  it('resolves a fully-qualified plugin:rune key and renders its help', async () => {
+    await writeFile(join(tmp, '.crunes', 'config.json'), JSON.stringify({
+      runes: {}, plugins: ['my-org@git']
+    }))
+    resolvePluginKeyScoped.mockReturnValue('my-org@git')
+    loadRegistry.mockResolvedValue({
+      plugins: { 'my-org@git': { path: '/plugins/git', cacheDir: '/plugins/git' } }
+    })
+    loadPluginJson.mockResolvedValue({
+      name: 'git', version: '1.0.0',
+      runes: { status: { name: 'Git Status', description: 'Shows status', permissions: {} } }
+    })
+
+    await handler({ keys: ['my-org@git:status'], projectRoot: tmp, configRoot: tmp })
+    const out = written.join('')
+    expect(out).toContain('Shows status')
+  })
+
+  it('auto-discovers a bare rune key from an enabled plugin when no local entry exists', async () => {
+    await writeFile(join(tmp, '.crunes', 'config.json'), JSON.stringify({
+      runes: {}, plugins: ['my-org@git']
+    }))
+    loadRegistry.mockResolvedValue({
+      plugins: { 'my-org@git': { path: '/plugins/git', cacheDir: '/plugins/git' } }
+    })
+    loadPluginJson.mockResolvedValue({
+      name: 'git', version: '1.0.0',
+      runes: { status: { name: 'Git Status', description: 'Shows status', permissions: {} } }
+    })
+
+    await handler({ keys: ['status'], projectRoot: tmp, configRoot: tmp })
+    const out = written.join('')
+    expect(out).toContain('Shows status')
+  })
+
+  it('an ambiguous bare rune key surfaces the resolver error instead of "Unknown rune"', async () => {
+    await writeFile(join(tmp, '.crunes', 'config.json'), JSON.stringify({
+      runes: {}, plugins: ['sole-market@git', 'other-market@docker-tools']
+    }))
+    loadRegistry.mockResolvedValue({
+      plugins: {
+        'sole-market@git': { path: '/plugins/git', cacheDir: '/plugins/git' },
+        'other-market@docker-tools': { path: '/plugins/docker', cacheDir: '/plugins/docker' },
+      }
+    })
+    loadPluginJson.mockImplementation(async (dir) => {
+      if (dir === '/plugins/git') return { name: 'git', version: '1.0.0', runes: { info: {} } }
+      if (dir === '/plugins/docker') return { name: 'docker-tools', version: '1.0.0', runes: { info: {} } }
+      throw new Error('unexpected dir')
+    })
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {})
+
+    await handler({ keys: ['info'], projectRoot: tmp, configRoot: tmp })
+
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('"info" matches runes in multiple plugins: sole-market@git, other-market@docker-tools'))
+    expect(exitSpy).toHaveBeenCalledWith(1)
   })
 })

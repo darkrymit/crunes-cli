@@ -1,7 +1,8 @@
 import { join, relative } from 'node:path'
 import { loadConfig } from '../../core/config.js'
-import { getRune } from '../../rune/resolver.js'
-import { getArgsSchema, getReplSchema } from '../../rune/isolation/runner.js'
+import { getRune, resolvePluginRune, resolveRuneFromPlugins } from '../../rune/resolver.js'
+import { getArgsSchema, getReplSchema, getPluginRunePath } from '../../rune/isolation/runner.js'
+import { loadPluginJson } from '../../plugin/manifest.js'
 import { formatHelp } from '../formatter.js'
 import { computeEffectivePermissions } from '../../rune/permissions/permissions.js'
 import { output } from '../../shared/output.js'
@@ -54,8 +55,31 @@ export async function handler({ keys, format = 'text', projectRoot = process.cwd
   let anyFailed = false
 
   for (const key of keys) {
-    const entry = getRune(config, key)
-    if (!entry) {
+    let pluginMatch
+    try {
+      pluginMatch = await resolvePluginRune(config, key)
+    } catch (err) {
+      output.warn(err.message)
+      anyFailed = true
+      continue
+    }
+
+    const localEntry = pluginMatch ? null : getRune(config, key)
+
+    let autoMatch = null
+    if (!pluginMatch && !localEntry) {
+      try {
+        autoMatch = await resolveRuneFromPlugins(config, key)
+      } catch (err) {
+        output.warn(err.message)
+        anyFailed = true
+        continue
+      }
+    }
+
+    const resolved = pluginMatch ?? autoMatch
+
+    if (!localEntry && !resolved) {
       if (SUGGESTIONS[key]) {
         output.warn(`Unknown rune: "${key}". (Tip: Did you mean "${SUGGESTIONS[key]}"?)`)
       } else {
@@ -65,10 +89,35 @@ export async function handler({ keys, format = 'text', projectRoot = process.cwd
       continue
     }
 
-    const runeFile = join(configRoot, entry.path ?? `.crunes/runes/${key}.js`)
-    const relativePath = relative(projectRoot, runeFile).replace(/\\/g, '/')
-    const basePerms = entry.permissions ?? { allow: [], deny: [] }
-    const vars = entry.vars ?? {}
+    let runeFile, relativePath, basePerms, vars, displayName, displayDescription, batch
+
+    if (resolved) {
+      const { runeKey, pluginDir } = resolved
+      let pluginJson
+      try {
+        pluginJson = await loadPluginJson(pluginDir)
+      } catch (err) {
+        output.warn(`Could not load plugin for "${key}": ${err.message}`)
+        anyFailed = true
+        continue
+      }
+      const runeDef = pluginJson.runes[runeKey] ?? {}
+      runeFile = getPluginRunePath(pluginDir, runeKey, pluginJson)
+      relativePath = undefined
+      basePerms = runeDef.permissions ?? { allow: [], deny: [] }
+      vars = runeDef.vars ?? {}
+      displayName = runeDef.name ?? runeKey
+      displayDescription = runeDef.description ?? null
+      batch = runeDef.batch != null ? { allow: runeDef.batch.allow ?? [], deny: runeDef.batch.deny ?? [] } : null
+    } else {
+      runeFile = join(configRoot, localEntry.path ?? `.crunes/runes/${key}.js`)
+      relativePath = relative(projectRoot, runeFile).replace(/\\/g, '/')
+      basePerms = localEntry.permissions ?? { allow: [], deny: [] }
+      vars = localEntry.vars ?? {}
+      displayName = localEntry.name ?? key
+      displayDescription = localEntry.description ?? null
+      batch = localEntry.batch != null ? { allow: localEntry.batch.allow ?? [], deny: localEntry.batch.deny ?? [] } : null
+    }
 
     const runEffective  = computeEffectivePermissions(basePerms, undefined, 'run')
     const replEffective = computeEffectivePermissions(basePerms, undefined, 'repl')
@@ -90,14 +139,10 @@ export async function handler({ keys, format = 'text', projectRoot = process.cwd
       output.warn(`Could not load REPL schema for "${key}": ${err.message}`)
     }
 
-    const batch = entry.batch != null
-      ? { allow: entry.batch.allow ?? [], deny: entry.batch.deny ?? [] }
-      : null
-
     results.push({
       key,
-      name: entry.name ?? key,
-      description: entry.description ?? null,
+      name: displayName,
+      description: displayDescription,
       relativePath,
       schema,
       repl,
