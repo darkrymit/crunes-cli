@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process'
 import fs from 'node:fs'
+import { spawnDetachedJob } from '../../job/spawn-detached.js'
 
 const ANSI_RE = /\x1b\[[0-9;]*m/g
 
@@ -226,8 +227,8 @@ export function createShellUtils(dir, checkPermission) {
     const { id } = await createJob(null, {
       type: 'shell', spawnedBy, runeKey: null, projectDir: jobProjectDir, args: [cmd],
     })
-    const outFd = fs.openSync(jobStdoutPath(jobProjectDir, id), 'a')
-    const errFd = fs.openSync(jobStderrPath(jobProjectDir, id), 'a')
+    const outPath = jobStdoutPath(jobProjectDir, id)
+    const errPath = jobStderrPath(jobProjectDir, id)
     const childEnv = opts?.env ? { ...process.env, ...opts.env } : process.env
     if (repl) {
       const stdinLog = jobStdinPath(jobProjectDir, id)
@@ -254,31 +255,17 @@ function read(){
 function sched(){setTimeout(read,50)}
 sched()
 `
-      const wrapper_child = spawn(process.execPath, ['-e', wrapper], {
-        detached:    true,
-        stdio:       ['ignore', outFd, errFd],
-        cwd:         jobProjectDir,
-        env:         wrapperEnv,
-        windowsHide: true,
+      // The wrapper is the job: its pid is registered, and killing it takes the tree.
+      const { pid } = spawnDetachedJob(process.execPath, ['-e', wrapper], {
+        outPath, errPath, cwd: jobProjectDir, env: wrapperEnv,
       })
-      await updateJobPid(jobProjectDir, id, wrapper_child.pid)
-      wrapper_child.unref()
-      fs.closeSync(outFd)
-      fs.closeSync(errFd)
+      await updateJobPid(jobProjectDir, id, pid)
       return { id }
     }
-    const child = spawn(cmd, [], {
-      shell:       true,
-      detached:    true,
-      stdio:       ['ignore', outFd, errFd],
-      cwd:         jobProjectDir,
-      env:         childEnv,
-      windowsHide: true,
+    const { pid } = spawnDetachedJob(cmd, [], {
+      outPath, errPath, cwd: jobProjectDir, env: childEnv, shell: true,
     })
-    await updateJobPid(jobProjectDir, id, child.pid)
-    child.unref()
-    fs.closeSync(outFd)
-    fs.closeSync(errFd)
+    await updateJobPid(jobProjectDir, id, pid)
     return { id }
   }
 

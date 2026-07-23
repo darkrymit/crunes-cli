@@ -9,6 +9,7 @@ import { createModuleResolver } from './resolver.js'
 import { DENY_BUILTINS } from './builtins.js'
 import { createJob, getJob } from '../../job/index.js'
 import { updateJobPid, jobStdoutPath, jobStderrPath, jobStdinPath } from '../../job/registry.js'
+import { spawnDetachedJob } from '../../job/spawn-detached.js'
 import { EOF_SENTINEL } from '../../job/stdin-tail.js'
 import fsSync from 'node:fs'
 import { ensureProjectIdentity, upsertProject } from '../../project/index.js'
@@ -468,8 +469,6 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
     checkPermission(repl ? 'rune.repl' : 'rune.job.start', runeKey)
     const cliPath = process.argv[1]
     const { id } = await createJob(null, { type: 'rune', spawnedBy: currentRuneKey, runeKey, projectDir, args: args ?? [] })
-    const outFd = fsSync.openSync(jobStdoutPath(projectDir, id), 'a')
-    const errFd = fsSync.openSync(jobStderrPath(projectDir, id), 'a')
     const cliArgs = repl
       ? [cliPath, '--cwd', projectDir, 'repl', '--format', 'jsonl', runeKey, ...(args ?? [])]
       : [cliPath, '--cwd', projectDir, 'run', '--format', 'jsonl', runeKey, ...(args ?? [])]
@@ -479,15 +478,12 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
       fsSync.writeFileSync(stdinLog, '')
       childEnv = { ...childEnv, CRUNES_STDIN_LOG: stdinLog }
     }
-    const child = spawnProcess(
-      process.execPath,
-      cliArgs,
-      { detached: true, stdio: ['ignore', outFd, errFd], env: childEnv, windowsHide: true }
-    )
-    await updateJobPid(projectDir, id, child.pid)
-    child.unref()
-    fsSync.closeSync(outFd)
-    fsSync.closeSync(errFd)
+    const { pid } = spawnDetachedJob(process.execPath, cliArgs, {
+      outPath: jobStdoutPath(projectDir, id),
+      errPath: jobStderrPath(projectDir, id),
+      env:     childEnv,
+    })
+    await updateJobPid(projectDir, id, pid)
     return { id }
   }))
   await jail.set('$__utils_rune_job_kill', asyncRef(async (id, signal) => {
