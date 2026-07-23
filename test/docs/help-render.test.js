@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { flattenCommands, selectNode } from '../../src/docs/help-render.js'
+import { flattenCommands, selectNode, formatCommandPage, formatRuneIndex } from '../../src/docs/help-render.js'
 
 const SCHEMA = {
   options: [{ flags: '--dry-run', description: 'Print actions without executing' }],
@@ -96,5 +96,172 @@ describe('selectNode', () => {
 
   it('returns empty candidates when a resolved leaf has no children', () => {
     expect(selectNode(SCHEMA, ['info']).candidates).toEqual([])
+  })
+})
+
+describe('formatCommandPage', () => {
+  const bump = SCHEMA.commands[1]
+
+  it('renders a usage line with the full command path', () => {
+    const out = formatCommandPage(bump, { key: 'release', path: 'bump' })
+    expect(out.split('\n')[0]).toBe('Usage: crunes run release bump <level> [options]')
+  })
+
+  it('renders <command> instead of positionals when the node has children but no positionals', () => {
+    const info = { ...SCHEMA.commands[0], commands: [{ name: 'x', description: 'X', options: [], positionals: [], examples: [], commands: [] }] }
+    const out = formatCommandPage(info, { key: 'release', path: 'info' })
+    expect(out.split('\n')[0]).toBe('Usage: crunes run release info <command> [options]')
+  })
+
+  it('uses the repl verb under the repl lifecycle', () => {
+    const out = formatCommandPage(bump, { key: 'release', path: 'bump', lifecycle: 'repl' })
+    expect(out.split('\n')[0]).toBe('Usage: crunes repl release bump <level> [options]')
+  })
+
+  it('renders the node description indented under the usage line', () => {
+    expect(formatCommandPage(bump, { key: 'release', path: 'bump' })).toContain('\n  Bump the version\n')
+  })
+
+  it('renders positionals with descriptions', () => {
+    const out = formatCommandPage(bump, { key: 'release', path: 'bump' })
+    expect(out).toContain('Positionals:')
+    expect(out).toContain('  <level>                  major | minor | patch')
+  })
+
+  it('renders options with descriptions', () => {
+    const out = formatCommandPage(bump, { key: 'release', path: 'bump' })
+    expect(out).toContain('Options:')
+    expect(out).toContain('-a, --added <text>')
+  })
+
+  it('renders a default value in brackets when present', () => {
+    const node = { name: 'x', description: '', positionals: [], examples: [], commands: [],
+      options: [{ flags: '-n <count>', description: 'How many', def: 10 }] }
+    expect(formatCommandPage(node, { key: 'r', path: 'x' })).toContain('[default: 10]')
+  })
+
+  it('lists direct children only, one level deep, as full paths', () => {
+    const deep = {
+      ...bump,
+      commands: [{
+        name: 'patch', description: 'Patch bump', options: [], positionals: [], examples: [],
+        commands: [{ name: 'rc', description: 'RC bump', options: [], positionals: [], examples: [], commands: [] }],
+      }],
+    }
+    const out = formatCommandPage(deep, { key: 'release', path: 'bump' })
+    expect(out).toContain('  bump patch')
+    expect(out).not.toContain('bump patch rc')
+  })
+
+  it('omits every section that has no content', () => {
+    const bare = { name: 'x', description: '', options: [], positionals: [], examples: [], commands: [] }
+    const out = formatCommandPage(bare, { key: 'r', path: 'x' })
+    expect(out).not.toContain('Positionals:')
+    expect(out).not.toContain('Options:')
+    expect(out).not.toContain('Commands:')
+    expect(out).not.toContain('Examples:')
+  })
+
+  it('renders examples with their descriptions', () => {
+    const node = { name: 'x', description: '', options: [], positionals: [], commands: [],
+      examples: [{ usage: 'crunes run r x', description: 'Basic use' }] }
+    const out = formatCommandPage(node, { key: 'r', path: 'x' })
+    expect(out).toContain('Examples:')
+    expect(out).toContain('  crunes run r x')
+    expect(out).toContain('    Basic use')
+  })
+
+  it('matches the command page snapshot', () => {
+    expect(formatCommandPage(bump, { key: 'release', path: 'bump' })).toMatchSnapshot()
+  })
+})
+
+describe('formatRuneIndex', () => {
+  const META = {
+    key: 'release',
+    name: 'Release',
+    description: 'Release automation',
+    relativePath: '.crunes/runes/release.js',
+    includeBatch: true,
+    batch: { allow: ['m', 'kb'], deny: [] },
+    repl: { commands: [{ name: 'reload', description: 'Reload the rune' }] },
+  }
+
+  it('renders the header with key and description', () => {
+    expect(formatRuneIndex(SCHEMA, META)).toContain('Rune: release — Release automation')
+  })
+
+  it('falls back to the name when there is no description', () => {
+    const out = formatRuneIndex(SCHEMA, { ...META, description: null })
+    expect(out).toContain('Rune: release — Release')
+  })
+
+  it('renders the project-relative file path when provided', () => {
+    expect(formatRuneIndex(SCHEMA, META)).toContain('File (project-relative): .crunes/runes/release.js')
+  })
+
+  it('omits the file line for plugin runes with no relative path', () => {
+    expect(formatRuneIndex(SCHEMA, { ...META, relativePath: undefined })).not.toContain('File (project-relative)')
+  })
+
+  it('lists every command at every depth as a full path', () => {
+    const out = formatRuneIndex(SCHEMA, META)
+    expect(out).toContain('  info')
+    expect(out).toContain('  bump <level>')
+    expect(out).toContain('  bump patch')
+    expect(out).toContain('  bump minor')
+  })
+
+  it('renders rune-level options', () => {
+    expect(formatRuneIndex(SCHEMA, META)).toContain('--dry-run')
+  })
+
+  it('renders rune-level positionals', () => {
+    const schema = { ...SCHEMA, positionals: [{ spec: '<target>', description: 'What to release' }] }
+    const out = formatRuneIndex(schema, META)
+    expect(out).toContain('Positionals:')
+    expect(out).toContain('  <target>                 What to release')
+  })
+
+  it('omits rune-level examples from the index to keep it bounded', () => {
+    const schema = { ...SCHEMA, examples: [{ usage: 'crunes run release info', description: 'Basic use' }] }
+    const out = formatRuneIndex(schema, META)
+    expect(out).not.toContain('Examples:')
+    expect(out).not.toContain('crunes run release info')
+  })
+
+  it('renders REPL slash commands with a leading slash', () => {
+    expect(formatRuneIndex(SCHEMA, META)).toContain('  /reload')
+  })
+
+  it('omits the REPL section when there are no repl commands', () => {
+    expect(formatRuneIndex(SCHEMA, { ...META, repl: null })).not.toContain('REPL commands:')
+  })
+
+  it('renders the batch allow list when includeBatch is true', () => {
+    expect(formatRuneIndex(SCHEMA, META)).toContain('allow: m, kb')
+  })
+
+  it('renders the not-permitted line when batch is null and includeBatch is true', () => {
+    const out = formatRuneIndex(SCHEMA, { ...META, batch: null })
+    expect(out).toContain('(not permitted — no batch block declared)')
+  })
+
+  it('omits the batch section entirely when includeBatch is false', () => {
+    const out = formatRuneIndex(SCHEMA, { ...META, includeBatch: false })
+    expect(out).not.toContain('Batch:')
+  })
+
+  it('renders the drill-down footer', () => {
+    expect(formatRuneIndex(SCHEMA, META)).toContain('Drill down: crunes docs rune release <command>')
+  })
+
+  it('handles a null schema without throwing', () => {
+    const out = formatRuneIndex(null, { key: 'bare', includeBatch: false })
+    expect(out).toContain('Usage: crunes run bare [options]')
+  })
+
+  it('matches the rune index snapshot', () => {
+    expect(formatRuneIndex(SCHEMA, META)).toMatchSnapshot()
   })
 })

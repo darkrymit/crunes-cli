@@ -1,0 +1,41 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`formatCommandPage > matches the command page snapshot 1`] = `
+"Usage: crunes run release bump <level> [options]
+
+  Bump the version
+
+Positionals:
+  <level>                  major | minor | patch
+
+Options:
+  -a, --added <text>       Changelog "Added" entry
+
+Commands:
+  bump patch               Patch bump
+  bump minor               Minor bump"
+`;
+
+exports[`formatRuneIndex > matches the rune index snapshot 1`] = `
+"Rune: release — Release automation
+File (project-relative): .crunes/runes/release.js
+
+Usage: crunes run release <command> [options]
+
+Options:
+  --dry-run                Print actions without executing
+
+Commands:
+  info                     Show current release context
+  bump <level>             Bump the version
+  bump patch               Patch bump
+  bump minor               Minor bump
+
+REPL commands:
+  /reload                  Reload the rune
+
+Batch:
+  allow: m, kb
+
+Drill down: crunes docs rune release <command>"
+`;
