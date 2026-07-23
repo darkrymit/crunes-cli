@@ -3,7 +3,6 @@ import lifecycleApiData from './generated/lifecycle-api.json' assert { type: 'js
 import globalsApiData from './generated/globals-api.json' assert { type: 'json' }
 import { walk } from './ts-walker.js'
 import { formatNode, formatMembers } from './ts-formatter.js'
-import { formatHelp } from './formatter.js'
 
 const NAMESPACE_RECIPES = {
   fs: `\`\`\`javascript
