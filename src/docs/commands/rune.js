@@ -5,7 +5,8 @@ import { getArgsSchema, getReplSchema, getPluginRunePath } from '../../rune/isol
 import { loadPluginJson } from '../../plugin/manifest.js'
 import { computeEffectivePermissions } from '../../rune/permissions/permissions.js'
 import { output } from '../../shared/output.js'
-import { formatRuneIndex, formatCommandPage, selectNode, flattenCommands } from '../help-render.js'
+import { enumerateRunes } from '../../rune/enumerate.js'
+import { formatRuneIndex, formatCommandPage, formatGlobalIndex, selectNode, flattenCommands } from '../help-render.js'
 
 const SUGGESTIONS = {
   run: 'crunes docs run',
@@ -54,9 +55,11 @@ export async function resolveRuneDocs(config, key, projectRoot, configRoot) {
   const replEffective = computeEffectivePermissions(basePerms, undefined, 'repl')
 
   let schema = null
+  let schemaError = null
   try {
     schema = await getArgsSchema(runeFile, runEffective, projectRoot, { vars, runeKey: key })
   } catch (err) {
+    schemaError = err.message
     output.warn(`Could not load args schema for "${key}": ${err.message}`)
   }
 
@@ -68,7 +71,7 @@ export async function resolveRuneDocs(config, key, projectRoot, configRoot) {
     output.warn(`Could not load REPL schema for "${key}": ${err.message}`)
   }
 
-  return { key, name: displayName, description: displayDescription, relativePath, schema, repl, batch }
+  return { key, name: displayName, description: displayDescription, relativePath, schema, schemaError, repl, batch }
 }
 
 /** `[{ path, description }]` — the index shape, deliberately without option detail. */
@@ -90,6 +93,46 @@ export async function handler({ key, path = [], format = 'text', projectRoot = p
   } catch (err) {
     output.error(`Config unreadable: ${err.message}`)
     process.exit(1)
+    return
+  }
+
+  if (key == null) {
+    const listed = await enumerateRunes(config)
+    const entries = []
+    let anyFailed = false
+
+    for (const e of listed) {
+      let docsEntry = null
+      let error = null
+      try {
+        docsEntry = await resolveRuneDocs(config, e.key, projectRoot, configRoot)
+        if (!docsEntry) error = 'rune could not be resolved'
+        else if (docsEntry.schemaError) error = docsEntry.schemaError
+      } catch (err) {
+        error = err.message
+      }
+      if (error) {
+        anyFailed = true
+        entries.push({ ...e, error })
+      } else {
+        entries.push({ ...e, schema: docsEntry.schema })
+      }
+    }
+
+    if (format === 'json') {
+      process.stdout.write(JSON.stringify(entries.map(e => ({
+        key: e.key,
+        name: e.name,
+        description: e.description,
+        source: e.source,
+        error: e.error ?? null,
+        commands: e.error ? [] : commandRows(e.schema?.commands),
+      })), null, 2) + '\n')
+    } else {
+      process.stdout.write(formatGlobalIndex(entries) + '\n')
+    }
+
+    if (anyFailed) process.exit(1)
     return
   }
 
