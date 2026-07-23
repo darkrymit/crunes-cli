@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.5] - 2026-07-23
+
+### Added
+- **Sandbox globals**: structuredClone, queueMicrotask, atob/btoa, performance with a performance.now bridge, Buffer, a whatwg-url backed URL and URLSearchParams, plus EventTarget/Event/CustomEvent and an upgraded AbortSignal
+- **Project-scoped plugin key resolution**: a bare plugin name resolves against the plugins enabled in the project before falling back to a global not-enabled or ambiguous error
+- **Non-interactive scaffolding defaults**: crunes create defaults --format to markdown and crunes plugin create defaults --description to a generated placeholder when omitted, instead of hard-failing
+- **Plugin rune keys in docs**: crunes docs rune resolves plugin-prefixed and auto-discovered plugin rune keys through the same resolution path run and repl already use
+
+### Changed
+- **Plugin-rune permission and vars overrides**: the top-level permissions and vars sibling maps are gone; a project grants a plugin rune extra permissions or vars through a fully-qualified runes entry keyed marketplace@plugin:rune, nested like local rune entries
+- **Documentation**: intro shows only the nested config shape and adds a crunes create invocation, --help handling, and dynamic args reading vars; the shell.exec recipe checks result.ok; env docs cover the bare-key env.read form; rune docs clarify that helpSection renders the full command tree
+
+### Fixed
+- **Detached jobs held the spawning stdout pipe on Windows**: a job inherited the parent stdout handle regardless of the stdio option, so crunes run <rune> | head blocked until the job exited; jobs now launch through a non-inheriting shim that reports the real pid
+- **False plugin ambiguity**: bare plugin names resolve against the plugins enabled in the project for run, repl, plugin disable, and entry.plugin aliases, so a same-named plugin installed elsewhere no longer blocks resolution
+- **Ambiguity errors**: rune and template ambiguity errors show full marketplace@name:rune forms instead of bare names that rendered identically
+- **Unresolvable plugin-rune override keys**: config load hard-errors on a bare-form override key that can never resolve, instead of failing silently forever
+- **Dead docs flags**: crunes docs intro no longer advertises --global and --format, which had been silently doing nothing
+
+---
+
 ## [0.8.4] - 2026-06-24
 
 ### Fixed
