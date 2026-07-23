@@ -12,31 +12,37 @@ vi.mock('../../../src/plugin/manifest.js', () => ({
 }))
 
 import { handler } from '../../../src/docs/commands/rune.js'
-import { loadRegistry, resolvePluginKeyScoped } from '../../../src/plugin/registry.js'
-import { loadPluginJson } from '../../../src/plugin/manifest.js'
 
-describe('help rune handler', () => {
+const RELEASE_RUNE = [
+  'export async function args(b) {',
+  '  return b',
+  '    .option("--dry-run", "Print actions without executing")',
+  '    .command("info", "Show current release context")',
+  '    .command("bump", "Bump the version", c => c',
+  '      .positional("<level>", "major | minor | patch")',
+  '      .option("-a, --added <text>", "Changelog Added entry")',
+  '      .command("patch", "Patch bump")',
+  '      .command("minor", "Minor bump"))',
+  '    .build()',
+  '}',
+  'export async function run() { return [] }',
+].join('\n')
+
+describe('docs rune handler', () => {
   let tmp
   let written
 
   beforeEach(async () => {
-    tmp = await mkdtemp(join(tmpdir(), 'crunes-help-'))
+    tmp = await mkdtemp(join(tmpdir(), 'crunes-docs-'))
     await mkdir(join(tmp, '.crunes', 'runes'), { recursive: true })
     await writeFile(join(tmp, '.crunes', 'config.json'), JSON.stringify({
       runes: {
-        greet: { name: 'Greeter', description: 'Says hello' },
+        release: { name: 'Release', description: 'Release automation' },
         count: { name: 'Counter', description: 'Counts things' },
-      }
+      },
     }))
-    await writeFile(join(tmp, '.crunes', 'runes', 'greet.js'), [
-      'export async function args(b) {',
-      '  return b.positional("<who>", "Who to greet").build()',
-      '}',
-      'export async function run() { return [] }',
-    ].join('\n'))
-    await writeFile(join(tmp, '.crunes', 'runes', 'count.js'), [
-      'export async function run() { return [] }',
-    ].join('\n'))
+    await writeFile(join(tmp, '.crunes', 'runes', 'release.js'), RELEASE_RUNE)
+    await writeFile(join(tmp, '.crunes', 'runes', 'count.js'), 'export async function run() { return [] }')
     written = []
     vi.spyOn(process.stdout, 'write').mockImplementation((chunk) => { written.push(chunk); return true })
   })
@@ -46,162 +52,99 @@ describe('help rune handler', () => {
     await rm(tmp, { recursive: true, force: true })
   })
 
-  it('md output contains usage line and rune description', async () => {
-    await handler({ keys: ['greet'], projectRoot: tmp, configRoot: tmp })
-    const out = written.join('')
-    expect(out).toContain('crunes run greet')
-    expect(out).toContain('Says hello')
+  const out = () => written.join('')
+
+  it('renders the rune index with every command as a full path', async () => {
+    await handler({ key: 'release', path: [], projectRoot: tmp, configRoot: tmp })
+    expect(out()).toContain('Rune: release — Release automation')
+    expect(out()).toContain('  info')
+    expect(out()).toContain('  bump <level>')
+    expect(out()).toContain('  bump patch')
   })
 
-  it('md output for multiple keys contains both usage lines', async () => {
-    await handler({ keys: ['greet', 'count'], projectRoot: tmp, configRoot: tmp })
-    const out = written.join('')
-    expect(out).toContain('crunes run greet')
-    expect(out).toContain('crunes run count')
+  it('does not render option detail for subcommands on the index', async () => {
+    await handler({ key: 'release', path: [], projectRoot: tmp, configRoot: tmp })
+    expect(out()).not.toContain('-a, --added')
   })
 
-  it('json output is valid JSON array with correct shape', async () => {
-    await handler({ keys: ['greet'], format: 'json', projectRoot: tmp, configRoot: tmp })
-    const out = written.join('')
-    const parsed = JSON.parse(out)
-    expect(parsed).toHaveLength(1)
-    expect(parsed[0]).toMatchObject({
-      key: 'greet',
-      name: 'Greeter',
-      description: 'Says hello',
-      schema: { positionals: [{ spec: '<who>' }], options: [], examples: [] },
-    })
+  it('renders a depth-1 command page with that command options', async () => {
+    await handler({ key: 'release', path: ['bump'], projectRoot: tmp, configRoot: tmp })
+    expect(out()).toContain('Usage: crunes run release bump <level> [options]')
+    expect(out()).toContain('-a, --added <text>')
   })
 
-  it('json output for multiple keys has one entry per key', async () => {
-    await handler({ keys: ['greet', 'count'], format: 'json', projectRoot: tmp, configRoot: tmp })
-    const out = written.join('')
-    const parsed = JSON.parse(out)
-    expect(parsed).toHaveLength(2)
-    expect(parsed.map(r => r.key)).toEqual(['greet', 'count'])
+  it('renders a depth-2 command page', async () => {
+    await handler({ key: 'release', path: ['bump', 'patch'], projectRoot: tmp, configRoot: tmp })
+    expect(out()).toContain('Usage: crunes run release bump patch [options]')
   })
 
-  it('rune with no args() export has null schema in json', async () => {
-    await handler({ keys: ['count'], format: 'json', projectRoot: tmp, configRoot: tmp })
-    const out = written.join('')
-    const parsed = JSON.parse(out)
-    expect(parsed[0].schema).toBeNull()
-  })
-
-  it('unknown key in batch is skipped but exit 1 is called', async () => {
+  it('errors with the valid children on an unknown segment and exits 1', async () => {
     const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {})
-    await handler({ keys: ['greet', 'unknown'], format: 'json', projectRoot: tmp, configRoot: tmp })
-    const out = written.join('')
-    const parsed = JSON.parse(out)
-    expect(parsed).toHaveLength(1)
-    expect(parsed[0].key).toBe('greet')
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    await handler({ key: 'release', path: ['bump', 'nope'], projectRoot: tmp, configRoot: tmp })
+    const msg = errSpy.mock.calls.flat().join('\n')
+    expect(msg).toContain('"nope" is not a command of rune "release"')
+    expect(msg).toContain('patch, minor')
     expect(exitSpy).toHaveBeenCalledWith(1)
   })
 
-  it('unknown key suggesting commands displays correct Tip', async () => {
+  it('names the multi-rune migration when the failed segment is itself a rune key', async () => {
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {})
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    await handler({ key: 'release', path: ['count'], projectRoot: tmp, configRoot: tmp })
+    const msg = errSpy.mock.calls.flat().join('\n')
+    expect(msg).toContain('"count" is a known rune')
+    expect(msg).toContain('crunes docs rune')
+    expect(exitSpy).toHaveBeenCalledWith(1)
+  })
+
+  it('warns and exits 1 for an unknown rune key', async () => {
     const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {})
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    await handler({ keys: ['run'], projectRoot: tmp, configRoot: tmp })
-    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('Unknown rune: "run". (Tip: Did you mean "crunes docs run"?)'))
+    await handler({ key: 'nosuch', path: [], projectRoot: tmp, configRoot: tmp })
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('Unknown rune: "nosuch"'))
     expect(exitSpy).toHaveBeenCalledWith(1)
   })
 
-  describe('batch field in docs output', () => {
-    beforeEach(async () => {
-      const cfg = JSON.parse(await import('node:fs').then(m => m.promises.readFile(join(tmp, '.crunes', 'config.json'), 'utf8')))
-      cfg.runes.greet.batch = { allow: ['*'] }
-      await import('node:fs').then(m => m.promises.writeFile(join(tmp, '.crunes', 'config.json'), JSON.stringify(cfg)))
-    })
-
-    it('text output includes Batch: section when batch block declared', async () => {
-      await handler({ keys: ['greet'], projectRoot: tmp, configRoot: tmp })
-      const out = written.join('')
-      expect(out).toContain('Batch:')
-      expect(out).toContain('allow: *')
-    })
-
-    it('text output shows not permitted when no batch block', async () => {
-      await handler({ keys: ['count'], projectRoot: tmp, configRoot: tmp })
-      const out = written.join('')
-      expect(out).toContain('Batch:')
-      expect(out).toContain('not permitted')
-    })
-
-    it('json output includes batch field with allow/deny arrays', async () => {
-      await handler({ keys: ['greet'], format: 'json', projectRoot: tmp, configRoot: tmp })
-      const parsed = JSON.parse(written.join(''))
-      expect(parsed[0].batch).toEqual({ allow: ['*'], deny: [] })
-    })
-
-    it('json output batch is null when no batch block declared', async () => {
-      await handler({ keys: ['count'], format: 'json', projectRoot: tmp, configRoot: tmp })
-      const parsed = JSON.parse(written.join(''))
-      expect(parsed[0].batch).toBeNull()
-    })
+  it('keeps the docs-subcommand tip for keys that collide with docs subcommands', async () => {
+    vi.spyOn(process, 'exit').mockImplementation(() => {})
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    await handler({ key: 'run', path: [], projectRoot: tmp, configRoot: tmp })
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('Did you mean "crunes docs run"?'))
   })
 
-  // REPL schema extension tests
-  describe('REPL schema display', () => {
-    beforeEach(async () => {
-      await writeFile(join(tmp, '.crunes', 'runes', 'shell.js'), [
-        'export async function argsRepl(b) {',
-        '  return b.option("--db <path>", "DB path", "./state").build()',
-        '}',
-        'export function commandsRepl(b) {',
-        '  return b.command("tables", "List tables").command("exit", "Quit")',
-        '}',
-        'export async function inputRepl(input) { return { type: "done" } }',
-      ].join('\n'))
-      const cfg = JSON.parse(await import('node:fs').then(m => m.promises.readFile(join(tmp, '.crunes', 'config.json'), 'utf8')))
-      cfg.runes.shell = { name: 'Shell', description: 'Interactive shell' }
-      await import('node:fs').then(m => m.promises.writeFile(join(tmp, '.crunes', 'config.json'), JSON.stringify(cfg)))
-    })
+  it('json index returns command paths, not the full nested schema', async () => {
+    await handler({ key: 'release', path: [], format: 'json', projectRoot: tmp, configRoot: tmp })
+    const parsed = JSON.parse(out())
+    expect(parsed.key).toBe('release')
+    expect(parsed.commands.map(c => c.path)).toEqual(['info', 'bump', 'bump patch', 'bump minor'])
+    expect(parsed.commands[1].options).toBeUndefined()
+  })
 
-    it('text output includes REPL args section when argsRepl exported', async () => {
-      await handler({ keys: ['shell'], projectRoot: tmp, configRoot: tmp })
-      const out = written.join('')
-      expect(out).toContain('crunes repl shell')
-      expect(out).toContain('--db <path>')
-    })
+  it('json command page returns that node detail and its direct children', async () => {
+    await handler({ key: 'release', path: ['bump'], format: 'json', projectRoot: tmp, configRoot: tmp })
+    const parsed = JSON.parse(out())
+    expect(parsed.path).toBe('bump')
+    expect(parsed.options[0].flags).toBe('-a, --added <text>')
+    expect(parsed.commands.map(c => c.path)).toEqual(['bump patch', 'bump minor'])
+  })
 
-    it('text output includes slash commands section when commandsRepl exported', async () => {
-      await handler({ keys: ['shell'], projectRoot: tmp, configRoot: tmp })
-      const out = written.join('')
-      expect(out).toContain('/tables')
-      expect(out).toContain('List tables')
-      expect(out).toContain('/exit')
-    })
-
-    it('json output includes repl field with argsSchema and commandsSchema', async () => {
-      await handler({ keys: ['shell'], format: 'json', projectRoot: tmp, configRoot: tmp })
-      const out = written.join('')
-      const parsed = JSON.parse(out)
-      expect(parsed[0].repl).not.toBeNull()
-      expect(parsed[0].repl.argsSchema.options[0].flags).toBe('--db <path>')
-      expect(parsed[0].repl.commandsSchema.commands).toHaveLength(2)
-    })
-
-    it('json output repl is null for rune with no REPL exports', async () => {
-      await handler({ keys: ['count'], format: 'json', projectRoot: tmp, configRoot: tmp })
-      const out = written.join('')
-      const parsed = JSON.parse(out)
-      expect(parsed[0].repl).toBeNull()
-    })
+  it('renders an index for a rune with no args export', async () => {
+    await handler({ key: 'count', path: [], projectRoot: tmp, configRoot: tmp })
+    expect(out()).toContain('Rune: count — Counts things')
   })
 })
 
-describe('help rune handler — plugin runes', () => {
+describe('docs rune handler — plugin runes', () => {
   let tmp
   let written
 
   beforeEach(async () => {
-    tmp = await mkdtemp(join(tmpdir(), 'crunes-help-plugin-'))
+    tmp = await mkdtemp(join(tmpdir(), 'crunes-docs-plugin-'))
     await mkdir(join(tmp, '.crunes'), { recursive: true })
     written = []
     vi.spyOn(process.stdout, 'write').mockImplementation((chunk) => { written.push(chunk); return true })
     vi.clearAllMocks()
-    loadRegistry.mockResolvedValue({ plugins: {} })
-    resolvePluginKeyScoped.mockReturnValue(null)
   })
 
   afterEach(async () => {
@@ -209,50 +152,33 @@ describe('help rune handler — plugin runes', () => {
     await rm(tmp, { recursive: true, force: true })
   })
 
-  it('resolves a fully-qualified plugin:rune key and renders its help', async () => {
-    await writeFile(join(tmp, '.crunes', 'config.json'), JSON.stringify({
-      runes: {}, plugins: ['my-org@git']
-    }))
+  it('resolves a fully-qualified plugin:rune key and renders its index', async () => {
+    const { loadRegistry, resolvePluginKeyScoped } = await import('../../../src/plugin/registry.js')
+    const { loadPluginJson } = await import('../../../src/plugin/manifest.js')
+    await writeFile(join(tmp, '.crunes', 'config.json'), JSON.stringify({ runes: {}, plugins: ['my-org@git'] }))
     resolvePluginKeyScoped.mockReturnValue('my-org@git')
-    loadRegistry.mockResolvedValue({
-      plugins: { 'my-org@git': { path: '/plugins/git', cacheDir: '/plugins/git' } }
-    })
+    loadRegistry.mockResolvedValue({ plugins: { 'my-org@git': { path: '/plugins/git', cacheDir: '/plugins/git' } } })
     loadPluginJson.mockResolvedValue({
       name: 'git', version: '1.0.0',
-      runes: { status: { name: 'Git Status', description: 'Shows status', permissions: {} } }
+      runes: { status: { name: 'Git Status', description: 'Shows status', permissions: {} } },
     })
 
-    await handler({ keys: ['my-org@git:status'], projectRoot: tmp, configRoot: tmp })
-    const out = written.join('')
-    expect(out).toContain('Shows status')
-  })
-
-  it('auto-discovers a bare rune key from an enabled plugin when no local entry exists', async () => {
-    await writeFile(join(tmp, '.crunes', 'config.json'), JSON.stringify({
-      runes: {}, plugins: ['my-org@git']
-    }))
-    loadRegistry.mockResolvedValue({
-      plugins: { 'my-org@git': { path: '/plugins/git', cacheDir: '/plugins/git' } }
-    })
-    loadPluginJson.mockResolvedValue({
-      name: 'git', version: '1.0.0',
-      runes: { status: { name: 'Git Status', description: 'Shows status', permissions: {} } }
-    })
-
-    await handler({ keys: ['status'], projectRoot: tmp, configRoot: tmp })
-    const out = written.join('')
-    expect(out).toContain('Shows status')
+    await handler({ key: 'my-org@git:status', path: [], projectRoot: tmp, configRoot: tmp })
+    expect(written.join('')).toContain('Shows status')
   })
 
   it('an ambiguous bare rune key surfaces the resolver error instead of "Unknown rune"', async () => {
+    const { loadRegistry, resolvePluginKeyScoped } = await import('../../../src/plugin/registry.js')
+    const { loadPluginJson } = await import('../../../src/plugin/manifest.js')
     await writeFile(join(tmp, '.crunes', 'config.json'), JSON.stringify({
-      runes: {}, plugins: ['sole-market@git', 'other-market@docker-tools']
+      runes: {}, plugins: ['sole-market@git', 'other-market@docker-tools'],
     }))
+    resolvePluginKeyScoped.mockReturnValue(null)
     loadRegistry.mockResolvedValue({
       plugins: {
         'sole-market@git': { path: '/plugins/git', cacheDir: '/plugins/git' },
         'other-market@docker-tools': { path: '/plugins/docker', cacheDir: '/plugins/docker' },
-      }
+      },
     })
     loadPluginJson.mockImplementation(async (dir) => {
       if (dir === '/plugins/git') return { name: 'git', version: '1.0.0', runes: { info: {} } }
@@ -262,7 +188,7 @@ describe('help rune handler — plugin runes', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {})
 
-    await handler({ keys: ['info'], projectRoot: tmp, configRoot: tmp })
+    await handler({ key: 'info', path: [], projectRoot: tmp, configRoot: tmp })
 
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('"info" matches runes in multiple plugins: sole-market@git, other-market@docker-tools'))
     expect(exitSpy).toHaveBeenCalledWith(1)

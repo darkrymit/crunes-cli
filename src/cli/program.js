@@ -84,12 +84,17 @@ export function buildProgram() {
   const helpGroup = program.command('docs').description('Show documentation for runes and other resources')
 
   helpGroup
-    .command('rune <rune...>')
-    .description('Show usage, argument schema, and examples for one or more runes')
+    .command('rune [key] [path...]')
+    .description('Show a rune command index, or drill into one command')
+    .addHelpText('after',
+      '\n  crunes docs rune                    index of every rune and its commands\n' +
+      '  crunes docs rune <key>              command index for one rune\n' +
+      '  crunes docs rune <key> <cmd>...     detail for one command path\n'
+    )
     .addOption(new Option('--format <format>', 'output format').choices(['text', 'json']).default('text'))
-    .action(async (keys, opts) => {
+    .action(async (key, path, opts) => {
       const { handler } = await import('../docs/commands/rune.js')
-      await handler({ keys, format: opts.format, projectRoot: projectRoot(), configRoot: configRoot() })
+      await handler({ key, path, format: opts.format, projectRoot: projectRoot(), configRoot: configRoot() })
     })
 
   helpGroup

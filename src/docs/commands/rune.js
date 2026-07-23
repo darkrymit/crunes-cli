@@ -3,9 +3,9 @@ import { loadConfig } from '../../core/config.js'
 import { getRune, resolvePluginRune, resolveRuneFromPlugins } from '../../rune/resolver.js'
 import { getArgsSchema, getReplSchema, getPluginRunePath } from '../../rune/isolation/runner.js'
 import { loadPluginJson } from '../../plugin/manifest.js'
-import { formatHelp } from '../formatter.js'
 import { computeEffectivePermissions } from '../../rune/permissions/permissions.js'
 import { output } from '../../shared/output.js'
+import { formatRuneIndex, formatCommandPage, selectNode, flattenCommands } from '../help-render.js'
 
 const SUGGESTIONS = {
   run: 'crunes docs run',
@@ -15,159 +15,159 @@ const SUGGESTIONS = {
   globals: 'crunes docs globals',
 }
 
-function formatSlashCommands(commands, indent = '') {
-  const lines = [`${indent}REPL Slash Commands:`]
-  for (const cmd of commands) {
-    lines.push(`${indent}  /${cmd.name.padEnd(12)} ${cmd.description ?? ''}`)
-    for (const pos of (cmd.positionals ?? [])) {
-      lines.push(`${indent}               ${pos.spec.padEnd(14)} ${pos.description ?? ''}`)
-    }
-    for (const opt of (cmd.options ?? [])) {
-      lines.push(`${indent}               ${opt.flags.padEnd(14)} ${opt.description ?? ''}`)
-    }
+/** Resolve a rune key to everything the docs pages need. Returns null when unknown. */
+export async function resolveRuneDocs(config, key, projectRoot, configRoot) {
+  const pluginMatch = await resolvePluginRune(config, key)
+  const localEntry = pluginMatch ? null : getRune(config, key)
+
+  let autoMatch = null
+  if (!pluginMatch && !localEntry) {
+    autoMatch = await resolveRuneFromPlugins(config, key)
   }
-  return lines.join('\n')
+  const resolved = pluginMatch ?? autoMatch
+  if (!localEntry && !resolved) return null
+
+  let runeFile, relativePath, basePerms, vars, displayName, displayDescription, batch
+
+  if (resolved) {
+    const { runeKey, pluginDir } = resolved
+    const pluginJson = await loadPluginJson(pluginDir)
+    const runeDef = pluginJson.runes[runeKey] ?? {}
+    runeFile = getPluginRunePath(pluginDir, runeKey, pluginJson)
+    relativePath = undefined
+    basePerms = runeDef.permissions ?? { allow: [], deny: [] }
+    vars = runeDef.vars ?? {}
+    displayName = runeDef.name ?? runeKey
+    displayDescription = runeDef.description ?? null
+    batch = runeDef.batch != null ? { allow: runeDef.batch.allow ?? [], deny: runeDef.batch.deny ?? [] } : null
+  } else {
+    runeFile = join(configRoot, localEntry.path ?? `.crunes/runes/${key}.js`)
+    relativePath = relative(projectRoot, runeFile).replace(/\\/g, '/')
+    basePerms = localEntry.permissions ?? { allow: [], deny: [] }
+    vars = localEntry.vars ?? {}
+    displayName = localEntry.name ?? key
+    displayDescription = localEntry.description ?? null
+    batch = localEntry.batch != null ? { allow: localEntry.batch.allow ?? [], deny: localEntry.batch.deny ?? [] } : null
+  }
+
+  const runEffective = computeEffectivePermissions(basePerms, undefined, 'run')
+  const replEffective = computeEffectivePermissions(basePerms, undefined, 'repl')
+
+  let schema = null
+  try {
+    schema = await getArgsSchema(runeFile, runEffective, projectRoot, { vars, runeKey: key })
+  } catch (err) {
+    output.warn(`Could not load args schema for "${key}": ${err.message}`)
+  }
+
+  let repl = null
+  try {
+    const { argsSchema, commandsSchema } = await getReplSchema(runeFile, replEffective, [], projectRoot, { vars, runeKey: key })
+    if (argsSchema !== null || commandsSchema !== null) repl = { argsSchema, commandsSchema }
+  } catch (err) {
+    output.warn(`Could not load REPL schema for "${key}": ${err.message}`)
+  }
+
+  return { key, name: displayName, description: displayDescription, relativePath, schema, repl, batch }
 }
 
-function formatBatch(batch) {
-  const lines = ['Batch:']
-  if (!batch) {
-    lines.push('  (not permitted — no batch block declared)')
-    return lines.join('\n')
-  }
-  const allow = batch.allow ?? []
-  const deny  = batch.deny  ?? []
-  lines.push(`  allow: ${allow.length ? allow.join(', ') : '(none)'}`)
-  if (deny.length) lines.push(`  deny:  ${deny.join(', ')}`)
-  return lines.join('\n')
+/** `[{ path, description }]` — the index shape, deliberately without option detail. */
+function commandRows(commands) {
+  return flattenCommands(commands ?? []).map(r => ({ path: r.path, description: r.description }))
 }
 
-export async function handler({ keys, format = 'text', projectRoot = process.cwd(), configRoot = projectRoot }) {
+function directChildRows(node, path) {
+  return (node?.commands ?? []).map(c => ({
+    path: path ? `${path} ${c.name}` : c.name,
+    description: c.description ?? '',
+  }))
+}
+
+export async function handler({ key, path = [], format = 'text', projectRoot = process.cwd(), configRoot = projectRoot }) {
   let config
   try {
     config = loadConfig(configRoot)
   } catch (err) {
     output.error(`Config unreadable: ${err.message}`)
     process.exit(1)
+    return
   }
 
-  const results = []
-  let anyFailed = false
+  let docs
+  try {
+    docs = await resolveRuneDocs(config, key, projectRoot, configRoot)
+  } catch (err) {
+    output.warn(err.message)
+    process.exit(1)
+    return
+  }
 
-  for (const key of keys) {
-    let pluginMatch
-    try {
-      pluginMatch = await resolvePluginRune(config, key)
-    } catch (err) {
-      output.warn(err.message)
-      anyFailed = true
-      continue
-    }
-
-    const localEntry = pluginMatch ? null : getRune(config, key)
-
-    let autoMatch = null
-    if (!pluginMatch && !localEntry) {
-      try {
-        autoMatch = await resolveRuneFromPlugins(config, key)
-      } catch (err) {
-        output.warn(err.message)
-        anyFailed = true
-        continue
-      }
-    }
-
-    const resolved = pluginMatch ?? autoMatch
-
-    if (!localEntry && !resolved) {
-      if (SUGGESTIONS[key]) {
-        output.warn(`Unknown rune: "${key}". (Tip: Did you mean "${SUGGESTIONS[key]}"?)`)
-      } else {
-        output.warn(`Unknown rune: "${key}"`)
-      }
-      anyFailed = true
-      continue
-    }
-
-    let runeFile, relativePath, basePerms, vars, displayName, displayDescription, batch
-
-    if (resolved) {
-      const { runeKey, pluginDir } = resolved
-      let pluginJson
-      try {
-        pluginJson = await loadPluginJson(pluginDir)
-      } catch (err) {
-        output.warn(`Could not load plugin for "${key}": ${err.message}`)
-        anyFailed = true
-        continue
-      }
-      const runeDef = pluginJson.runes[runeKey] ?? {}
-      runeFile = getPluginRunePath(pluginDir, runeKey, pluginJson)
-      relativePath = undefined
-      basePerms = runeDef.permissions ?? { allow: [], deny: [] }
-      vars = runeDef.vars ?? {}
-      displayName = runeDef.name ?? runeKey
-      displayDescription = runeDef.description ?? null
-      batch = runeDef.batch != null ? { allow: runeDef.batch.allow ?? [], deny: runeDef.batch.deny ?? [] } : null
+  if (!docs) {
+    if (SUGGESTIONS[key]) {
+      output.warn(`Unknown rune: "${key}". (Tip: Did you mean "${SUGGESTIONS[key]}"?)`)
     } else {
-      runeFile = join(configRoot, localEntry.path ?? `.crunes/runes/${key}.js`)
-      relativePath = relative(projectRoot, runeFile).replace(/\\/g, '/')
-      basePerms = localEntry.permissions ?? { allow: [], deny: [] }
-      vars = localEntry.vars ?? {}
-      displayName = localEntry.name ?? key
-      displayDescription = localEntry.description ?? null
-      batch = localEntry.batch != null ? { allow: localEntry.batch.allow ?? [], deny: localEntry.batch.deny ?? [] } : null
+      output.warn(`Unknown rune: "${key}"`)
     }
+    process.exit(1)
+    return
+  }
 
-    const runEffective  = computeEffectivePermissions(basePerms, undefined, 'run')
-    const replEffective = computeEffectivePermissions(basePerms, undefined, 'repl')
+  const segments = path ?? []
 
-    let schema = null
-    try {
-      schema = await getArgsSchema(runeFile, runEffective, projectRoot, { vars, runeKey: key })
-    } catch (err) {
-      output.warn(`Could not load args schema for "${key}": ${err.message}`)
+  if (segments.length === 0) {
+    if (format === 'json') {
+      process.stdout.write(JSON.stringify({
+        key: docs.key,
+        name: docs.name,
+        description: docs.description,
+        relativePath: docs.relativePath,
+        options: docs.schema?.options ?? [],
+        positionals: docs.schema?.positionals ?? [],
+        commands: commandRows(docs.schema?.commands),
+        repl: docs.repl ? { commands: docs.repl.commandsSchema?.commands ?? [] } : null,
+        batch: docs.batch,
+      }, null, 2) + '\n')
+    } else {
+      process.stdout.write(formatRuneIndex(docs.schema, {
+        key: docs.key,
+        name: docs.name,
+        description: docs.description,
+        relativePath: docs.relativePath,
+        repl: docs.repl ? { commands: docs.repl.commandsSchema?.commands ?? [] } : null,
+        batch: docs.batch,
+        includeBatch: true,
+      }) + '\n')
     }
+    return
+  }
 
-    let repl = null
-    try {
-      const { argsSchema, commandsSchema } = await getReplSchema(runeFile, replEffective, [], projectRoot, { vars, runeKey: key })
-      if (argsSchema !== null || commandsSchema !== null) {
-        repl = { argsSchema, commandsSchema }
-      }
-    } catch (err) {
-      output.warn(`Could not load REPL schema for "${key}": ${err.message}`)
+  const sel = selectNode(docs.schema, segments)
+  if (!sel.node) {
+    const lines = [`"${sel.failedAt}" is not a command of rune "${docs.key}"${sel.matchedPath ? ` at path "${sel.matchedPath}"` : ''}.`]
+    lines.push('')
+    lines.push(`  Available commands: ${sel.candidates.length ? sel.candidates.join(', ') : '(none)'}`)
+
+    const isKnownRune = await resolveRuneDocs(config, sel.failedAt, projectRoot, configRoot).catch(() => null)
+    if (isKnownRune) {
+      lines.push('')
+      lines.push(`  "${sel.failedAt}" is a known rune. Multi-rune lookup was removed — run`)
+      lines.push('  `crunes docs rune` for an index of all runes, or `crunes docs rune ' + sel.failedAt + '`.')
     }
-
-    results.push({
-      key,
-      name: displayName,
-      description: displayDescription,
-      relativePath,
-      schema,
-      repl,
-      batch,
-    })
+    output.error(lines.join('\n'))
+    process.exit(1)
+    return
   }
 
   if (format === 'json') {
-    process.stdout.write(JSON.stringify(results, null, 2) + '\n')
+    process.stdout.write(JSON.stringify({
+      path: sel.matchedPath,
+      description: sel.node.description ?? null,
+      positionals: sel.node.positionals ?? [],
+      options: sel.node.options ?? [],
+      examples: sel.node.examples ?? [],
+      commands: directChildRows(sel.node, sel.matchedPath),
+    }, null, 2) + '\n')
   } else {
-    const blocks = []
-    for (const r of results) {
-      const parts = []
-      parts.push(formatHelp(r.schema, { key: r.key, name: r.name, description: r.description, relativePath: r.relativePath }))
-      if (r.repl?.argsSchema) {
-        parts.push(formatHelp(r.repl.argsSchema, { key: r.key, name: r.name, description: r.description, relativePath: r.relativePath, lifecycle: 'repl' }))
-      }
-      if (r.repl?.commandsSchema?.commands?.length) {
-        parts.push(formatSlashCommands(r.repl.commandsSchema.commands))
-      }
-      parts.push(formatBatch(r.batch))
-      blocks.push(parts.join('\n\n'))
-    }
-    if (blocks.length > 0) process.stdout.write(blocks.join('\n\n') + '\n')
+    process.stdout.write(formatCommandPage(sel.node, { key: docs.key, path: sel.matchedPath }) + '\n')
   }
-
-  if (anyFailed) process.exit(1)
 }
