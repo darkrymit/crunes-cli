@@ -4,6 +4,7 @@
 
 import * as md from 'crunes:md'
 import * as tree from 'crunes:tree'
+import { selectNode, toSegments, formatRuneIndex, formatCommandPage } from '../../docs/help-render.js'
 
 const __vars = JSON.parse($__vars)
 
@@ -1869,13 +1870,38 @@ globalThis.clearInterval = function(id) {
 globalThis.fetch = (input, init) => globalThis.utils.http.fetch(input, init)
 
 const __runeKey            = typeof $__rune_key !== 'undefined' ? $__rune_key : null
-const __runeHelpText       = typeof $__rune_help_text !== 'undefined' ? $__rune_help_text : null
+const __runeLifecycle      = typeof $__rune_lifecycle !== 'undefined' ? $__rune_lifecycle : 'run'
 const __runeArgsSchema     = typeof $__rune_args_schema !== 'undefined' ? JSON.parse($__rune_args_schema) : null
 const __runeCommandsSchema = typeof $__rune_commands_schema !== 'undefined' ? JSON.parse($__rune_commands_schema) : null
 
+function __renderRuneHelp(path) {
+  if (!__runeArgsSchema) return ''
+  const segments = toSegments(path)
+  if (segments.length === 0) {
+    return formatRuneIndex(__runeArgsSchema, {
+      key: __runeKey ?? 'rune',
+      lifecycle: __runeLifecycle,
+      repl: __runeCommandsSchema ? { commands: __runeCommandsSchema.commands ?? [] } : null,
+      // Effective permissions are computed host-side and are not available
+      // inside the isolate, so the batch block is omitted rather than guessed.
+      includeBatch: false,
+    })
+  }
+  const sel = selectNode(__runeArgsSchema, segments)
+  if (!sel.node) {
+    throw new Error(
+      `rune.helpText: "${sel.failedAt}" is not a command of "${__runeKey ?? 'rune'}"` +
+      `${sel.matchedPath ? ` at path "${sel.matchedPath}"` : ''}. ` +
+      `Available: ${sel.candidates.length ? sel.candidates.join(', ') : '(none)'}`
+    )
+  }
+  return formatCommandPage(sel.node, { key: __runeKey ?? 'rune', lifecycle: __runeLifecycle, path: sel.matchedPath })
+}
+
 globalThis.utils.rune.key            = () => __runeKey
-globalThis.utils.rune.helpText       = () => __runeHelpText ?? ''
-globalThis.utils.rune.helpSection    = () => globalThis.utils.section.create('help', { type: 'markdown', content: __runeHelpText ?? '' })
+globalThis.utils.rune.helpText       = (path) => __renderRuneHelp(path)
+globalThis.utils.rune.helpSection    = (path) =>
+  globalThis.utils.section.create('help', { type: 'markdown', content: __renderRuneHelp(path) })
 globalThis.utils.rune.argsSchema     = () => __runeArgsSchema
 globalThis.utils.rune.commandsSchema = () => __runeCommandsSchema?.commands ?? null
 

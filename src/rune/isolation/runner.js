@@ -19,7 +19,6 @@ import { isVerbose } from '../../shared/output.js'
 import * as EMBEDDED from './embedded.js'
 import { parseArgs } from '../api/args-parser.js'
 import { RuneSession } from '../api/rune.js'
-import { formatHelp } from '../../docs/formatter.js'
 import { readSchemaCache, writeSchemaCache } from '../schema-cache.js'
 
 const __isolationDir = path.dirname(fileURLToPath(import.meta.url))
@@ -1300,7 +1299,7 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
   await jail.set('$__vars', JSON.stringify(vars))
   await jail.set('$__projectDir', projectDir)
   await jail.set('$__rune_key',             runeContext?.key ?? null)
-  await jail.set('$__rune_help_text',       runeContext?.helpText ?? null)
+  await jail.set('$__rune_lifecycle',       runeContext?.lifecycle ?? 'run')
   await jail.set('$__rune_args_schema',     JSON.stringify(runeContext?.argsSchema ?? null))
   await jail.set('$__rune_commands_schema', JSON.stringify(runeContext?.commandsSchema ?? null))
 
@@ -1399,13 +1398,11 @@ export async function runRuneInIsolate(runeFile, effective, args, projectDir, {
     }))
 
     if (isVerbose) console.error(`[crunes:debug] injecting utils and console...`)
-    let runeContext = { key: runeKey, helpText: null, argsSchema: null, commandsSchema: null }
+    let runeContext = { key: runeKey, lifecycle, argsSchema: null, commandsSchema: null }
     if (lifecycle === 'run') {
       try {
-        const schema = await getArgsSchema(runeFile, effective, projectDir, { vars, nodeModulesDir, pluginDeps, pluginDir, pluginId, runeKey })
-        runeContext.argsSchema = schema
-        runeContext.helpText = formatHelp(schema, { key: runeKey, name: runeKey, description: undefined })
-      } catch { /* help unavailable, silently skip */ }
+        runeContext.argsSchema = await getArgsSchema(runeFile, effective, projectDir, { vars, nodeModulesDir, pluginDeps, pluginDir, pluginId, runeKey })
+      } catch { /* schema unavailable, help renders empty */ }
     }
     const utilsMod = await injectUtils(isolate, context, utils, runeCallback, vars, projectDir, checkPermission, sections, wrappedOnEvent, runeContext)
     await injectConsole(isolate, context, wrappedOnEvent)
@@ -1891,13 +1888,12 @@ export async function runRuneInRepl(runeFile, effective, args, projectDir, {
     throw new Error(`PermissionError: ${msg}`)
   }))
 
-  let runeContext = { key: runeKey, helpText: null, argsSchema: null, commandsSchema: null }
+  let runeContext = { key: runeKey, lifecycle: 'repl', argsSchema: null, commandsSchema: null }
   try {
     const { argsSchema, commandsSchema } = await getReplSchema(runeFile, effective, [], projectDir, { vars, nodeModulesDir, pluginDeps, pluginDir, runeKey })
     runeContext.argsSchema = argsSchema ?? null
     runeContext.commandsSchema = commandsSchema ?? null
-    if (argsSchema) runeContext.helpText = formatHelp(argsSchema, { key: runeKey, name: runeKey, description: undefined, lifecycle: 'repl' })
-  } catch { /* help unavailable, silently skip */ }
+  } catch { /* schema unavailable, help renders empty */ }
 
   const utilsMod = await injectUtils(isolate, context, utils, null, vars, projectDir, checkPermission, null, wrappedOnEvent, runeContext)
   await injectConsole(isolate, context, wrappedOnEvent)

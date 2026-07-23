@@ -3,11 +3,20 @@ declare namespace rune {
   /** Returns the current rune's key (e.g. 'my-rune' or 'myplugin:my-rune'). null in bootstrap contexts. */
   function key(): string | null
 
-  /** Returns the formatted CLI help text for the current rune. Empty string if no args schema. Always renders the full rune command tree (all subcommands, all options) — there is no way to scope this to just the matched subcommand. */
-  function helpText(): string
+  /**
+   * Returns formatted CLI help text for the current rune, scoped to a command path.
+   * Omit `path` (or pass an empty string/array) for the rune command index.
+   * Pass `args.$command` or `args.$commands` to render only the matched subcommand.
+   * Throws if the path does not resolve against the rune's own schema.
+   * Returns an empty string when the rune declares no args schema.
+   */
+  function helpText(path?: string | string[]): string
 
-  /** Creates a markdown section containing the formatted CLI help text. Always renders the full rune command tree (all subcommands, all options) — there is no way to scope this to just the matched subcommand. */
-  function helpSection(): RuneSection
+  /**
+   * Creates a markdown section containing the scoped CLI help text.
+   * Same path semantics as `helpText`.
+   */
+  function helpSection(path?: string | string[]): RuneSection
 
   /**
    * Returns the raw arg schema object for the current rune.
