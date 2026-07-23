@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **Global rune index**: `crunes docs rune` with no key lists every resolvable rune with its command tree; a rune whose schema fails to build is reported inline and does not prevent the healthy runes from being listed
+- **Command-path drill-down**: `crunes docs rune <key> <command>...` renders a bounded page for exactly that command — its own options, positionals, examples, and direct children only
+
+### Changed
+- **BREAKING — multi-rune lookup removed**: `crunes docs rune a b` now means command `b` of rune `a`, not documentation for runes `a` and `b`. Use `crunes docs rune` for an index of all runes
+- **BREAKING — `utils.rune.helpSection()` / `helpText()` scope**: with no argument they now return the rune command index rather than the full command tree. Both accept an optional command path (`args.$command` or `args.$commands`) to render only the matched subcommand, and throw when the path does not resolve
+- **Bounded documentation pages**: `crunes docs rune` and in-rune help share one renderer and disclose progressively, so a rune with many nested commands no longer produces a page that floods an agent's context. `--format json` mirrors the text scope at every level
+
+### Removed
+- **Per-run help prebake**: the full help string is no longer rendered at isolate startup for every `crunes run`; it is rendered on demand inside the sandbox
+
 ## [0.8.5] - 2026-07-23
 
 ### Added
