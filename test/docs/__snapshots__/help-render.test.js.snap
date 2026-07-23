@@ -16,6 +16,24 @@ Commands:
   bump minor               Minor bump"
 `;
 
+exports[`formatGlobalIndex > matches the global index snapshot 1`] = `
+"Runes:
+
+release — Release automation                      local
+  info                     Show current release context
+  bump <level>             Bump the version
+  bump patch               Patch bump
+  bump minor               Minor bump
+
+m — Module structure map                          local
+
+ctx:kb — Knowledge base entries                   plugin: ctx
+
+⚠ broken — could not build args schema: boom
+
+Drill down: crunes docs rune <key> [command path...]"
+`;
+
 exports[`formatRuneIndex > matches the rune index snapshot 1`] = `
 "Rune: release — Release automation
 File (project-relative): .crunes/runes/release.js

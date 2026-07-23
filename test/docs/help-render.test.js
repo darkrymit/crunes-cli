@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { flattenCommands, selectNode, formatCommandPage, formatRuneIndex } from '../../src/docs/help-render.js'
+import { flattenCommands, selectNode, formatCommandPage, formatRuneIndex, formatGlobalIndex } from '../../src/docs/help-render.js'
 
 const SCHEMA = {
   options: [{ flags: '--dry-run', description: 'Print actions without executing' }],
@@ -263,5 +263,59 @@ describe('formatRuneIndex', () => {
 
   it('matches the rune index snapshot', () => {
     expect(formatRuneIndex(SCHEMA, META)).toMatchSnapshot()
+  })
+})
+
+describe('formatGlobalIndex', () => {
+  const ENTRIES = [
+    { key: 'release', name: 'Release', description: 'Release automation', source: 'local', schema: SCHEMA },
+    { key: 'm', name: 'Map', description: 'Module structure map', source: 'local', schema: null },
+    { key: 'ctx:kb', name: 'KB', description: 'Knowledge base entries', source: 'plugin: ctx', schema: { commands: [] } },
+    { key: 'broken', name: null, description: null, source: 'local', error: 'boom' },
+  ]
+
+  it('renders a header line per rune with description and source', () => {
+    const out = formatGlobalIndex(ENTRIES)
+    expect(out).toContain('release — Release automation')
+    expect(out).toContain('local')
+  })
+
+  it('renders each rune command tree as full paths', () => {
+    const out = formatGlobalIndex(ENTRIES)
+    expect(out).toContain('  bump patch')
+  })
+
+  it('renders a rune with no schema as a bare header line', () => {
+    const lines = formatGlobalIndex(ENTRIES).split('\n')
+    const i = lines.findIndex(l => l.startsWith('m — '))
+    expect(lines[i + 1]).toBe('')
+  })
+
+  it('renders a rune with an empty command list as a bare header line', () => {
+    const lines = formatGlobalIndex(ENTRIES).split('\n')
+    const i = lines.findIndex(l => l.startsWith('ctx:kb — '))
+    expect(lines[i + 1]).toBe('')
+  })
+
+  it('renders a warn line for a rune whose schema failed to build', () => {
+    expect(formatGlobalIndex(ENTRIES)).toContain('⚠ broken — could not build args schema: boom')
+  })
+
+  it('renders the drill-down footer', () => {
+    expect(formatGlobalIndex(ENTRIES)).toContain('Drill down: crunes docs rune <key> [command path...]')
+  })
+
+  it('renders an empty-state line when there are no runes', () => {
+    expect(formatGlobalIndex([])).toContain('No runes configured.')
+  })
+
+  it('does not list REPL commands or batch blocks', () => {
+    const out = formatGlobalIndex(ENTRIES)
+    expect(out).not.toContain('REPL commands:')
+    expect(out).not.toContain('Batch:')
+  })
+
+  it('matches the global index snapshot', () => {
+    expect(formatGlobalIndex(ENTRIES)).toMatchSnapshot()
   })
 })

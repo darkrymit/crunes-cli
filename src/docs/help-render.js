@@ -222,3 +222,38 @@ export function formatRuneIndex(schema, meta) {
 
   return lines.join('\n')
 }
+
+/** Width of the "key — description" column in the global index. */
+export const GLOBAL_PAD = 50
+
+/**
+ * Index of every resolvable rune with its names-only run-command tree.
+ * REPL commands and batch blocks are deliberately excluded — including them
+ * would reintroduce the flooding this page exists to replace.
+ */
+export function formatGlobalIndex(entries) {
+  if (!entries || entries.length === 0) {
+    return 'No runes configured. Run `crunes create <key>` to add one.'
+  }
+
+  const lines = ['Runes:', '']
+
+  for (const e of entries) {
+    if (e.error) {
+      lines.push(`⚠ ${e.key} — could not build args schema: ${e.error}`)
+      lines.push('')
+      continue
+    }
+    const label = e.description ?? e.name ?? ''
+    const head = `${e.key}${label ? ` — ${label}` : ''}`
+    const padded = head.length >= GLOBAL_PAD ? head + ' ' : head.padEnd(GLOBAL_PAD)
+    lines.push(`${padded}${e.source ?? ''}`.trimEnd())
+    for (const r of flattenCommands(e.schema?.commands ?? [])) {
+      lines.push(row(r.label, r.description))
+    }
+    lines.push('')
+  }
+
+  lines.push('Drill down: crunes docs rune <key> [command path...]')
+  return lines.join('\n')
+}
