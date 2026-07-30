@@ -1,8 +1,36 @@
 import { readFileSync, existsSync } from 'node:fs'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 
 function isObject(item) {
   return item && typeof item === 'object' && !Array.isArray(item)
+}
+
+export const LAYER = Symbol.for('crunes.layer')
+
+/**
+ * Resolve every `path` in a config section against the layer's own base dir,
+ * before layers are merged. Only the global layer fills in a default path
+ * (`runes/<key>.js`) — project entries stay pathless so that an entry which
+ * only overrides `vars` inherits the path of the layer that defined it.
+ */
+function absolutizeSection(section, kind, baseDir, layer) {
+  const out = {}
+  for (const [key, entry] of Object.entries(section)) {
+    if (!isObject(entry)) { out[key] = entry; continue }
+    const copy = { ...entry, [LAYER]: layer }
+    const isPluginRef = Boolean(entry.plugin) || key.includes(':')
+    if (entry.path) copy.path = resolve(baseDir, entry.path)
+    else if (layer === 'global' && !isPluginRef) copy.path = resolve(baseDir, `${kind}/${key}.js`)
+    out[key] = copy
+  }
+  return out
+}
+
+export function absolutizeEntryPaths(config, baseDir, layer) {
+  const out = { ...config }
+  if (isObject(config.runes))     out.runes     = absolutizeSection(config.runes, 'runes', baseDir, layer)
+  if (isObject(config.templates)) out.templates = absolutizeSection(config.templates, 'templates', baseDir, layer)
+  return out
 }
 
 export function coercePlugins(plugins) {
@@ -21,7 +49,7 @@ export function mergeConfigs(shared, local) {
 
   // 1. Merge Top-level Primitives & simple keys
   for (const [key, value] of Object.entries(local)) {
-    if (key !== 'runes' && key !== 'plugins') {
+    if (key !== 'runes' && key !== 'templates' && key !== 'plugins') {
       merged[key] = value
     }
   }
@@ -40,6 +68,17 @@ export function mergeConfigs(shared, local) {
       } else {
         merged.runes[key] = localEntry
       }
+    }
+  }
+
+  // 2b. Merge 'templates' (same shape as runes, no vars)
+  if (local.templates) {
+    merged.templates = { ...shared.templates }
+    for (const [key, localEntry] of Object.entries(local.templates)) {
+      const sharedEntry = shared.templates?.[key]
+      merged.templates[key] = (isObject(sharedEntry) && isObject(localEntry))
+        ? { ...sharedEntry, ...localEntry }
+        : localEntry
     }
   }
 

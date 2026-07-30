@@ -1,5 +1,8 @@
 import { describe, it, expect, vi } from 'vitest'
-import { validateConfig, mergeConfigs, coercePlugins, enabledPluginKeys } from '../../src/core/config.js'
+import path from 'node:path'
+import { validateConfig, mergeConfigs, coercePlugins, enabledPluginKeys, absolutizeEntryPaths, LAYER } from '../../src/core/config.js'
+
+const abs = p => path.resolve(p).replace(/\\/g, '/')
 
 describe('validateConfig', () => {
   it('ignores a top-level permissions map (not a supported shape)', () => {
@@ -153,6 +156,74 @@ describe('mergeConfigs', () => {
     const local = { isolateMemoryMb: 256 }
     const result = mergeConfigs(shared, local)
     expect(result.isolateMemoryMb).toBe(256)
+  })
+})
+
+describe('absolutizeEntryPaths', () => {
+  it('resolves an explicit rune path against the layer base dir', () => {
+    const out = absolutizeEntryPaths({ runes: { serve: { path: 'runes/serve.js' } } }, '/store', 'global')
+    expect(out.runes.serve.path.replace(/\\/g, '/')).toBe(abs('/store/runes/serve.js'))
+  })
+
+  it('fills the global default path with no .crunes segment', () => {
+    const out = absolutizeEntryPaths({ runes: { serve: {} } }, '/store', 'global')
+    expect(out.runes.serve.path.replace(/\\/g, '/')).toBe(abs('/store/runes/serve.js'))
+  })
+
+  it('leaves a pathless project entry pathless, so it can override a global entry', () => {
+    const out = absolutizeEntryPaths({ runes: { serve: {} } }, '/proj', 'project')
+    expect(out.runes.serve.path).toBeUndefined()
+  })
+
+  it('leaves a plugin-rune override key without a path', () => {
+    const out = absolutizeEntryPaths({ runes: { 'mp@plug:status': { vars: { a: 1 } } } }, '/proj', 'project')
+    expect(out.runes['mp@plug:status'].path).toBeUndefined()
+  })
+
+  it('leaves a plugin alias entry without a path', () => {
+    const out = absolutizeEntryPaths({ runes: { deploy: { plugin: 'mp@plug:deploy' } } }, '/proj', 'project')
+    expect(out.runes.deploy.path).toBeUndefined()
+  })
+
+  it('tags each entry with its layer', () => {
+    const out = absolutizeEntryPaths({ runes: { serve: {} } }, '/store', 'global')
+    expect(out.runes.serve[LAYER]).toBe('global')
+  })
+
+  it('resolves template paths the same way', () => {
+    const out = absolutizeEntryPaths({ templates: { base: {} } }, '/store', 'global')
+    expect(out.templates.base.path.replace(/\\/g, '/')).toBe(abs('/store/templates/base.js'))
+  })
+})
+
+describe('mergeConfigs templates', () => {
+  it('merges templates per key instead of replacing the whole map', () => {
+    const result = mergeConfigs(
+      { templates: { a: { path: '/store/templates/a.js' } } },
+      { templates: { b: { path: '/proj/.crunes/templates/b.js' } } }
+    )
+    expect(Object.keys(result.templates).sort()).toEqual(['a', 'b'])
+  })
+})
+
+describe('partial override across layers', () => {
+  it('keeps the defining layer path when a later layer overrides only vars', () => {
+    const global = absolutizeEntryPaths(
+      { runes: { serve: { path: 'runes/serve.js', vars: { port: 3000 } } } }, '/store', 'global')
+    const project = absolutizeEntryPaths(
+      { runes: { serve: { vars: { port: 4000 } } } }, '/proj', 'project')
+    const merged = mergeConfigs(global, project)
+    expect(merged.runes.serve.path.replace(/\\/g, '/')).toBe(abs('/store/runes/serve.js'))
+    expect(merged.runes.serve.vars).toEqual({ port: 4000 })
+  })
+
+  it('takes the overriding layer path when that layer supplies its own', () => {
+    const global = absolutizeEntryPaths(
+      { runes: { serve: { path: 'runes/serve.js' } } }, '/store', 'global')
+    const project = absolutizeEntryPaths(
+      { runes: { serve: { path: 'custom/serve.js' } } }, '/proj', 'project')
+    const merged = mergeConfigs(global, project)
+    expect(merged.runes.serve.path.replace(/\\/g, '/')).toBe(abs('/proj/custom/serve.js'))
   })
 })
 
