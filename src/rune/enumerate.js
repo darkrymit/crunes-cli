@@ -1,4 +1,5 @@
 import { getRune } from './resolver.js'
+import { enabledPluginKeys } from '../core/config.js'
 
 /**
  * Enumerate every rune visible to a project: local config runes first, then
@@ -16,7 +17,7 @@ export async function enumerateRunes(config) {
     entries.push({ key, source, name: entry.name ?? null, description: entry.description ?? null })
   }
 
-  const enabledPlugins = config?.plugins ?? []
+  const enabledPlugins = enabledPluginKeys(config)
   if (enabledPlugins.length > 0) {
     try {
       const { loadRegistry } = await import('../plugin/registry.js')

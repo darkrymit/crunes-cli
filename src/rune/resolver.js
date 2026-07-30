@@ -4,6 +4,7 @@ import { loadPluginJson } from '../plugin/manifest.js'
 import { executePluginRune, runRuneInIsolate, runRuneInRepl, getPluginRunePath } from './isolation/runner.js'
 import { computeEffectivePermissions } from './permissions/permissions.js'
 import { CircularRuneError } from '../core/errors.js'
+import { enabledPluginKeys } from '../core/config.js'
 
 export function normaliseRune(entry) {
   return entry
@@ -19,7 +20,7 @@ export async function resolvePluginRune(config, key) {
   const colonIdx = key.indexOf(':')
   if (colonIdx === -1) return null
 
-  const enabledPlugins = config.plugins ?? []
+  const enabledPlugins = enabledPluginKeys(config)
   if (enabledPlugins.length === 0) return null
 
   const pluginPart = key.slice(0, colonIdx)
@@ -44,7 +45,7 @@ export async function resolvePluginRune(config, key) {
 }
 
 export async function resolveRuneFromPlugins(config, runeKey) {
-  const enabledPlugins = config.plugins ?? []
+  const enabledPlugins = enabledPluginKeys(config)
   if (enabledPlugins.length === 0) return null
 
   let registry

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { validateConfig, mergeConfigs } from '../../src/core/config.js'
+import { validateConfig, mergeConfigs, coercePlugins, enabledPluginKeys } from '../../src/core/config.js'
 
 describe('validateConfig', () => {
   it('ignores a top-level permissions map (not a supported shape)', () => {
@@ -148,18 +148,40 @@ describe('mergeConfigs', () => {
     })
   })
 
-  it('unions plugins list', () => {
-    const shared = { plugins: ["plugin-a", "plugin-b"] }
-    const local = { plugins: ["plugin-b", "plugin-c"] }
-    const result = mergeConfigs(shared, local)
-    expect(result.plugins).toEqual(["plugin-a", "plugin-b", "plugin-c"])
-  })
-
   it('overrides global primitives', () => {
     const shared = { isolateMemoryMb: 128 }
     const local = { isolateMemoryMb: 256 }
     const result = mergeConfigs(shared, local)
     expect(result.isolateMemoryMb).toBe(256)
+  })
+})
+
+describe('plugins as a boolean map', () => {
+  it('coerces a legacy array into an all-true map', () => {
+    expect(coercePlugins(['a@x', 'b@y'])).toEqual({ 'a@x': true, 'b@y': true })
+  })
+
+  it('passes a map through unchanged and treats missing as empty', () => {
+    expect(coercePlugins({ 'a@x': false })).toEqual({ 'a@x': false })
+    expect(coercePlugins(undefined)).toEqual({})
+  })
+
+  it('merges maps last-wins so a later layer can disable', () => {
+    const result = mergeConfigs({ plugins: { 'a@x': true } }, { plugins: { 'a@x': false } })
+    expect(result.plugins).toEqual({ 'a@x': false })
+  })
+
+  it('coerces a legacy array on either side of a merge', () => {
+    const result = mergeConfigs({ plugins: ['a@x'] }, { plugins: { 'b@y': true } })
+    expect(result.plugins).toEqual({ 'a@x': true, 'b@y': true })
+  })
+
+  it('lists only keys explicitly enabled', () => {
+    expect(enabledPluginKeys({ plugins: { 'a@x': true, 'b@y': false } })).toEqual(['a@x'])
+  })
+
+  it('lists keys from a legacy array config', () => {
+    expect(enabledPluginKeys({ plugins: ['a@x'] })).toEqual(['a@x'])
   })
 })
 

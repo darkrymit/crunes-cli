@@ -5,6 +5,17 @@ function isObject(item) {
   return item && typeof item === 'object' && !Array.isArray(item)
 }
 
+export function coercePlugins(plugins) {
+  if (Array.isArray(plugins)) return Object.fromEntries(plugins.map(k => [k, true]))
+  return isObject(plugins) ? { ...plugins } : {}
+}
+
+export function enabledPluginKeys(config) {
+  return Object.entries(coercePlugins(config?.plugins))
+    .filter(([, enabled]) => enabled === true)
+    .map(([key]) => key)
+}
+
 export function mergeConfigs(shared, local) {
   const merged = { ...shared }
 
@@ -32,10 +43,9 @@ export function mergeConfigs(shared, local) {
     }
   }
 
-  // 3. Merge 'plugins' (Union)
-  if (local.plugins) {
-    const combined = [...(shared.plugins ?? []), ...(local.plugins ?? [])]
-    merged.plugins = Array.from(new Set(combined))
+  // 3. Merge 'plugins' (boolean map, last layer wins per key)
+  if (shared.plugins || local.plugins) {
+    merged.plugins = { ...coercePlugins(shared.plugins), ...coercePlugins(local.plugins) }
   }
 
   return merged
@@ -71,6 +81,14 @@ export function validateConfig(config, fileName = 'config.json') {
             )
           }
         }
+      }
+    }
+  }
+
+  if (config.plugins && !Array.isArray(config.plugins) && typeof config.plugins === 'object') {
+    for (const [key, value] of Object.entries(config.plugins)) {
+      if (typeof value !== 'boolean') {
+        throw new Error(`${fileName}: plugins["${key}"] must be true or false, got ${JSON.stringify(value)}`)
       }
     }
   }

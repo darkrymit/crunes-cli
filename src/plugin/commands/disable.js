@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
+import { enabledPluginKeys } from '../../core/config.js'
 
 function resolveEnabledPluginKey(nameOrKey, enabledPlugins) {
   if (nameOrKey.includes('@')) return nameOrKey
@@ -25,7 +26,7 @@ export async function handler({ name, projectRoot, configRoot }) {
     process.exit(1)
   }
 
-  const enabledPlugins = config.plugins ?? []
+  const enabledPlugins = enabledPluginKeys(config)
 
   let pluginKey
   try {
