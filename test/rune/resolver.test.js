@@ -17,6 +17,15 @@ import { runRune } from '../../src/rune/resolver.js'
 import { runRuneInIsolate, executePluginRune } from '../../src/rune/isolation/runner.js'
 import { loadRegistry, resolvePluginKeyScoped } from '../../src/plugin/registry.js'
 import { loadPluginJson } from '../../src/plugin/manifest.js'
+import { getLocalBase } from '../../src/store/index.js'
+import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+
+// A real project dir: node_modules only stays under `.crunes/` when a project
+// config exists — otherwise crunes runs rootless and redirects to the store.
+const projectDir = mkdtempSync(join(tmpdir(), 'crunes-resolver-proj-'))
+mkdirSync(join(projectDir, '.crunes'), { recursive: true })
+writeFileSync(join(projectDir, '.crunes', 'config.json'), '{}')
 
 const baseConfig = {
   runes: {
@@ -119,16 +128,23 @@ describe('runRune — local npm imports via .crunes/node_modules', () => {
 
   it('passes <configDir>/.crunes/node_modules as nodeModulesDir', async () => {
     const config = { runes: { hello: { path: 'runes/hello.js' } } }
-    await runRune('/project', config, 'hello', [])
+    await runRune(projectDir, config, 'hello', [])
     const opts = runRuneInIsolate.mock.calls[0][4]
-    expect(opts.nodeModulesDir).toBe(join('/project', '.crunes', 'node_modules'))
+    expect(opts.nodeModulesDir).toBe(join(projectDir, '.crunes', 'node_modules'))
   })
 
   it('nodeModulesDir uses configDir when provided', async () => {
     const config = { runes: { hello: { path: 'runes/hello.js' } } }
-    await runRune('/project', config, 'hello', [], { configDir: '/config' })
+    await runRune('/project', config, 'hello', [], { configDir: projectDir })
     const opts = runRuneInIsolate.mock.calls[0][4]
-    expect(opts.nodeModulesDir).toBe(join('/config', '.crunes', 'node_modules'))
+    expect(opts.nodeModulesDir).toBe(join(projectDir, '.crunes', 'node_modules'))
+  })
+
+  it('redirects nodeModulesDir into the store when the dir is not a project', async () => {
+    const config = { runes: { hello: { path: 'runes/hello.js' } } }
+    await runRune('/not-a-project', config, 'hello', [])
+    const opts = runRuneInIsolate.mock.calls[0][4]
+    expect(opts.nodeModulesDir).toBe(join(getLocalBase('/not-a-project'), 'node_modules'))
   })
 })
 

@@ -5,6 +5,7 @@ import { executePluginRune, runRuneInIsolate, runRuneInRepl, getPluginRunePath }
 import { computeEffectivePermissions } from './permissions/permissions.js'
 import { CircularRuneError } from '../core/errors.js'
 import { enabledPluginKeys } from '../core/config.js'
+import { getLocalBase } from '../store/index.js'
 
 export function normaliseRune(entry) {
   return entry
@@ -170,7 +171,7 @@ export async function runRune(dir, config, key, args, opts = {}, _callStack = []
     runeKey: key,
     onEvent: opts.onEvent ?? null,
     instanceId,
-    nodeModulesDir: join(configDir, '.crunes', 'node_modules'),
+    nodeModulesDir: join(getLocalBase(configDir), 'node_modules'),
     pluginDeps: null,
   })
   return normaliseResult(result)
@@ -230,7 +231,7 @@ export async function resolveRuneEntry(projectDir, config, key, configDir = proj
           runeKey: key,
           onEvent: opts.onEvent ?? null,
           instanceId: opts.instanceId ?? '1',
-          nodeModulesDir: join(configDir, '.crunes', 'node_modules'),
+          nodeModulesDir: join(getLocalBase(configDir), 'node_modules'),
           pluginDeps: null,
         })
       }

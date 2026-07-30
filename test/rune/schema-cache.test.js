@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { join } from 'node:path'
-import { mkdtemp, rm, writeFile, readdir } from 'node:fs/promises'
+import { mkdtemp, rm, writeFile, readdir, mkdir } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import {
   computeHash,
@@ -16,6 +16,9 @@ describe('schema-cache', () => {
   beforeEach(async () => {
     tmp = await mkdtemp(join(tmpdir(), 'crunes-sc-'))
     projectDir = tmp
+    // schemas live under `<dir>/.crunes` only for a real project
+    await mkdir(join(tmp, '.crunes'), { recursive: true })
+    await writeFile(join(tmp, '.crunes', 'config.json'), '{}')
     runeFile = join(tmp, 'my-rune.js')
     await writeFile(runeFile, `export function args(b) { return b.option('--verbose', 'v', false) }`)
   })

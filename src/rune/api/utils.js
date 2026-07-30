@@ -2,6 +2,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { getCachePluginDir } from '../../cache/index.js'
 import { getSqlitePluginDir } from '../../sqlite/index.js'
+import { getLocalBase } from '../../store/index.js'
 import { shortHash, getProjectKey } from '../../project/index.js'
 export { shortHash, getProjectKey }
 
@@ -37,15 +38,15 @@ function virtualStoreBase(prefix, { dir, pluginId }) {
       if (!pluginId) throw new Error('@global-plugin-sqlite requires a plugin context')
       return getSqlitePluginDir(pluginId)
     case '@local-cache':
-      return path.join(dir, '.crunes', 'caches', 'project')
+      return path.join(getLocalBase(dir), 'caches', 'project')
     case '@local-plugin-cache':
       if (!pluginId) throw new Error('@local-plugin-cache requires a plugin context')
-      return path.join(dir, '.crunes', 'caches', 'plugins', pluginId)
+      return path.join(getLocalBase(dir), 'caches', 'plugins', pluginId)
     case '@local-sqlite':
-      return path.join(dir, '.crunes', 'sqlite', 'project')
+      return path.join(getLocalBase(dir), 'sqlite', 'project')
     case '@local-plugin-sqlite':
       if (!pluginId) throw new Error('@local-plugin-sqlite requires a plugin context')
-      return path.join(dir, '.crunes', 'sqlite', 'plugins', pluginId)
+      return path.join(getLocalBase(dir), 'sqlite', 'plugins', pluginId)
   }
 }
 

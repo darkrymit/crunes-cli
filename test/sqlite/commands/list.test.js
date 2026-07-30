@@ -12,6 +12,9 @@ describe('sqlite list handler', () => {
   beforeEach(async () => {
     tmp = await mkdtemp(join(tmpdir(), 'crunes-sqlite-cmd-'))
     process.env.CRUNES_STORE = tmp
+    // local-sqlite scanning only looks under `<dir>/.crunes` for a real project
+    await mkdir(join(tmp, '.crunes'), { recursive: true })
+    await writeFile(join(tmp, '.crunes', 'config.json'), '{}')
     vi.spyOn(console, 'log').mockImplementation(() => {})
   })
   afterEach(async () => {

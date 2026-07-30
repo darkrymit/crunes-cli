@@ -107,7 +107,7 @@ export async function handler({
 
   if (resolved.type === 'local') {
     const localPath = typeof resolved.entry === 'string' ? resolved.entry : resolved.entry.path
-    await fs.copyFile(path.join(projectRoot, localPath), runeAbsPath)
+    await fs.copyFile(path.resolve(projectRoot, localPath), runeAbsPath)
     templateMeta = typeof resolved.entry === 'string' ? {} : resolved.entry
 
   } else if (resolved.type === 'shortcut') {

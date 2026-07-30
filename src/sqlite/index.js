@@ -1,7 +1,7 @@
 import { readFile, readdir, writeFile, mkdir, rm } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import path from 'node:path'
-import { getSqliteBasePath, getSqliteJsonPath } from '../store/index.js'
+import { getSqliteBasePath, getSqliteJsonPath, getLocalBase } from '../store/index.js'
 import { storageKey } from '../store/storage-key.js'
 
 async function loadDatabase() {
@@ -53,7 +53,7 @@ export async function listSqliteDbs() {
 
 export async function listLocalSqliteDbs(projectDir) {
   const results = []
-  const localSqliteDir = path.join(projectDir, '.crunes', 'sqlite')
+  const localSqliteDir = path.join(getLocalBase(projectDir), 'sqlite')
 
   async function scanScope(scopeDir, scope, pluginId = null) {
     let entries

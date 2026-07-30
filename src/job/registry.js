@@ -1,8 +1,9 @@
 import { readFile, writeFile, mkdir, readdir, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
+import { getLocalBase } from '../store/index.js'
 
-function jobDir(projectDir, id)    { return join(projectDir, '.crunes', 'jobs', id) }
+function jobDir(projectDir, id)    { return join(getLocalBase(projectDir), 'jobs', id) }
 
 export function jobStdoutPath(projectDir, id) { return join(jobDir(projectDir, id), 'stdout.log') }
 export function jobStderrPath(projectDir, id) { return join(jobDir(projectDir, id), 'stderr.log') }
@@ -34,7 +35,7 @@ export async function getJob(projectDir, id) {
 }
 
 export async function listJobs(projectDir) {
-  const base = join(projectDir, '.crunes', 'jobs')
+  const base = join(getLocalBase(projectDir), 'jobs')
   let entries
   try { entries = await readdir(base, { withFileTypes: true }) } catch { return [] }
   const records = await Promise.all(
@@ -48,7 +49,7 @@ export async function deleteJob(projectDir, id) {
 }
 
 export async function cleanJobs(projectDir) {
-  const base = join(projectDir, '.crunes', 'jobs')
+  const base = join(getLocalBase(projectDir), 'jobs')
   let entries
   try { entries = await readdir(base, { withFileTypes: true }) } catch { return }
   await Promise.all(

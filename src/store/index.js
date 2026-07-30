@@ -1,9 +1,33 @@
 import fs from 'node:fs/promises'
+import { existsSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { createHash } from 'node:crypto'
 
 export function getStorePath() {
   return process.env.CRUNES_STORE ?? path.join(os.homedir(), '.crunes')
+}
+
+// Duplicated rather than imported from src/project: store is a leaf module.
+function shortHash(str) {
+  return createHash('sha1').update(str).digest('hex').slice(0, 8)
+}
+
+export function isRootless(projectDir) {
+  return !existsSync(path.join(projectDir, '.crunes', 'config.json'))
+}
+
+export function getRootlessBase(projectDir) {
+  return path.join(getStorePath(), 'rootless', shortHash(projectDir))
+}
+
+/**
+ * Where per-project local state (caches, sqlite, jobs, schemas, node_modules)
+ * lives. In a project that is `<project>/.crunes`; with no project config it
+ * redirects into the store so the working directory is never written to.
+ */
+export function getLocalBase(projectDir) {
+  return isRootless(projectDir) ? getRootlessBase(projectDir) : path.join(projectDir, '.crunes')
 }
 
 export function getProjectsJsonPath() {

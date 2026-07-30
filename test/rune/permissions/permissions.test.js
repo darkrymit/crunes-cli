@@ -7,6 +7,16 @@ import {
   makePermissionChecker,
   PermissionError,
 } from '../../../src/rune/permissions/permissions.js'
+import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs'
+
+// A real project dir: local cache/sqlite paths only stay under `.crunes/`
+// when a project config exists — otherwise crunes runs rootless.
+function makeProjectDir() {
+  const dir = mkdtempSync(join(tmpdir(), 'crunes-perm-proj-'))
+  mkdirSync(join(dir, '.crunes'), { recursive: true })
+  writeFileSync(join(dir, '.crunes', 'config.json'), '{}')
+  return dir.replace(/\\/g, '/')
+}
 
 describe('computeEffectivePermissions', () => {
   it('uses plugin allow when no project override', () => {
@@ -269,7 +279,7 @@ describe('rune.job.write / shell.job.write permissions', () => {
 
 
 describe('makePermissionChecker — expandPattern siblings (ctx)', () => {
-  const dir = '/home/user/myproject'
+  const dir = makeProjectDir()
   const ctx = { dir }
 
   it('relative pattern ./src/** also matches its absolute form', () => {
@@ -354,7 +364,7 @@ describe('makePermissionChecker — db.connect capability', () => {
 })
 
 describe('expandPattern — full sibling coverage via makePermissionChecker', () => {
-  const dir = '/home/user/myproject'
+  const dir = makeProjectDir()
   const ctx = { dir }
 
   it('bare fs pattern matches ./rel, bare, absolute, and @project/ forms', () => {

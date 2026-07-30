@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { mkdtemp, rm, mkdir } from 'node:fs/promises'
+import { mkdtemp, rm, mkdir, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { upsertCacheBucket } from '../../../src/cache/index.js'
@@ -10,6 +10,9 @@ describe('cache list handler', () => {
   beforeEach(async () => {
     tmp = await mkdtemp(join(tmpdir(), 'crunes-cache-cmd-'))
     process.env.CRUNES_STORE = tmp
+    // local-cache scanning only looks under `<dir>/.crunes` for a real project
+    await mkdir(join(tmp, '.crunes'), { recursive: true })
+    await writeFile(join(tmp, '.crunes', 'config.json'), '{}')
     vi.spyOn(console, 'log').mockImplementation(() => {})
   })
   afterEach(async () => {

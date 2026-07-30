@@ -53,6 +53,9 @@ describe('resolvePath', () => {
     tmp       = await makeTmp()
     pluginDir = await makeTmp()
     process.env.CRUNES_STORE = await makeTmp()
+    // `@local-*` prefixes only stay under `<dir>/.crunes` for a real project
+    await mkdir(join(tmp, '.crunes'), { recursive: true })
+    await writeFile(join(tmp, '.crunes', 'config.json'), '{}')
   })
   afterEach(async () => {
     const store = process.env.CRUNES_STORE

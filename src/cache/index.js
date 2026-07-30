@@ -1,7 +1,7 @@
 import { readFile, readdir, writeFile, mkdir, rm } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import path from 'node:path'
-import { getCacheBasePath, getCacheJsonPath } from '../store/index.js'
+import { getCacheBasePath, getCacheJsonPath, getLocalBase } from '../store/index.js'
 import { storageKey } from '../store/storage-key.js'
 
 export function getCachePluginDir(pluginId) {
@@ -41,7 +41,7 @@ export async function listCacheBuckets() {
 
 export async function listLocalCacheBuckets(projectDir) {
   const results = []
-  const localCacheDir = path.join(projectDir, '.crunes', 'caches')
+  const localCacheDir = path.join(getLocalBase(projectDir), 'caches')
 
   async function scanScope(scopeDir, scope, pluginId = null) {
     let entries

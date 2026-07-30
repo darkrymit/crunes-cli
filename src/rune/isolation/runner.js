@@ -13,6 +13,7 @@ import { spawnDetachedJob } from '../../job/spawn-detached.js'
 import { EOF_SENTINEL } from '../../job/stdin-tail.js'
 import fsSync from 'node:fs'
 import { ensureProjectIdentity, upsertProject } from '../../project/index.js'
+import { isRootless } from '../../store/index.js'
 import { hash, hashAsHex, hashAsBase64, hmac, hmacAsHex, hmacAsBase64, encrypt, decrypt, uuid as cryptoUuid, randomHex as cryptoHex, randomBase64 as cryptoBase64, randomBytesFn } from '../api/crypt.js'
 import { computeEffectivePermissions, makePermissionChecker } from '../permissions/permissions.js'
 import { isVerbose } from '../../shared/output.js'
@@ -1378,9 +1379,11 @@ export async function runRuneInIsolate(runeFile, effective, args, projectDir, {
     allow: [...effective.allow, ...getAutoPermits({ pluginId, pluginDir })],
     deny: effective.deny,
   }
-  ensureProjectIdentity(projectDir)
-    .then(({ id }) => upsertProject(id, projectDir))
-    .catch(() => {})
+  if (!isRootless(projectDir)) {
+    ensureProjectIdentity(projectDir)
+      .then(({ id }) => upsertProject(id, projectDir))
+      .catch(() => {})
+  }
   const checkPermission = makePermissionChecker(augmented, { dir: projectDir, pluginId, pluginDir })
   const { utils, dispose } = createUtils(projectDir, checkPermission, pluginDir ?? null, augmented, vars, sections, pluginId)
 
@@ -1874,9 +1877,11 @@ export async function runRuneInRepl(runeFile, effective, args, projectDir, {
     allow: [...effective.allow, ...getAutoPermits({ pluginId, pluginDir })],
     deny: effective.deny,
   }
-  ensureProjectIdentity(projectDir)
-    .then(({ id }) => upsertProject(id, projectDir))
-    .catch(() => {})
+  if (!isRootless(projectDir)) {
+    ensureProjectIdentity(projectDir)
+      .then(({ id }) => upsertProject(id, projectDir))
+      .catch(() => {})
+  }
   const checkPermission = makePermissionChecker(augmented, { dir: projectDir, pluginId, pluginDir })
   const { utils, dispose: disposeUtils } = createUtils(projectDir, checkPermission, pluginDir ?? null, augmented, vars, null, pluginId)
 

@@ -41,7 +41,8 @@ describe('resolveTemplate — convention path', () => {
     }))
     const result = await resolveTemplate(null, 'mytemplate', tmp)
     expect(result.type).toBe('local')
-    expect(result.entry.path).toBe('custom/tmpl.js')
+    // absolutized against the layer that declared it
+    expect(result.entry.path).toBe(join(tmp, 'custom/tmpl.js'))
   })
 
   it('string entry (legacy shorthand) still works', async () => {

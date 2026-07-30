@@ -1,6 +1,7 @@
 import { readFile, writeFile, mkdir, readdir, rm, rename } from 'node:fs/promises'
 import { createHash, randomBytes } from 'node:crypto'
 import { join } from 'node:path'
+import { getLocalBase } from '../store/index.js'
 
 const TYPES = ['args', 'argsRepl', 'commandsRepl']
 
@@ -9,7 +10,7 @@ function safeKey(runeKey) {
 }
 
 function schemasDir(projectDir) {
-  return join(projectDir, '.crunes', 'schemas')
+  return join(getLocalBase(projectDir), 'schemas')
 }
 
 function cacheFilePath(runeKey, type, projectDir) {

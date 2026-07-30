@@ -1,11 +1,14 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, rm, mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 
 let projectDir
 beforeEach(async () => {
   projectDir = await mkdtemp(join(tmpdir(), 'crunes-job-test-'))
+  // jobs live under `<dir>/.crunes` only for a real project
+  await mkdir(join(projectDir, '.crunes'), { recursive: true })
+  await writeFile(join(projectDir, '.crunes', 'config.json'), '{}')
 })
 afterEach(async () => {
   await rm(projectDir, { recursive: true, force: true })
