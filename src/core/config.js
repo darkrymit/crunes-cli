@@ -1,5 +1,6 @@
 import { readFileSync, existsSync } from 'node:fs'
 import { join, resolve } from 'node:path'
+import { getStorePath } from '../store/index.js'
 
 function isObject(item) {
   return item && typeof item === 'object' && !Array.isArray(item)
@@ -133,24 +134,40 @@ export function validateConfig(config, fileName = 'config.json') {
   }
 }
 
+export const ROOTLESS = Symbol.for('crunes.rootless')
+
+function readLayer(filePath, label) {
+  if (!existsSync(filePath)) return null
+  let parsed
+  try {
+    parsed = JSON.parse(readFileSync(filePath, 'utf8'))
+  } catch (err) {
+    throw new Error(`${label} is invalid JSON: ${err.message}`)
+  }
+  validateConfig(parsed, label)
+  return parsed
+}
+
 export function loadConfig(dir) {
-  const configPath = join(dir, '.crunes', 'config.json')
-  const localConfigPath = join(dir, '.crunes', 'config.local.json')
+  const layers = []
 
-  // Read & validate config.json
-  const shared = JSON.parse(readFileSync(configPath, 'utf8'))
-  validateConfig(shared, 'config.json')
-
-  // Read & validate config.local.json (if present)
-  let local = {}
-  if (existsSync(localConfigPath)) {
-    try {
-      local = JSON.parse(readFileSync(localConfigPath, 'utf8'))
-    } catch (err) {
-      throw new Error(`config.local.json is invalid JSON: ${err.message}`)
-    }
-    validateConfig(local, 'config.local.json')
+  if (process.env.CRUNES_NO_GLOBAL !== '1') {
+    const storeRoot = getStorePath()
+    const globalPath = join(storeRoot, 'config.json')
+    const globalRaw = readLayer(globalPath, globalPath)
+    if (globalRaw) layers.push(absolutizeEntryPaths(globalRaw, storeRoot, 'global'))
   }
 
-  return mergeConfigs(shared, local)
+  const sharedRaw = readLayer(join(dir, '.crunes', 'config.json'), 'config.json')
+  const rootless = sharedRaw === null
+
+  if (sharedRaw) {
+    layers.push(absolutizeEntryPaths(sharedRaw, dir, 'project'))
+    const localRaw = readLayer(join(dir, '.crunes', 'config.local.json'), 'config.local.json')
+    if (localRaw) layers.push(absolutizeEntryPaths(localRaw, dir, 'local'))
+  }
+
+  const merged = layers.reduce((acc, layer) => mergeConfigs(acc, layer), {})
+  merged[ROOTLESS] = rootless
+  return merged
 }
