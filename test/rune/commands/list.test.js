@@ -2,7 +2,10 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { handler } from '../../../src/rune/commands/list.js'
 import { loadConfig } from '../../../src/core/config.js'
 
-vi.mock('../../../src/core/config.js', () => ({ loadConfig: vi.fn() }))
+vi.mock('../../../src/core/config.js', async (importOriginal) => ({
+  ...(await importOriginal()),
+  loadConfig: vi.fn(),
+}))
 vi.mock('../../../src/plugin/registry.js', () => ({
   loadRegistry: vi.fn(() => ({
     plugins: {

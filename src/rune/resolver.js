@@ -1,4 +1,4 @@
-import { join } from 'node:path'
+import { join, isAbsolute } from 'node:path'
 import { loadRegistry, resolvePluginKeyScoped } from '../plugin/registry.js'
 import { loadPluginJson } from '../plugin/manifest.js'
 import { executePluginRune, runRuneInIsolate, runRuneInRepl, getPluginRunePath } from './isolation/runner.js'
@@ -8,6 +8,11 @@ import { enabledPluginKeys } from '../core/config.js'
 
 export function normaliseRune(entry) {
   return entry
+}
+
+export function resolveRuneFilePath(entry, key, configDir) {
+  const relOrAbs = entry.path ?? `.crunes/runes/${key}.js`
+  return isAbsolute(relOrAbs) ? relOrAbs : join(configDir, relOrAbs)
 }
 
 export function getRune(config, key) {
@@ -154,7 +159,7 @@ export async function runRune(dir, config, key, args, opts = {}, _callStack = []
     return normaliseResult(result)
   }
 
-  const fullPath = join(configDir, entry.path ?? `.crunes/runes/${key}.js`)
+  const fullPath = resolveRuneFilePath(entry, key, configDir)
   const basePerms = entry.permissions ?? { allow: [], deny: [] }
   const effective = computeEffectivePermissions(basePerms, undefined, 'run')
   const result = await runRuneInIsolate(fullPath, effective, args, dir, {
@@ -215,7 +220,7 @@ export async function resolveRuneEntry(projectDir, config, key, configDir = proj
   // Local config rune
   const entry = getRune(config, key)
   if (entry && !entry.plugin) {
-    const runeFile = join(configDir, entry.path ?? `.crunes/runes/${key}.js`)
+    const runeFile = resolveRuneFilePath(entry, key, configDir)
     const effective = computeEffectivePermissions(entry.permissions ?? {}, undefined, 'repl')
     const vars = entry.vars ?? {}
     return {
