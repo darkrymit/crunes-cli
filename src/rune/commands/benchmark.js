@@ -2,7 +2,7 @@ import { performance } from 'node:perf_hooks'
 import chalk from 'chalk'
 import { loadConfig } from '../../core/config.js'
 import { runRune } from '../resolver.js'
-import { parseBracketKey } from './run.js'
+import { parseBracketKey, joinBracketTokens } from './run.js'
 import { output } from '../../shared/output.js'
 
 const FAST_MS  = 200
@@ -74,7 +74,8 @@ export function parseBenchArgs(argv) {
   }
   rawSegments.push(current)
 
-  const segments = rawSegments.map(seg => {
+  const segments = rawSegments.map(rawSeg => {
+    const seg = joinBracketTokens(rawSeg)
     const { key, bracketArgs } = parseBracketKey(seg[0] ?? '')
     let runs = globalRuns
     let warmup = globalWarmup

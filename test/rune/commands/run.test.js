@@ -81,6 +81,27 @@ describe('parseSegment', () => {
       .toEqual({ key: 'api', sections: ['layout'], runeArgs: ['--flag', 'val'] })
   })
 
+  it('rejoins a bracket the shell split on whitespace', () => {
+    // Unquoted `api[-s layout]` reaches argv as two tokens.
+    expect(parseSegment(['api[-s', 'layout]']))
+      .toEqual({ key: 'api', sections: ['layout'], runeArgs: [] })
+  })
+
+  it('rejoins a split bracket spanning more than two tokens', () => {
+    expect(parseSegment(['api[--section', 'a,b', '--runs', '5]', '--flag']))
+      .toEqual({ key: 'api', sections: ['a', 'b'], runeArgs: ['--flag'] })
+  })
+
+  it('keeps rune args after a rejoined bracket', () => {
+    expect(parseSegment(['api[-s', 'layout]', '--flag', 'val']))
+      .toEqual({ key: 'api', sections: ['layout'], runeArgs: ['--flag', 'val'] })
+  })
+
+  it('leaves a closed bracket alone', () => {
+    expect(parseSegment(['api[-s layout]', 'other]']))
+      .toEqual({ key: 'api', sections: ['layout'], runeArgs: ['other]'] })
+  })
+
   it('returns null key for empty argv', () => {
     expect(parseSegment([])).toEqual({ key: null, sections: null, runeArgs: [] })
   })

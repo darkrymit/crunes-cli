@@ -552,3 +552,32 @@ describe('makePermissionChecker — fs.glob cwd::pattern matching', () => {
     expect(() => check('fs.glob', '*.key', join(dir, 'secrets'))).toThrow(PermissionError)
   })
 })
+
+describe('fs.read value normalization', () => {
+  let dir
+  beforeEach(() => { dir = makeProjectDir() })
+
+  // fs.glob returns bare relative paths; a declared `fs.read:**` normalises to
+  // `./**`, so the runtime value must be normalised the same way to match.
+  it('fs.read:** permits a bare relative path', () => {
+    const check = makePermissionChecker({ allow: ['fs.read:./**'], deny: [] }, { dir })
+    expect(() => check('fs.read', 'notes.txt')).not.toThrow()
+    expect(() => check('fs.read', 'sub/notes.txt')).not.toThrow()
+  })
+
+  it('fs.read:** still permits the explicit ./ form', () => {
+    const check = makePermissionChecker({ allow: ['fs.read:./**'], deny: [] }, { dir })
+    expect(() => check('fs.read', './notes.txt')).not.toThrow()
+  })
+
+  it('fs.read:** does not permit escaping the project dir', () => {
+    const check = makePermissionChecker({ allow: ['fs.read:./**'], deny: [] }, { dir })
+    expect(() => check('fs.read', '../secret.txt')).toThrow(PermissionError)
+    expect(() => check('fs.read', '/etc/passwd')).toThrow(PermissionError)
+  })
+
+  it('deny on a bare relative path is honoured', () => {
+    const check = makePermissionChecker({ allow: ['fs.read:./**'], deny: ['fs.read:./secrets/**'] }, { dir })
+    expect(() => check('fs.read', 'secrets/key.pem')).toThrow(PermissionError)
+  })
+})

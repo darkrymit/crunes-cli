@@ -17,8 +17,20 @@ export function parseBracketKey(token) {
   return { key: key || null, bracketArgs }
 }
 
-export function parseSegment(argv) {
-  if (!argv.length) return { key: null, sections: null, runeArgs: [] }
+// An unquoted `key[-s a b]` reaches us split on whitespace by the shell.
+// Rejoin the tokens up to the one closing the bracket so quoted and unquoted
+// forms parse identically.
+export function joinBracketTokens(argv) {
+  const first = argv[0]
+  if (!first || !first.includes('[') || first.includes(']')) return argv
+  const end = argv.findIndex((tok, i) => i > 0 && tok.includes(']'))
+  if (end === -1) return argv
+  return [argv.slice(0, end + 1).join(' '), ...argv.slice(end + 1)]
+}
+
+export function parseSegment(rawArgv) {
+  if (!rawArgv.length) return { key: null, sections: null, runeArgs: [] }
+  const argv = joinBracketTokens(rawArgv)
 
   const { key, bracketArgs } = parseBracketKey(argv[0])
 

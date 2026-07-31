@@ -214,11 +214,14 @@ export function makePermissionChecker(effective, ctx = null) {
 
   // fs.glob perms are stored as-is (cwd::pattern form) and matched at check time.
   const globBucket = { allow: [], deny: [] }
-  for (const p of effective.allow) {
+  // normalizePattern is idempotent, so re-applying it here costs nothing when the
+  // caller already went through computeEffectivePermissions — and keeps declared
+  // and runtime values in the same shape when they passed raw values instead.
+  for (const p of effective.allow.map(normalizePattern)) {
     if (p.startsWith('fs.glob:')) { globBucket.allow.push(p.slice('fs.glob:'.length)); continue }
     for (const expanded of expandPattern(p, ctx)) getBucket(capOf(expanded)).allow.push(expanded)
   }
-  for (const p of effective.deny) {
+  for (const p of effective.deny.map(normalizePattern)) {
     if (p.startsWith('fs.glob:')) { globBucket.deny.push(p.slice('fs.glob:'.length)); continue }
     for (const expanded of expandPattern(p, ctx)) getBucket(capOf(expanded)).deny.push(expanded)
   }
@@ -243,7 +246,10 @@ export function makePermissionChecker(effective, ctx = null) {
       case 'fs.write':
       case 'fs.exists': {
         const sub = s => s.startsWith('./') ? '__DOT__/' + s.slice(2) : s
-        const v   = sub(value.replace(/\\/g, '/'))
+        // Declared values pass through normalizeFsPath, which anchors bare
+        // relative paths as "./". The runtime value must match that shape or a
+        // bare path (what fs.glob returns) can never match a "./**" grant.
+        const v   = sub(normalizeFsPath(value))
         checkBatchAndThrow(capability, value, pvs => isGlobMatch(v, pvs.map(sub)))
         return
       }
