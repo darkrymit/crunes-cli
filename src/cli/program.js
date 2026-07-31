@@ -240,9 +240,10 @@ export function buildProgram() {
     .command('list')
     .description('List all registered runes')
     .addOption(new Option('--format <format>', 'output format').choices(['text', 'json']).default('text'))
+    .option('-g, --global', 'list only runes from the global config (~/.crunes/config.json)')
     .action(async (opts) => {
       const { handler } = await import('../rune/commands/list.js')
-      await handler({ format: opts.format, plain: !!program.opts().plain, projectRoot: projectRoot(), configRoot: configRoot() })
+      await handler({ format: opts.format, plain: !!program.opts().plain, projectRoot: projectRoot(), configRoot: configRoot(), global: !!opts.global })
     })
 
   // Job management commands
@@ -478,9 +479,10 @@ export function buildProgram() {
     .option('--path <path>', 'file path for the template (default: .crunes/templates/<name>.js)')
     .option('--name <name>', 'display label shown in crunes template list (separate from the template key)')
     .option('--description <description>', 'short description of what kind of rune this template produces')
+    .option('-g, --global', 'operate on the global config (~/.crunes/config.json) instead of the project')
     .action(async (name, opts) => {
       const { handler } = await import('../template/commands/create.js')
-      await handler({ name, path: opts.path, templateName: opts.name, description: opts.description, yes: !!program.opts().yes, projectRoot: projectRoot(), configRoot: configRoot() })
+      await handler({ name, path: opts.path, templateName: opts.name, description: opts.description, yes: !!program.opts().yes, projectRoot: projectRoot(), configRoot: configRoot(), global: !!opts.global })
     })
 
   // Marketplace commands

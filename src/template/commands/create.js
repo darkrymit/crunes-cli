@@ -1,7 +1,9 @@
-import { mkdir, writeFile, readFile, rename } from 'node:fs/promises'
+import { mkdir, writeFile } from 'node:fs/promises'
 import { join, dirname } from 'node:path'
 import { intro, outro, text, cancel } from '@clack/prompts'
 import { output } from '../../shared/output.js'
+import { getConfigPath, readRawConfig, writeRawConfig } from '../../core/config-writer.js'
+import { getStorePath } from '../../store/index.js'
 
 export function templateStub(name) {
   return [
@@ -42,6 +44,7 @@ export async function handler({
   yes = false,
   projectRoot = process.cwd(),
   configRoot = projectRoot,
+  global = false,
 } = {}) {
   const isNonInteractive = yes || !process.stdout.isTTY
 
@@ -60,7 +63,7 @@ export async function handler({
     }
 
     if (!templateRelPath) {
-      const defaultPath = `.crunes/templates/${name}.js`
+      const defaultPath = global ? `templates/${name}.js` : `.crunes/templates/${name}.js`
       const result = await text({ message: 'File path?', initialValue: defaultPath })
       if (result === Symbol.for('clack:cancel')) { cancel('Cancelled.'); return }
       templateRelPath = result
@@ -79,16 +82,15 @@ export async function handler({
     }
   }
 
-  templateRelPath = templateRelPath ?? `.crunes/templates/${name}.js`
-  const templateAbsPath = join(configRoot, templateRelPath)
+  templateRelPath = templateRelPath ?? (global ? `templates/${name}.js` : `.crunes/templates/${name}.js`)
+  const baseRoot = global ? getStorePath() : configRoot
+  const templateAbsPath = join(baseRoot, templateRelPath)
 
   await mkdir(dirname(templateAbsPath), { recursive: true })
   await writeFile(templateAbsPath, templateStub(name))
 
-  const configPath = join(configRoot, '.crunes', 'config.json')
-  await mkdir(dirname(configPath), { recursive: true })
-  let config = { runes: {} }
-  try { config = JSON.parse(await readFile(configPath, 'utf8')) } catch {}
+  const configPath = getConfigPath({ configRoot, global })
+  const config = readRawConfig(configPath) ?? { runes: {} }
 
   const entry = {
     path: templateRelPath,
@@ -96,9 +98,7 @@ export async function handler({
     ...(description && { description }),
   }
   config.templates = { ...(config.templates ?? {}), [name]: entry }
-  const tmpPath = configPath + '.tmp'
-  await writeFile(tmpPath, JSON.stringify(config, null, 2) + '\n', 'utf8')
-  await rename(tmpPath, configPath)
+  await writeRawConfig(configPath, config)
 
   if (!isNonInteractive) {
     outro(`Created ${templateRelPath}\nUse it with: crunes template apply ${name}`)
