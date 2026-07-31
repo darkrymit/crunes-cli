@@ -77,8 +77,13 @@ npm test && npm run build && node dist/cli.js --help
 **Core Execution Path:** `crunes run <key>` → `src/rune/commands/run.js` → `src/rune/resolver.js` (`runRune`) → resolves local config vs. plugin → `src/rune/isolation/runner.js` (isolated-vm run) → returns `Section[]` → `src/shared/render.js` → stdout.
 
 **Key Resolution Order** (for a bare key with no prefix):
-1. Project config (`.crunes/config.json` → `runes.<key>.path`)
-2. Enabled plugins (auto-resolved; throws error if ambiguous across multiple plugins)
+1. Merged config (`runes.<key>`) — layers merge lowest-to-highest: global `~/.crunes/config.json` → project `.crunes/config.json` → `.crunes/config.local.json`
+2. Enabled plugins (merged boolean map; throws error if ambiguous across multiple plugins)
+
+In a directory with no `.crunes/config.json`, crunes runs **rootless** — global layer only, and no local
+state (caches, sqlite, jobs, schemas, `node_modules`) is written outside the store. `~/.crunes` **is** the
+global config dir, so global rune paths are `runes/<key>.js`, with no `.crunes/` segment.
+`CRUNES_NO_GLOBAL=1` skips the global layer.
 
 **Prefixes:** `local:<key>` forces local config resolution. `<plugin>:<key>` forces a specific plugin resolver.
 

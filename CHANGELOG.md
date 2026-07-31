@@ -8,10 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Global rune & plugin configuration**: `~/.crunes/config.json` is now a config layer beneath the project config. Register personal runes with `crunes create -g`, enable plugins everywhere with `crunes plugin enable -g`, and run from any directory — including ones with no `.crunes/` at all, where crunes runs rootless and writes no local state outside the store. `CRUNES_NO_GLOBAL=1` opts out. `-g` is also accepted by `init`, `plugin install`, `plugin disable`, `plugin uninstall`, `template create`, and `list`
+- **Layer reporting**: `crunes list` gains a Layer column showing which config layer each rune came from, and `crunes doctor` warns when a project rune shadows a global one or disables a globally-enabled plugin
 - **Global rune index**: `crunes docs rune` with no key lists every resolvable rune with its command tree; a rune whose schema fails to build is reported inline and does not prevent the healthy runes from being listed
 - **Command-path drill-down**: `crunes docs rune <key> <command>...` renders a bounded page for exactly that command — its own options, positionals, examples, and direct children only
 
 ### Changed
+- **`plugins` is now a boolean map** (`{"mkt@plug": true}`). Legacy arrays are still read and are converted to map form on the next write. A project can now disable a globally-enabled plugin with `crunes plugin disable <name>`
 - **BREAKING — multi-rune lookup removed**: `crunes docs rune a b` now means command `b` of rune `a`, not documentation for runes `a` and `b`. Use `crunes docs rune` for an index of all runes
 - **BREAKING — `utils.rune.helpSection()` / `helpText()` scope**: with no argument they now return the rune command index rather than the full command tree. Both accept an optional command path (`args.$command` or `args.$commands`) to render only the matched subcommand, and throw when the path does not resolve
 - **Bounded documentation pages**: `crunes docs rune` and in-rune help share one renderer and disclose progressively, so a rune with many nested commands no longer produces a page that floods an agent's context. `--format json` mirrors the text scope at every level
