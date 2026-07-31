@@ -39,7 +39,7 @@ describe('enable handler — configRoot', () => {
     const written = JSON.parse(
       await import('node:fs/promises').then(fs => fs.readFile(join(configRoot, '.crunes', 'config.json'), 'utf8'))
     )
-    expect(written.plugins).toContain('official@myplugin')
+    expect(written.plugins['official@myplugin']).toBe(true)
 
     // projectRoot/.crunes must NOT have been created
     await expect(

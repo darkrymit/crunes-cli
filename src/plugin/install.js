@@ -8,6 +8,8 @@ import { getPluginCacheDir, ensureStoreDirs } from '../store/index.js'
 import { registerPlugin, loadRegistry, removePlugin } from './registry.js'
 import { installDeps } from './deps.js'
 import { promptConsent, diffPermissions, promptReConsent } from './consent.js'
+import { getConfigPath, readRawConfig, writeRawConfig, setPluginEnabled } from '../core/config-writer.js'
+import { coercePlugins } from '../core/config.js'
 
 const execFileAsync = promisify(execFile)
 
@@ -78,7 +80,7 @@ async function downloadNpm(packageName, destDir) {
  * @param {{ marketplaceName?: string, pluginName?: string }} provenance
  */
 export async function installPlugin(source, projectDir, provenance = {}, options = {}) {
-  const { yes = false } = options
+  const { yes = false, global = false } = options
   if (!provenance.marketplaceName) {
     throw new Error('Direct installs are not allowed. Use: crunes plugin install <marketplace>@<plugin>')
   }
@@ -113,7 +115,7 @@ export async function installPlugin(source, projectDir, provenance = {}, options
     const registry = await loadRegistry()
     const existing = registry.plugins?.[pluginKey]
     if (existing) {
-      return await updatePlugin(pluginKey, stagingDir, pluginJson, projectDir, type === 'local', provenance, { yes })
+      return await updatePlugin(pluginKey, stagingDir, pluginJson, projectDir, type === 'local', provenance, { yes, global })
     }
 
     const isLocal = type === 'local'
@@ -142,7 +144,7 @@ export async function installPlugin(source, projectDir, provenance = {}, options
     }
 
     await registerPlugin({ name, version, path: isLocal ? stagingDir : cacheDir, cacheDir, local: isLocal, consentedPermissions, ...provenance })
-    await addPluginToProjectConfig(projectDir, pluginKey)
+    await setEnabled(projectDir, pluginKey, true, global)
 
     return { installed: true, name: pluginKey, version }
   } finally {
@@ -153,7 +155,7 @@ export async function installPlugin(source, projectDir, provenance = {}, options
 }
 
 async function updatePlugin(pluginKey, newPluginDir, newPluginJson, projectDir, isLocal, provenance = {}, options = {}) {
-  const { yes = false } = options
+  const { yes = false, global = false } = options
   const registry = await loadRegistry()
   const existing = registry.plugins[pluginKey]
   if (!existing) throw new Error(`Plugin "${pluginKey}" is not installed.`)
@@ -185,29 +187,37 @@ async function updatePlugin(pluginKey, newPluginDir, newPluginJson, projectDir, 
   }
 
   await registerPlugin({ name, version, path: isLocal ? newPluginDir : cacheDir, cacheDir, local: isLocal, consentedPermissions, ...provenance })
-  await addPluginToProjectConfig(projectDir, pluginKey)
+  await setEnabled(projectDir, pluginKey, true, global)
   return { installed: true, name: pluginKey, version, updated: true }
 }
 
-async function addPluginToProjectConfig(projectDir, pluginName) {
-  if (!projectDir) return
-  const configPath = path.join(projectDir, '.crunes', 'config.json')
+async function setEnabled(projectDir, pluginKey, enabled, global) {
+  if (!projectDir && !global) return
   try {
-    const raw = await fs.readFile(configPath, 'utf8')
-    const config = JSON.parse(raw)
-    const plugins = config.plugins ?? []
-    if (!plugins.includes(pluginName)) {
-      config.plugins = [...plugins, pluginName]
-      const tmp = configPath + '.' + Date.now() + Math.random().toString(36).slice(2) + '.tmp'
-      await fs.writeFile(tmp, JSON.stringify(config, null, 2), 'utf8')
-      await fs.rename(tmp, configPath)
-    }
+    await setPluginEnabled(getConfigPath({ configRoot: projectDir, global }), pluginKey, enabled)
   } catch {
-    // No config.json — skip
+    // No config to update — skip
   }
 }
 
-export async function uninstallPlugin(pluginKey, projectDir) {
+/** Uninstall drops the key outright: a `false` would outlive the plugin. */
+async function removeEnabled(projectDir, pluginKey, global) {
+  if (!projectDir && !global) return
+  try {
+    const configPath = getConfigPath({ configRoot: projectDir, global })
+    const config = readRawConfig(configPath)
+    if (!config) return
+    const plugins = coercePlugins(config.plugins)
+    if (!(pluginKey in plugins)) return
+    delete plugins[pluginKey]
+    config.plugins = plugins
+    await writeRawConfig(configPath, config)
+  } catch {
+    // No config to update — skip
+  }
+}
+
+export async function uninstallPlugin(pluginKey, projectDir, { global = false } = {}) {
   const registry = await loadRegistry()
   const entry = registry.plugins?.[pluginKey]
   if (!entry) throw new Error(`Plugin "${pluginKey}" is not installed.`)
@@ -225,18 +235,6 @@ export async function uninstallPlugin(pluginKey, projectDir) {
   } catch { /* already gone */ }
 
   await removePlugin(pluginKey)
-  await removePluginFromProjectConfig(projectDir, pluginKey)
+  await removeEnabled(projectDir, pluginKey, global)
 }
 
-async function removePluginFromProjectConfig(projectDir, pluginName) {
-  if (!projectDir) return
-  const configPath = path.join(projectDir, '.crunes', 'config.json')
-  try {
-    const raw = await fs.readFile(configPath, 'utf8')
-    const config = JSON.parse(raw)
-    config.plugins = (config.plugins ?? []).filter(p => p !== pluginName)
-    const tmp = configPath + '.' + Date.now() + Math.random().toString(36).slice(2) + '.tmp'
-    await fs.writeFile(tmp, JSON.stringify(config, null, 2), 'utf8')
-    await fs.rename(tmp, configPath)
-  } catch { /* no config */ }
-}

@@ -380,17 +380,19 @@ export function buildProgram() {
   plugin
     .command('install <source>')
     .description('Install a plugin from a configured marketplace in the format <marketplace>@<plugin>')
-    .action(async (source) => {
+    .option('-g, --global', 'enable in the global config (~/.crunes/config.json) instead of the project')
+    .action(async (source, opts) => {
       const { handler } = await import('../plugin/commands/install.js')
-      await handler({ source, projectRoot: projectRoot(), configRoot: configRoot(), yes: !!program.opts().yes })
+      await handler({ source, projectRoot: projectRoot(), configRoot: configRoot(), yes: !!program.opts().yes, global: !!opts.global })
     })
 
   plugin
     .command('uninstall <plugin>')
     .description('Uninstall an installed plugin')
-    .action(async (name) => {
+    .option('-g, --global', 'also drop the plugin from the global config (~/.crunes/config.json)')
+    .action(async (name, opts) => {
       const { handler } = await import('../plugin/commands/uninstall.js')
-      await handler({ name, yes: !!program.opts().yes, projectRoot: projectRoot(), configRoot: configRoot() })
+      await handler({ name, yes: !!program.opts().yes, projectRoot: projectRoot(), configRoot: configRoot(), global: !!opts.global })
     })
 
   plugin
@@ -413,17 +415,19 @@ export function buildProgram() {
   plugin
     .command('enable <plugin>')
     .description('Add a plugin to this project\'s enabled list')
-    .action(async (name) => {
+    .option('-g, --global', 'enable in the global config (~/.crunes/config.json), for every directory')
+    .action(async (name, opts) => {
       const { handler } = await import('../plugin/commands/enable.js')
-      await handler({ name, projectRoot: projectRoot(), configRoot: configRoot() })
+      await handler({ name, projectRoot: projectRoot(), configRoot: configRoot(), global: !!opts.global })
     })
 
   plugin
     .command('disable <plugin>')
-    .description('Remove a plugin from this project\'s enabled list')
-    .action(async (name) => {
+    .description('Turn a plugin off for this project, including one enabled globally')
+    .option('-g, --global', 'disable in the global config (~/.crunes/config.json) instead of the project')
+    .action(async (name, opts) => {
       const { handler } = await import('../plugin/commands/disable.js')
-      await handler({ name, projectRoot: projectRoot(), configRoot: configRoot() })
+      await handler({ name, projectRoot: projectRoot(), configRoot: configRoot(), global: !!opts.global })
     })
 
   plugin

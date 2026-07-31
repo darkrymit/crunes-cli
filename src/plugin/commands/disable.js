@@ -1,6 +1,5 @@
-import fs from 'node:fs/promises'
-import path from 'node:path'
-import { enabledPluginKeys } from '../../core/config.js'
+import { loadConfig, enabledPluginKeys } from '../../core/config.js'
+import { getConfigPath, setPluginEnabled } from '../../core/config-writer.js'
 
 function resolveEnabledPluginKey(nameOrKey, enabledPlugins) {
   if (nameOrKey.includes('@')) return nameOrKey
@@ -11,35 +10,18 @@ function resolveEnabledPluginKey(nameOrKey, enabledPlugins) {
   return matches[0] ?? null
 }
 
-export async function handler({ name, projectRoot, configRoot }) {
-  const configPath = path.join(configRoot ?? projectRoot, '.crunes', 'config.json')
-
-  let config
+export async function handler({ name, projectRoot, configRoot, global = false }) {
   try {
-    config = JSON.parse(await fs.readFile(configPath, 'utf8'))
-  } catch (err) {
-    if (err.code === 'ENOENT') {
-      console.error('Error: No .crunes/config.json found. Run: crunes init')
-    } else {
-      console.error(`Error: ${err.message}`)
-    }
-    process.exit(1)
-  }
-
-  const enabledPlugins = enabledPluginKeys(config)
-
-  let pluginKey
-  try {
-    pluginKey = resolveEnabledPluginKey(name, enabledPlugins)
-    if (!pluginKey) throw new Error(`Plugin "${name}" is not enabled in this project.`)
+    const root = configRoot ?? projectRoot
+    // Resolve against the merged set: a globally-enabled plugin is absent from
+    // the project config, so the raw project file alone would not find it.
+    const enabled = enabledPluginKeys(loadConfig(root))
+    const pluginKey = resolveEnabledPluginKey(name, enabled)
+    if (!pluginKey) throw new Error(`Plugin "${name}" is not enabled.`)
+    await setPluginEnabled(getConfigPath({ configRoot: root, global }), pluginKey, false)
+    console.log(`Plugin "${pluginKey}" disabled${global ? ' globally' : ' for this project'}.`)
   } catch (err) {
     console.error(`Error: ${err.message}`)
     process.exit(1)
   }
-
-  config.plugins = enabledPlugins.filter(p => p !== pluginKey)
-  const tmp = configPath + '.tmp'
-  await fs.writeFile(tmp, JSON.stringify(config, null, 2), 'utf8')
-  await fs.rename(tmp, configPath)
-  console.log(`Plugin "${pluginKey}" disabled.`)
 }

@@ -8,7 +8,7 @@ function parseInstallArg(arg) {
   return [arg.slice(0, idx), arg.slice(idx + 1)]
 }
 
-export async function handler({ source, projectRoot, configRoot, yes }) {
+export async function handler({ source, projectRoot, configRoot, yes, global = false }) {
   const parts = parseInstallArg(source)
   if (!parts) {
     p.cancel('Use <marketplace>@<plugin> format (e.g. hello-world@hello-world)')
@@ -28,7 +28,7 @@ export async function handler({ source, projectRoot, configRoot, yes }) {
 
   let result
   try {
-    result = await installPlugin(resolvedSource, configRoot ?? projectRoot, provenance, { yes })
+    result = await installPlugin(resolvedSource, configRoot ?? projectRoot, provenance, { yes, global })
   } catch (err) {
     p.cancel(`Installation failed: ${err.message}`)
     process.exit(1)
