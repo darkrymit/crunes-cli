@@ -355,9 +355,10 @@ export function buildProgram() {
   program
     .command('init')
     .description('Create .crunes/config.json in the current project')
-    .action(async () => {
+    .option('-g, --global', 'operate on the global config (~/.crunes/config.json) instead of the project')
+    .action(async (opts) => {
       const { handler } = await import('../core/commands/init.js')
-      await handler({ yes: !!program.opts().yes, projectRoot: projectRoot() })
+      await handler({ yes: !!program.opts().yes, projectRoot: projectRoot(), global: !!opts.global })
     })
 
   program
@@ -367,9 +368,10 @@ export function buildProgram() {
     .option('--path <path>', 'file path for the rune (default: .crunes/runes/<key>.js)')
     .option('--name <name>', 'human-readable label shown in crunes list')
     .option('--description <description>', 'short description of what context this rune provides')
+    .option('-g, --global', 'operate on the global config (~/.crunes/config.json) instead of the project')
     .action(async (key, opts) => {
       const { handler } = await import('../rune/commands/create.js')
-      await handler({ key, format: opts.format, path: opts.path, name: opts.name, description: opts.description, yes: !!program.opts().yes, projectRoot: projectRoot(), configRoot: configRoot() })
+      await handler({ key, format: opts.format, path: opts.path, name: opts.name, description: opts.description, yes: !!program.opts().yes, projectRoot: projectRoot(), configRoot: configRoot(), global: !!opts.global })
     })
 
   // Plugin management commands

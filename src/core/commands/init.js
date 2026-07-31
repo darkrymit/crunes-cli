@@ -1,7 +1,8 @@
 import { mkdirSync, writeFileSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, dirname } from 'node:path';
 import { intro, outro, confirm, cancel } from '@clack/prompts';
 import { output } from '../../shared/output.js';
+import { getConfigPath } from '../config-writer.js';
 
 const EMPTY_CONFIG = JSON.stringify({ runes: {} }, null, 2) + '\n';
 const GITIGNORE_CONTENT = '# local overrides (machine-specific, never commit)\nconfig.local.json\nproject.local.json\n\n# run logs\nlogs/\n\n# local caches, databases, schema cache and job logs (gitignored by default)\ncaches/\nschemas/\nsqlite/\njobs/\n';
@@ -9,9 +10,10 @@ const GITIGNORE_CONTENT = '# local overrides (machine-specific, never commit)\nc
 export async function handler({
   yes = false,
   projectRoot = process.cwd(),
+  global = false,
 } = {}) {
-  const configDir = join(projectRoot, '.crunes');
-  const configPath = join(configDir, 'config.json');
+  const configPath = getConfigPath({ configRoot: projectRoot, global });
+  const configDir = dirname(configPath);
   const isNonInteractive = yes || !process.stdout.isTTY;
 
   if (existsSync(configPath)) {
@@ -37,8 +39,9 @@ export async function handler({
   mkdirSync(configDir, { recursive: true });
   writeFileSync(configPath, EMPTY_CONFIG);
 
+  // The store is not a git repository, so it needs no .gitignore scaffold.
   const gitignorePath = join(configDir, '.gitignore');
-  if (!existsSync(gitignorePath)) {
+  if (!global && !existsSync(gitignorePath)) {
     writeFileSync(gitignorePath, GITIGNORE_CONTENT);
   }
 

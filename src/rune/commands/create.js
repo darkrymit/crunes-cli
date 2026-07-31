@@ -1,7 +1,9 @@
-import { mkdir, writeFile, readFile, rename } from 'node:fs/promises'
+import { mkdir, writeFile } from 'node:fs/promises'
 import { join, dirname } from 'node:path'
 import { intro, outro, text, select, cancel } from '@clack/prompts'
 import { output } from '../../shared/output.js'
+import { getConfigPath, readRawConfig, writeRawConfig } from '../../core/config-writer.js'
+import { getStorePath } from '../../store/index.js'
 
 const VALID_FORMATS = ['tree', 'markdown']
 
@@ -64,6 +66,7 @@ export async function handler({
   yes = false,
   projectRoot = process.cwd(),
   configRoot = projectRoot,
+  global = false,
 } = {}) {
   const isNonInteractive = yes || !process.stdout.isTTY
 
@@ -102,7 +105,7 @@ export async function handler({
     }
 
     if (!runeRelPath) {
-      const defaultPath = `.crunes/runes/${key}.js`
+      const defaultPath = global ? `runes/${key}.js` : `.crunes/runes/${key}.js`
       const result = await text({ message: 'File path?', initialValue: defaultPath })
       if (result === Symbol.for('clack:cancel')) { cancel('Cancelled.'); return }
       runeRelPath = result
@@ -121,25 +124,22 @@ export async function handler({
     }
   }
 
-  runeRelPath = runeRelPath ?? `.crunes/runes/${key}.js`
-  const runeAbsPath = join(configRoot, runeRelPath)
+  runeRelPath = runeRelPath ?? (global ? `runes/${key}.js` : `.crunes/runes/${key}.js`)
+  const baseRoot = global ? getStorePath() : configRoot
+  const runeAbsPath = join(baseRoot, runeRelPath)
 
   await mkdir(dirname(runeAbsPath), { recursive: true })
   await writeFile(runeAbsPath, template(key, format))
 
-  const configPath = join(configRoot, '.crunes', 'config.json')
-  await mkdir(dirname(configPath), { recursive: true })
-  let config = { runes: {} }
-  try { config = JSON.parse(await readFile(configPath, 'utf8')) } catch {}
+  const configPath = getConfigPath({ configRoot, global })
+  const config = readRawConfig(configPath) ?? { runes: {} }
   const entry = {
     path: runeRelPath,
     ...(name && { name }),
     ...(description && { description }),
   }
   config.runes = { ...(config.runes ?? {}), [key]: entry }
-  const tmpPath = configPath + '.tmp'
-  await writeFile(tmpPath, JSON.stringify(config, null, 2) + '\n', 'utf8')
-  await rename(tmpPath, configPath)
+  await writeRawConfig(configPath, config)
 
   if (!isNonInteractive) {
     outro(`Created ${runeRelPath}\nRun: crunes run ${key}`)
