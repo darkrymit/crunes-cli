@@ -14,7 +14,9 @@ beforeEach(() => {
 
 describe('init -g', () => {
   it('creates config.json at the store root with no .crunes segment', async () => {
-    await initHandler({ yes: true, global: true })
+    // projectRoot is passed explicitly so a regression can never fall back to
+    // process.cwd() and scribble into this repository.
+    await initHandler({ yes: true, global: true, projectRoot: dir })
     expect(existsSync(path.join(process.env.CRUNES_STORE, 'config.json'))).toBe(true)
     expect(existsSync(path.join(process.env.CRUNES_STORE, '.crunes'))).toBe(false)
   })
@@ -22,8 +24,8 @@ describe('init -g', () => {
 
 describe('create -g', () => {
   it('writes the rune under the store and registers it globally', async () => {
-    await initHandler({ yes: true, global: true })
-    await createHandler({ key: 'serve', format: 'markdown', global: true, yes: true })
+    await initHandler({ yes: true, global: true, projectRoot: dir })
+    await createHandler({ key: 'serve', format: 'markdown', global: true, yes: true, projectRoot: dir, configRoot: dir })
     const store = process.env.CRUNES_STORE
     expect(existsSync(path.join(store, 'runes', 'serve.js'))).toBe(true)
     const config = JSON.parse(readFileSync(path.join(store, 'config.json'), 'utf8'))
