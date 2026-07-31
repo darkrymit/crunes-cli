@@ -1,5 +1,5 @@
 import { loadConfig } from '../../core/config.js'
-import { runRune } from '../resolver.js'
+import { runRune, describeConfigLayers } from '../resolver.js'
 import { renderSection } from '../../shared/render.js'
 import { output, isVerbose } from '../../shared/output.js'
 import { checkBatchPermission, buildMatchString } from './batch-permission.js'
@@ -222,7 +222,7 @@ export async function handler({
 
     if (!sections) {
       const available = Object.keys(config.runes ?? {}).join(', ') || '(none)'
-      output.error(`Unknown key: "${key}". Available: ${available}`)
+      output.error(`Unknown key: "${key}". Available: ${available}. Looked in: ${describeConfigLayers(configRoot ?? projectRoot)}.`)
       anyFailed = true
       if (failFast) process.exit(1)
       continue

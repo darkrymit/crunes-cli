@@ -5,10 +5,21 @@ import { executePluginRune, runRuneInIsolate, runRuneInRepl, getPluginRunePath }
 import { computeEffectivePermissions } from './permissions/permissions.js'
 import { CircularRuneError } from '../core/errors.js'
 import { enabledPluginKeys } from '../core/config.js'
-import { getLocalBase } from '../store/index.js'
+import { getLocalBase, getStorePath } from '../store/index.js'
 
 export function normaliseRune(entry) {
   return entry
+}
+
+/** Which config layers a lookup consulted, for "Unknown key" diagnostics. */
+export function describeConfigLayers(configDir) {
+  return [
+    `project config (${configDir})`,
+    'enabled plugins',
+    process.env.CRUNES_NO_GLOBAL === '1'
+      ? 'global config (skipped: CRUNES_NO_GLOBAL=1)'
+      : `global config (${join(getStorePath(), 'config.json')})`,
+  ].join(', ')
 }
 
 export function resolveRuneFilePath(entry, key, configDir) {
@@ -267,5 +278,5 @@ export async function resolveRuneEntry(projectDir, config, key, configDir = proj
     }
   }
 
-  throw new Error(`Unknown key: "${key}"`)
+  throw new Error(`Unknown key: "${key}". Looked in: ${describeConfigLayers(configDir)}.`)
 }
