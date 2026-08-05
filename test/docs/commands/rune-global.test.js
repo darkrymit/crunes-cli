@@ -86,3 +86,47 @@ describe('docs rune global index', () => {
     expect(out()).toContain('No runes configured.')
   })
 })
+
+describe('docs rune with an explicit path entry', () => {
+  let tmp
+  let written
+
+  beforeEach(async () => {
+    tmp = await mkdtemp(join(tmpdir(), 'crunes-docsp-'))
+    await mkdir(join(tmp, '.crunes', 'runes', 'nested'), { recursive: true })
+    await writeFile(join(tmp, '.crunes', 'config.json'), JSON.stringify({
+      runes: {
+        nested: { path: '.crunes/runes/nested/index.js', name: 'Nested', description: 'Has an explicit path' },
+      },
+    }))
+    await writeFile(join(tmp, '.crunes', 'runes', 'nested', 'index.js'), [
+      'export async function args(b) { return b.option("--flag", "a flag").build() }',
+      'export async function run() { return [] }',
+    ].join('\n'))
+    written = []
+    vi.spyOn(process.stdout, 'write').mockImplementation((chunk) => { written.push(chunk); return true })
+  })
+
+  afterEach(async () => {
+    vi.restoreAllMocks()
+    await rm(tmp, { recursive: true, force: true })
+  })
+
+  const out = () => written.join('')
+
+  // loadConfig absolutizes every entry.path, so joining it against the config
+  // root again produced a doubled path and every schema load warned ENOENT.
+  it('loads the schema without doubling the absolutized path', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    await handler({ key: 'nested', path: [], projectRoot: tmp, configRoot: tmp })
+    expect(warnSpy).not.toHaveBeenCalled()
+    expect(out()).toContain('--flag')
+  })
+
+  it('reports the file as a path relative to the project root', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    await handler({ key: 'nested', path: [], projectRoot: tmp, configRoot: tmp })
+    expect(out()).toContain('.crunes/runes/nested/index.js')
+    expect(out()).not.toMatch(/[A-Za-z]:.*[A-Za-z]:/)
+  })
+})

@@ -1,6 +1,6 @@
-import { join, relative } from 'node:path'
+import { relative } from 'node:path'
 import { loadConfig } from '../../core/config.js'
-import { getRune, resolvePluginRune, resolveRuneFromPlugins } from '../../rune/resolver.js'
+import { getRune, resolvePluginRune, resolveRuneFromPlugins, resolveRuneFilePath } from '../../rune/resolver.js'
 import { getArgsSchema, getReplSchema, getPluginRunePath } from '../../rune/isolation/runner.js'
 import { loadPluginJson } from '../../plugin/manifest.js'
 import { computeEffectivePermissions } from '../../rune/permissions/permissions.js'
@@ -42,7 +42,7 @@ export async function resolveRuneDocs(config, key, projectRoot, configRoot) {
     displayDescription = runeDef.description ?? null
     batch = runeDef.batch != null ? { allow: runeDef.batch.allow ?? [], deny: runeDef.batch.deny ?? [] } : null
   } else {
-    runeFile = join(configRoot, localEntry.path ?? `.crunes/runes/${key}.js`)
+    runeFile = resolveRuneFilePath(localEntry, key, configRoot)
     relativePath = relative(projectRoot, runeFile).replace(/\\/g, '/')
     basePerms = localEntry.permissions ?? { allow: [], deny: [] }
     vars = localEntry.vars ?? {}
