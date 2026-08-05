@@ -84,11 +84,14 @@ export function createModuleResolver(isolate, pluginDir, pluginNodeModules, plug
   // isolated-vm Module objects expose no .filename property — track it ourselves
   const moduleFilenames = new Map()
 
-  async function compileFile(specifier, absPath) {
-    if (cache.has(specifier)) return cache.get(specifier)
+  // Keyed by resolved path, never by specifier: the same file reached as
+  // "@project/src/x.js" and as "./src/x.js" must be one module with one copy
+  // of its module-level state, as it would be in Node.
+  async function compileFile(absPath) {
+    if (cache.has(absPath)) return cache.get(absPath)
     const source = await fs.readFile(absPath, 'utf8')
     const mod = await isolate.compileModule(source, { filename: absPath })
-    cache.set(specifier, mod)
+    cache.set(absPath, mod)
     moduleFilenames.set(mod, absPath)
     return mod
   }
@@ -121,7 +124,7 @@ export function createModuleResolver(isolate, pluginDir, pluginNodeModules, plug
       if (rel.startsWith('..') || path.isAbsolute(rel)) {
         throw new Error(`PermissionError: '@plugin/' path '${specifier}' escapes plugin root`)
       }
-      return compileFile(specifier, absPath)
+      return compileFile(absPath)
     }
 
     // Step 1 — @project/ prefix: import from project root
@@ -142,7 +145,7 @@ export function createModuleResolver(isolate, pluginDir, pluginNodeModules, plug
       if (!allowed || denied) {
         throw new Error(`PermissionError: '${specifier}' — add 'fs.read:${normalizedRel}' to allow list.`)
       }
-      return compileFile(specifier, absPath)
+      return compileFile(absPath)
     }
 
     // Step 1 — relative or absolute path: confined to sandbox boundary
@@ -172,7 +175,7 @@ export function createModuleResolver(isolate, pluginDir, pluginNodeModules, plug
         throw new Error(`PermissionError: relative import '${specifier}' — no sandbox boundary available`)
       }
 
-      return compileFile(absPath, absPath)
+      return compileFile(absPath)
     }
 
 

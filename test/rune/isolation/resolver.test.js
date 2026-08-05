@@ -311,3 +311,49 @@ describe('bundleNpmPackage', () => {
     }
   }, 30000)
 })
+
+describe('createModuleResolver — module identity across notations', () => {
+  let tmp, isolate
+
+  beforeEach(async () => {
+    tmp = await makeTmp()
+    // Distinct object per compile, so a duplicate compile is observable.
+    isolate = { compileModule: vi.fn().mockImplementation(async (src, opts) => ({ src, filename: opts.filename })) }
+  })
+  afterEach(async () => { await rm(tmp, { recursive: true, force: true }) })
+
+  it('returns one module for a file imported as @project/ and as a relative path', async () => {
+    const { resolve, register } = createModuleResolver(isolate, tmp, tmp, {}, ['fs.read:./src/**'], [], tmp)
+    const entry = { id: 'entry' }
+    register(entry, join(tmp, 'index.js'))
+
+    const viaPrefix = await resolve('@project/src/utils.js', null)
+    const viaRelative = await resolve('./src/utils.js', entry)
+
+    expect(viaRelative).toBe(viaPrefix)
+    expect(isolate.compileModule).toHaveBeenCalledTimes(1)
+  })
+
+  it('returns one module for a file imported as @plugin/ and as a relative path', async () => {
+    const { resolve, register } = createModuleResolver(isolate, tmp, tmp, {}, ['fs.read:./src/**'], [], null, tmp)
+    const entry = { id: 'entry' }
+    register(entry, join(tmp, 'index.js'))
+
+    const viaPrefix = await resolve('@plugin/src/utils.js', null)
+    const viaRelative = await resolve('./src/utils.js', entry)
+
+    expect(viaRelative).toBe(viaPrefix)
+    expect(isolate.compileModule).toHaveBeenCalledTimes(1)
+  })
+
+  it('still returns distinct modules for genuinely different files', async () => {
+    await writeFile(join(tmp, 'src/other.js'), 'export const y = 2')
+    const { resolve } = createModuleResolver(isolate, tmp, tmp, {}, ['fs.read:./src/**'], [], tmp)
+
+    const a = await resolve('@project/src/utils.js', null)
+    const b = await resolve('@project/src/other.js', null)
+
+    expect(a).not.toBe(b)
+    expect(isolate.compileModule).toHaveBeenCalledTimes(2)
+  })
+})
