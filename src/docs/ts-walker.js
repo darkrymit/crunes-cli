@@ -1,5 +1,6 @@
 const KIND_MODULE    = 2
 const KIND_NAMESPACE = 4
+const KIND_VARIABLE  = 32
 const KIND_FUNCTION  = 64
 const KIND_CLASS     = 128
 const KIND_INTERFACE = 256
@@ -162,6 +163,13 @@ function walkChildren(children) {
           returnsDescription: returnsComment(sig.comment) || undefined,
         })
       }
+    } else if (child.kind === KIND_VARIABLE) {
+      members.push({
+        kind: 'variable',
+        name: child.name,
+        type: typeStr(child.type),
+        description: commentText(child.comment) || undefined,
+      })
     } else if (child.kind === KIND_CLASS) {
       members.push({ kind: 'class', ...walkClassOrInterface(child) })
     } else if (child.kind === KIND_INTERFACE) {

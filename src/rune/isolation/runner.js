@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url'
 import { spawn as spawnProcess } from 'node:child_process'
 import { createUtils } from '../api/index.js'
 import { getAutoPermits } from '../api/utils.js'
+import { createOsInfo } from '../api/os.js'
 import { createModuleResolver } from './resolver.js'
 import { DENY_BUILTINS } from './builtins.js'
 import { createJob, getJob } from '../../job/index.js'
@@ -1301,6 +1302,7 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
 
   await jail.set('$__performance_now', new ivm.Reference(() => performance.now()))
   await jail.set('$__vars', JSON.stringify(vars))
+  await jail.set('$__os', JSON.stringify(createOsInfo()))
   await jail.set('$__projectDir', projectDir)
   await jail.set('$__rune_key',             runeContext?.key ?? null)
   await jail.set('$__rune_lifecycle',       runeContext?.lifecycle ?? 'run')

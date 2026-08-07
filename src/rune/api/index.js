@@ -9,6 +9,7 @@ import { createCsvUtils } from './csv.js'
 import { createHttpUtils } from './http.js'
 import { createEnvUtils } from './env.js'
 import { createVarsUtils } from './vars.js'
+import { createOsInfo } from './os.js'
 import { createArchiveUtils } from './archive.js'
 import { createCacheUtils } from './cache.js'
 import { createSqliteUtils } from './sqlite.js'
@@ -51,6 +52,7 @@ export function createUtils(dir, checkPermission = null, pluginDir = null, permi
     http:    createHttpUtils(checkPermission),
     env:     createEnvUtils(dir, checkPermission, permissions),
     vars:    createVarsUtils(vars),
+    os:      createOsInfo(),
     archive: createArchiveUtils(dir, checkPermission),
     cache:   createCacheUtils(dir, checkPermission, { pluginId, projectName }),
     sqlite,

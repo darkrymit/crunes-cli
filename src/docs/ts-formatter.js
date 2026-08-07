@@ -56,6 +56,12 @@ function renderFunction(node, indent) {
   return lines.join('\n')
 }
 
+function renderVariable(node, indent) {
+  const lines = [`${indent}${node.name}: ${node.type}`]
+  if (node.description) lines.push(`${indent}  ${indentDesc(node.description, indent + '  ')}`)
+  return lines.join('\n')
+}
+
 function renderProperty(p, indent) {
   const ro = p.readonly ? 'readonly ' : ''
   const opt = p.optional ? '?' : ''
@@ -124,6 +130,7 @@ export function formatNode(node, { prefix = '', indent = '' } = {}) {
   switch (node.kind) {
     case 'namespace': return renderNamespace(node, { prefix, indent })
     case 'function':  return renderFunction(node, indent)
+    case 'variable':  return renderVariable(node, indent)
     case 'class':
     case 'interface': return renderClassOrInterface(node, indent)
     default:          return ''
@@ -132,7 +139,7 @@ export function formatNode(node, { prefix = '', indent = '' } = {}) {
 
 export function formatMembers(members, { prefix = '', indent = '' } = {}) {
   const sorted = [...(members ?? [])].sort((a, b) => {
-    const rank = k => (k === 'namespace' ? 0 : k === 'function' ? 1 : 2)
+    const rank = k => (k === 'namespace' ? 0 : k === 'variable' ? 1 : k === 'function' ? 2 : 3)
     return rank(a.kind) - rank(b.kind)
   })
   return sorted

@@ -7,6 +7,7 @@ import * as tree from 'crunes:tree'
 import { selectNode, toSegments, formatRuneIndex, formatCommandPage } from '../../docs/help-render.js'
 
 const __vars = JSON.parse($__vars)
+const __os = Object.freeze(JSON.parse($__os))
 
 import { TextEncoder, TextDecoder } from 'fast-text-encoding'
 import { ReadableStream, WritableStream, TransformStream, ByteLengthQueuingStrategy, CountQueuingStrategy } from 'web-streams-polyfill'
@@ -1249,6 +1250,7 @@ globalThis.utils = {
     read: (key, fallback = undefined) => Object.hasOwn(__vars, key) ? __vars[key] : fallback,
     has: (key) => Object.hasOwn(__vars, key),
   },
+  os: __os,
   archive: {
     zip:     (s, d) => $__utils_archive_zip.apply(undefined,     [s, d], { result: { promise: true } }),
     unzip:   (s, d) => $__utils_archive_unzip.apply(undefined,   [s, d], { result: { promise: true } }),
@@ -1803,7 +1805,7 @@ globalThis.utils = {
   tree,
 }
 
-export const { fs, shell, section, rune, json, yaml, xml, csv, http, env, vars, archive, cache, sqlite, db, crypt, codec, ws, time, notify } = globalThis.utils
+export const { fs, shell, section, rune, json, yaml, xml, csv, http, env, vars, os, archive, cache, sqlite, db, crypt, codec, ws, time, notify } = globalThis.utils
 export { md, tree }
 
 // ─── Global Sandbox Timers ───────────────────────────────────────────────────
