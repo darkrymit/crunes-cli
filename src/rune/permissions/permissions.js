@@ -8,11 +8,25 @@ import { matchWsPermission, matchWsServerPermission } from './permissions-ws.js'
 import { matchHttpServerPermission, isLoopbackHost } from './permissions-http-server.js'
 
 export class PermissionError extends Error {
-  constructor(capability, value) {
-    super(`'${capability}:${value}' is not permitted.`)
+  /**
+   * reason:
+   *  'ungranted'   — the value was checked and no grant matched
+   *  'unscannable' — the command could not be classified, so it was denied
+   *                  without ever being matched against grants
+   */
+  constructor(capability, value, reason = 'ungranted', details = {}) {
+    const message = reason === 'unscannable'
+      ? `Cannot scan command: '${details.construct}' at offset ${details.offset} is not supported.`
+      : `'${capability}:${value}' is not permitted.`
+    super(message)
     this.name = 'PermissionError'
     this.capability = capability
     this.value = value
+    this.reason = reason
+    if (reason === 'unscannable') {
+      this.construct = details.construct
+      this.offset = details.offset
+    }
   }
 }
 
