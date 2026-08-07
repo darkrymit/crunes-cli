@@ -2,7 +2,10 @@
 declare namespace shell {
   /**
    * Runs a shell command asynchronously and returns its output as a string.
-   * Requires `shell.run:<command>` permission. `*` matches any characters (e.g. `shell.run:bash *`).
+   * Every command position is permission-checked independently: a pipeline or
+   * sequence needs a `shell.run:` grant per command, and redirect targets need
+   * `fs.write:` or `fs.read:`. `*` matches any characters (e.g. `shell.run:git *`).
+   * Run `crunes shell explain <cmd>` to see exactly which grants a command needs.
    *
    * @param cmd Shell command to execute
    * @param opts Option object to configure shell execution
@@ -11,6 +14,10 @@ declare namespace shell {
    * @param opts.timeout Timeout in milliseconds (default: 30000).
    * @param opts.env Key-value pairs of environment variables to inject.
    * @param opts.stdin Input string, buffer, or ReadableStream piped to stdin.
+   * @param opts.shell Which shell runs the command: 'bash' (require bash, never
+   *   falls back), 'cmd' (require cmd.exe, Windows only), or omitted for
+   *   bash, then sh, then cmd. In 'cmd' mode only a single command with no
+   *   metacharacters is accepted.
    */
   export function exec(
     cmd: string,
@@ -20,12 +27,16 @@ declare namespace shell {
       timeout?: number
       env?: Record<string, string>
       stdin?: ReadableStream<Uint8Array | string> | Uint8Array | string
+      shell?: 'bash' | 'cmd'
     }
   ): Promise<ShellResult<string>>
 
   /**
    * Runs a shell command and returns stdout as raw Uint8Array bytes.
-   * Requires `shell.run:<command>` permission. `*` matches any characters (e.g. `shell.run:bash *`).
+   * Every command position is permission-checked independently: a pipeline or
+   * sequence needs a `shell.run:` grant per command, and redirect targets need
+   * `fs.write:` or `fs.read:`. `*` matches any characters (e.g. `shell.run:git *`).
+   * Run `crunes shell explain <cmd>` to see exactly which grants a command needs.
    *
    * @param cmd Shell command to execute
    * @param opts Option object to configure shell execution
@@ -33,6 +44,10 @@ declare namespace shell {
    * @param opts.timeout Timeout in milliseconds (default: 30000).
    * @param opts.env Key-value pairs of environment variables to inject.
    * @param opts.stdin Input string, buffer, or ReadableStream piped to stdin.
+   * @param opts.shell Which shell runs the command: 'bash' (require bash, never
+   *   falls back), 'cmd' (require cmd.exe, Windows only), or omitted for
+   *   bash, then sh, then cmd. In 'cmd' mode only a single command with no
+   *   metacharacters is accepted.
    */
   export function execBinary(
     cmd: string,
@@ -41,6 +56,7 @@ declare namespace shell {
       timeout?: number
       env?: Record<string, string>
       stdin?: ReadableStream<Uint8Array | string> | Uint8Array | string
+      shell?: 'bash' | 'cmd'
     }
   ): Promise<ShellResult<Uint8Array>>
 
@@ -60,36 +76,52 @@ declare namespace shell {
 
   /**
    * Spawns an interactive shell session, yielding text chunks on stdout and stderr.
-   * Requires `shell.run:<command>` permission. `*` matches any characters (e.g. `shell.run:npm *`).
+   * Every command position is permission-checked independently: a pipeline or
+   * sequence needs a `shell.run:` grant per command, and redirect targets need
+   * `fs.write:` or `fs.read:`. `*` matches any characters (e.g. `shell.run:npm *`).
+   * Run `crunes shell explain <cmd>` to see exactly which grants a command needs.
    *
    * @param cmd Shell command to spawn
    * @param opts Option object to configure interactive execution
    * @param opts.env Key-value pairs of environment variables to inject.
    * @param opts.signal AbortSignal to kill the session and its child process tree.
+   * @param opts.shell Which shell runs the command: 'bash' (require bash, never
+   *   falls back), 'cmd' (require cmd.exe, Windows only), or omitted for
+   *   bash, then sh, then cmd. In 'cmd' mode only a single command with no
+   *   metacharacters is accepted.
    */
   export function spawn(
     cmd: string,
     opts?: {
       env?: Record<string, string>
       signal?: AbortSignal
+      shell?: 'bash' | 'cmd'
     }
   ): ShellSession<string>
 
   /**
    * Spawns an interactive shell session, yielding raw Uint8Array chunks on stdout.
    * stderr always yields string chunks regardless of binary mode.
-   * Requires `shell.run:<command>` permission. `*` matches any characters (e.g. `shell.run:npm *`).
+   * Every command position is permission-checked independently: a pipeline or
+   * sequence needs a `shell.run:` grant per command, and redirect targets need
+   * `fs.write:` or `fs.read:`. `*` matches any characters (e.g. `shell.run:npm *`).
+   * Run `crunes shell explain <cmd>` to see exactly which grants a command needs.
    *
    * @param cmd Shell command to spawn
    * @param opts Option object to configure interactive execution
    * @param opts.env Key-value pairs of environment variables to inject.
    * @param opts.signal AbortSignal to kill the session and its child process tree.
+   * @param opts.shell Which shell runs the command: 'bash' (require bash, never
+   *   falls back), 'cmd' (require cmd.exe, Windows only), or omitted for
+   *   bash, then sh, then cmd. In 'cmd' mode only a single command with no
+   *   metacharacters is accepted.
    */
   export function spawnBinary(
     cmd: string,
     opts?: {
       env?: Record<string, string>
       signal?: AbortSignal
+      shell?: 'bash' | 'cmd'
     }
   ): ShellSession<Uint8Array>
 

