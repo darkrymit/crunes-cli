@@ -24,6 +24,40 @@ export class ScanRefusal extends Error {
 
 const ASSIGNMENT_RE = /^[A-Za-z_][A-Za-z0-9_]*=/
 
+const CONTROL_KEYWORDS = new Set([
+  'if', 'then', 'else', 'elif', 'fi',
+  'while', 'until', 'do', 'done',
+  'for', 'select', 'case', 'esac', 'function',
+])
+
+const NESTED_INTERPRETERS = new Set(['sh', 'bash', 'zsh', 'dash', 'ksh'])
+
+// cmd.exe has a different grammar (^ escaping, %VAR% expansion, & as an
+// unconditional separator). Rather than approximate a second grammar inside a
+// security boundary, cmd mode accepts only a single metacharacter-free command.
+const CMD_METACHARACTERS = /[&|<>^%()]/
+
+function guardCmdMode(cmd) {
+  const m = CMD_METACHARACTERS.exec(cmd)
+  if (m) throw new ScanRefusal('cmd metacharacter', m.index)
+}
+
+/** Index of the closing delimiter matching an opener, honouring nesting and quotes. */
+function matchDelimiter(src, from, open, close) {
+  let depth = 1
+  let i = from
+  while (i < src.length) {
+    const ch = src[i]
+    if (ch === '\\') { i += 2; continue }
+    if (ch === "'") { const e = src.indexOf("'", i + 1); if (e === -1) return -1; i = e + 1; continue }
+    if (ch === '"') { const e = src.indexOf('"', i + 1); if (e === -1) return -1; i = e + 1; continue }
+    if (ch === open) depth++
+    else if (ch === close) { depth--; if (depth === 0) return i }
+    i++
+  }
+  return -1
+}
+
 function isOperatorStart(ch) {
   return ch === '|' || ch === '&' || ch === ';' || ch === '\n'
 }
@@ -75,7 +109,16 @@ function tokenize(src, baseOffset) {
         j++
       }
       if (!closed) throw new ScanRefusal('unterminated double quote', baseOffset + i)
-      buf += inner
+      if (inner.includes('$(') || inner.includes('`')) {
+        // Substitution stays active inside double quotes.
+        const nested = tokenize(inner, baseOffset + i + 1)
+        for (const t of nested) {
+          if (t.type === 'subst') tokens.push({ ...t, inCommandPosition: false })
+        }
+        buf += inner.replace(/\$\([^)]*\)|`[^`]*`/g, '')
+      } else {
+        buf += inner
+      }
       i = j + 1
       continue
     }
@@ -84,6 +127,65 @@ function tokenize(src, baseOffset) {
       begin(i)
       buf += src[i + 1]
       i += 2
+      continue
+    }
+
+    if (ch === '$' && src[i + 1] === '(' && src[i + 2] === '(') {
+      throw new ScanRefusal('arithmetic expansion', baseOffset + i)
+    }
+
+    if (ch === '<' && src[i + 1] === '<') {
+      throw new ScanRefusal('heredoc', baseOffset + i)
+    }
+
+    if ((ch === '<' || ch === '>') && src[i + 1] === '(') {
+      throw new ScanRefusal('process substitution', baseOffset + i)
+    }
+
+    if (ch === '$' && src[i + 1] === '(') {
+      const end = matchDelimiter(src, i + 2, '(', ')')
+      if (end === -1) throw new ScanRefusal('unterminated command substitution', baseOffset + i)
+      const wasInCommandPosition = !hadWord
+      flush()
+      tokens.push({ type: 'subst', src: src.slice(i + 2, end), offset: baseOffset + i + 2, inCommandPosition: wasInCommandPosition })
+      i = end + 1
+      continue
+    }
+
+    if (ch === '`') {
+      const end = src.indexOf('`', i + 1)
+      if (end === -1) throw new ScanRefusal('unterminated command substitution', baseOffset + i)
+      const wasInCommandPosition = !hadWord
+      flush()
+      tokens.push({ type: 'subst', src: src.slice(i + 1, end), offset: baseOffset + i + 1, inCommandPosition: wasInCommandPosition })
+      i = end + 1
+      continue
+    }
+
+    if (ch === '(' && !hadWord) {
+      const end = matchDelimiter(src, i + 1, '(', ')')
+      if (end === -1) throw new ScanRefusal('unterminated subshell', baseOffset + i)
+      flush()
+      tokens.push({ type: 'group', src: src.slice(i + 1, end), offset: baseOffset + i + 1 })
+      i = end + 1
+      continue
+    }
+
+    if (ch === '>' || ch === '<' || (ch === '&' && src[i + 1] === '>')) {
+      // A bare digit word directly preceding '>' is an fd number, not an argument.
+      let opLen = 1
+      let mode = ch === '<' ? 'read' : 'write'
+      if (ch === '&') { opLen = 2; mode = 'write' }
+      else if (src[i + 1] === '>' || src[i + 1] === '|') opLen = 2
+      if (hadWord && /^\d+$/.test(buf) && (ch === '>' || ch === '<')) {
+        buf = ''
+        hadWord = false
+        bufStart = -1
+      } else {
+        flush()
+      }
+      tokens.push({ type: 'redirect', mode, offset: baseOffset + i })
+      i += opLen
       continue
     }
 
@@ -128,20 +230,58 @@ function stripAssignments(words) {
 }
 
 export function scanCommand(cmd, shellKind = 'bash') {
-  const tokens = tokenize(cmd, 0)
+  if (shellKind === 'cmd') guardCmdMode(cmd)
+
   const commands = []
   const redirects = []
-
-  for (const segment of splitSegments(tokens)) {
-    const words = stripAssignments(segment)
-    if (words.length === 0) continue
-    commands.push({
-      program: words[0].value,
-      args:    words.slice(1).map(w => w.value),
-      segment: words.map(w => w.value).join(' '),
-      offset:  words[0].offset,
-    })
-  }
-
+  collect(tokenize(cmd, 0), commands, redirects)
   return { commands, redirects }
+}
+
+function collect(tokens, commands, redirects) {
+  for (const segment of splitSegments(tokens)) {
+    // Recurse first so nested commands are reported in source order.
+    const words = []
+    for (let k = 0; k < segment.length; k++) {
+      const t = segment[k]
+
+      if (t.type === 'subst' || t.type === 'group') {
+        if (t.type === 'subst' && t.inCommandPosition && words.length === 0) {
+          throw new ScanRefusal('substitution in command position', t.offset)
+        }
+        collect(tokenize(t.src, t.offset), commands, redirects)
+        continue
+      }
+
+      if (t.type === 'redirect') {
+        const target = segment[k + 1]
+        if (!target || target.type !== 'word') throw new ScanRefusal('redirect without target', t.offset)
+        if (target.value.startsWith('$')) throw new ScanRefusal('variable redirect target', target.offset)
+        redirects.push({ mode: t.mode, target: target.value, offset: target.offset })
+        k++
+        continue
+      }
+
+      words.push(t)
+    }
+
+    const real = stripAssignments(words)
+    if (real.length === 0) continue
+
+    const program = real[0].value
+    const args = real.slice(1).map(w => w.value)
+
+    if (program.startsWith('$')) throw new ScanRefusal('variable in command position', real[0].offset)
+    if (CONTROL_KEYWORDS.has(program)) throw new ScanRefusal('control structure', real[0].offset)
+    if (program === 'eval') throw new ScanRefusal('eval', real[0].offset)
+    if (program === 'xargs') throw new ScanRefusal('xargs', real[0].offset)
+    if (NESTED_INTERPRETERS.has(program) && args.includes('-c')) {
+      throw new ScanRefusal('nested interpreter', real[0].offset)
+    }
+    if (program === 'find' && args.some(a => a === '-exec' || a === '-execdir' || a === '-ok')) {
+      throw new ScanRefusal('find -exec', real[0].offset)
+    }
+
+    commands.push({ program, args, segment: [program, ...args].join(' '), offset: real[0].offset })
+  }
 }
