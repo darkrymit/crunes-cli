@@ -238,7 +238,10 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
       streams.set(stdinStreamId, wrapped)
     }
     
-    const res = await utils.shell.exec(cmd, { ...opts, stdin: stdinStream })
+    // Only override opts.stdin when a stream was actually established. The
+    // unconditional spread clobbered a plain-string stdin from the isolate
+    // with undefined, so the child never received EOF.
+    const res = await utils.shell.exec(cmd, stdinStream ? { ...opts, stdin: stdinStream } : opts)
     
     if (res && typeof res === 'object') {
       if (res.stdout instanceof Uint8Array) {

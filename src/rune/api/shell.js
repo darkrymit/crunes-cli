@@ -4,6 +4,29 @@ import { spawnDetachedJob } from '../../job/spawn-detached.js'
 
 const ANSI_RE = /\x1b\[[0-9;]*m/g
 
+/**
+ * Kill a child and its descendants. On Windows a shell sits between us and the
+ * real program, so proc.kill() would terminate only the shell and orphan the
+ * grandchild.
+ */
+export function killProcessTree(proc, signal) {
+  if (!proc || proc.pid === undefined) return
+  if (process.platform === 'win32') {
+    try {
+      spawn('taskkill', ['/pid', String(proc.pid), '/t', '/f'], { windowsHide: true })
+      return
+    } catch {
+      proc.kill()
+      return
+    }
+  }
+  try {
+    process.kill(-proc.pid, signal ?? 'SIGTERM')
+  } catch {
+    try { proc.kill(signal ?? 'SIGTERM') } catch {}
+  }
+}
+
 export class ShellError extends Error {
   constructor({ message, stdout, stderr, exitCode }) {
     super(message)
@@ -132,7 +155,7 @@ export function createShellUtils(dir, checkPermission) {
       const proc = spawn(cmd, [], {
         shell:              true,
         cwd:                dir,
-        windowsHideConsole: true,
+        windowsHide: true,
         env: env ? { ...process.env, ...env } : process.env,
       })
 
@@ -143,7 +166,7 @@ export function createShellUtils(dir, checkPermission) {
 
       const timer = setTimeout(() => {
         timedOut = true
-        proc.kill()
+        killProcessTree(proc, 'SIGKILL')
         reject(new ShellError({
           message: `Command timed out after ${timeout}ms: ${cmd}`,
           stdout: binary ? Buffer.concat(stdoutParts) : stdout,
@@ -152,14 +175,21 @@ export function createShellUtils(dir, checkPermission) {
         }))
       }, timeout)
 
-      // Handle stdin writing/piping
+      // Handle stdin writing/piping. stdin must always end: a child reading to
+      // EOF hangs for the full timeout otherwise, including when no stdin was
+      // supplied at all.
       if (stdin !== undefined && stdin !== null) {
-        if (typeof stdin === 'string' || Buffer.isBuffer(stdin) || stdin instanceof Uint8Array) {
-          proc.stdin.write(stdin)
-          proc.stdin.end()
-        } else if (stdin && typeof stdin.pipe === 'function') {
+        if (typeof stdin.pipe === 'function') {
           stdin.pipe(proc.stdin)
+        } else if (typeof stdin === 'object' && stdin.type === 'Buffer' && Array.isArray(stdin.data)) {
+          proc.stdin.end(Buffer.from(stdin.data))
+        } else if (Buffer.isBuffer(stdin) || stdin instanceof Uint8Array) {
+          proc.stdin.end(stdin)
+        } else {
+          proc.stdin.end(String(stdin))
         }
+      } else {
+        proc.stdin.end()
       }
 
       proc.stdout.on('data', chunk => {
