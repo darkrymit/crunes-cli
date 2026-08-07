@@ -265,6 +265,18 @@ export function buildProgram() {
       await handler({ id, projectDir: projectRoot() })
     })
 
+  // Shell diagnostics
+  const shell = program.command('shell').description('Inspect how commands are parsed and permission-checked')
+
+  shell
+    .command('explain <cmd>')
+    .description('Show the command positions and redirect targets a command resolves to')
+    .option('-s, --shell <mode>', "force a shell mode: 'bash' or 'cmd'")
+    .action(async (cmd, opts) => {
+      const { handler } = await import('../rune/commands/shell-explain.js')
+      await handler({ cmd, shellMode: opts.shell })
+    })
+
   // Cache management commands
   const cache = program.command('cache').description('Manage cache buckets')
 
