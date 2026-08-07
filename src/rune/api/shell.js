@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process'
 import fs from 'node:fs'
 import { spawnDetachedJob } from '../../job/spawn-detached.js'
 import { resolveShell } from './shell-resolve.js'
+import { checkShellCommand } from '../permissions/shell-check.js'
 
 const ANSI_RE = /\x1b\[[0-9;]*m/g
 
@@ -151,9 +152,9 @@ export function createShellUtils(dir, checkPermission) {
   const activeSessions = new Set()
 
   async function exec(cmd, { throw: shouldThrow = true, trim = true, timeout = 30000, env, stdin, binary = false, shell: shellMode } = {}) {
-    if (checkPermission) checkPermission('shell.run', cmd)
-
+    // Resolve first: the scanner's grammar depends on which shell will run it.
     const resolved = resolveShell(shellMode)
+    checkShellCommand(cmd, resolved.kind, checkPermission)
 
     const result = await new Promise((resolve, reject) => {
       const proc = spawn(cmd, [], {
@@ -252,12 +253,13 @@ export function createShellUtils(dir, checkPermission) {
   }
 
   function execInSession(cmd, opts = {}) {
-    if (checkPermission) checkPermission('shell.run', cmd)
+    checkShellCommand(cmd, resolveShell(opts.shell).kind, checkPermission)
     return new ShellSession(cmd, { dir, ...opts, activeSessions })
   }
 
   async function createShellJob(cmd, opts, { createJob, updateJobPid, jobStdoutPath, jobStderrPath, jobStdinPath, spawnedBy, projectDir: jobProjectDir }) {
     const repl = opts?.repl ?? false
+    checkShellCommand(cmd, resolveShell(opts?.shell).kind, checkPermission)
     const { id } = await createJob(null, {
       type: 'shell', spawnedBy, runeKey: null, projectDir: jobProjectDir, args: [cmd],
     })
