@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process'
 import fs from 'node:fs'
 import { spawnDetachedJob } from '../../job/spawn-detached.js'
+import { resolveShell } from './shell-resolve.js'
 
 const ANSI_RE = /\x1b\[[0-9;]*m/g
 
@@ -38,19 +39,20 @@ export class ShellError extends Error {
 }
 
 export class ShellSession {
-  constructor(cmd, { dir, env, binary = false, activeSessions }) {
+  constructor(cmd, { dir, env, binary = false, activeSessions, shell: shellMode }) {
     this.handlers = new Map()
     this.binary = binary
     this.activeSessions = activeSessions
-    this._spawnArgs = { cmd, dir, env }
+    this._spawnArgs = { cmd, dir, env, shellMode }
     this.proc = null
   }
 
   open() {
-    const { cmd, dir, env } = this._spawnArgs
+    const { cmd, dir, env, shellMode } = this._spawnArgs
+    const resolved = resolveShell(shellMode)
     this._pending = []
     this.proc = spawn(cmd, [], {
-      shell:       true,
+      shell:       resolved.path,
       detached:    process.platform !== 'win32',
       cwd:         dir,
       windowsHide: true,
@@ -148,13 +150,15 @@ export class ShellSession {
 export function createShellUtils(dir, checkPermission) {
   const activeSessions = new Set()
 
-  async function exec(cmd, { throw: shouldThrow = true, trim = true, timeout = 30000, env, stdin, binary = false } = {}) {
+  async function exec(cmd, { throw: shouldThrow = true, trim = true, timeout = 30000, env, stdin, binary = false, shell: shellMode } = {}) {
     if (checkPermission) checkPermission('shell.run', cmd)
+
+    const resolved = resolveShell(shellMode)
 
     const result = await new Promise((resolve, reject) => {
       const proc = spawn(cmd, [], {
-        shell:              true,
-        cwd:                dir,
+        shell:       resolved.path,
+        cwd:         dir,
         windowsHide: true,
         env: env ? { ...process.env, ...env } : process.env,
       })
@@ -265,10 +269,16 @@ export function createShellUtils(dir, checkPermission) {
       fs.writeFileSync(stdinLog, '')
       // Wrapper process: tails stdinLog and feeds lines into the real child's stdin.
       // Runs detached so it outlives the parent; kill(wrapperPid) kills the full tree.
-      const wrapperEnv = { ...childEnv, CRUNES_SHELL_CMD: cmd, CRUNES_SHELL_CWD: jobProjectDir, CRUNES_STDIN_LOG: stdinLog }
+      const wrapperEnv = {
+        ...childEnv,
+        CRUNES_SHELL_CMD:  cmd,
+        CRUNES_SHELL_CWD:  jobProjectDir,
+        CRUNES_STDIN_LOG:  stdinLog,
+        CRUNES_SHELL_PATH: resolveShell(opts?.shell).path,
+      }
       const wrapper = `
 const {spawn}=require('child_process'),{openSync,closeSync,statSync,readSync}=require('fs')
-const child=spawn(process.env.CRUNES_SHELL_CMD,[],{shell:true,cwd:process.env.CRUNES_SHELL_CWD,stdio:['pipe','inherit','inherit'],env:process.env,windowsHide:true})
+const child=spawn(process.env.CRUNES_SHELL_CMD,[],{shell:process.env.CRUNES_SHELL_PATH,cwd:process.env.CRUNES_SHELL_CWD,stdio:['pipe','inherit','inherit'],env:process.env,windowsHide:true})
 child.on('exit',code=>process.exit(code??0))
 const log=process.env.CRUNES_STDIN_LOG
 let offset=0,rem='',done=false
@@ -292,8 +302,9 @@ sched()
       await updateJobPid(jobProjectDir, id, pid)
       return { id }
     }
+    const resolvedJobShell = resolveShell(opts?.shell)
     const { pid } = spawnDetachedJob(cmd, [], {
-      outPath, errPath, cwd: jobProjectDir, env: childEnv, shell: true,
+      outPath, errPath, cwd: jobProjectDir, env: childEnv, shell: resolvedJobShell.path,
     })
     await updateJobPid(jobProjectDir, id, pid)
     return { id }
@@ -304,6 +315,7 @@ sched()
     execBinary: (cmd, opts = {}) => exec(cmd, { ...opts, binary: true }),
     spawn: execInSession,
     spawnBinary: (cmd, opts = {}) => execInSession(cmd, { ...opts, binary: true }),
+    resolvedShellKind: () => resolveShell(undefined).kind,
     createShellJob,
     dispose() {
       for (const session of activeSessions) {

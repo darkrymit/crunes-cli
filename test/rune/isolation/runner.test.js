@@ -554,7 +554,7 @@ describe('spawn-like ShellSession sandbox integration', () => {
     await writeFile(runeFile, `
 import { shell, section } from '@utils'
 export async function run() {
-  const session = shell.spawnBinary('node ${scriptPath.replace(/\\/g, '\\\\')}')
+  const session = shell.spawnBinary('node "${scriptPath.replace(/\\/g, '\\\\')}"')
   let stdoutStr = ''
 
   await new Promise((resolve, reject) => {

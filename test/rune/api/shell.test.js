@@ -30,7 +30,8 @@ describe('shell utils', () => {
     await fs.writeFile(scriptPath, script);
 
     try {
-      const session = shellUtils.spawn(`node ${scriptPath}`);
+      // Quoted: under bash an unquoted Windows path loses its backslashes.
+      const session = shellUtils.spawn(`node "${scriptPath}"`);
       let stdout = '';
 
       session.setHandler('stdout', 'data', (chunk) => {
