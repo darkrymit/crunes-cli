@@ -548,6 +548,24 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
     const logPath = jobStdinPath(projectDir, id)
     await fsSync.promises.appendFile(logPath, JSON.stringify({ type: 'line', text }) + '\n', 'utf8')
   }))
+  await jail.set('$__utils_rune_job_write_command', asyncRef(async (id, nameOrText, args) => {
+    checkPermission('rune.job.write', null)
+    const record = await getJob(projectDir, id)
+    if (!record) throw new Error(`Unknown job: ${id}`)
+    const logPath = jobStdinPath(projectDir, id)
+    let payload
+    if (typeof nameOrText === 'string' && (args === undefined || args === null)) {
+      payload = { type: 'command', text: nameOrText }
+    } else if (typeof nameOrText === 'string' && typeof args === 'object' && args !== null) {
+      const name = nameOrText.startsWith('/') ? nameOrText.slice(1) : nameOrText
+      payload = { type: 'command', args: { $command: name, $commands: [name], ...args } }
+    } else if (typeof nameOrText === 'object' && nameOrText !== null) {
+      payload = { type: 'command', args: nameOrText }
+    } else {
+      throw new TypeError('writeCommand requires a command string or command name and args object')
+    }
+    await fsSync.promises.appendFile(logPath, JSON.stringify(payload) + '\n', 'utf8')
+  }))
   await jail.set('$__utils_rune_job_write_eof', asyncRef(async (id) => {
     checkPermission('rune.job.write', null)
     const record = await getJob(projectDir, id)

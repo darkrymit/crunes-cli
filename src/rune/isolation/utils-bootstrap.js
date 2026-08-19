@@ -850,6 +850,7 @@ globalThis.utils = {
       stderr:   (id)         => $__utils_rune_job_stderr.apply(undefined, [id], { result: { promise: true, copy: true } }),
       sections: (id)         => $__utils_rune_job_sections.apply(undefined, [id], { result: { promise: true, copy: true } }),
       write:    (id, text)   => $__utils_rune_job_write.apply(undefined, [id, text], { arguments: { copy: true }, result: { promise: true } }),
+      writeCommand: (id, nameOrText, args) => $__utils_rune_job_write_command.apply(undefined, [id, nameOrText, args ?? null], { arguments: { copy: true }, result: { promise: true } }),
       writeEof: (id)         => $__utils_rune_job_write_eof.apply(undefined, [id], { arguments: { copy: true }, result: { promise: true } }),
     },
   },

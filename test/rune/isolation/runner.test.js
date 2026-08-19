@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { join } from 'node:path'
-import { mkdtemp, rm, writeFile, mkdir } from 'node:fs/promises'
+import { mkdtemp, rm, writeFile, mkdir, readFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { createServer } from 'node:http'
 import { WebSocketServer } from 'ws'
 import { getPluginRunePath, runRuneInIsolate, getArgsSchema, getReplSchema } from '../../../src/rune/isolation/runner.js'
-import { createJob } from '../../../src/job/registry.js'
+import { createJob, jobStdinPath } from '../../../src/job/registry.js'
 
 vi.mock('pg', () => {
   return {
@@ -220,6 +220,41 @@ describe('rune.job.* permission enforcement', () => {
     ].join('\n'))
     const result = await runRuneInIsolate(runeFile, { allow: ['rune.job.kill'], deny: [] }, [], tmp)
     expect(result[0].data.content).toBe('ok')
+  })
+
+  it('rune.job.writeCommand throws PermissionError when rune.job.write not in allow', async () => {
+    const { id } = await createJob(process.pid, { spawnedBy: 'server', runeKey: 'worker', projectDir: tmp, args: [] })
+    const runeFile = join(tmp, 'rune.js')
+    await writeFile(runeFile, [
+      'import { rune } from "@utils"',
+      `export async function run(args) { await rune.job.writeCommand(${JSON.stringify(id)}, "/tables") }`,
+    ].join('\n'))
+    await expect(
+      runRuneInIsolate(runeFile, { allow: [], deny: [] }, [], tmp)
+    ).rejects.toThrow("'rune.job.write:' is not permitted.")
+  })
+
+  it('rune.job.writeCommand appends command JSONL to stdin.log', async () => {
+    const { id } = await createJob(process.pid, { spawnedBy: 'server', runeKey: 'worker', projectDir: tmp, args: [] })
+    const logPath = jobStdinPath(tmp, id)
+    const runeFile = join(tmp, 'rune.js')
+    await writeFile(runeFile, [
+      'import { rune } from "@utils"',
+      `export async function run(args) {`,
+      `  await rune.job.writeCommand(${JSON.stringify(id)}, "/schema books")`,
+      `  await rune.job.writeCommand(${JSON.stringify(id)}, "schema", { table: "books" })`,
+      `  await rune.job.writeCommand(${JSON.stringify(id)}, { $command: "tables" })`,
+      `  return []`,
+      `}`,
+    ].join('\n'))
+    await runRuneInIsolate(runeFile, { allow: ['rune.job.write'], deny: [] }, [], tmp)
+    const content = await readFile(logPath, 'utf8')
+    const lines = content.trim().split('\n').map(l => JSON.parse(l))
+    expect(lines).toEqual([
+      { type: 'command', text: '/schema books' },
+      { type: 'command', args: { $command: 'schema', $commands: ['schema'], table: 'books' } },
+      { type: 'command', args: { $command: 'tables' } },
+    ])
   })
 })
 
