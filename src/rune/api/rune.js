@@ -57,6 +57,27 @@ export class RuneSession {
     this.proc.stdin.write(JSON.stringify({ type: 'line', text }) + '\n')
   }
 
+  writeCommand(nameOrText, args) {
+    if (!this._repl) throw new Error('writeCommand() is only available in repl mode')
+    if (!this.proc) throw new Error('Session not open')
+    if (typeof nameOrText === 'string' && (args === undefined || args === null)) {
+      this.proc.stdin.write(JSON.stringify({ type: 'command', text: nameOrText }) + '\n')
+    } else if (typeof nameOrText === 'string' && typeof args === 'object' && args !== null) {
+      const name = nameOrText.startsWith('/') ? nameOrText.slice(1) : nameOrText
+      this.proc.stdin.write(JSON.stringify({
+        type: 'command',
+        args: { $command: name, $commands: [name], ...args }
+      }) + '\n')
+    } else if (typeof nameOrText === 'object' && nameOrText !== null) {
+      this.proc.stdin.write(JSON.stringify({
+        type: 'command',
+        args: nameOrText
+      }) + '\n')
+    } else {
+      throw new TypeError('writeCommand requires a command string or command name and args object')
+    }
+  }
+
   writeEof() {
     if (!this._repl) throw new Error('write() is only available in repl mode')
     if (!this.proc) throw new Error('Session not open')

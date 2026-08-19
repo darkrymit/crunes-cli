@@ -834,6 +834,7 @@ globalThis.utils = {
         open: () => $__utils_rune_spawn_start.applySync(undefined, [id]),
         kill: (signal) => $__utils_rune_spawn_kill.applySync(undefined, [id, signal ?? null]),
         write: (text) => $__utils_rune_spawn_write.applySync(undefined, [id, text], { arguments: { copy: true } }),
+        writeCommand: (nameOrText, args) => $__utils_rune_spawn_write_command.applySync(undefined, [id, nameOrText, args ?? null], { arguments: { copy: true } }),
         writeEof: () => $__utils_rune_spawn_write_eof.applySync(undefined, [id]),
         writeInterrupt: () => $__utils_rune_spawn_write_interrupt.applySync(undefined, [id]),
         stdin: {

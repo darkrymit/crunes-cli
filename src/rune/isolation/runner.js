@@ -456,6 +456,10 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
     const handle = shellHandles.get(id)
     if (handle) handle.write(text)
   }))
+  await jail.set('$__utils_rune_spawn_write_command', new ivm.Reference((id, nameOrText, args) => {
+    const handle = shellHandles.get(id)
+    if (handle) handle.writeCommand(nameOrText, args ?? undefined)
+  }))
   await jail.set('$__utils_rune_spawn_write_eof', new ivm.Reference((id) => {
     const handle = shellHandles.get(id)
     if (handle) handle.writeEof()

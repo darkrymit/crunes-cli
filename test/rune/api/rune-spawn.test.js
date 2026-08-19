@@ -38,6 +38,11 @@ describe('RuneSession — non-repl (default)', () => {
     const session = new RuneSession('greet', [], { cliPath: '/fake/cli.js', projectDir: '/fake' })
     expect(() => session.writeInterrupt()).toThrow('write() is only available in repl mode')
   })
+
+  it('writeCommand() throws when not in repl mode', () => {
+    const session = new RuneSession('greet', [], { cliPath: '/fake/cli.js', projectDir: '/fake' })
+    expect(() => session.writeCommand('/tables')).toThrow('writeCommand() is only available in repl mode')
+  })
 })
 
 describe('RuneSession — repl mode', () => {
@@ -49,6 +54,11 @@ describe('RuneSession — repl mode', () => {
   it('write() throws when session not open yet', () => {
     const session = new RuneSession('greet', [], { cliPath: '/fake/cli.js', projectDir: '/fake', repl: true })
     expect(() => session.write('hello')).toThrow('Session not open')
+  })
+
+  it('writeCommand() throws when session not open yet', () => {
+    const session = new RuneSession('greet', [], { cliPath: '/fake/cli.js', projectDir: '/fake', repl: true })
+    expect(() => session.writeCommand('/tables')).toThrow('Session not open')
   })
 
   it('writeEof() throws when session not open yet', () => {
@@ -67,6 +77,30 @@ describe('RuneSession — repl mode', () => {
     session.proc = { stdin: { write: (s) => written.push(s) } }
     session.write('hello world')
     expect(written).toEqual([JSON.stringify({ type: 'line', text: 'hello world' }) + '\n'])
+  })
+
+  it('writeCommand(string) sends correct command JSONL text when proc.stdin is mocked', () => {
+    const session = new RuneSession('greet', [], { cliPath: '/fake/cli.js', projectDir: '/fake', repl: true })
+    const written = []
+    session.proc = { stdin: { write: (s) => written.push(s) } }
+    session.writeCommand('/schema books')
+    expect(written).toEqual([JSON.stringify({ type: 'command', text: '/schema books' }) + '\n'])
+  })
+
+  it('writeCommand(name, args) sends correct command JSONL args when proc.stdin is mocked', () => {
+    const session = new RuneSession('greet', [], { cliPath: '/fake/cli.js', projectDir: '/fake', repl: true })
+    const written = []
+    session.proc = { stdin: { write: (s) => written.push(s) } }
+    session.writeCommand('schema', { table: 'books' })
+    expect(written).toEqual([JSON.stringify({ type: 'command', args: { $command: 'schema', $commands: ['schema'], table: 'books' } }) + '\n'])
+  })
+
+  it('writeCommand(object) sends direct command args when proc.stdin is mocked', () => {
+    const session = new RuneSession('greet', [], { cliPath: '/fake/cli.js', projectDir: '/fake', repl: true })
+    const written = []
+    session.proc = { stdin: { write: (s) => written.push(s) } }
+    session.writeCommand({ $command: 'tables' })
+    expect(written).toEqual([JSON.stringify({ type: 'command', args: { $command: 'tables' } }) + '\n'])
   })
 
   it('writeEof() sends correct JSONL line when proc.stdin is mocked', () => {
