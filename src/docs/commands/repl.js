@@ -161,10 +161,14 @@ When \`--format jsonl\` is active and stdin is not a TTY, each stdin line is par
 \`\`\`jsonl
 {"type":"line","text":"SELECT 1"}
 {"type":"line","text":"SELECT *\\nFROM books\\nWHERE genre = 'Sci-Fi'"}
+{"type":"command","text":"/schema books"}
+{"type":"command","args":{"$command":"schema","table":"books"}}
 {"type":"interrupt"}
 {"type":"eof"}
 \`\`\`
 
 Multi-line text is encoded as \`\\n\` in the JSON string — no Ctrl+Enter needed. Invalid JSON or unrecognised \`type\` values emit a \`{ type: "error" }\` JSONL output line and are skipped; the session continues.
+
+Programmatic callers can use \`session.writeCommand('/schema books')\` or \`session.writeCommand('schema', { table: 'books' })\` to dispatch commands.
 \n`)
 }

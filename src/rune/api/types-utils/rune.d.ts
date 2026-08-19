@@ -92,6 +92,9 @@ declare namespace rune {
     kill(signal?: string): void
     /** Sends a JSONL `{"type":"line","text":"..."}` event to the child's stdin. Repl mode only. */
     write(text: string): void
+    /** Sends a JSONL `{"type":"command",...}` event to the child's stdin. Repl mode only. */
+    writeCommand(nameOrText: string, args?: Record<string, any>): void
+    writeCommand(args: Record<string, any>): void
     /** Sends a JSONL `{"type":"eof","text":""}` event to the child's stdin, signalling end of input. Repl mode only. */
     writeEof(): void
     /** Sends a JSONL `{"type":"interrupt","text":""}` event to the child's stdin. Repl mode only. */
@@ -150,6 +153,14 @@ declare namespace rune {
      * Requires `rune.job.write` permission.
      */
     function write(id: string, text: string): Promise<void>
+
+    /**
+     * Appends a JSONL `{"type":"command",...}` event to the job's stdin log.
+     * Only works when the job was started with `repl: true`.
+     * Requires `rune.job.write` permission.
+     */
+    function writeCommand(id: string, nameOrText: string, args?: Record<string, any>): Promise<void>
+    function writeCommand(id: string, args: Record<string, any>): Promise<void>
 
     /**
      * Appends a JSONL `{"type":"eof","text":""}` event to the job's stdin log, closing its stdin.
