@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseReplReturn, parseSlashCommand, BUILTIN_SLASH_COMMANDS, parseJsonlInputLine, parseReplArgs } from '../../../src/rune/commands/repl.js'
+import { parseReplReturn, parseSlashCommand, BUILTIN_SLASH_COMMANDS, parseJsonlInputLine, parseReplArgs, resolveCommandEvent } from '../../../src/rune/commands/repl.js'
 
 describe('parseReplReturn', () => {
   it('undefined → continue with no prompt change', () => {
@@ -75,6 +75,14 @@ describe('parseJsonlInputLine', () => {
     expect(parseJsonlInputLine('{"type":"command","args":{"$command":"tables"}}')).toEqual({ type: 'command', args: { '$command': 'tables' } })
   })
 
+  it('parses a command event with text', () => {
+    expect(parseJsonlInputLine('{"type":"command","text":"/schema books"}')).toEqual({ type: 'command', text: '/schema books' })
+  })
+
+  it('parses a command event with name and args', () => {
+    expect(parseJsonlInputLine('{"type":"command","name":"schema","args":{"table":"books"}}')).toEqual({ type: 'command', name: 'schema', args: { table: 'books' } })
+  })
+
   it('returns null for invalid JSON', () => {
     expect(parseJsonlInputLine('not json')).toBeNull()
   })
@@ -89,6 +97,92 @@ describe('parseJsonlInputLine', () => {
 
   it('returns null for empty string', () => {
     expect(parseJsonlInputLine('')).toBeNull()
+  })
+})
+
+describe('resolveCommandEvent', () => {
+  const schema = {
+    commands: [
+      {
+        name: 'schema',
+        description: 'Show table schema',
+        positionals: [{ spec: '<table>', description: 'Table name' }],
+        options: [],
+        examples: [],
+        commands: [],
+      },
+      {
+        name: 'tables',
+        description: 'List tables',
+        positionals: [],
+        options: [],
+        examples: [],
+        commands: [],
+      }
+    ]
+  }
+
+  it('resolves text command matching schema with positional argument', () => {
+    const res = resolveCommandEvent({ type: 'command', text: '/schema books' }, schema)
+    expect(res).toEqual({
+      type: 'command',
+      args: expect.objectContaining({
+        $command: 'schema',
+        $commands: ['schema'],
+        table: 'books',
+      })
+    })
+  })
+
+  it('resolves text command without leading slash', () => {
+    const res = resolveCommandEvent({ type: 'command', text: 'tables' }, schema)
+    expect(res).toEqual({
+      type: 'command',
+      args: expect.objectContaining({
+        $command: 'tables',
+        $commands: ['tables'],
+      })
+    })
+  })
+
+  it('resolves /exit text command as eof event', () => {
+    const res = resolveCommandEvent({ type: 'command', text: '/exit' }, schema)
+    expect(res).toEqual({ type: 'eof', text: '' })
+  })
+
+  it('resolves structured args object directly', () => {
+    const res = resolveCommandEvent({ type: 'command', args: { $command: 'tables' } }, schema)
+    expect(res).toEqual({
+      type: 'command',
+      args: expect.objectContaining({
+        $command: 'tables',
+        $commands: ['tables'],
+      })
+    })
+  })
+
+  it('resolves name with args object', () => {
+    const res = resolveCommandEvent({ type: 'command', name: 'schema', args: { table: 'books' } }, schema)
+    expect(res).toEqual({
+      type: 'command',
+      args: expect.objectContaining({
+        $command: 'schema',
+        $commands: ['schema'],
+        table: 'books',
+      })
+    })
+  })
+
+  it('resolves unknown command text gracefully with generic args', () => {
+    const res = resolveCommandEvent({ type: 'command', text: '/custom foo bar' }, schema)
+    expect(res).toEqual({
+      type: 'command',
+      args: expect.objectContaining({
+        $command: 'custom',
+        $commands: ['custom'],
+        _: ['custom', 'foo', 'bar'],
+      })
+    })
   })
 })
 

@@ -33,14 +33,52 @@ export function parseJsonlInputLine(text) {
   return parsed
 }
 
-export function parseSlashCommand(line) {
+export function parseSlashCommand(line, requireSlash = true) {
   const trimmed = line.trim()
-  if (!trimmed.startsWith('/')) return null
-  const spaceIdx = trimmed.indexOf(' ')
-  const name = spaceIdx === -1 ? trimmed.slice(1) : trimmed.slice(1, spaceIdx)
-  const rest  = spaceIdx === -1 ? '' : trimmed.slice(spaceIdx + 1).trim()
+  if (requireSlash && !trimmed.startsWith('/')) return null
+  const raw = trimmed.startsWith('/') ? trimmed.slice(1) : trimmed
+  const spaceIdx = raw.indexOf(' ')
+  const name = spaceIdx === -1 ? raw : raw.slice(0, spaceIdx)
+  const rest  = spaceIdx === -1 ? '' : raw.slice(spaceIdx + 1).trim()
   if (!name) return null
   return { name, rest }
+}
+
+export function resolveCommandEvent(event, commandsSchema) {
+  if (event.type !== 'command') return event
+  if (event.args && typeof event.args === 'object') {
+    const args = { ...event.args }
+    if (event.name && !args.$command) args.$command = event.name
+    if (!args.$command) args.$command = ''
+    if (!args.$commands) args.$commands = args.$command ? [args.$command] : []
+    return { type: 'command', args }
+  }
+  if (typeof event.text === 'string') {
+    const slash = parseSlashCommand(event.text, false)
+    if (!slash) return { type: 'command', args: { $command: '', $commands: [], _: [], $rest: [], $raw: [] } }
+    if (slash.name === 'exit') return { type: 'eof', text: '' }
+    if (commandsSchema?.commands?.some(c => c.name === slash.name)) {
+      const cmdSchema = {
+        commands: commandsSchema.commands,
+        options: [], positionals: [], examples: [],
+      }
+      const cmdTokens = slash.rest ? [slash.name, ...slash.rest.split(/\s+/)] : [slash.name]
+      const parsedCmdArgs = parseArgs(cmdTokens, cmdSchema)
+      return { type: 'command', args: parsedCmdArgs }
+    }
+    const cmdTokens = slash.rest ? [slash.name, ...slash.rest.split(/\s+/)] : [slash.name]
+    const parsedCmdArgs = parseArgs(cmdTokens, null)
+    parsedCmdArgs.$command = slash.name
+    parsedCmdArgs.$commands = [slash.name]
+    return { type: 'command', args: parsedCmdArgs }
+  }
+  if (typeof event.name === 'string') {
+    return {
+      type: 'command',
+      args: { $command: event.name, $commands: [event.name], _: [], $rest: [], $raw: [event.name] }
+    }
+  }
+  return event
 }
 
 export function parseReplArgs(argv) {
@@ -216,7 +254,10 @@ export async function handler({
           if (sessionEnded) return
           if (jsonlInput) {
             const event = parseJsonlInputLine(line)
-            if (event) await handleInputEvent(event)
+            if (event) {
+              const resolved = resolveCommandEvent(event, session.commandsSchema)
+              await handleInputEvent(resolved)
+            }
           } else {
             await handleInputEvent({ type: 'line', text: line })
           }
@@ -330,7 +371,8 @@ export async function handler({
           process.stdout.write(JSON.stringify({ type: 'error', rune: key, instance: instanceId, message: `Invalid JSONL input: ${text}` }) + '\n')
           return
         }
-        await handleInputEvent(event)
+        const resolved = resolveCommandEvent(event, session.commandsSchema)
+        await handleInputEvent(resolved)
         return
       }
 
