@@ -5,10 +5,16 @@ import { output } from '../../shared/output.js'
 
 const ALL_NAMESPACES = walk(utilsApiData)
 
+// The index is one line per namespace; a multi-paragraph description would
+// otherwise break the list apart, so only the first paragraph is shown here.
+function summarize(description) {
+  return (description ?? '').split(/\n\s*\n/)[0].replace(/\s+/g, ' ').trim()
+}
+
 function formatIndex(namespaces) {
   const lines = ['Available utils namespaces:', '']
   for (const ns of namespaces) {
-    lines.push(`  ${ns.name}  ${ns.description ?? ''}`.trimEnd())
+    lines.push(`  ${ns.name}  ${summarize(ns.description)}`.trimEnd())
   }
   return lines.join('\n')
 }
