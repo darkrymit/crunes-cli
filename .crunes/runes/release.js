@@ -1,7 +1,8 @@
-import { fs, json, shell, section, md } from '@utils'
+import { fs, json, shell, section, md, rune } from '@utils'
 
 export async function args(b) {
   return b
+    .option('--help', 'Show help')
     .command('info', 'View current version status, git commits, and changelog')
     .command('bump', 'Perform package version bump and release automation', bump => {
       bump
@@ -15,6 +16,7 @@ export async function args(b) {
 }
 
 export async function run(args) {
+  if (args.help) return rune.helpSection(args.$command)
   const command = args.$command || 'info'
 
   if (command === 'info') {
