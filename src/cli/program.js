@@ -117,7 +117,7 @@ export function buildProgram() {
 
   helpGroup
     .command('intro')
-    .description('Generate a comprehensive introduction and context document for Crunes and the active project')
+    .description('Generate a comprehensive introduction to Crunes: rune anatomy, calling conventions, config, permissions and the full @utils API. Generic — for this project\'s own runes use `crunes list` and `crunes docs rune`')
     .option('--out <path>', 'output file path (defaults to stdout)')
     .action(async (opts) => {
       const { handler } = await import('../docs/commands/intro.js')
