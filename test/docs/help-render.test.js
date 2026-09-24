@@ -230,6 +230,16 @@ describe('formatRuneIndex', () => {
     expect(out).not.toContain('crunes run release info')
   })
 
+  it('renders rune-level examples when the rune has no commands to drill into', () => {
+    const schema = {
+      options: [], positionals: [], commands: [],
+      examples: [{ usage: 'crunes run release', description: 'Basic use' }],
+    }
+    const out = formatRuneIndex(schema, META)
+    expect(out).toContain('Examples:')
+    expect(out).toContain('crunes run release')
+  })
+
   it('renders REPL slash commands with a leading slash', () => {
     expect(formatRuneIndex(SCHEMA, META)).toContain('  /reload')
   })
@@ -242,9 +252,11 @@ describe('formatRuneIndex', () => {
     expect(formatRuneIndex(SCHEMA, META)).toContain('allow: m, kb')
   })
 
-  it('renders the not-permitted line when batch is null and includeBatch is true', () => {
+  it('says batching is unavailable, not denied, when batch is null and includeBatch is true', () => {
     const out = formatRuneIndex(SCHEMA, { ...META, batch: null })
-    expect(out).toContain('(not permitted — no batch block declared)')
+    expect(out).toContain('(no batch block declared — this rune cannot appear in a -b batch)')
+    // "not permitted" read as a permission failure rather than an absent declaration.
+    expect(out).not.toContain('not permitted')
   })
 
   it('omits the batch section entirely when includeBatch is false', () => {

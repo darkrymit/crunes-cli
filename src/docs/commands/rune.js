@@ -166,6 +166,8 @@ export async function handler({ key, path = [], format = 'text', projectRoot = p
         relativePath: docs.relativePath,
         options: docs.schema?.options ?? [],
         positionals: docs.schema?.positionals ?? [],
+        // Mirrors the text index: withheld while there are commands to drill into.
+        examples: (docs.schema?.commands ?? []).length === 0 ? (docs.schema?.examples ?? []) : [],
         commands: commandRows(docs.schema?.commands),
         repl: docs.repl ? { commands: docs.repl.commandsSchema?.commands ?? [] } : null,
         batch: docs.batch,

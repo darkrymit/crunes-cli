@@ -195,6 +195,16 @@ export function formatRuneIndex(schema, meta) {
     for (const r of flattenCommands(commands)) lines.push(row(r.label, r.description))
   }
 
+  // Rune-level examples are withheld while there are commands to drill into, so the
+  // index stays bounded — the reader gets them on the command page. With no commands
+  // there is no page to drill to, so the index is the whole surface and they belong here.
+  const rootExamples = schema?.examples ?? []
+  if (commands.length === 0 && rootExamples.length > 0) {
+    lines.push('')
+    lines.push('Examples:')
+    lines.push(...exampleLines(rootExamples))
+  }
+
   const replCommands = meta?.repl?.commands ?? []
   if (replCommands.length > 0) {
     lines.push('')
@@ -206,7 +216,7 @@ export function formatRuneIndex(schema, meta) {
     lines.push('')
     lines.push('Batch:')
     if (!meta.batch) {
-      lines.push('  (not permitted — no batch block declared)')
+      lines.push('  (no batch block declared — this rune cannot appear in a -b batch)')
     } else {
       const allow = meta.batch.allow ?? []
       const deny = meta.batch.deny ?? []
