@@ -15,11 +15,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`os` namespace**: `os.platform`, `os.arch`, `os.shell`, `os.pathSep`, `os.eol`. Ungated and frozen. `os.shell` reports the shell `shell.exec` actually resolved to, so runes stop inferring it from `platform`
 - **`opts.shell`**: `'bash'` or `'cmd'` on `shell.exec`, `shell.execBinary`, `shell.spawn`, `shell.spawnBinary` and shell jobs. Explicit modes never fall back
 - **`crunes shell explain <cmd>`**: prints the command positions, required grants and redirect targets a command resolves to, or the refused construct and its offset. Exits non-zero on a refusal
+- **`writeCommand` on REPL sessions and shell jobs**: `RuneSession.writeCommand(nameOrText, args?)` and `rune.job.writeCommand(id, ...)` send a command to a REPL-mode session as a structured value instead of hand-formatted text, so callers no longer build input strings themselves
+- **Structured command events in REPL JSONL input**: the REPL input stream accepts both plain text and structured command events, so a driver can send `{ name, args }` rather than serialising to a line of text
 
 ### Fixed
 - **`shell.exec` string `stdin` was discarded**, so any program reading to EOF hung for the full timeout. The isolate bridge overwrote `opts.stdin` unconditionally. Binary `stdin` never worked either, and `stdin` was left open when none was supplied
 - **Windows console window flashed on every `shell.exec`** — `windowsHideConsole` is not a Node option; the correct name is `windowsHide`
 - **Windows `shell.exec` timeout orphaned the child** — killing the shell left the grandchild running. Now kills the process tree
+- **`fs.watch` aborted the process on Windows short paths** — watching a directory reached by an 8.3 short path (`C:\Users\RUNNER~1\...`, which is what `os.tmpdir()` returns for a long username) made libuv compare the long filename it receives against the short directory it was given and fail a native assertion, killing the process outright rather than throwing. The watch base is now resolved to its long form first
+- **`crunes docs utils` index broke apart on multi-paragraph descriptions** — the `os` namespace's full description was printed into the one-line-per-namespace list, so the list stopped being readable as a list. The index now shows only the first paragraph
 
 ### Changed
 - **`plugins` is now a boolean map** (`{"mkt@plug": true}`). Legacy arrays are still read and are converted to map form on the next write. A project can now disable a globally-enabled plugin with `crunes plugin disable <name>`
