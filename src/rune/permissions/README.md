@@ -1,6 +1,6 @@
 # rune/permissions
 
-Permission enforcement for all sandboxed rune capabilities. `permissions.js` merges plugin and project permission sets and exposes a `checkPermission` function; each capability (http fetch, env, store, ws client, ws server, http server) has its own pattern-matching module. Full docs: `docs/knowledge-base/modules/rune.md`
+Permission enforcement for all sandboxed rune capabilities. `permissions.js` merges plugin and project permission sets and exposes a `checkPermission` function; each capability (http fetch, env, store, ws client, ws server, http server) has its own pattern-matching module. Full docs: `docs/kb/main/modules/rune.md`
 
 ## Files
 

@@ -1,6 +1,6 @@
 # rune/isolation
 
-Sandboxed VM lifecycle via `isolated-vm`. Manages isolate creation, script compilation, module resolution, and teardown for both local runes and plugin runes. Full docs: `docs/knowledge-base/modules/rune.md`
+Sandboxed VM lifecycle via `isolated-vm`. Manages isolate creation, script compilation, module resolution, and teardown for both local runes and plugin runes. Full docs: `docs/kb/main/modules/rune.md`
 
 ## Files
 
