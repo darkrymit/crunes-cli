@@ -52,4 +52,26 @@ describe('enumerateRunes', () => {
     const out = await enumerateRunes(config)
     expect(out.map(e => e.key)).toEqual(['greet'])
   })
+
+  it('does not list a fully-qualified plugin-rune override as a rune of its own', async () => {
+    loadRegistry.mockResolvedValue({ plugins: { 'scope@git': { path: '/p/git' } } })
+    loadPluginJson.mockResolvedValue({ runes: { status: { name: 'Status', description: 'Git status' } } })
+    const config = {
+      runes: { 'scope@git:status': { vars: { depth: 5 } } },
+      plugins: ['scope@git'],
+    }
+    const out = await enumerateRunes(config)
+    // The override modifies the plugin's rune; it is not a second rune, and it
+    // carries no name or description of its own to list.
+    expect(out).toHaveLength(1)
+    expect(out[0].key).toBe('git:status')
+    expect(out[0].name).toBe('Status')
+  })
+
+  it('still lists a qualified override when its plugin is not enabled', async () => {
+    loadRegistry.mockResolvedValue({ plugins: {} })
+    const config = { runes: { 'scope@git:status': { vars: { depth: 5 } } }, plugins: [] }
+    const out = await enumerateRunes(config)
+    expect(out.map(e => e.key)).toEqual(['scope@git:status'])
+  })
 })

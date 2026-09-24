@@ -11,7 +11,14 @@ export async function enumerateRunes(config) {
   const runes = config?.runes ?? {}
   const entries = []
 
+  // A key of the form `marketplace@plugin:rune` is an override of a plugin's rune —
+  // extra vars or permissions for it — not a rune of its own. Listing it produces a
+  // blank duplicate beside the plugin's own row, so it is held back and only emitted
+  // below if the plugin never supplies that row (disabled, missing, or unreadable).
+  const overrideKeys = []
+
   for (const key of Object.keys(runes)) {
+    if (/@[^:]+:/.test(key)) { overrideKeys.push(key); continue }
     const entry = getRune(config, key)
     const source = entry.plugin ? `→ ${entry.plugin}` : (entry.path ?? '')
     entries.push({ key, source, name: entry.name ?? null, description: entry.description ?? null })
@@ -51,6 +58,16 @@ export async function enumerateRunes(config) {
     } catch {
       // Registry unavailable — local runes are still a useful answer.
     }
+  }
+
+  // An override whose plugin rune never appeared would otherwise vanish silently,
+  // leaving config that does something invisible in every listing.
+  for (const key of overrideKeys) {
+    const runeKey = key.slice(key.lastIndexOf(':') + 1)
+    const shortName = key.slice(key.indexOf('@') + 1, key.lastIndexOf(':'))
+    if (entries.some(e => e.key === `${shortName}:${runeKey}`)) continue
+    const entry = getRune(config, key)
+    entries.push({ key, source: entry.path ?? '', name: entry.name ?? null, description: entry.description ?? null })
   }
 
   return entries
