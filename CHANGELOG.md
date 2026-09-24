@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.9.0] - 2026-09-24
 
 ### Added
 - **Global rune & plugin configuration**: `~/.crunes/config.json` is now a config layer beneath the project config. Register personal runes with `crunes create -g`, enable plugins everywhere with `crunes plugin enable -g`, and run from any directory — including ones with no `.crunes/` at all, where crunes runs rootless and writes no local state outside the store. `CRUNES_NO_GLOBAL=1` opts out. `-g` is also accepted by `init`, `plugin install`, `plugin disable`, `plugin uninstall`, `template create`, and `list`
