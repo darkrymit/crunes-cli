@@ -1,6 +1,6 @@
 # project
 
-Project identity and reverse-lookup index: maps a hashed project key to its real directory path, and maintains a global `projects.json` registry. Full docs: `docs/knowledge-base/modules/project.md`
+Project identity and reverse-lookup index: maps a hashed project key to its real directory path, and maintains a global `projects.json` registry. Full docs: `docs/kb/main/modules/project.md`
 
 ## Files
 

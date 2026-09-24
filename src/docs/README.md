@@ -1,6 +1,6 @@
 # docs
 
-Documentation commands: loads TypeDoc-generated JSON, walks and formats API surfaces for utils/globals, renders the full sandbox intro, and formats rune arg schemas into usage strings. Full docs: `docs/knowledge-base/modules/docs.md`
+Documentation commands: loads TypeDoc-generated JSON, walks and formats API surfaces for utils/globals, renders the full sandbox intro, and formats rune arg schemas into usage strings. Full docs: `docs/kb/main/modules/docs.md`
 
 ## Files
 

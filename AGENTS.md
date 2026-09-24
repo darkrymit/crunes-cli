@@ -93,11 +93,17 @@ global config dir, so global rune paths are `runes/<key>.js`, with no `.crunes/`
 - `cli` • `core` • `job` • `marketplace` • `plugin` • `project` • `rune` • `shared` • `store` • `cache` • `sqlite` • `docs` • `template`
 
 ### Live Codebase Documentation
-Our primary documentation lives inside our Obsidian Knowledge Base vault (`docs/knowledge-base/`).
+Our primary documentation is the `crunes-cli-main` knowledge bundle at `docs/kb/main/`, read through the `kb` plugin rune. It holds what is unguessable from the source — module boundaries, execution flows, system-wide patterns, decisions and traps.
+- **List what exists:** `crunes -p run kb list`
+- **Read a document:** `crunes -p run kb read modules/rune` (the `.md` is optional)
 - **Retrieve structural map:** `crunes -p run m <module>` (e.g., `m rune`)
-- **Retrieve KB entries:** `crunes -p run kb -m <module>` (e.g., `kb -m rune.isolation`)
-- **Batch both context maps in one shot:** `crunes -p run -b m rune + kb -m rune`
-- **Fallback (Crunes offline):** Refer to `docs/knowledge-base/index.md` manually.
+- **Batch both context maps in one shot:** `crunes -p run -b m rune + kb read modules/rune`
+- **Audit links:** `crunes -p run kb broken --all` and `kb dead --all`
+- **Fallback (Crunes offline):** Refer to `docs/kb/main/index.md` manually.
+
+**The API surface is not in the bundle.** `crunes docs utils`, `crunes docs rune`, `crunes docs globals` and `crunes docs intro` render it from the TypeScript declarations and live rune schemas, so they describe the installed version. Never restate a signature, namespace list or command inventory in a document.
+
+The layout every bundle obeys is the `crunes-main` bundle's `specs/knowledge-base.md`, in the monorepo root.
 
 ## Release Process
 

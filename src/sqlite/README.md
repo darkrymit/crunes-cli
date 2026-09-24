@@ -1,6 +1,6 @@
 # sqlite
 
-Rune-visible SQLite store: named databases registered in a central index at `~/.crunes/sqlite.json`. Full docs: `docs/knowledge-base/modules/sqlite.md`
+Rune-visible SQLite store: named databases registered in a central index at `~/.crunes/sqlite.json`. Full docs: `docs/kb/main/modules/sqlite.md`
 
 ## Files
 

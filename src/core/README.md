@@ -1,6 +1,6 @@
 # core
 
-Shared domain logic used across multiple feature modules: config loading/merging/validation and error types. Full docs: `docs/knowledge-base/modules/core.md`
+Shared domain logic used across multiple feature modules: config loading/merging/validation and error types. Full docs: `docs/kb/main/modules/core.md`
 
 ## Files
 

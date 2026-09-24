@@ -1,6 +1,6 @@
 # template
 
-Rune template management: list available templates from local config or installed plugins, apply a template to scaffold a new rune, or create a new template file and register it. Full docs: `docs/knowledge-base/modules/template.md`
+Rune template management: list available templates from local config or installed plugins, apply a template to scaffold a new rune, or create a new template file and register it. Full docs: `docs/kb/main/modules/template.md`
 
 ## Files
 

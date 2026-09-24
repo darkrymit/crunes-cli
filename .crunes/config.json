@@ -52,25 +52,22 @@
         "allow": ["*"]
       }
     },
-    "kb": {
-      "path": ".crunes/runes/kb.js",
-      "name": "Knowledge Base Context",
-      "description": "Deep narrative context (Key Decisions, Gotchas) from the docs/knowledge-base.",
+    "crunes-plugins@kb:kb": {
+      "vars": {
+        "roots": ["docs/kb/main"]
+      },
       "permissions": {
         "run": {
           "allow": [
-            "fs.read:docs/knowledge-base/**",
-            "fs.glob:docs/knowledge-base/**::*.md",
-            "fs.exists:docs/knowledge-base/**"
+            "fs.glob:docs/kb/main/**/*.md",
+            "fs.read:docs/kb/main/**"
           ]
         }
-      },
-      "batch": {
-        "allow": ["*"]
       }
     }
   },
-  "plugins": [
-    "crunes-plugins@git"
-  ]
+  "plugins": {
+    "crunes-plugins@git": true,
+    "crunes-plugins@kb": true
+  }
 }

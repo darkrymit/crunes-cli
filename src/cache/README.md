@@ -1,6 +1,6 @@
 # cache
 
-Rune-visible cache store: named key/value buckets backed by individual JSON files, with a central registry at `~/.crunes/cache.json`. Full docs: `docs/knowledge-base/modules/cache.md`
+Rune-visible cache store: named key/value buckets backed by individual JSON files, with a central registry at `~/.crunes/cache.json`. Full docs: `docs/kb/main/modules/cache.md`
 
 ## Files
 

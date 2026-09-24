@@ -1,6 +1,6 @@
 # job
 
-Background job tracking: create, list, kill, and garbage-collect rune-spawned processes. Each job is persisted under `<projectDir>/.crunes/jobs/<id>/` as `job.json` plus `stdout.log`, `stderr.log`, `stdin.log`. Full docs: `docs/knowledge-base/modules/job.md`
+Background job tracking: create, list, kill, and garbage-collect rune-spawned processes. Each job is persisted under `<projectDir>/.crunes/jobs/<id>/` as `job.json` plus `stdout.log`, `stderr.log`, `stdin.log`. Full docs: `docs/kb/main/modules/job.md`
 
 ## Files
 
