@@ -1,4 +1,5 @@
 import * as p from '@clack/prompts'
+import { output } from '../shared/output.js'
 
 function collectAllow(permissions) {
   const all = []
@@ -30,7 +31,7 @@ export async function promptConsent(pluginName, pluginJson, { yes = false } = {}
   const isYes = yes || !process.stdout.isTTY
   if (isYes) return true
 
-  p.note(formatConsentScreen(pluginName, pluginJson), 'Permissions requested')
+  output.note(formatConsentScreen(pluginName, pluginJson), 'Permissions requested')
 
   const answer = await p.confirm({ message: 'Allow these permissions?' })
 
@@ -62,7 +63,7 @@ export async function promptReConsent(pluginName, diff, { yes = false } = {}) {
     lines.push('')
   }
 
-  p.note(lines.join('\n'), 'New permissions')
+  output.note(lines.join('\n'), 'New permissions')
 
   const answer = await p.confirm({ message: 'Allow these new permissions?' })
   if (p.isCancel(answer)) return false
