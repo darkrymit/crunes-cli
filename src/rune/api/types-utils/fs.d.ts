@@ -28,6 +28,12 @@ declare namespace fs {
   /**
    * Returns file paths matching a glob pattern. Relative patterns only.
    * Requires `fs.glob:<cwd>::<pattern>` permission (convenience form: `fs.glob:<pattern>` sets cwd to project root).
+   * **The granted `<pattern>` is matched exactly against the pattern string this call passes, not against the
+   * paths it resolves to.** Only `*` on its own is a wildcard, meaning "any pattern". So a grant of
+   * `fs.glob:./**` does NOT permit `fs.glob('./**\/*.js')` — grant the exact pattern the rune uses, or `fs.glob:*`.
+   * This is why a rune globs patterns it declares up front rather than ones it builds from what it just found:
+   * a pattern computed at runtime could never have been granted in advance.
+   * The `<cwd>` half IS glob-matched, so `fs.glob:./src/**::*` permits any pattern under any cwd below `./src`.
    * When `cwd` is set, returned paths are relative to `cwd`. Without `cwd`, paths are relative to project root.
    * @param pattern Glob pattern (e.g., '**\/*.js')
    * @param opts.cwd Base directory for the glob (relative to project root). Affects permission matching and returned paths.
