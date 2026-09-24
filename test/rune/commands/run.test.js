@@ -1,7 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 vi.mock('../../../src/core/config.js', () => ({ loadConfig: vi.fn() }))
-vi.mock('../../../src/rune/resolver.js', () => ({ runRune: vi.fn(), resolvePluginRune: vi.fn() }))
+vi.mock('../../../src/rune/resolver.js', () => ({
+  runRune: vi.fn(),
+  resolvePluginRune: vi.fn(),
+  describeConfigLayers: vi.fn(() => 'project config (/fake)'),
+}))
 vi.mock('../../../src/plugin/manifest.js', () => ({ loadPluginJson: vi.fn() }))
 
 import { loadConfig } from '../../../src/core/config.js'

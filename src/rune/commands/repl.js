@@ -5,6 +5,8 @@ import { formatSection } from '../../shared/render.js'
 import { output, isVerbose } from '../../shared/output.js'
 import { parseArgs } from '../api/args-parser.js'
 import { parseSegment } from './run.js'
+import { permissionHint } from './denial-hint.js'
+import { describeConfigLayers } from '../resolver.js'
 import { tailStdin } from '../../job/stdin-tail.js'
 
 export function parseReplReturn(value) {
@@ -160,7 +162,10 @@ export async function handler({
     session = await runeEntry.createReplSession(runeArgs, { onEvent, instanceId })
   } catch (err) {
     const msg = isVerbose ? (err.stack || err.message) : err.message
-    output.error(`Failed to start REPL for "${key}": ${msg}`)
+    const hint = permissionHint(err.message, {
+      key, lifecycle: 'repl', configLayers: describeConfigLayers(configRoot),
+    })
+    output.error(`Failed to start REPL for "${key}": ${msg}${hint ?? ''}`)
     process.exit(1)
   }
 
@@ -210,7 +215,10 @@ export async function handler({
       if (format === 'jsonl') {
         process.stdout.write(JSON.stringify({ type: 'error', rune: key, instance: instanceId, message: msg }) + '\n')
       } else {
-        process.stderr.write(`Error: ${msg}\n`)
+        const hint = permissionHint(err.message, {
+          key, lifecycle: 'repl', configLayers: describeConfigLayers(configRoot),
+        })
+        process.stderr.write(`Error: ${msg}${hint ?? ''}\n`)
       }
       prompt()
       return

@@ -1,5 +1,6 @@
 import { loadConfig } from '../../core/config.js'
 import { runRune, describeConfigLayers } from '../resolver.js'
+import { permissionHint } from './denial-hint.js'
 import { renderSection } from '../../shared/render.js'
 import { output, isVerbose } from '../../shared/output.js'
 import { checkBatchPermission, buildMatchString } from './batch-permission.js'
@@ -156,7 +157,17 @@ export async function handler({
       const matchString = buildMatchString(seg.key, seg.runeArgs)
       const result = checkBatchPermission(entry, matchString)
       if (!result.allowed) {
-        output.error(`Batch not permitted for "${matchString}". Add a batch.allow pattern in config.json or run it separately.`)
+        const spaceIdx = matchString.indexOf(' ')
+        const subject = spaceIdx === -1 ? matchString : matchString.slice(spaceIdx + 1)
+        const lines = [`Batch not permitted for "${matchString}" — ${result.reason}.`, '']
+        lines.push(`  "batch" is a sibling of "permissions" on the rune entry, not inside it:`)
+        lines.push('')
+        lines.push(`    "runes": { "${seg.key}": { "batch": { "allow": ["${subject}"] } } }`)
+        lines.push('')
+        lines.push(`  Patterns match the rune's arguments — here "${subject}" — or its bare key when it is`)
+        lines.push(`  invoked with none. Edit the config that declares this rune: ${describeConfigLayers(configRoot ?? projectRoot)}.`)
+        lines.push(`  Or drop -b and run the segments separately.`)
+        output.error(lines.join('\n'))
         process.exit(1)
       }
     }
@@ -226,7 +237,12 @@ export async function handler({
       if (isVerbose) console.error(`[crunes:debug] Rune "${key}" completed with ${sections?.length ?? 0} sections`)
     } catch (err) {
       const msg = isVerbose ? (err.stack || err.message) : err.message
-      output.error(`Rune "${key}" failed: \n${msg}`)
+      const hint = permissionHint(err.message, {
+        key,
+        lifecycle: 'run',
+        configLayers: describeConfigLayers(configRoot ?? projectRoot),
+      })
+      output.error(`Rune "${key}" failed: \n${msg}${hint ?? ''}`)
       anyFailed = true
       if (failFast) process.exit(1)
       continue
