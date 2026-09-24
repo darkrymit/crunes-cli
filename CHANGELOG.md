@@ -33,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`crunes docs intro --help` claimed the document covers "the active project"** — it is entirely generic. `crunes list` and `crunes docs rune` are what describe a project's own runes
 - **`crunes create --format markdown --yes` was documented in `docs intro` and fails** — `-y` is a global flag and must precede the subcommand. The section also now states that `create` writes no permissions block and where grants actually live
 - **`fs.glob` grant matching was undocumented** — the granted pattern is matched exactly against the pattern string the call passes, with only `fs.glob:*` acting as a wildcard, so `fs.glob:./**` does not permit `fs.glob('./**/*.js')`
+- **A plugin-rune override listed as a blank duplicate** — a `marketplace@plugin:rune` config key grants extra vars or permissions to a plugin's rune rather than declaring one, so `crunes list` showed the same rune twice, the second time with no name or description
 
 ### Changed
 - **`plugins` is now a boolean map** (`{"mkt@plug": true}`). Legacy arrays are still read and are converted to map form on the next write. A project can now disable a globally-enabled plugin with `crunes plugin disable <name>`
