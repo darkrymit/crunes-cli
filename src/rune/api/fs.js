@@ -1,5 +1,5 @@
 import fsPromises from 'node:fs/promises'
-import { createReadStream, createWriteStream } from 'node:fs'
+import { createReadStream, createWriteStream, realpathSync } from 'node:fs'
 import path from 'node:path'
 import { glob } from 'tinyglobby'
 import chokidar from 'chokidar'
@@ -8,6 +8,10 @@ import { resolvePath } from './utils.js'
 
 function stripBom(str) {
   return str.charCodeAt(0) === 0xfeff ? str.slice(1) : str
+}
+
+function realPathOr(p) {
+  try { return realpathSync.native(p) } catch { return p }
 }
 
 function sliceLines(content, from, to) {
@@ -269,15 +273,19 @@ export function createFsUtils(dir, checkPermission, pluginDir = null, pluginId =
 
     watch(pattern, callback, { debounce = 50 } = {}) {
       if (checkPermission) checkPermission('fs.read', pattern)
+      // Windows hands back 8.3 short paths (os.tmpdir() -> C:\Users\RUNNER~1\...).
+      // libuv compares each event filename against the directory string it was
+      // given and aborts the process when they disagree, so watch the long form.
+      const baseDir = realPathOr(dir)
       const isGlob = /[*?{}\[\]!]/.test(pattern)
-      const watchRoot = isGlob
-        ? path.join(dir, pattern.replace(/[*?{}\[\]!].*$/, '').replace(/\/$/, '') || '.')
-        : path.isAbsolute(pattern) ? pattern : path.join(dir, pattern)
+      const watchRoot = realPathOr(isGlob
+        ? path.join(baseDir, pattern.replace(/[*?{}\[\]!].*$/, '').replace(/\/$/, '') || '.')
+        : path.isAbsolute(pattern) ? pattern : path.join(baseDir, pattern))
       const isMatch = isGlob ? picomatch(pattern) : null
       const timers = new Map()
 
       const fire = (type, filePath) => {
-        const rel = path.relative(dir, filePath).replace(/\\/g, '/')
+        const rel = path.relative(baseDir, filePath).replace(/\\/g, '/')
         if (isMatch && !isMatch(rel)) return
         const key = `${type}:${rel}`
         if (timers.has(key)) clearTimeout(timers.get(key))
