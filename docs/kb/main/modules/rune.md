@@ -62,6 +62,10 @@ Because children are separate processes, **they do not share the parent's call s
 
 **Shell grants are per command position.** `git log | head -20` needs two grants, redirects need `fs.*` grants, and unscannable constructs are refused outright with no grant that overrides it. `crunes shell explain '<cmd>'` is the intended first move on a denial — the full rule is in [the permission concept](kb:crunes-main/concepts/permission.md).
 
+**A denial names the grant and where to put it.** `run` and `repl` append the config entry that resolves it, scoped to the lifecycle actually invoked. Before that existed, the error gave an exact token and no indication of which file, rune entry or lifecycle block it belonged in, which was a dead end for anyone who did not already know the config shape.
+
+**`fs.glob` grants are matched by equality, not as globs.** This is the costliest trap in the permission system and has [its own page](/gotchas/glob-grants-match-exactly.md).
+
 **The two matchers are not interchangeable.** `isGlobMatch` stops `*` at `/` and is correct for paths and URLs; `isWildcardMatch` lets `*` cross slashes, spaces and commas and is correct for shell commands, rune keys, env names and store names. Using the path matcher on a shell command silently refuses every command containing a slash. See [shared](/modules/shared.md).
 
 **Help lives on `rune`, and there is no `help` namespace.** `rune.helpText(path?)` and `rune.helpSection(path?)` render the command index with no argument, or one subcommand when passed `args.$command`. An unresolvable path throws. The older `help.text()` / `help.section()` import no longer exists.
