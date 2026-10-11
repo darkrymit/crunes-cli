@@ -1,14 +1,14 @@
 ---
 okf_version: 0.2
 kb_version: 0.1
-kb: crunes-cli-main
+kb: crunes-cli
 ---
 
 # crunes-cli knowledge base
 
 The runtime: how a rune key becomes an isolate, what each module under `src/` owns, and the traps found while building it.
 
-What is true of the ecosystem rather than of this code — the model, the vocabulary, the contracts more than one repository implements — is in [`crunes-main`](kb:crunes-main/index.md). A note here earns its place by being unguessable from the source: if the code says it plainly, the code is the record.
+What is true of the ecosystem rather than of this code — the model, the vocabulary, the contracts more than one repository implements — is in [`crunes`](kb:crunes/index.md). A note here earns its place by being unguessable from the source: if the code says it plainly, the code is the record.
 
 **The API surface is not documented here.** `crunes docs utils`, `crunes docs rune`, `crunes docs globals` and `crunes docs intro` render it from the TypeScript declarations and from live rune schemas, so they describe the installed version. A copy in this bundle would describe whichever version it was written against.
 
