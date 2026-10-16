@@ -55,7 +55,7 @@ describe('resolveCompletions — rune key commands', () => {
 describe('resolveCompletions — plugin subcommands', () => {
   it('returns plugin subcommands', () => {
     expect(resolveCompletions(['crunes', 'plugin', ''], program)).toEqual(
-      ['install', 'uninstall', 'list', 'update', 'enable', 'disable', 'create']
+      ['install', 'uninstall', 'list', 'update', 'trust', 'enable', 'disable', 'create']
     )
   })
 

@@ -2,6 +2,7 @@ import { relative } from 'node:path'
 import { loadConfig } from '../../core/config.js'
 import { getRune, resolvePluginRune, resolveRuneFromPlugins } from '../../rune/resolver.js'
 import { scopedPermissions, blockModule } from '../../core/rune-entry.js'
+import { isNativeRune } from '../../plugin/native.js'
 import { getArgsSchema, getReplSchema, getPluginRunePath } from '../../rune/isolation/runner.js'
 import { loadPluginJson } from '../../plugin/manifest.js'
 import { computeEffectivePermissions } from '../../rune/permissions/permissions.js'
@@ -38,7 +39,12 @@ export async function resolveRuneDocs(config, key, projectRoot, configRoot) {
     const { runeKey, pluginDir } = resolved
     const pluginJson = await loadPluginJson(pluginDir)
     const runeDef = pluginJson.runes[runeKey] ?? {}
-    runeFile = getPluginRunePath(pluginDir, runeKey, pluginJson)
+    if (isNativeRune(runeDef)) {
+      native = describeRunBlock({ run: runeDef.run, args: runeDef.args }, pluginDir)
+      runs = `${[runeDef.run.command ?? runeDef.run, ...native.argv].join(' ')} · ${native.runtime} · plugin script, native, full access — runs only once trusted (crunes plugin trust)`
+    } else {
+      runeFile = getPluginRunePath(pluginDir, runeKey, pluginJson)
+    }
     if (runeDef.repl != null) replFile = getPluginRunePath(pluginDir, runeKey, pluginJson, 'repl')
     relativePath = undefined
     basePerms = scopedPermissions(runeDef) ?? {}
