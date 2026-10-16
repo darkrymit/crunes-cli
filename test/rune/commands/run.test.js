@@ -366,26 +366,35 @@ describe('handler — progressive streaming and console logs', () => {
     })
   })
 
-  it('log event with level renders [instanceId:rune:log:level] prefix in text mode', async () => {
+  it('a log line from a rune run alone goes to standard error, unlabelled', async () => {
     runRune.mockImplementation(async (dir, config, key, args, opts) => {
       opts.onEvent({ type: 'log', level: 'info', message: 'hello', rune: 'docs', instanceId: '1' })
+      opts.onEvent({ type: 'section', section: { name: 'sec1', data: { type: 'markdown', content: 'c1' } }, rune: 'docs', instanceId: '1' })
       return []
     })
     let stdoutWritten = ''
+    let stderrWritten = ''
     vi.spyOn(process.stdout, 'write').mockImplementation(s => { stdoutWritten += s })
+    vi.spyOn(process.stderr, 'write').mockImplementation(s => { stderrWritten += s })
     await handler({ segments: [{ key: 'docs', sections: null, runeArgs: [] }], format: 'text' })
-    expect(stdoutWritten).toContain('[1:docs:log:info] hello')
+    expect(stderrWritten).toBe('hello\n')
+    expect(stdoutWritten).toBe('## sec1\nc1\n\n')
   })
 
-  it('log event with meta appends attrs in text mode', async () => {
+  it('in a batch, log lines go to standard error labelled with level and attrs', async () => {
     runRune.mockImplementation(async (dir, config, key, args, opts) => {
       opts.onEvent({ type: 'log', level: 'warn', message: 'slow', meta: { ms: 1200 }, rune: 'docs', instanceId: '1' })
+      opts.onEvent({ type: 'section', section: { name: 'sec1', data: { type: 'markdown', content: 'c1' } }, rune: 'docs', instanceId: '1' })
       return []
     })
     let stdoutWritten = ''
+    let stderrWritten = ''
     vi.spyOn(process.stdout, 'write').mockImplementation(s => { stdoutWritten += s })
-    await handler({ segments: [{ key: 'docs', sections: null, runeArgs: [] }], format: 'text' })
-    expect(stdoutWritten).toContain('[1:docs:log:warn] slow [ms: 1200]')
+    vi.spyOn(process.stderr, 'write').mockImplementation(s => { stderrWritten += s })
+    loadConfig.mockReturnValue({ runes: { docs: { batch: true } } })
+    await handler({ segments: [{ key: 'docs', sections: null, runeArgs: [] }], format: 'text', isBatch: true })
+    expect(stderrWritten).toContain('[1:docs:log:warn] slow [ms: 1200]')
+    expect(stdoutWritten).toBe('[1:docs:section] sec1\nc1\n\n')
   })
 
   it('log event with level and meta emits structured JSONL', async () => {

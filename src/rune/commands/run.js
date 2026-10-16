@@ -113,6 +113,26 @@ export function parseRunArgs(argv) {
 }
 
 
+// A framed section line: `[instance:key:section] name [attrs]`, then the content.
+function framedSection(prefix, section) {
+  const rendered = renderSection(section)
+  if (!rendered) return null
+  const lines = rendered.split('\n')
+  let contentStartIndex = 1
+  let attrs = ''
+  if (lines[1] && lines[1].startsWith('[')) {
+    attrs = ' ' + lines[1]
+    contentStartIndex = 2
+  }
+  return `${prefix} ${section.name}${attrs}\n${lines.slice(contentStartIndex).join('\n')}\n\n`
+}
+
+// Direct output is the section as markdown, unlabelled; framed output labels it with the rune.
+function writeSection(direct, prefix, section) {
+  const text = direct ? (renderSection(section) ?? '') + '\n\n' : framedSection(prefix, section)
+  if (text) process.stdout.write(text)
+}
+
 export async function handler({
   segments,
   format = 'text',
@@ -212,26 +232,21 @@ export async function handler({
           } else {
             if (type === 'section') {
               if (!sectionFilter || isGlobMatch(section.name, sectionFilter)) {
-                const rendered = renderSection(section)
-                const lines = rendered ? rendered.split('\n') : []
-                let contentStartIndex = 1
-                let attrs = ''
-                if (lines[1] && lines[1].startsWith('[')) {
-                  attrs = ' ' + lines[1]
-                  contentStartIndex = 2
-                }
-                const content = lines.slice(contentStartIndex).join('\n')
-                process.stdout.write(`${prefix} ${section.name}${attrs}\n${content}\n\n`)
+                writeSection(direct, prefix, section)
                 printedSections.add(section)
               }
             } else {
+              // Diagnostics go to standard error, so standard output carries only results.
+              // Run alone, a rune's log lines read as a program's own; framed, they are labelled.
               const attrsStr = meta && Object.keys(meta).length > 0
                 ? ' ' + Object.entries(meta).map(([k, v]) => `[${k}: ${v}]`).join(' ')
                 : ''
-              if (message && message.includes('\n')) {
-                process.stdout.write(`${prefix}${attrsStr}\n${message}\n\n`)
+              if (direct) {
+                process.stderr.write(`${message ?? ''}${attrsStr}\n`)
+              } else if (message && message.includes('\n')) {
+                process.stderr.write(`${prefix}${attrsStr}\n${message}\n\n`)
               } else {
-                process.stdout.write(`${prefix} ${message ?? ''}${attrsStr}\n`)
+                process.stderr.write(`${prefix} ${message ?? ''}${attrsStr}\n`)
               }
             }
           }
@@ -279,19 +294,7 @@ export async function handler({
             section: sect
           }) + '\n')
         } else {
-          const rendered = renderSection(sect)
-          if (rendered) {
-            const prefix = `[${instanceId}:${key}:section]`
-            const lines = rendered.split('\n')
-            let contentStartIndex = 1
-            let attrs = ''
-            if (lines[1] && lines[1].startsWith('[')) {
-              attrs = ' ' + lines[1]
-              contentStartIndex = 2
-            }
-            const content = lines.slice(contentStartIndex).join('\n')
-            process.stdout.write(`${prefix} ${sect.name}${attrs}\n${content}\n\n`)
-          }
+          writeSection(direct, `[${instanceId}:${key}:section]`, sect)
         }
         printedSections.add(sect)
       }
