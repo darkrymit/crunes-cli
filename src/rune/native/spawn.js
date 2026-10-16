@@ -109,6 +109,9 @@ export function spawnNative({ key, file, argv, env, cwd, direct, stdin = 'inheri
       child.stdout.on('data', chunk => { stdout += chunk })
     }
 
+    // Once a timed-out script has exited, its output is over even if something it started still
+    // holds the pipe open — a descendant the platform's tree kill cannot see, as with Git Bash.
+    child.on('exit', () => { if (timedOut) child.stdout?.destroy() })
     child.on('error', err => { detach(); reject(notFound(key, file, err)) })
     child.on('close', (code, signal) => {
       detach()
