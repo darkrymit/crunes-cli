@@ -11,6 +11,13 @@ import { buildProgram } from './program.js'
 
 const program = buildProgram()
 
+// A reader that closes early (`crunes run x | head`) is not an error: stop writing and exit
+// quietly, as other command-line tools do. Any other stdout error still surfaces.
+process.stdout.on('error', (err) => {
+  if (err.code === 'EPIPE') process.exit(0)
+  throw err
+})
+
 process.on('uncaughtException', (err) => {
   console.error('[crunes] FATAL UNCAUGHT EXCEPTION:', err)
   process.exit(1)
