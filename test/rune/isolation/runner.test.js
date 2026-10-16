@@ -51,22 +51,15 @@ function stopServer({ wss, httpServer }) {
 }
 
 describe('getPluginRunePath', () => {
-  it('uses convention runes/<key>.js when plugin.json has no path', () => {
-    const pluginJson = { runes: { hello: { permissions: { use: { allow: [] } } } } }
-    expect(getPluginRunePath('/plugin', 'hello', pluginJson))
-      .toBe(join('/plugin', 'runes/hello.js'))
+  it('resolves the module a block names against the plugin root', () => {
+    const pluginJson = { runes: { hello: { run: { command: 'lib/runes/hello.rune.js' }, repl: 'lib/runes/hello-repl.rune.js' } } }
+    expect(getPluginRunePath('/plugin', 'hello', pluginJson)).toBe(join('/plugin', 'lib/runes/hello.rune.js'))
+    expect(getPluginRunePath('/plugin', 'hello', pluginJson, 'repl')).toBe(join('/plugin', 'lib/runes/hello-repl.rune.js'))
   })
 
-  it('uses custom path when rune entry declares path', () => {
-    const pluginJson = { runes: { hello: { path: 'lib/runes/hello.js', permissions: { use: { allow: [] } } } } }
-    expect(getPluginRunePath('/plugin', 'hello', pluginJson))
-      .toBe(join('/plugin', 'lib/runes/hello.js'))
-  })
-
-  it('handles missing rune entry gracefully (falls back to convention)', () => {
-    const pluginJson = { runes: {} }
-    expect(getPluginRunePath('/plugin', 'hello', pluginJson))
-      .toBe(join('/plugin', 'runes/hello.js'))
+  it('finds nothing a rune does not declare', () => {
+    expect(() => getPluginRunePath('/plugin', 'hello', { runes: {} })).toThrow('has no run block')
+    expect(() => getPluginRunePath('/plugin', 'hello', { runes: { hello: { run: 'a.rune.js' } } }, 'repl')).toThrow('has no repl block')
   })
 })
 

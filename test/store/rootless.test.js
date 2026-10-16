@@ -53,10 +53,10 @@ describe('rootless run invariant', () => {
     const store = process.env.CRUNES_STORE
     const cwd = mkdtempSync(path.join(os.tmpdir(), 'crunes-rootless-cwd-'))
     mkdirSync(path.join(store, 'runes'), { recursive: true })
-    writeFileSync(path.join(store, 'runes', 'ping.js'),
+    writeFileSync(path.join(store, 'runes', 'ping.rune.js'),
       `import { section } from '@utils'\nexport function run() { return section.create('ok', { type: 'markdown', content: 'pong' }) }\n`)
     writeFileSync(path.join(store, 'config.json'),
-      JSON.stringify({ runes: { ping: { path: 'runes/ping.js' } } }))
+      JSON.stringify({ runes: { ping: { run: 'runes/ping.rune.js' } } }))
 
     execFileSync('node', [path.resolve('dist/cli.js'), '-p', 'run', 'ping'], {
       cwd,

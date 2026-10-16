@@ -196,7 +196,7 @@ export async function handler({
     }
 
     if (!runeRelPath) {
-      const defaultPath = global ? `runes/${key}.js` : `.crunes/runes/${key}.js`
+      const defaultPath = global ? `runes/${key}.rune.js` : `.crunes/runes/${key}.rune.js`
       const result = await text({ message: 'File path?', initialValue: defaultPath })
       if (result === Symbol.for('clack:cancel')) { cancel('Cancelled.'); return }
       runeRelPath = result
@@ -215,7 +215,11 @@ export async function handler({
     }
   }
 
-  runeRelPath = runeRelPath ?? (global ? `runes/${key}.js` : `.crunes/runes/${key}.js`)
+  runeRelPath = runeRelPath ?? (global ? `runes/${key}.rune.js` : `.crunes/runes/${key}.rune.js`)
+  if (!/\.rune\.m?js$/i.test(runeRelPath)) {
+    output.error(`${runeRelPath}: a sandboxed rune's file must be named *.rune.js — the name is what runs it in the isolate.`)
+    process.exit(1)
+  }
   const baseRoot = global ? getStorePath() : configRoot
   const runeAbsPath = join(baseRoot, runeRelPath)
 
@@ -225,9 +229,9 @@ export async function handler({
   const configPath = getConfigPath({ configRoot, global })
   const config = readRawConfig(configPath) ?? { runes: {} }
   const entry = {
-    path: runeRelPath,
     ...(name && { name }),
     ...(description && { description }),
+    run: runeRelPath,
   }
   config.runes = { ...(config.runes ?? {}), [key]: entry }
   await writeRawConfig(configPath, config)

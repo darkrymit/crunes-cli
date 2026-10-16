@@ -206,6 +206,17 @@ export function buildProgram() {
     })
 
   program
+    .command('migrate')
+    .description('Rewrite rune entries from path/permissions to run and repl blocks, renaming isolate modules to *.rune.js')
+    .option('-g, --global', 'migrate the global config (~/.crunes/config.json) instead of the project')
+    .option('--plugin <dir>', 'migrate a plugin manifest to format "2"')
+    .option('--dry-run', 'print the rewrite without writing or renaming anything')
+    .action(async (opts) => {
+      const { handler } = await import('./commands/migrate.js')
+      await handler({ configRoot: configRoot(), global: !!opts.global, pluginDir: opts.plugin ?? null, dryRun: !!opts.dryRun })
+    })
+
+  program
     .command('bench [args...]')
     .description('Time rune execution and report fast, ok, or slow.')
     .addHelpText('after',

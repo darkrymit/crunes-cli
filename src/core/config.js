@@ -3,6 +3,7 @@ import { join, resolve } from 'node:path'
 import { getStorePath } from '../store/index.js'
 import { isPathCommand } from '../shared/command.js'
 import { isInlineSchema, normaliseJsonSchema } from '../rune/native/schema.js'
+import { migrateEntry, v1EntryError } from './rune-entry.js'
 
 function isObject(item) {
   return item && typeof item === 'object' && !Array.isArray(item)
@@ -10,25 +11,31 @@ function isObject(item) {
 
 export const LAYER = Symbol.for('crunes.layer')
 
+const BLOCKS = ['run', 'args', 'repl']
+
 /**
- * Resolve every `path` in a config section against the layer's own base dir,
- * before layers are merged. Only the global layer fills in a default path
- * (`runes/<key>.js`) — project entries stay pathless so that an entry which
- * only overrides `vars` inherits the path of the layer that defined it.
+ * Resolve every file a config section names against the layer's own base dir, before layers
+ * are merged, so a higher layer that overrides one field keeps the file the lower layer meant.
+ * Rune entries name files in blocks; templates keep `path`, and the global layer's default
+ * template path (`templates/<key>.js`).
  */
 function absolutizeSection(section, kind, baseDir, layer) {
   const out = {}
   for (const [key, entry] of Object.entries(section)) {
     if (!isObject(entry)) { out[key] = entry; continue }
     const copy = { ...entry, [LAYER]: layer }
-    const isPluginRef = Boolean(entry.plugin) || key.includes(':')
-    if (entry.path) copy.path = resolve(baseDir, entry.path)
-    else if (layer === 'global' && !isPluginRef && entry.run == null) copy.path = resolve(baseDir, `${kind}/${key}.js`)
-    for (const block of ['run', 'args']) {
+    if (kind === 'templates') {
+      const isPluginRef = Boolean(entry.plugin) || key.includes(':')
+      if (entry.path) copy.path = resolve(baseDir, entry.path)
+      else if (layer === 'global' && !isPluginRef) copy.path = resolve(baseDir, `templates/${key}.js`)
+      out[key] = copy
+      continue
+    }
+    for (const block of BLOCKS) {
       if (entry[block] == null || (block === 'args' && isInlineSchema(entry[block]))) continue
       const b = typeof entry[block] === 'string' ? { command: entry[block] } : { ...entry[block] }
-      // A run command may be a program on PATH; an args command is always a file.
-      if (typeof b.command === 'string' && (block === 'args' || isPathCommand(b.command))) b.command = resolve(baseDir, b.command)
+      // A run command may be a program on PATH; every other block names a file.
+      if (typeof b.command === 'string' && (block !== 'run' || isPathCommand(b.command))) b.command = resolve(baseDir, b.command)
       copy[block] = b
     }
     out[key] = copy
@@ -75,8 +82,8 @@ export function mergeConfigs(shared, local) {
           ...localEntry,
           vars: { ...sharedEntry.vars, ...localEntry.vars }
         }
-        // run and args blocks merge key by key, so a layer that only adds grants keeps the command.
-        for (const block of ['run', 'args']) {
+        // Blocks merge key by key, so a layer that only adds grants keeps the command.
+        for (const block of BLOCKS) {
           if (isObject(sharedEntry[block]) && isObject(localEntry[block]) &&
               !isInlineSchema(sharedEntry[block]) && !isInlineSchema(localEntry[block])) {
             merged.runes[key][block] = { ...sharedEntry[block], ...localEntry[block] }
@@ -111,6 +118,7 @@ const ISOLATE_MODULE = /\.rune\.m?js$/i
 const RUN_BLOCK_KEYS = ['command', 'argv', 'permissions', 'output']
 const ARGS_FILE = /\.(rune\.m?js|json)$/i
 const ARGS_BLOCK_KEYS = ['command', 'permissions']
+const REPL_BLOCK_KEYS = ['command', 'permissions']
 
 function validateBlockShape(where, block, allowedKeys, fileName) {
   if (typeof block === 'string') {
@@ -134,25 +142,46 @@ function validateBlockShape(where, block, allowedKeys, fileName) {
   return block
 }
 
+/** A plugin alias (`plugin`) or an override keyed `marketplace@plugin:rune`: it grants, it names no handler. */
+function isPluginReference(runeKey, entry) {
+  const runCommand = typeof entry.run === 'string' ? entry.run : entry.run?.command
+  return entry.plugin != null || (runeKey.includes(':') && runCommand === undefined)
+}
+
 /**
- * Rules for an entry declared with run/args blocks. Entries with "path" keep their existing rules.
- * A single layer may hold part of an entry — grants for a command another layer declares — so
- * `partial` skips only the checks that need the whole entry; the merged config is checked in full.
+ * Rules for a rune entry. A single layer may hold part of an entry — grants or vars for a rune
+ * another layer declares — so `partial` skips only the checks that need the whole entry; the
+ * merged config is checked in full.
  */
-function validateRunBlocks(runeKey, entry, fileName, partial) {
+function validateEntry(runeKey, entry, fileName, partial) {
   const at = `runes["${runeKey}"]`
-  if (entry.run == null) {
-    if (!partial) throw new Error(`${fileName}: ${at} has an "args" block but no "run" block`)
-  } else {
-    if (entry.path != null) throw new Error(`${fileName}: ${at} declares both "path" and "run" — a rune names its handler with one of them`)
-    if (entry.plugin != null) throw new Error(`${fileName}: ${at} declares both "plugin" and "run" — an alias cannot also have a handler`)
-    if (entry.permissions != null) {
-      throw new Error(`${fileName}: ${at}.permissions is not used by a rune with a run block — put grants in run.permissions (and args.permissions for an args module)`)
+
+  if (isPluginReference(runeKey, entry)) {
+    if (entry.plugin == null) {
+      const pluginPart = runeKey.slice(0, runeKey.indexOf(':'))
+      if (!pluginPart.includes('@')) {
+        throw new Error(
+          `${fileName}: ${at} is a plugin-rune override — but "${pluginPart}" is missing the marketplace ` +
+          `prefix. Use the full "marketplace@plugin:${runeKey.slice(runeKey.indexOf(':') + 1)}" form.`
+        )
+      }
     }
+    for (const name of ['run', 'repl']) {
+      if (entry[name] == null) continue
+      const b = validateBlockShape(`${at}.${name}`, entry[name], ['command', 'permissions'], fileName)
+      if (b.command !== undefined) throw new Error(`${fileName}: ${at}.${name} — a plugin rune's handler comes from the plugin; this entry may only grant permissions`)
+    }
+    if (entry.args != null) throw new Error(`${fileName}: ${at}.args — a plugin rune's schema comes from the plugin`)
+    return
   }
 
   const run = entry.run == null ? null : validateBlockShape(`${at}.run`, entry.run, RUN_BLOCK_KEYS, fileName)
-  if (run && run.command === undefined && !partial) throw new Error(`${fileName}: ${at}.run has no command in any config layer`)
+  if (!partial && (run == null || run.command === undefined)) {
+    throw new Error(
+      `${fileName}: ${at} has no run block naming its command in any config layer — a rune runs only what its entry declares. ` +
+      `An entry written for the old .crunes/runes/<key>.js convention is rewritten by \`crunes migrate\`.`
+    )
+  }
   if (run?.argv != null && (!Array.isArray(run.argv) || run.argv.some(a => typeof a !== 'string'))) {
     throw new Error(`${fileName}: ${at}.run.argv must be an array of strings`)
   }
@@ -180,52 +209,38 @@ function validateRunBlocks(runeKey, entry, fileName, partial) {
       throw new Error(`${fileName}: ${at}.args — an isolate run module declares its schema with its own args export; an args block is for native handlers`)
     }
   }
-}
 
-/** Whole-entry checks for run/args blocks, once every layer has been merged. */
-export function validateMergedRunBlocks(config, label = 'config') {
-  for (const [runeKey, entry] of Object.entries(config.runes ?? {})) {
-    if (entry && typeof entry === 'object' && (entry.run != null || entry.args != null)) {
-      validateRunBlocks(runeKey, entry, label, false)
+  if (entry.repl != null) {
+    const repl = validateBlockShape(`${at}.repl`, entry.repl, REPL_BLOCK_KEYS, fileName)
+    if (repl.command === undefined && !partial) throw new Error(`${fileName}: ${at}.repl has no command in any config layer`)
+    if (repl.command !== undefined && !ISOLATE_MODULE.test(repl.command)) {
+      throw new Error(`${fileName}: ${at}.repl.command must be a *.rune.js module — a REPL runs in the isolate`)
     }
   }
 }
 
-export function validateConfig(config, fileName = 'config.json') {
+/** Whole-entry checks, once every layer has been merged. */
+export function validateMergedRunBlocks(config, label = 'config') {
+  for (const [runeKey, entry] of Object.entries(config.runes ?? {})) {
+    if (isObject(entry)) validateEntry(runeKey, entry, label, false)
+  }
+}
+
+/**
+ * Per-layer checks. base and layer, when given, let a v1 entry be refused with its rewrite:
+ * the rewrite needs the layer's directory to find the file the v1 fallback would have used.
+ */
+export function validateConfig(config, fileName = 'config.json', { base = null, layer = 'project' } = {}) {
   if (config.runes && typeof config.runes === 'object') {
     for (const [runeKey, entry] of Object.entries(config.runes)) {
-      if (entry && typeof entry === 'object' && (entry.run != null || entry.args != null)) {
-        validateRunBlocks(runeKey, entry, fileName, true)
-      }
-
-      if (entry && typeof entry === 'object' && entry.permissions) {
-        const perms = entry.permissions
-        if (Array.isArray(perms)) {
-          throw new Error(`${fileName}: runes["${runeKey}"].permissions must be lifecycle-scoped (e.g. permissions.run.allow)`)
-        }
-        if (perms && typeof perms === 'object') {
-          if (Array.isArray(perms.allow) || Array.isArray(perms.deny)) {
-            throw new Error(`${fileName}: runes["${runeKey}"].permissions must be lifecycle-scoped (e.g. permissions.run.allow)`)
-          }
-          if (perms.run && typeof perms.run === 'object' && Object.keys(perms.run).length === 0) {
-            console.warn(`[crunes:warn] ${fileName}: runes["${runeKey}"].permissions.run is empty. No extra permissions will be granted.`)
-          }
-        }
-      }
-
-      if (entry && typeof entry === 'object' && !entry.path && !entry.plugin) {
-        const colonIdx = runeKey.indexOf(':')
-        if (colonIdx !== -1) {
-          const pluginPart = runeKey.slice(0, colonIdx)
-          if (!pluginPart.includes('@')) {
-            throw new Error(
-              `${fileName}: runes["${runeKey}"] has no path or plugin, so it can only be a plugin-rune ` +
-              `override — but "${pluginPart}" is missing the marketplace prefix. Use the full ` +
-              `"marketplace@plugin:${runeKey.slice(colonIdx + 1)}" form.`
-            )
-          }
-        }
-      }
+      if (!isObject(entry)) continue
+      // Only explicit v1 fields are refused here: whether a block-less entry relied on the fallback
+      // file cannot be told from one layer, and the merged check names the migration for it.
+      const rewritten = (entry.path !== undefined || entry.permissions !== undefined)
+        ? migrateEntry(entry, { base: base ?? '.', defaultFile: base ? defaultRuneFile(runeKey, layer) : null })
+        : null
+      if (rewritten) throw v1EntryError(fileName, `runes["${runeKey}"]`, rewritten)
+      validateEntry(runeKey, entry, fileName, true)
     }
   }
 
@@ -238,9 +253,14 @@ export function validateConfig(config, fileName = 'config.json') {
   }
 }
 
+/** Where the v1 fallback looked for a pathless rune in a layer. */
+export function defaultRuneFile(runeKey, layer) {
+  return runeKey.includes(':') ? null : layer === 'global' ? `runes/${runeKey}.js` : `.crunes/runes/${runeKey}.js`
+}
+
 export const ROOTLESS = Symbol.for('crunes.rootless')
 
-function readLayer(filePath, label) {
+function readLayer(filePath, label, base, layer) {
   if (!existsSync(filePath)) return null
   let parsed
   try {
@@ -248,7 +268,7 @@ function readLayer(filePath, label) {
   } catch (err) {
     throw new Error(`${label} is invalid JSON: ${err.message}`)
   }
-  validateConfig(parsed, label)
+  validateConfig(parsed, label, { base, layer })
   return parsed
 }
 
@@ -258,16 +278,16 @@ export function loadConfig(dir) {
   if (process.env.CRUNES_NO_GLOBAL !== '1') {
     const storeRoot = getStorePath()
     const globalPath = join(storeRoot, 'config.json')
-    const globalRaw = readLayer(globalPath, globalPath)
+    const globalRaw = readLayer(globalPath, globalPath, storeRoot, 'global')
     if (globalRaw) layers.push(absolutizeEntryPaths(globalRaw, storeRoot, 'global'))
   }
 
-  const sharedRaw = readLayer(join(dir, '.crunes', 'config.json'), 'config.json')
+  const sharedRaw = readLayer(join(dir, '.crunes', 'config.json'), 'config.json', dir, 'project')
   const rootless = sharedRaw === null
 
   if (sharedRaw) {
     layers.push(absolutizeEntryPaths(sharedRaw, dir, 'project'))
-    const localRaw = readLayer(join(dir, '.crunes', 'config.local.json'), 'config.local.json')
+    const localRaw = readLayer(join(dir, '.crunes', 'config.local.json'), 'config.local.json', dir, 'local')
     if (localRaw) layers.push(absolutizeEntryPaths(localRaw, dir, 'local'))
   }
 

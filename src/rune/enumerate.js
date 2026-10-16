@@ -28,7 +28,7 @@ export async function enumerateRunes(config) {
       entries.push({ key, source, runtime, name: entry.name ?? null, description: entry.description ?? null })
       continue
     }
-    const source = entry.plugin ? `→ ${entry.plugin}` : (entry.path ?? '')
+    const source = entry.plugin ? `→ ${entry.plugin}` : ''
     entries.push({ key, source, name: entry.name ?? null, description: entry.description ?? null })
   }
 
@@ -75,7 +75,7 @@ export async function enumerateRunes(config) {
     const shortName = key.slice(key.indexOf('@') + 1, key.lastIndexOf(':'))
     if (entries.some(e => e.key === `${shortName}:${runeKey}`)) continue
     const entry = getRune(config, key)
-    entries.push({ key, source: entry.path ?? '', name: entry.name ?? null, description: entry.description ?? null })
+    entries.push({ key, source: '', name: entry.name ?? null, description: entry.description ?? null })
   }
 
   return entries

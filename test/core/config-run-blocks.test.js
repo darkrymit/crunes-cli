@@ -16,20 +16,20 @@ describe('validateConfig — run and args blocks', () => {
   })
 
   it('refuses path and run together', () => {
-    expect(validate({ a: { path: 'a.js', run: 'a.py' } })).toThrow('both "path" and "run"')
+    expect(validate({ a: { path: 'a.js', run: 'a.py' } })).toThrow('uses the old entry shape')
   })
 
   it('refuses plugin and run together', () => {
-    expect(validate({ a: { plugin: 'm@p:r', run: 'a.py' } })).toThrow('both "plugin" and "run"')
+    expect(validate({ a: { plugin: 'm@p:r', run: 'a.py' } })).toThrow("a plugin rune's handler comes from the plugin")
   })
 
   it('refuses an args block without a run block once the layers are merged', () => {
     expect(validate({ a: { args: 'a.args.rune.js' } })).not.toThrow()
-    expect(() => validateMergedRunBlocks({ runes: { a: { args: { command: '/p/a.args.rune.js' } } } })).toThrow('no "run" block')
+    expect(() => validateMergedRunBlocks({ runes: { a: { args: { command: '/p/a.args.rune.js' } } } })).toThrow('has no run block')
   })
 
   it('refuses entry-level permissions, pointing at the block', () => {
-    expect(validate({ a: { run: 'a.rune.js', permissions: { run: { allow: [] } } } })).toThrow('put grants in run.permissions')
+    expect(validate({ a: { run: 'a.rune.js', permissions: { run: { allow: [] } } } })).toThrow('uses the old entry shape')
   })
 
   it('refuses grants on a native handler, because nothing would enforce them', () => {
@@ -56,8 +56,15 @@ describe('validateConfig — run and args blocks', () => {
     expect(validate({ a: { run: 'a.rune.js', args: 'a.args.rune.js' } })).toThrow('its own args export')
   })
 
-  it('leaves path entries to their existing rules', () => {
-    expect(validate({ a: { path: 'a.js', permissions: { run: { allow: [] } } } })).not.toThrow()
+  it('accepts a repl block naming an isolate module, and refuses one that does not', () => {
+    expect(validate({ a: { run: 'a.rune.js', repl: { command: 'a.rune.js', permissions: { allow: [] } } } })).not.toThrow()
+    expect(validate({ a: { run: 'a.rune.js', repl: 'tools/a.py' } })).toThrow('repl.command must be a *.rune.js module')
+  })
+
+  it('lets a plugin alias or override grant per block, but never name a command', () => {
+    expect(validate({ a: { plugin: 'm@p:r', run: { permissions: { allow: [] } } } })).not.toThrow()
+    expect(validate({ 'm@p:r': { repl: { permissions: { allow: [] } } } })).not.toThrow()
+    expect(validate({ 'm@p:r': { repl: { command: 'x.rune.js' } } })).toThrow('may only grant permissions')
   })
 })
 
@@ -72,10 +79,10 @@ describe('absolutizeEntryPaths — run and args blocks', () => {
     expect(out.runes.b.run).toEqual({ command: 'git', argv: ['log'] })
   })
 
-  it('gives a global run-block rune no default path', () => {
+  it('gives a global rune no default path', () => {
     const out = absolutizeEntryPaths({ runes: { a: { run: 'git' }, b: {} } }, '/store', 'global')
     expect(out.runes.a.path).toBeUndefined()
-    expect(out.runes.b.path).toBe(resolve('/store', 'runes/b.js'))
+    expect(out.runes.b.path).toBeUndefined()
   })
 })
 
@@ -111,11 +118,7 @@ describe('run blocks across layers', () => {
   })
 
   it('refuses a run block whose command no layer declares', () => {
-    expect(() => load({}, { a: { run: { permissions: { allow: [] } } } })).toThrow('no command in any config layer')
-  })
-
-  it('refuses a path from one layer combined with a run block from another', () => {
-    expect(() => load({ a: { path: 'runes/a.js' } }, { a: { run: 'tools/a.py' } })).toThrow('both "path" and "run"')
+    expect(() => load({}, { a: { run: { permissions: { allow: [] } } } })).toThrow('has no run block naming its command')
   })
 })
 
@@ -159,5 +162,17 @@ describe('run blocks across layers — args schemas', () => {
       { runes: { a: { args: { options: [{ flags: '--x' }] } } } },
     )
     expect(merged.runes.a.args).toEqual({ options: [{ flags: '--x' }] })
+  })
+})
+
+describe('validateConfig — a block-less layer entry is not taken for the v1 fallback', () => {
+  it('lets a local layer override vars of a rune whose script sits at .crunes/runes/<key>.js', async () => {
+    const { mkdtempSync, mkdirSync, writeFileSync } = await import('node:fs')
+    const { tmpdir } = await import('node:os')
+    const { join } = await import('node:path')
+    const base = mkdtempSync(join(tmpdir(), 'crunes-fallback-'))
+    mkdirSync(join(base, '.crunes', 'runes'), { recursive: true })
+    writeFileSync(join(base, '.crunes', 'runes', 'lint.js'), 'console.log(1)\n')
+    expect(() => validateConfig({ runes: { lint: { vars: { strict: true } } } }, 'config.local.json', { base, layer: 'local' })).not.toThrow()
   })
 })
