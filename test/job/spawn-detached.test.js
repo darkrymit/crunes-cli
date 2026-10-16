@@ -22,10 +22,16 @@ async function getSpawn() {
   return (await import('../../src/job/spawn-detached.js')).spawnDetachedJob
 }
 
+// The job opens its log before it writes to it, so an empty file means "not yet",
+// not "no output": wait for content, not just for the file.
 async function waitForFile(path, timeoutMs = 15_000) {
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
-    try { return await readFile(path, 'utf8') } catch { await new Promise(r => setTimeout(r, 100)) }
+    try {
+      const content = await readFile(path, 'utf8')
+      if (content) return content
+    } catch { /* not created yet */ }
+    await new Promise(r => setTimeout(r, 100))
   }
   return null
 }
