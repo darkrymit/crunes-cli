@@ -115,7 +115,7 @@ export function mergeConfigs(shared, local) {
 }
 
 const ISOLATE_MODULE = /\.rune\.m?js$/i
-const RUN_BLOCK_KEYS = ['command', 'argv', 'permissions', 'output', 'pass']
+const RUN_BLOCK_KEYS = ['command', 'argv', 'permissions', 'output', 'pass', 'timeout']
 const ARGS_FILE = /\.(rune\.m?js|json)$/i
 const ARGS_BLOCK_KEYS = ['command', 'permissions']
 const REPL_BLOCK_KEYS = ['command', 'permissions']
@@ -194,6 +194,9 @@ function validateEntry(runeKey, entry, fileName, partial) {
     if (runIsIsolate) throw new Error(`${fileName}: ${at}.run.output — an isolate module returns sections itself; output applies to native handlers`)
   }
 
+  if (run?.timeout !== undefined && !(typeof run.timeout === 'number' && Number.isFinite(run.timeout) && run.timeout > 0)) {
+    throw new Error(`${fileName}: ${at}.run.timeout must be a number of seconds greater than 0`)
+  }
   if (run?.pass !== undefined) {
     if (run.pass !== 'raw' && run.pass !== 'mapped') throw new Error(`${fileName}: ${at}.run.pass must be "raw" or "mapped"`)
     if (runIsIsolate) throw new Error(`${fileName}: ${at}.run.pass — an isolate module receives parsed arguments itself; pass applies to native handlers`)

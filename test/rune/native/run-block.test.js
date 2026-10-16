@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from 'vitest'
+import { describe, it, expect, beforeAll, vi } from 'vitest'
 import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
@@ -203,5 +203,26 @@ describe('runRunBlock — mapped arguments (pass: "mapped")', () => {
   it('passes the raw arguments unchanged without pass: "mapped"', async () => {
     const out = await run({ run: { command: 'tools/echo.sh', argv: ['log'] }, args: entry.args }, ['src', '--graph'])
     expect(out).toContain('argv:log src --graph')
+  })
+})
+
+describe('runRunBlock — run.timeout', () => {
+  beforeAll(() => { write('tools/slow.sh', 'echo started\nsleep 30\necho never\n') })
+
+  it('captured: stops a script that outlasts its timeout and fails the rune', async () => {
+    const started = Date.now()
+    await expect(run({ run: { command: 'tools/slow.sh', timeout: 0.5 } })).rejects.toThrow('timed out after 0.5s')
+    expect(Date.now() - started).toBeLessThan(10_000)
+  })
+
+  it('direct: ends with status 124, the convention of timeout(1)', async () => {
+    vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+    const result = await run({ run: { command: 'tools/slow.sh', timeout: 0.5 } }, [], { direct: true, stdin: 'ignore' })
+    expect(result).toEqual({ directExitCode: 124 })
+    vi.restoreAllMocks()
+  })
+
+  it('leaves a script that finishes in time alone', async () => {
+    expect(await run({ run: { command: 'tools/echo.sh', timeout: 10 } }, ['x'])).toContain('argv:x')
   })
 })
