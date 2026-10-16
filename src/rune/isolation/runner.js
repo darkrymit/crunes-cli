@@ -1416,6 +1416,10 @@ export async function runRuneInIsolate(runeFile, effective, args, projectDir, {
 
   if (isVerbose) console.error(`[crunes:debug] creating Isolate...`)
   const isolate = new ivm.Isolate({ memoryLimit: isolateMemoryMb })
+  // The isolate's setTimeout sits on unref'd host timers so a leftover timer cannot hold
+  // the process open after run() returns — which also means nothing holds it open while
+  // run() awaits one. This handle keeps the process alive for exactly the lifecycle call.
+  const keepAlive = setInterval(() => {}, 2 ** 30)
   let context
   try {
     if (isVerbose) console.error(`[crunes:debug] creating Context...`)
@@ -1548,16 +1552,20 @@ export async function runRuneInIsolate(runeFile, effective, args, projectDir, {
     if (isVerbose) console.error(`[crunes:debug] parsing isolate result...`)
     return result
   } finally {
-    if (isVerbose) console.error(`[crunes:debug] disposing Isolate...`)
-    if (await context.eval('typeof __crunes_dispose !== "undefined"').catch(() => false)) {
-      await context.evalClosure(
-        `return (async () => { await __crunes_dispose() })()`,
-        [],
-        { result: { promise: true, copy: true } }
-      ).catch(() => {})
+    try {
+      if (isVerbose) console.error(`[crunes:debug] disposing Isolate...`)
+      if (await context.eval('typeof __crunes_dispose !== "undefined"').catch(() => false)) {
+        await context.evalClosure(
+          `return (async () => { await __crunes_dispose() })()`,
+          [],
+          { result: { promise: true, copy: true } }
+        ).catch(() => {})
+      }
+      await dispose()
+      isolate.dispose()
+    } finally {
+      clearInterval(keepAlive)
     }
-    await dispose()
-    isolate.dispose()
   }
 }
 
