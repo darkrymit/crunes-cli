@@ -450,6 +450,14 @@ export function buildProgram() {
     })
 
   plugin
+    .command('trust <plugin> [rune]')
+    .description('Review a plugin\'s native runes — scripts that run outside the sandbox — and trust them to run')
+    .action(async (name, rune) => {
+      const { handler } = await import('../plugin/commands/trust.js')
+      await handler({ name, rune: rune ?? null, yes: !!program.opts().yes })
+    })
+
+  plugin
     .command('enable <plugin>')
     .description('Add a plugin to this project\'s enabled list')
     .option('-g, --global', 'enable in the global config (~/.crunes/config.json), for every directory')

@@ -1,6 +1,7 @@
 import * as p from '@clack/prompts'
 import { output } from '../shared/output.js'
-import { scopedPermissions } from '../core/rune-entry.js'
+import { scopedPermissions, blockOf } from '../core/rune-entry.js'
+import { isNativeRune } from './native.js'
 
 function collectAllow(permissions) {
   const all = []
@@ -23,6 +24,13 @@ export function formatConsentScreen(pluginName, pluginJson) {
       lines.push(`          ${perm}`)
     }
     lines.push('')
+  }
+
+  const natives = Object.entries(pluginJson.runes).filter(([, rune]) => isNativeRune(rune))
+  if (natives.length) {
+    lines.push('Native runes — these run outside the sandbox, with your full access:\n')
+    for (const [runeKey, rune] of natives) lines.push(`  ${runeKey}  runs ${blockOf(rune, 'run').command}`)
+    lines.push('', `They will not run until you review and trust them: crunes plugin trust ${pluginName}`, '')
   }
 
   return lines.join('\n')

@@ -1,5 +1,6 @@
 import { join } from 'node:path'
 import { loadRegistry, resolvePluginKeyScoped } from '../plugin/registry.js'
+import { isNativeRune, trustDigest, trustState, untrustedError } from '../plugin/native.js'
 import { loadPluginJson } from '../plugin/manifest.js'
 import { executePluginRune, runRuneInRepl, getPluginRunePath } from './isolation/runner.js'
 import { computeEffectivePermissions } from './permissions/permissions.js'
@@ -84,6 +85,36 @@ export async function resolveRuneFromPlugins(config, runeKey) {
   return matches[0] ?? null
 }
 
+/**
+ * Run a resolved plugin rune: an isolate module in the sandbox, or a native script or program
+ * once it has been trusted in its current form — announced on standard error every time.
+ */
+async function runPluginMatch({ match, pluginJson, projectPerms, projectVars, key, args, dir, config, opts, runeCallback, instanceId }) {
+  const { pluginKey, runeKey, pluginDir, pluginCacheDir } = match
+  const rune = pluginJson.runes?.[runeKey]
+  if (rune && isNativeRune(rune)) {
+    const registry = await loadRegistry()
+    const state = trustState(registry.plugins?.[pluginKey], runeKey, trustDigest(pluginDir, rune))
+    if (state !== 'trusted') throw untrustedError(pluginKey, runeKey, state)
+    process.stderr.write(`[crunes] ${pluginKey}:${runeKey} is a plugin script: it runs natively, outside the sandbox, with your full access.\n`)
+    const entry = { run: rune.run, args: rune.args, vars: { ...(rune.vars ?? {}), ...projectVars } }
+    const result = await runRunBlock({
+      dir, key, args, entry, opts, configDir: pluginDir, runeCallback, instanceId,
+      extraEnv: { CRUNES_PLUGIN_ROOT: pluginDir },
+    })
+    return result?.directExitCode !== undefined ? result : normaliseResult(result)
+  }
+  const result = await executePluginRune({
+    pluginDir, pluginCacheDir, runeKey, pluginJson, projectPerms, projectVars, args,
+    projectDir: dir, opts: config, runeCallback,
+    sections: opts.sections ?? null,
+    lifecycle: 'run',
+    onEvent: opts.onEvent ?? null,
+    instanceId,
+  })
+  return normaliseResult(result)
+}
+
 export async function runRune(dir, config, key, args, opts = {}, _callStack = []) {
   const configDir = opts.configDir ?? dir
   const instanceId = opts.instanceId ?? "1"
@@ -112,19 +143,11 @@ export async function runRune(dir, config, key, args, opts = {}, _callStack = []
 
   const pluginMatch = localOnly ? null : await resolvePluginRune(config, key)
   if (pluginMatch) {
-    const { pluginKey, runeKey, pluginDir, pluginCacheDir } = pluginMatch
+    const { pluginKey, runeKey, pluginDir } = pluginMatch
     const pluginJson   = await loadPluginJson(pluginDir)
     const projectPerms = scopedPermissions(config.runes?.[`${pluginKey}:${runeKey}`])
     const projectVars  = config.runes?.[`${pluginKey}:${runeKey}`]?.vars ?? {}
-    const result = await executePluginRune({
-      pluginDir, pluginCacheDir, runeKey, pluginJson, projectPerms, projectVars, args,
-      projectDir: dir, opts: config, runeCallback,
-      sections: opts.sections ?? null,
-      lifecycle: 'run',
-      onEvent: opts.onEvent ?? null,
-      instanceId,
-    })
-    return normaliseResult(result)
+    return runPluginMatch({ match: pluginMatch, pluginJson, projectPerms, projectVars, key, args, dir, config, opts, runeCallback, instanceId })
   }
 
   const entry = getRune(config, key)
@@ -132,18 +155,10 @@ export async function runRune(dir, config, key, args, opts = {}, _callStack = []
   if (!entry && !localOnly) {
     const autoMatch = await resolveRuneFromPlugins(config, key)
     if (autoMatch) {
-      const { pluginKey, runeKey, pluginDir, pluginCacheDir, pluginJson } = autoMatch
+      const { pluginKey, runeKey, pluginJson } = autoMatch
       const projectPerms = scopedPermissions(config.runes?.[`${pluginKey}:${runeKey}`])
       const projectVars  = config.runes?.[`${pluginKey}:${runeKey}`]?.vars ?? {}
-      const result = await executePluginRune({
-        pluginDir, pluginCacheDir, runeKey, pluginJson, projectPerms, projectVars, args,
-        projectDir: dir, opts: config, runeCallback,
-        sections: opts.sections ?? null,
-        lifecycle: 'run',
-        onEvent: opts.onEvent ?? null,
-        instanceId,
-      })
-      return normaliseResult(result)
+      return runPluginMatch({ match: autoMatch, pluginJson, projectPerms, projectVars, key, args, dir, config, opts, runeCallback, instanceId })
     }
     return null
   }
@@ -153,19 +168,11 @@ export async function runRune(dir, config, key, args, opts = {}, _callStack = []
   if (entry.plugin) {
     const aliasMatch = await resolvePluginRune(config, entry.plugin)
     if (!aliasMatch) throw new Error(`Plugin alias "${key}" → "${entry.plugin}" is not enabled or installed.`)
-    const { pluginKey, runeKey, pluginDir, pluginCacheDir } = aliasMatch
+    const { pluginKey, runeKey, pluginDir } = aliasMatch
     const pluginJson   = await loadPluginJson(pluginDir)
     const projectPerms = scopedPermissions(entry) ?? scopedPermissions(config.runes?.[`${pluginKey}:${runeKey}`])
     const projectVars  = entry.vars ?? config.runes?.[`${pluginKey}:${runeKey}`]?.vars ?? {}
-    const result = await executePluginRune({
-      pluginDir, pluginCacheDir, runeKey, pluginJson, projectPerms, projectVars, args,
-      projectDir: dir, opts: config, runeCallback,
-      sections: opts.sections ?? null,
-      lifecycle: 'run',
-      onEvent: opts.onEvent ?? null,
-      instanceId,
-    })
-    return normaliseResult(result)
+    return runPluginMatch({ match: aliasMatch, pluginJson, projectPerms, projectVars, key, args, dir, config, opts, runeCallback, instanceId })
   }
 
   const result = await runRunBlock({ dir, key, args, entry, opts, configDir, runeCallback, instanceId })

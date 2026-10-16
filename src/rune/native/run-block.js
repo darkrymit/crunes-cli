@@ -99,7 +99,7 @@ function wantsHelp(rawArgs) {
  * Returns the isolate's result, { directExitCode } for a direct native run, or a string
  * (the captured standard output, or help text) for a captured one.
  */
-export async function runRunBlock({ dir, key, args, entry, opts = {}, configDir, runeCallback, instanceId }) {
+export async function runRunBlock({ dir, key, args, entry, opts = {}, configDir, runeCallback, instanceId, extraEnv = {} }) {
   const desc = describeRunBlock(entry, configDir)
   let callArgs = [...desc.argv, ...args]
 
@@ -163,6 +163,7 @@ export async function runRunBlock({ dir, key, args, entry, opts = {}, configDir,
     CRUNES_LIFECYCLE: 'run',
     ...(parsed ? { CRUNES_ARGS: JSON.stringify(parsed) } : {}),
     CRUNES_VARS: JSON.stringify(entry.vars ?? {}),
+    ...extraEnv,
   }
 
   const shown = isPathCommand(desc.command) ? relative(dir, desc.command) || desc.command : desc.command

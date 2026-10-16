@@ -1,3 +1,5 @@
+import { isNativeRune } from '../plugin/native.js'
+import { blockOf } from '../core/rune-entry.js'
 import { getRune } from './resolver.js'
 import { enabledPluginKeys } from '../core/config.js'
 import { runtimeOf } from './native/runtime.js'
@@ -57,6 +59,7 @@ export async function enumerateRunes(config) {
             entries.push({
               key: displayKey,
               source: `plugin: ${pluginKey}`,
+              ...(isNativeRune(runeEntry) && { runtime: runtimeOf(blockOf(runeEntry, 'run').command) }),
               name: runeEntry.name ?? null,
               description: runeEntry.description ?? null,
             })
