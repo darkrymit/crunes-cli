@@ -84,17 +84,18 @@ function verb(lifecycle) {
 
 // choices and required only come from a JSON schema; a builder schema never sets them.
 const choicesNote = choices => choices ? `  [choices: ${choices.map(c => JSON.stringify(c)).join(', ')}]` : ''
+const typeNote = type => type ? `  [${type}]` : ''
 
 function optionRows(options, indent = '  ') {
   return (options ?? []).map(opt => {
     const def = opt.def !== undefined ? `  [default: ${JSON.stringify(opt.def)}]` : ''
     const required = opt.required ? '  [required]' : ''
-    return row(opt.flags, `${opt.description ?? ''}${def}${required}${choicesNote(opt.choices)}`, indent)
+    return row(opt.flags, `${opt.description ?? ''}${typeNote(opt.type)}${def}${required}${choicesNote(opt.choices)}`, indent)
   })
 }
 
 function positionalRow(p, indent) {
-  return row(p.spec ?? '', `${p.description ?? ''}${choicesNote(p.choices)}`, indent)
+  return row(p.spec ?? '', `${p.description ?? ''}${typeNote(p.type)}${choicesNote(p.choices)}`, indent)
 }
 
 function exampleLines(examples, indent = '  ') {

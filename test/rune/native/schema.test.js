@@ -75,3 +75,31 @@ describe('validateParsed — what a schema declares is enforced', () => {
     expect(check(['diff', 'main', '--token', 't'])).not.toThrow()
   })
 })
+
+describe('value types', () => {
+  const schema = normaliseJsonSchema({
+    positionals: [{ spec: '<version>' }, { spec: '[count]', type: 'integer' }],
+    options: [{ flags: '--ratio <r>', type: 'number' }, { flags: '--id <id>' }],
+  })
+  const parse = argv => parseArgs(argv, schema)
+
+  it('keeps untyped values exactly as typed', () => {
+    const parsed = parse(['1.10', '--id', '007'])
+    expect(parsed.version).toBe('1.10')
+    expect(parsed.id).toBe('007')
+  })
+
+  it('coerces declared numbers and reports values that are not', () => {
+    expect(parse(['1.0', '3', '--ratio', '0.5'])).toMatchObject({ count: 3, ratio: 0.5 })
+    expect(() => validateParsed(schema, parse(['1.0', 'x', '--ratio', 'y']), 'rel')).toThrow(
+      /\[count\] must be an integer — got "x"\n  --ratio <r> must be a number/
+    )
+    expect(() => validateParsed(schema, parse(['1.0', '2.5']), 'rel')).toThrow('[count] must be an integer — got "2.5"')
+  })
+
+  it('refuses a type that does not fit the flag', () => {
+    expect(() => normaliseJsonSchema({ options: [{ flags: '--dry', type: 'number' }] })).toThrow('"boolean" for a flag that takes no value')
+    expect(() => normaliseJsonSchema({ options: [{ flags: '--n <n>', type: 'boolean' }] })).toThrow('for an option that takes a value')
+    expect(() => normaliseJsonSchema({ positionals: [{ spec: '<a>', type: 'date' }] })).toThrow('"type" must be one of string, number, integer')
+  })
+})
