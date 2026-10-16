@@ -387,6 +387,18 @@ export function buildProgram() {
       await handler({ key, format: opts.format, path: opts.path, name: opts.name, description: opts.description, yes: !!program.opts().yes, projectRoot: projectRoot(), configRoot: configRoot(), global: !!opts.global })
     })
 
+  program
+    .command('add <key> <command> [argv...]')
+    .description('Register an existing script or program as a rune (fixed arguments go after --)')
+    .option('--name <name>', 'human-readable label shown in crunes list')
+    .option('--description <description>', 'short description of what the rune does')
+    .option('-g, --global', 'operate on the global config (~/.crunes/config.json) instead of the project')
+    .addHelpText('after', '\nExamples:\n  crunes add coverage tools/coverage.py --description "Test coverage per module"\n  crunes add log git -- log --oneline -n 20')
+    .action(async (key, command, argv, opts) => {
+      const { handler } = await import('../rune/commands/add.js')
+      await handler({ key, command, argv, name: opts.name, description: opts.description, configRoot: configRoot(), global: !!opts.global })
+    })
+
   // Plugin management commands
   const plugin = program.command('plugin').description('Manage rune plugins')
 

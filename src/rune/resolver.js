@@ -6,6 +6,7 @@ import { computeEffectivePermissions } from './permissions/permissions.js'
 import { CircularRuneError } from '../core/errors.js'
 import { enabledPluginKeys } from '../core/config.js'
 import { getLocalBase, getStorePath } from '../store/index.js'
+import { runRunBlock } from './native/run-block.js'
 
 export function normaliseRune(entry) {
   return entry
@@ -171,6 +172,11 @@ export async function runRune(dir, config, key, args, opts = {}, _callStack = []
     return normaliseResult(result)
   }
 
+  if (entry.run != null) {
+    const result = await runRunBlock({ dir, key, args, entry, opts, configDir, runeCallback, instanceId })
+    return result?.directExitCode !== undefined ? result : normaliseResult(result)
+  }
+
   const fullPath = resolveRuneFilePath(entry, key, configDir)
   const basePerms = entry.permissions ?? { allow: [], deny: [] }
   const effective = computeEffectivePermissions(basePerms, undefined, 'run')
@@ -240,6 +246,12 @@ export async function resolveRuneEntry(projectDir, config, key, configDir = proj
 
   // Local config rune
   const entry = getRune(config, key)
+  if (entry && entry.run != null) {
+    throw new Error(
+      `Rune "${key}" is declared with a run block, which has no REPL in this version. ` +
+      `A REPL for such a rune will come from a repl block.`
+    )
+  }
   if (entry && !entry.plugin) {
     const runeFile = resolveRuneFilePath(entry, key, configDir)
     const effective = computeEffectivePermissions(entry.permissions ?? {}, undefined, 'repl')

@@ -174,6 +174,8 @@ export async function handler({
   }
 
   let anyFailed = false
+  // A single rune in text format reaches the caller directly; batches and JSONL are framed.
+  const direct = !isBatch && format === 'text' && segments.length === 1
 
   for (let i = 0; i < segments.length; i++) {
     const printedSections = new Set()
@@ -186,6 +188,8 @@ export async function handler({
         sections: sectionFilter,
         configDir: configRoot,
         instanceId: String(i + 1),
+        direct,
+        stdin: isBatch ? 'ignore' : 'inherit',
         onEvent(event) {
           const { type, level, message, meta, section, instanceId, rune } = event
           const prefix = level ? `[${instanceId}:${rune}:${type}:${level}]` : `[${instanceId}:${rune}:${type}]`
@@ -247,6 +251,8 @@ export async function handler({
       if (failFast) process.exit(1)
       continue
     }
+
+    if (sections?.directExitCode !== undefined) return process.exit(sections.directExitCode)
 
     if (!sections) {
       const available = Object.keys(config.runes ?? {}).join(', ') || '(none)'

@@ -562,3 +562,45 @@ describe('handler — batch permission enforcement', () => {
   })
 })
 
+
+describe('handler — direct and framed invocations', () => {
+  beforeEach(() => {
+    loadConfig.mockReturnValue({ runes: { a: { run: 'a.sh', batch: { allow: ['*'] } }, b: { run: 'b.sh', batch: { allow: ['*'] } } } })
+    vi.spyOn(process.stdout, 'write').mockImplementation(() => {})
+    vi.spyOn(process, 'exit').mockImplementation(() => {})
+    runRune.mockResolvedValue([])
+  })
+
+  afterEach(() => { vi.clearAllMocks(); vi.restoreAllMocks() })
+
+  const seg = key => ({ key, sections: null, runeArgs: [] })
+  const optsOf = call => runRune.mock.calls[call][4]
+
+  it('runs a single rune in text format directly, with standard input', async () => {
+    await handler({ segments: [seg('a')] })
+    expect(optsOf(0)).toMatchObject({ direct: true, stdin: 'inherit' })
+  })
+
+  it('frames JSONL output, even for a single rune', async () => {
+    await handler({ segments: [seg('a')], format: 'jsonl' })
+    expect(optsOf(0).direct).toBe(false)
+  })
+
+  it('frames a batch and closes standard input for its runes', async () => {
+    await handler({ segments: [seg('a'), seg('b')], isBatch: true })
+    expect(optsOf(0)).toMatchObject({ direct: false, stdin: 'ignore' })
+    expect(optsOf(1)).toMatchObject({ direct: false, stdin: 'ignore' })
+  })
+
+  it('frames a batch of one', async () => {
+    await handler({ segments: [seg('a')], isBatch: true })
+    expect(optsOf(0).direct).toBe(false)
+  })
+
+  it('exits with the status a direct script returned, printing nothing', async () => {
+    runRune.mockResolvedValue({ directExitCode: 4 })
+    await handler({ segments: [seg('a')] })
+    expect(process.exit).toHaveBeenCalledWith(4)
+    expect(process.stdout.write).not.toHaveBeenCalled()
+  })
+})

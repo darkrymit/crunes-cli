@@ -49,4 +49,21 @@ describe('crunes list — unified listing', () => {
     expect(entries[1].key).toBe('plug:custom-rune')
     expect(entries[1].description).toBe('Plugin Rune')
   })
+
+  it('marks a run-block rune with its runtime, and a script as native', async () => {
+    loadConfig.mockReturnValue({
+      runes: {
+        cov: { run: '/p/tools/cov.py' },
+        api: { run: '/p/api.rune.js' },
+        old: { path: 'runes/old.js' },
+      },
+    })
+
+    await handler({ format: 'text', plain: true, projectRoot: '/p', configRoot: '/p' })
+
+    const lines = stdoutWritten.trim().split('\n').map(l => l.split('\t'))
+    expect(lines.find(l => l[0] === 'cov')[3]).toBe('/p/tools/cov.py (python, native)')
+    expect(lines.find(l => l[0] === 'api')[3]).toBe('/p/api.rune.js (isolate)')
+    expect(lines.find(l => l[0] === 'old')[3]).toBe('runes/old.js')
+  })
 })

@@ -20,6 +20,20 @@ describe('enumerateRunes', () => {
     expect(out).toEqual([{ key: 'greet', source: '.crunes/runes/greet.js', name: 'Greeter', description: 'Says hello' }])
   })
 
+  it('names the command and runtime of a run-block rune', async () => {
+    const config = { runes: {
+      cov: { run: '/p/tools/cov.py', description: 'Coverage' },
+      log: { run: { command: 'git', argv: ['log', '--oneline'] } },
+      api: { run: { command: '/p/api.rune.js' } },
+    } }
+    const out = await enumerateRunes(config)
+    expect(out).toEqual([
+      { key: 'cov', source: '/p/tools/cov.py', runtime: 'python', name: null, description: 'Coverage' },
+      { key: 'log', source: 'git log --oneline', runtime: 'program', name: null, description: null },
+      { key: 'api', source: '/p/api.rune.js', runtime: 'isolate', name: null, description: null },
+    ])
+  })
+
   it('returns an empty array when there are no runes and no plugins', async () => {
     expect(await enumerateRunes({})).toEqual([])
   })
