@@ -6,13 +6,14 @@ import { output } from '../../shared/output.js'
 
 export function pluginJson({ name, description, author, license }) {
   return JSON.stringify({
-    format: '1',
+    format: '2',
     runes: {
       example: {
         name: 'Example Rune',
         description: 'Replace with your rune description',
-        permissions: {
-          run: {
+        run: {
+          command: 'runes/example.rune.js',
+          permissions: {
             allow: [],
             deny: [],
           },
@@ -50,8 +51,7 @@ export function exampleRune() {
   return `// Ready-to-run rune — runs directly from the plugin install location.
 // Users activate it by adding your plugin to their project config.
 //
-// permissions (plugin.json):
-//   run:
+// permissions (plugin.json, inside this rune's run block):
 //     allow: []  — add patterns like fs.read:./** if you use utils.fs
 //     deny:  []
 
@@ -185,7 +185,7 @@ export async function handler({
   const files = [
     [join(outDir, '.crunes-plugin', 'plugin.json'), pluginJson(opts)],
     [join(outDir, '.crunes-plugin', 'marketplace.json'), marketplaceJson(opts)],
-    [join(outDir, 'runes', 'example.js'), exampleRune()],
+    [join(outDir, 'runes', 'example.rune.js'), exampleRune()],
     [join(outDir, 'templates', 'example-template.js'), exampleTemplate()],
     [join(outDir, 'README.md'), readmeMd(opts)],
     [join(outDir, 'CHANGELOG.md'), changelogMd()],
