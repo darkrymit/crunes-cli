@@ -2,6 +2,7 @@ import { readFileSync, existsSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { getStorePath } from '../store/index.js'
 import { isPathCommand } from '../shared/command.js'
+import { isInlineSchema, normaliseJsonSchema } from '../rune/native/schema.js'
 
 function isObject(item) {
   return item && typeof item === 'object' && !Array.isArray(item)
@@ -24,9 +25,10 @@ function absolutizeSection(section, kind, baseDir, layer) {
     if (entry.path) copy.path = resolve(baseDir, entry.path)
     else if (layer === 'global' && !isPluginRef && entry.run == null) copy.path = resolve(baseDir, `${kind}/${key}.js`)
     for (const block of ['run', 'args']) {
-      if (entry[block] == null) continue
+      if (entry[block] == null || (block === 'args' && isInlineSchema(entry[block]))) continue
       const b = typeof entry[block] === 'string' ? { command: entry[block] } : { ...entry[block] }
-      if (typeof b.command === 'string' && isPathCommand(b.command)) b.command = resolve(baseDir, b.command)
+      // A run command may be a program on PATH; an args command is always a file.
+      if (typeof b.command === 'string' && (block === 'args' || isPathCommand(b.command))) b.command = resolve(baseDir, b.command)
       copy[block] = b
     }
     out[key] = copy
@@ -75,7 +77,8 @@ export function mergeConfigs(shared, local) {
         }
         // run and args blocks merge key by key, so a layer that only adds grants keeps the command.
         for (const block of ['run', 'args']) {
-          if (isObject(sharedEntry[block]) && isObject(localEntry[block])) {
+          if (isObject(sharedEntry[block]) && isObject(localEntry[block]) &&
+              !isInlineSchema(sharedEntry[block]) && !isInlineSchema(localEntry[block])) {
             merged.runes[key][block] = { ...sharedEntry[block], ...localEntry[block] }
           }
         }
@@ -105,7 +108,8 @@ export function mergeConfigs(shared, local) {
 }
 
 const ISOLATE_MODULE = /\.rune\.m?js$/i
-const RUN_BLOCK_KEYS = ['command', 'argv', 'permissions']
+const RUN_BLOCK_KEYS = ['command', 'argv', 'permissions', 'output']
+const ARGS_FILE = /\.(rune\.m?js|json)$/i
 const ARGS_BLOCK_KEYS = ['command', 'permissions']
 
 function validateBlockShape(where, block, allowedKeys, fileName) {
@@ -156,12 +160,21 @@ function validateRunBlocks(runeKey, entry, fileName, partial) {
   if (run?.permissions != null && run.command !== undefined && !runIsIsolate) {
     throw new Error(`${fileName}: ${at}.run.permissions — "${run.command}" runs natively with full access, so grants would not apply to it. Remove the block, or use a *.rune.js module to run in the sandbox`)
   }
+  if (run?.output !== undefined) {
+    if (run.output !== 'text' && run.output !== 'sections') throw new Error(`${fileName}: ${at}.run.output must be "text" or "sections"`)
+    if (runIsIsolate) throw new Error(`${fileName}: ${at}.run.output — an isolate module returns sections itself; output applies to native handlers`)
+  }
 
-  if (entry.args != null) {
+  if (entry.args != null && isInlineSchema(entry.args)) {
+    try { normaliseJsonSchema(entry.args, `${at}.args`) } catch (err) { throw new Error(`${fileName}: ${err.message}`) }
+    if (runIsIsolate) {
+      throw new Error(`${fileName}: ${at}.args — an isolate run module declares its schema with its own args export; an args block is for native handlers`)
+    }
+  } else if (entry.args != null) {
     const args = validateBlockShape(`${at}.args`, entry.args, ARGS_BLOCK_KEYS, fileName)
     if (args.command === undefined && !partial) throw new Error(`${fileName}: ${at}.args has no command in any config layer`)
-    if (args.command !== undefined && !ISOLATE_MODULE.test(args.command)) {
-      throw new Error(`${fileName}: ${at}.args.command must be a *.rune.js module exporting args(builder)`)
+    if (args.command !== undefined && !ARGS_FILE.test(args.command)) {
+      throw new Error(`${fileName}: ${at}.args.command must be a *.rune.js module exporting args(builder), or a .json schema`)
     }
     if (runIsIsolate) {
       throw new Error(`${fileName}: ${at}.args — an isolate run module declares its schema with its own args export; an args block is for native handlers`)

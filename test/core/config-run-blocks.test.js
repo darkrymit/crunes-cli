@@ -118,3 +118,46 @@ describe('run blocks across layers', () => {
     expect(() => load({ a: { path: 'runes/a.js' } }, { a: { run: 'tools/a.py' } })).toThrow('both "path" and "run"')
   })
 })
+
+describe('validateConfig — JSON args and structured output', () => {
+  it('accepts an inline schema and a .json schema file in front of a script', () => {
+    expect(validate({
+      a: { run: 'tools/a.py', args: { positionals: [{ spec: '<m>', choices: ['x'] }] } },
+      b: { run: 'tools/b.sh', args: 'tools/b.args.json' },
+    })).not.toThrow()
+  })
+
+  it('checks an inline schema when the config loads, naming the field', () => {
+    expect(validate({ a: { run: 'tools/a.py', args: { options: [{ flags: '--x', bogus: 1 }] } } }))
+      .toThrow('runes["a"].args.options[0]: unknown field "bogus"')
+  })
+
+  it('refuses an args file that is neither a schema module nor JSON', () => {
+    expect(validate({ a: { run: 'tools/a.py', args: 'tools/a.yaml' } })).toThrow('or a .json schema')
+  })
+
+  it('refuses an inline schema in front of an isolate module', () => {
+    expect(validate({ a: { run: 'a.rune.js', args: { options: [] } } })).toThrow('its own args export')
+  })
+
+  it('accepts output text or sections on a native handler only', () => {
+    expect(validate({ a: { run: { command: 'tools/a.py', output: 'sections' } } })).not.toThrow()
+    expect(validate({ a: { run: { command: 'tools/a.py', output: 'json' } } })).toThrow('must be "text" or "sections"')
+    expect(validate({ a: { run: { command: 'a.rune.js', output: 'sections' } } })).toThrow('output applies to native handlers')
+  })
+})
+
+describe('run blocks across layers — args schemas', () => {
+  it('resolves an args file against its layer even without a path separator', () => {
+    const out = absolutizeEntryPaths({ runes: { a: { run: 'git', args: 'a.args.json' } } }, '/layer', 'project')
+    expect(out.runes.a.args).toEqual({ command: resolve('/layer', 'a.args.json') })
+  })
+
+  it('lets an inline schema replace a lower layer\'s args whole, not merge into it', () => {
+    const merged = mergeConfigs(
+      { runes: { a: { run: { command: '/p/a.py' }, args: { command: '/p/a.args.json' } } } },
+      { runes: { a: { args: { options: [{ flags: '--x' }] } } } },
+    )
+    expect(merged.runes.a.args).toEqual({ options: [{ flags: '--x' }] })
+  })
+})

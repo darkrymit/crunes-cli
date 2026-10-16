@@ -4,6 +4,7 @@ import { getConfigPath, readRawConfig } from '../../core/config-writer.js'
 import { output } from '../../shared/output.js'
 import { describeRunBlock } from '../../rune/native/run-block.js'
 import { existsSync } from 'node:fs'
+import { loadJsonSchema } from '../../rune/native/schema.js'
 import { relative } from 'node:path'
 import { resolveInterpreter, assertNotMissedRename, onPath } from '../../rune/native/runtime.js'
 
@@ -27,6 +28,9 @@ export function checkRunBlockRunes(config, projectRoot) {
         throw new Error(`${relative(projectRoot, desc.command).replace(/\\/g, '/')} does not exist`)
       }
       assertNotMissedRename(desc.command, desc.runtime, projectRoot)
+      if (desc.argsModule && /\.json$/i.test(desc.argsModule)) {
+        loadJsonSchema(desc.argsModule, relative(projectRoot, desc.argsModule).replace(/\\/g, '/'))
+      }
       const found = resolveInterpreter(desc.runtime, projectRoot)
       const how = found ? `${desc.runtime}: ${[found.command, ...found.args].join(' ')}` : desc.runtime === 'program' ? `program: ${onPath(desc.command)}` : `${desc.runtime}: run directly`
       results.push({ ok: true, message: `${key} → ${how} (native)` })

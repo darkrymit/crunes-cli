@@ -3,9 +3,12 @@ import { runRuneInIsolate, getArgsSchema } from '../isolation/runner.js'
 import { computeEffectivePermissions } from '../permissions/permissions.js'
 import { parseArgs } from '../api/args-parser.js'
 import { formatRuneIndex, formatCommandPage, selectNode } from '../../docs/help-render.js'
+import { renderSection } from '../../shared/render.js'
+import { isGlobMatch } from '../../shared/match.js'
 import { getLocalBase } from '../../store/index.js'
 import { isPathCommand, runtimeOf, resolveInterpreter, assertNotMissedRename } from './runtime.js'
 import { spawnNative } from './spawn.js'
+import { isInlineSchema, normaliseJsonSchema, loadJsonSchema, validateParsed } from './schema.js'
 
 /** A block written as a string is shorthand for { command }. */
 export function normaliseBlock(block) {
@@ -26,22 +29,50 @@ function blockGrants(block, lifecycle = 'run') {
 /** Everything a caller needs to know about how a run-block rune executes. */
 export function describeRunBlock(entry, configDir) {
   const run = normaliseBlock(entry.run)
-  const args = normaliseBlock(entry.args)
+  const inline = isInlineSchema(entry.args) ? entry.args : null
+  const args = inline ? null : normaliseBlock(entry.args)
   const command = resolveCommand(run.command, configDir)
+  // An args handler is always a file — a schema module or a .json schema — never a program.
+  const argsFile = args ? (isAbsolute(args.command) ? args.command : join(configDir, args.command)) : null
   return {
     command,
     argv: run.argv ?? [],
     runtime: runtimeOf(command),
+    output: run.output ?? 'text',
     permissions: run.permissions,
-    argsModule: args ? resolveCommand(args.command, configDir) : null,
+    argsInline: inline,
+    argsModule: argsFile,
     argsPermissions: args?.permissions,
   }
 }
 
-/** The schema a native run block is documented and parsed with, or null without an args block. */
+/**
+ * The schema a native run block is documented and parsed with, or null without an args block:
+ * written inline, read from a .json file, or built by a *.rune.js module in the isolate.
+ */
 export async function getRunBlockSchema(desc, projectDir, { vars = {}, runeKey = null } = {}) {
+  if (desc.argsInline) return normaliseJsonSchema(desc.argsInline, `runes["${runeKey}"].args`)
   if (!desc.argsModule) return null
+  if (/\.json$/i.test(desc.argsModule)) {
+    return loadJsonSchema(desc.argsModule, relative(projectDir, desc.argsModule).replace(/\\/g, '/') || desc.argsModule)
+  }
   return getArgsSchema(desc.argsModule, blockGrants({ permissions: desc.argsPermissions }), projectDir, { vars, runeKey })
+}
+
+/**
+ * A line of structured output: a section event in the shape crunes prints with --format jsonl,
+ * a log event, or anything else — which is plain text.
+ */
+export function parseOutputLine(line) {
+  if (!line.startsWith('{')) return { text: line }
+  let event
+  try { event = JSON.parse(line) } catch { return { text: line } }
+  const sec = event?.section
+  if (event?.type === 'section' && sec && typeof sec.name === 'string' && sec.data && typeof sec.data === 'object') {
+    return { section: { name: sec.name, ...(sec.title && { title: sec.title }), attrs: sec.attrs ?? {}, data: sec.data } }
+  }
+  if (event?.type === 'log' && typeof event.message === 'string') return { log: event }
+  return { text: line }
 }
 
 function helpText(schema, parsed, key) {
@@ -85,7 +116,8 @@ export async function runRunBlock({ dir, key, args, entry, opts = {}, configDir,
   }
 
   const direct = opts.direct === true
-  if (direct && opts.sections) {
+  const structured = desc.output === 'sections'
+  if (direct && opts.sections && !structured) {
     throw new Error(
       `A section filter cannot apply to "${key}": it is a script rune run on its own, so crunes does not capture its output. ` +
       `Run it in a batch (-b) or with --format jsonl to filter its result.`
@@ -104,6 +136,7 @@ export async function runRunBlock({ dir, key, args, entry, opts = {}, configDir,
       process.stdout.write(text + '\n')
       return { directExitCode: 0 }
     }
+    validateParsed(schema, parsed, key)
   }
 
   const interpreter = resolveInterpreter(desc.runtime, dir)
@@ -117,9 +150,41 @@ export async function runRunBlock({ dir, key, args, entry, opts = {}, configDir,
     CRUNES_RUNE_KEY: key,
     CRUNES_LIFECYCLE: 'run',
     ...(parsed ? { CRUNES_ARGS: JSON.stringify(parsed) } : {}),
+    CRUNES_VARS: JSON.stringify(entry.vars ?? {}),
   }
 
   const shown = isPathCommand(desc.command) ? relative(dir, desc.command) || desc.command : desc.command
-  const result = await spawnNative({ key, file: shown, argv, env, cwd: dir, direct, stdin: opts.stdin ?? 'inherit' })
-  return direct ? { directExitCode: result.exitCode } : result.stdout
+  const spawnOpts = { key, file: shown, argv, env, cwd: dir, direct, stdin: opts.stdin ?? 'inherit' }
+
+  if (!structured) {
+    const result = await spawnNative(spawnOpts)
+    return direct ? { directExitCode: result.exitCode } : result.stdout
+  }
+
+  // Structured output: each section line becomes a section as soon as it is printed;
+  // any other line is plain text, kept in order around them.
+  const sections = []
+  const text = []
+  const wanted = sec => !opts.sections || isGlobMatch(sec.name, opts.sections)
+  const onLine = line => {
+    const parsedLine = parseOutputLine(line)
+    if (parsedLine.log) {
+      process.stderr.write(`${parsedLine.log.message}\n`)
+    } else if (parsedLine.section) {
+      if (direct) {
+        if (wanted(parsedLine.section)) process.stdout.write(renderSection(parsedLine.section) + '\n\n')
+      } else {
+        sections.push(parsedLine.section)
+        opts.onEvent?.({ type: 'section', section: parsedLine.section, instanceId, rune: key })
+      }
+    } else if (direct) {
+      process.stdout.write(parsedLine.text + '\n')
+    } else {
+      text.push(parsedLine.text)
+    }
+  }
+  const result = await spawnNative({ ...spawnOpts, onLine })
+  if (direct) return { directExitCode: result.exitCode }
+  const plain = text.join('\n').replace(/\n+$/, '')
+  return plain ? [...sections, plain] : sections
 }

@@ -82,11 +82,19 @@ function verb(lifecycle) {
   return lifecycle === 'repl' ? 'repl' : 'run'
 }
 
+// choices and required only come from a JSON schema; a builder schema never sets them.
+const choicesNote = choices => choices ? `  [choices: ${choices.map(c => JSON.stringify(c)).join(', ')}]` : ''
+
 function optionRows(options, indent = '  ') {
   return (options ?? []).map(opt => {
     const def = opt.def !== undefined ? `  [default: ${JSON.stringify(opt.def)}]` : ''
-    return row(opt.flags, `${opt.description ?? ''}${def}`, indent)
+    const required = opt.required ? '  [required]' : ''
+    return row(opt.flags, `${opt.description ?? ''}${def}${required}${choicesNote(opt.choices)}`, indent)
   })
+}
+
+function positionalRow(p, indent) {
+  return row(p.spec ?? '', `${p.description ?? ''}${choicesNote(p.choices)}`, indent)
 }
 
 function exampleLines(examples, indent = '  ') {
@@ -125,7 +133,7 @@ export function formatCommandPage(node, meta) {
   if (positionals.length > 0) {
     lines.push('')
     lines.push('Positionals:')
-    for (const p of positionals) lines.push(row(p.spec ?? '', p.description))
+    for (const p of positionals) lines.push(positionalRow(p))
   }
 
   const options = node?.options ?? []
@@ -181,7 +189,7 @@ export function formatRuneIndex(schema, meta) {
   if (positionals.length > 0) {
     lines.push('')
     lines.push('Positionals:')
-    for (const p of positionals) lines.push(row(p.spec ?? '', p.description))
+    for (const p of positionals) lines.push(positionalRow(p))
   }
 
   const options = schema?.options ?? []

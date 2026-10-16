@@ -18,8 +18,11 @@ function notFound(key, command, err) {
  * direct   — the caller's streams are the script's; resolves { exitCode } with the script's own status.
  * captured — standard output is collected and returned as the rune's result; standard error passes
  *            through; a non-zero exit rejects. stdin: 'inherit' or 'ignore' (closed, as in a batch).
+ *
+ * With onLine, standard output is read line by line in either mode and handed to onLine as each
+ * line completes, instead of being collected or inherited.
  */
-export function spawnNative({ key, file, argv, env, cwd, direct, stdin = 'inherit' }) {
+export function spawnNative({ key, file, argv, env, cwd, direct, stdin = 'inherit', onLine = null }) {
   const [command, ...args] = argv
   return new Promise((resolve, reject) => {
     let child
@@ -27,7 +30,9 @@ export function spawnNative({ key, file, argv, env, cwd, direct, stdin = 'inheri
       child = spawn(command, args, {
         cwd,
         env,
-        stdio: direct ? 'inherit' : [stdin, 'pipe', 'inherit'],
+        stdio: direct
+          ? ['inherit', onLine ? 'pipe' : 'inherit', 'inherit']
+          : [stdin, 'pipe', 'inherit'],
         windowsHide: true,
       })
     } catch (err) {
@@ -49,7 +54,18 @@ export function spawnNative({ key, file, argv, env, cwd, direct, stdin = 'inheri
     }
 
     let stdout = ''
-    if (!direct) {
+    let pending = ''
+    if (onLine) {
+      child.stdout.setEncoding('utf8')
+      child.stdout.on('data', chunk => {
+        pending += chunk
+        let nl
+        while ((nl = pending.indexOf('\n')) !== -1) {
+          onLine(pending.slice(0, nl).replace(/\r$/, ''))
+          pending = pending.slice(nl + 1)
+        }
+      })
+    } else if (!direct) {
       child.stdout.setEncoding('utf8')
       child.stdout.on('data', chunk => { stdout += chunk })
     }
@@ -57,6 +73,7 @@ export function spawnNative({ key, file, argv, env, cwd, direct, stdin = 'inheri
     child.on('error', err => { detach(); reject(notFound(key, file, err)) })
     child.on('close', (code, signal) => {
       detach()
+      if (onLine && pending) onLine(pending.replace(/\r$/, ''))
       const status = code ?? signalStatus(signal)
       if (direct) {
         resolve({ exitCode: status })

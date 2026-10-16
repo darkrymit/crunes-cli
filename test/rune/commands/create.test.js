@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { mkdirSync, writeFileSync, rmSync, existsSync, readFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, writeFileSync, rmSync, existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import os from 'node:os'
 
@@ -161,5 +161,33 @@ describe('handler (non-interactive)', () => {
       expect(allOutput).not.toContain('crunes query')
       infoSpy.mockRestore()
     })
+  })
+})
+
+describe('crunes create --lang — scaffolds a script rune', () => {
+  let dir
+  beforeEach(() => {
+    dir = mkdtempSync(join(os.tmpdir(), 'crunes-create-lang-'))
+    mkdirSync(join(dir, '.crunes'), { recursive: true })
+    writeFileSync(join(dir, '.crunes', 'config.json'), '{ "runes": {} }')
+    vi.spyOn(process, 'exit').mockImplementation(() => { throw new Error('exit') })
+  })
+  afterEach(() => { vi.restoreAllMocks(); rmSync(dir, { recursive: true, force: true }) })
+
+  const config = () => JSON.parse(readFileSync(join(dir, '.crunes', 'config.json'), 'utf8'))
+
+  it.each([
+    ['python', '.crunes/runes/lint.py', 'CRUNES_VARS'],
+    ['bash', '.crunes/runes/lint.sh', 'CRUNES_ARGS'],
+    ['node', '.crunes/runes/lint.js', 'CRUNES_VARS'],
+  ])('%s writes %s and a run entry', async (lang, rel, mentions) => {
+    await handler({ key: 'lint', lang, description: 'Lint', projectRoot: dir, configRoot: dir })
+    expect(readFileSync(join(dir, rel), 'utf8')).toContain(mentions)
+    expect(config().runes.lint).toEqual({ description: 'Lint', run: rel })
+  })
+
+  it('refuses a key that already exists', async () => {
+    await handler({ key: 'lint', lang: 'bash', projectRoot: dir, configRoot: dir })
+    await expect(handler({ key: 'lint', lang: 'bash', projectRoot: dir, configRoot: dir })).rejects.toThrow('exit')
   })
 })
