@@ -182,7 +182,10 @@ export async function runRunBlock({ dir, key, args, entry, opts = {}, configDir,
   const onLine = line => {
     const parsedLine = parseOutputLine(line)
     if (parsedLine.log) {
-      process.stderr.write(`${parsedLine.log.message}\n`)
+      // Run alone, a log line is the script's own; framed, it is labelled like any rune's.
+      const { level = 'log', message, meta } = parsedLine.log
+      if (direct) process.stderr.write(`${message}\n`)
+      else opts.onEvent?.({ type: 'log', level, message, ...(meta && { meta }), instanceId, rune: key })
     } else if (parsedLine.section) {
       if (direct) {
         if (wanted(parsedLine.section)) process.stdout.write(renderSection(parsedLine.section) + '\n\n')
