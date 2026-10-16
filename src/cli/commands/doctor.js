@@ -24,7 +24,7 @@ export function checkRunBlockRunes(config, projectRoot) {
       if (desc.runtime === 'program') {
         if (!onPath(desc.command)) throw new Error(`"${desc.command}" is not on PATH`)
       } else if (!existsSync(desc.command)) {
-        throw new Error(`${relative(projectRoot, desc.command)} does not exist`)
+        throw new Error(`${relative(projectRoot, desc.command).replace(/\\/g, '/')} does not exist`)
       }
       assertNotMissedRename(desc.command, desc.runtime, projectRoot)
       const found = resolveInterpreter(desc.runtime, projectRoot)

@@ -15,7 +15,7 @@ describe('checkRunBlockRunes — doctor reports what runs each run-block rune', 
   it('names the interpreter for a script and marks it native', () => {
     const [r] = check({ ok: { run: 'tools/ok.sh' } })
     expect(r.ok).toBe(true)
-    expect(r.message).toMatch(/^ok → bash: .*bash \(native\)$/)
+    expect(r.message).toMatch(/^ok → bash: .*bash(\.exe)? \(native\)$/i)
   })
 
   it('reports an isolate module as such', () => {

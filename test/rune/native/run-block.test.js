@@ -65,7 +65,8 @@ describe('runRunBlock — direct (a single invocation)', () => {
     expect(await run({ run: 'tools/quiet.sh' }, [], { direct: true })).toEqual({ directExitCode: 3 })
   })
 
-  it('reports a signal-killed script as 128 + the signal number', async () => {
+  // Signals are POSIX; Windows has no equivalent of a process killing itself with SIGTERM.
+  it.skipIf(process.platform === 'win32')('reports a signal-killed script as 128 + the signal number', async () => {
     expect(await run({ run: 'tools/killed.sh' }, [], { direct: true })).toEqual({ directExitCode: 143 })
   })
 
