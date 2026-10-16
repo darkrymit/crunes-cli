@@ -115,7 +115,7 @@ export function mergeConfigs(shared, local) {
 }
 
 const ISOLATE_MODULE = /\.rune\.m?js$/i
-const RUN_BLOCK_KEYS = ['command', 'argv', 'permissions', 'output']
+const RUN_BLOCK_KEYS = ['command', 'argv', 'permissions', 'output', 'pass']
 const ARGS_FILE = /\.(rune\.m?js|json)$/i
 const ARGS_BLOCK_KEYS = ['command', 'permissions']
 const REPL_BLOCK_KEYS = ['command', 'permissions']
@@ -192,6 +192,14 @@ function validateEntry(runeKey, entry, fileName, partial) {
   if (run?.output !== undefined) {
     if (run.output !== 'text' && run.output !== 'sections') throw new Error(`${fileName}: ${at}.run.output must be "text" or "sections"`)
     if (runIsIsolate) throw new Error(`${fileName}: ${at}.run.output — an isolate module returns sections itself; output applies to native handlers`)
+  }
+
+  if (run?.pass !== undefined) {
+    if (run.pass !== 'raw' && run.pass !== 'mapped') throw new Error(`${fileName}: ${at}.run.pass must be "raw" or "mapped"`)
+    if (runIsIsolate) throw new Error(`${fileName}: ${at}.run.pass — an isolate module receives parsed arguments itself; pass applies to native handlers`)
+    if (run.pass === 'mapped' && entry.args == null && !partial) {
+      throw new Error(`${fileName}: ${at}.run.pass is "mapped" but the rune has no args block — mapped arguments are built from the schema`)
+    }
   }
 
   if (entry.args != null && isInlineSchema(entry.args)) {

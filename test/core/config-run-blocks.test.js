@@ -176,3 +176,16 @@ describe('validateConfig — a block-less layer entry is not taken for the v1 fa
     expect(() => validateConfig({ runes: { lint: { vars: { strict: true } } } }, 'config.local.json', { base, layer: 'local' })).not.toThrow()
   })
 })
+
+describe('validateConfig — run.pass', () => {
+  it('accepts raw or mapped in front of a native handler with a schema', () => {
+    expect(validate({ a: { run: { command: 'git', pass: 'mapped' }, args: { options: [] } } })).not.toThrow()
+    expect(validate({ a: { run: { command: 'git', pass: 'raw' } } })).not.toThrow()
+  })
+
+  it('refuses other values, an isolate module, and mapped without a schema', () => {
+    expect(validate({ a: { run: { command: 'git', pass: 'strict' } } })).toThrow('must be "raw" or "mapped"')
+    expect(validate({ a: { run: { command: 'a.rune.js', pass: 'mapped' } } })).toThrow('pass applies to native handlers')
+    expect(() => validateMergedRunBlocks({ runes: { a: { run: { command: 'git', pass: 'mapped' } } } })).toThrow('has no args block')
+  })
+})

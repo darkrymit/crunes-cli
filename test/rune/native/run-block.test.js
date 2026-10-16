@@ -181,3 +181,27 @@ describe('runRunBlock — structured output', () => {
     expect(written).not.toContain('## details')
   })
 })
+
+describe('runRunBlock — mapped arguments (pass: "mapped")', () => {
+  const entry = {
+    run: { command: 'tools/echo.sh', argv: ['log'], pass: 'mapped' },
+    args: {
+      positionals: [{ spec: '[path]', to: ['--', '{value}'] }],
+      options: [{ flags: '--limit <n>', type: 'integer', default: 5, to: '-n{value}' }, { flags: '--graph' }],
+    },
+  }
+
+  it('rewrites the call into the program\'s arguments, after argv', async () => {
+    const out = await run(entry, ['src', '--graph', '--limit', '2'])
+    expect(out).toContain('argv:log -n2 --graph -- src')
+  })
+
+  it('refuses what the schema does not declare, before the program starts', async () => {
+    await expect(run(entry, ['src', 'extra', '--force'])).rejects.toThrow(/unknown option --force\n  unexpected argument "extra"/)
+  })
+
+  it('passes the raw arguments unchanged without pass: "mapped"', async () => {
+    const out = await run({ run: { command: 'tools/echo.sh', argv: ['log'] }, args: entry.args }, ['src', '--graph'])
+    expect(out).toContain('argv:log src --graph')
+  })
+})
