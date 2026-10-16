@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { mkdtempSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { join, win32 } from 'node:path'
 import { tmpdir } from 'node:os'
 import { isPathCommand, runtimeOf, findPython, assertNotMissedRename, InterpreterNotFoundError } from '../../../src/rune/native/runtime.js'
 
@@ -56,10 +56,10 @@ describe('findPython — lookup order', () => {
   })
 
   it('uses Scripts\\python.exe for a Windows virtualenv and py -3 as the last resort', () => {
-    const win = deps({ platform: 'win32', pathDirs: ['C:\\Win'], existing: [join('C:\\Win', 'py.exe')] })
-    expect(findPython('C:\\proj', win)).toEqual({ command: join('C:\\Win', 'py.exe'), args: ['-3'] })
-    const venv = deps({ platform: 'win32', env: { VIRTUAL_ENV: 'C:\\v' }, existing: [join('C:\\v', 'Scripts', 'python.exe')] })
-    expect(findPython('C:\\proj', venv).command).toBe(join('C:\\v', 'Scripts', 'python.exe'))
+    const win = deps({ platform: 'win32', pathDirs: ['C:\\Win'], existing: [win32.join('C:\\Win', 'py.exe')] })
+    expect(findPython('C:\\proj', win)).toEqual({ command: win32.join('C:\\Win', 'py.exe'), args: ['-3'] })
+    const venv = deps({ platform: 'win32', env: { VIRTUAL_ENV: 'C:\\v' }, existing: [win32.join('C:\\v', 'Scripts', 'python.exe')] })
+    expect(findPython('C:\\proj', venv).command).toBe(win32.join('C:\\v', 'Scripts', 'python.exe'))
   })
 
   it('names every candidate it tried when nothing is found', () => {
