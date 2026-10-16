@@ -21,7 +21,7 @@ export class RuneSession {
       {
         stdio: [this._repl ? 'pipe' : 'ignore', 'pipe', 'pipe'],
         env: { ...process.env, CRUNES_NO_TIMEOUT: '1' },
-        windowsHideConsole: true,
+        windowsHide: true,
       }
     )
     this.proc.stdout.on('data', chunk => this.emit('stdout', 'data', chunk))
