@@ -1,6 +1,7 @@
 import { relative } from 'node:path'
 import { loadConfig } from '../../core/config.js'
-import { getRune, resolvePluginRune, resolveRuneFromPlugins, resolveRuneFilePath } from '../../rune/resolver.js'
+import { getRune, resolvePluginRune, resolveRuneFromPlugins } from '../../rune/resolver.js'
+import { scopedPermissions, blockModule } from '../../core/rune-entry.js'
 import { getArgsSchema, getReplSchema, getPluginRunePath } from '../../rune/isolation/runner.js'
 import { loadPluginJson } from '../../plugin/manifest.js'
 import { computeEffectivePermissions } from '../../rune/permissions/permissions.js'
@@ -30,7 +31,7 @@ export async function resolveRuneDocs(config, key, projectRoot, configRoot) {
   const resolved = pluginMatch ?? autoMatch
   if (!localEntry && !resolved) return null
 
-  let runeFile, relativePath, basePerms, vars, displayName, displayDescription, batch
+  let runeFile, replFile = null, relativePath, basePerms, vars, displayName, displayDescription, batch
   let native = null, runs = null
 
   if (resolved) {
@@ -38,19 +39,21 @@ export async function resolveRuneDocs(config, key, projectRoot, configRoot) {
     const pluginJson = await loadPluginJson(pluginDir)
     const runeDef = pluginJson.runes[runeKey] ?? {}
     runeFile = getPluginRunePath(pluginDir, runeKey, pluginJson)
+    if (runeDef.repl != null) replFile = getPluginRunePath(pluginDir, runeKey, pluginJson, 'repl')
     relativePath = undefined
-    basePerms = runeDef.permissions ?? { allow: [], deny: [] }
+    basePerms = scopedPermissions(runeDef) ?? {}
     vars = runeDef.vars ?? {}
     displayName = runeDef.name ?? runeKey
     displayDescription = runeDef.description ?? null
     batch = runeDef.batch != null ? { allow: runeDef.batch.allow ?? [], deny: runeDef.batch.deny ?? [] } : null
-  } else if (localEntry.run != null) {
+  } else {
     const desc = describeRunBlock(localEntry, configRoot)
+    replFile = blockModule(localEntry, 'repl', configRoot)
     const shown = isPathCommand(desc.command) ? relative(projectRoot, desc.command).replace(/\\/g, '/') : desc.command
     if (desc.runtime === 'isolate') {
       runeFile = desc.command
       relativePath = shown
-      basePerms = { run: desc.permissions ?? {} }
+      basePerms = scopedPermissions(localEntry) ?? {}
     } else {
       native = desc
       let interpreter = ''
@@ -61,16 +64,8 @@ export async function resolveRuneDocs(config, key, projectRoot, configRoot) {
         interpreter = ` (not found: ${err.message.split('\n')[0]})`
       }
       runs = `${[shown, ...desc.argv].join(' ')} · ${desc.runtime}${interpreter} · native, full access`
-      basePerms = {}
+      basePerms = scopedPermissions(localEntry) ?? {}
     }
-    vars = localEntry.vars ?? {}
-    displayName = localEntry.name ?? key
-    displayDescription = localEntry.description ?? null
-    batch = localEntry.batch != null ? { allow: localEntry.batch.allow ?? [], deny: localEntry.batch.deny ?? [] } : null
-  } else {
-    runeFile = resolveRuneFilePath(localEntry, key, configRoot)
-    relativePath = relative(projectRoot, runeFile).replace(/\\/g, '/')
-    basePerms = localEntry.permissions ?? { allow: [], deny: [] }
     vars = localEntry.vars ?? {}
     displayName = localEntry.name ?? key
     displayDescription = localEntry.description ?? null
@@ -92,9 +87,8 @@ export async function resolveRuneDocs(config, key, projectRoot, configRoot) {
   }
 
   let repl = null
-  // A run-block rune has no REPL until repl blocks exist.
-  if (localEntry?.run == null) try {
-    const { argsSchema, commandsSchema } = await getReplSchema(runeFile, replEffective, [], projectRoot, { vars, runeKey: key })
+  if (replFile) try {
+    const { argsSchema, commandsSchema } = await getReplSchema(replFile, replEffective, [], projectRoot, { vars, runeKey: key })
     if (argsSchema !== null || commandsSchema !== null) repl = { argsSchema, commandsSchema }
   } catch (err) {
     output.warn(`Could not load REPL schema for "${key}": ${err.message}`)

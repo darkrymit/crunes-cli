@@ -86,8 +86,8 @@ describe('handler (non-interactive)', () => {
       const { output } = await import('../../../src/shared/output.js')
       const infoSpy = vi.spyOn(output, 'info').mockImplementation(() => {})
       await handler({ key: 'myrune', yes: true, projectRoot: tmp, configRoot: tmp })
-      expect(existsSync(join(tmp, '.crunes', 'runes', 'myrune.js'))).toBe(true)
-      const content = readFileSync(join(tmp, '.crunes', 'runes', 'myrune.js'), 'utf8')
+      expect(existsSync(join(tmp, '.crunes', 'runes', 'myrune.rune.js'))).toBe(true)
+      const content = readFileSync(join(tmp, '.crunes', 'runes', 'myrune.rune.js'), 'utf8')
       expect(content).toContain('md.h3')
       expect(infoSpy).toHaveBeenCalledWith(expect.stringContaining('markdown'))
       infoSpy.mockRestore()
@@ -97,19 +97,25 @@ describe('handler (non-interactive)', () => {
   describe('file creation', () => {
     it('creates rune file at default path under configRoot', async () => {
       await handler({ key: 'myrune', format: 'markdown', yes: true, projectRoot: tmp, configRoot: tmp })
-      expect(existsSync(join(tmp, '.crunes', 'runes', 'myrune.js'))).toBe(true)
+      expect(existsSync(join(tmp, '.crunes', 'runes', 'myrune.rune.js'))).toBe(true)
     })
 
     it('creates rune file with modern run(args) signature', async () => {
       await handler({ key: 'myrune', format: 'markdown', yes: true, projectRoot: tmp, configRoot: tmp })
-      const content = readFileSync(join(tmp, '.crunes', 'runes', 'myrune.js'), 'utf8')
+      const content = readFileSync(join(tmp, '.crunes', 'runes', 'myrune.rune.js'), 'utf8')
       expect(content).toMatch(/export async function run\(args\)/)
       expect(content).toContain("from '@utils'")
     })
 
     it('creates rune file at custom path under configRoot', async () => {
-      await handler({ key: 'myrune', format: 'markdown', path: 'custom/myrune.js', yes: true, projectRoot: tmp, configRoot: tmp })
-      expect(existsSync(join(tmp, 'custom', 'myrune.js'))).toBe(true)
+      await handler({ key: 'myrune', format: 'markdown', path: 'custom/myrune.rune.js', yes: true, projectRoot: tmp, configRoot: tmp })
+      expect(existsSync(join(tmp, 'custom', 'myrune.rune.js'))).toBe(true)
+    })
+
+    it('refuses a path that does not name an isolate module', async () => {
+      await expect(handler({ key: 'myrune', format: 'markdown', path: 'custom/myrune.js', yes: true, projectRoot: tmp, configRoot: tmp }))
+        .rejects.toThrow('process.exit(1)')
+      expect(existsSync(join(tmp, 'custom', 'myrune.js'))).toBe(false)
     })
   })
 
@@ -118,7 +124,7 @@ describe('handler (non-interactive)', () => {
       await handler({ key: 'myrune', format: 'markdown', yes: true, projectRoot: tmp, configRoot: tmp })
       const config = JSON.parse(readFileSync(join(tmp, '.crunes', 'config.json'), 'utf8'))
       expect(config.runes.myrune).toBeDefined()
-      expect(config.runes.myrune.path).toBe('.crunes/runes/myrune.js')
+      expect(config.runes.myrune.run).toBe('.crunes/runes/myrune.rune.js')
     })
 
     it('stores name and description in config when provided', async () => {
@@ -131,7 +137,7 @@ describe('handler (non-interactive)', () => {
     it('preserves existing rune entries in config', async () => {
       const configDir = join(tmp, '.crunes')
       mkdirSync(configDir, { recursive: true })
-      writeFileSync(join(configDir, 'config.json'), JSON.stringify({ runes: { existing: { path: 'existing.js' } } }, null, 2))
+      writeFileSync(join(configDir, 'config.json'), JSON.stringify({ runes: { existing: { run: 'existing.rune.js' } } }, null, 2))
       await handler({ key: 'newrune', format: 'markdown', yes: true, projectRoot: tmp, configRoot: tmp })
       const config = JSON.parse(readFileSync(join(configDir, 'config.json'), 'utf8'))
       expect(config.runes.existing).toBeDefined()

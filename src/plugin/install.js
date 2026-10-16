@@ -10,12 +10,13 @@ import { installDeps } from './deps.js'
 import { promptConsent, diffPermissions, promptReConsent } from './consent.js'
 import { getConfigPath, readRawConfig, writeRawConfig, setPluginEnabled } from '../core/config-writer.js'
 import { coercePlugins } from '../core/config.js'
+import { scopedPermissions } from '../core/rune-entry.js'
 
 const execFileAsync = promisify(execFile)
 
 function collectAllowFromRune(rune) {
   const all = []
-  for (const lifecycle of Object.values(rune.permissions ?? {})) {
+  for (const lifecycle of Object.values(scopedPermissions(rune) ?? {})) {
     for (const perm of lifecycle?.allow ?? []) {
       if (!all.includes(perm)) all.push(perm)
     }

@@ -4,6 +4,7 @@ import { intro, outro, confirm, cancel } from '@clack/prompts'
 import { loadConfig } from '../../core/config.js'
 import { loadRegistry, resolvePluginKey } from '../../plugin/registry.js'
 import { loadPluginJson } from '../../plugin/manifest.js'
+import { migrateEntry } from '../../core/rune-entry.js'
 import { output } from '../../shared/output.js'
 
 /**
@@ -87,7 +88,11 @@ export async function handler({
   }
 
   const outputKey = key ?? templateName
-  runeRelPath = runeRelPath ?? `.crunes/runes/${outputKey}.js`
+  runeRelPath = runeRelPath ?? `.crunes/runes/${outputKey}.rune.js`
+  if (!/\.rune\.m?js$/i.test(runeRelPath)) {
+    output.error(`${runeRelPath}: a sandboxed rune's file must be named *.rune.js — the name is what runs it in the isolate.`)
+    process.exit(1)
+  }
   const runeAbsPath = path.join(projectRoot, runeRelPath)
 
   if (!isNonInteractive) intro('crunes template apply')
@@ -152,11 +157,11 @@ export async function handler({
 
   const resolvedName = name ?? templateMeta.name
   const resolvedDesc = description ?? templateMeta.description
+  // A template declares mode-scoped grants; the rune entry carries them in its run and repl blocks.
   const configEntry = {
-    path: runeRelPath,
     ...(resolvedName && { name: resolvedName }),
     ...(resolvedDesc && { description: resolvedDesc }),
-    ...(templateMeta.permissions && { permissions: templateMeta.permissions }),
+    ...migrateEntry({ path: runeRelPath, permissions: templateMeta.permissions }, { base: projectRoot }).entry,
   }
   config.runes = { ...(config.runes ?? {}), [outputKey]: configEntry }
 

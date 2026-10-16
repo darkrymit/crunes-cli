@@ -1,11 +1,16 @@
 {
   "runes": {
     "release": {
-      "path": ".crunes/runes/release.js",
       "name": "Release Automator",
       "description": "Bump package versions, update changelogs, synchronize lockfiles, compile bundles, and tag Git releases automatically.",
-      "permissions": {
-        "run": {
+      "batch": {
+        "allow": [
+          "info*"
+        ]
+      },
+      "run": {
+        "command": ".crunes/runes/release.rune.js",
+        "permissions": {
           "allow": [
             "fs.read:package.json",
             "fs.read:package-lock.json",
@@ -29,17 +34,19 @@
             "shell.run:git tag *"
           ]
         }
-      },
-      "batch": {
-        "allow": ["info*"]
       }
     },
     "m": {
-      "path": ".crunes/runes/m.js",
       "name": "Module Structural Context",
       "description": "Live structural context (README and file tree) for modules.",
-      "permissions": {
-        "run": {
+      "batch": {
+        "allow": [
+          "*"
+        ]
+      },
+      "run": {
+        "command": ".crunes/runes/m.rune.js",
+        "permissions": {
           "allow": [
             "fs.read:src/**",
             "fs.glob:src/**::*",
@@ -47,17 +54,16 @@
             "fs.exists:src/**"
           ]
         }
-      },
-      "batch": {
-        "allow": ["*"]
       }
     },
     "crunes-plugins@kb:kb": {
       "vars": {
-        "roots": ["docs/kb/main"]
+        "roots": [
+          "docs/kb/main"
+        ]
       },
-      "permissions": {
-        "run": {
+      "run": {
+        "permissions": {
           "allow": [
             "fs.glob:docs/kb/main/**/*.md",
             "fs.read:docs/kb/main/**"

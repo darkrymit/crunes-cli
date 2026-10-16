@@ -1,99 +1,65 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect } from 'vitest'
+import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { tmpdir } from 'node:os'
 import { validatePluginJson } from '../../src/plugin/manifest.js'
 
 const VALID = {
-  format: '1',
+  format: '2',
   name: 'my-plugin',
   version: '1.0.0',
   runes: {
-    example: { permissions: { run: { allow: ['fs.read:**'], deny: [] } } },
+    example: { run: { command: 'runes/example.rune.js', permissions: { allow: ['fs.read:**'], deny: [] } } },
   },
 }
 
-describe('validatePluginJson', () => {
+describe('validatePluginJson — format 2', () => {
   it('passes a valid plugin.json', () => {
     expect(() => validatePluginJson(VALID)).not.toThrow()
   })
 
-  it('throws when format is not "1"', () => {
-    expect(() => validatePluginJson({ ...VALID, format: '2' }))
-      .toThrow('unsupported format')
-  })
-
-
-
-  it('throws when runes is missing', () => {
-    const { runes: _, ...rest } = VALID
-    expect(() => validatePluginJson(rest)).toThrow('"runes" must be an object')
-  })
-
-  it('passes when a rune has no permissions block', () => {
-    const json = {
-      ...VALID,
-      runes: { example: {} },
-    }
+  it('accepts a run block written as a string, and a repl block', () => {
+    const json = { ...VALID, runes: { a: { run: 'runes/a.rune.js', repl: { command: 'runes/a.rune.js', permissions: { allow: [] } } } } }
     expect(() => validatePluginJson(json)).not.toThrow()
-  })
-
-  it('throws when permissions has no lifecycle with an allow array', () => {
-    const json = {
-      ...VALID,
-      runes: { example: { permissions: { run: { deny: [] } } } },
-    }
-    expect(() => validatePluginJson(json)).toThrow('lifecycle-scoped permissions')
   })
 
   it('passes when runes object is empty', () => {
     expect(() => validatePluginJson({ ...VALID, runes: {} })).not.toThrow()
   })
 
-  it('passes multiple runes each with lifecycle-scoped permissions', () => {
-    const json = {
-      ...VALID,
-      runes: {
-        a: { permissions: { run: { allow: [], deny: [] } } },
-        b: { permissions: { run: { allow: ['shell:**'], deny: [] } } },
-      },
-    }
-    expect(() => validatePluginJson(json)).not.toThrow()
+  it('throws on an unknown format', () => {
+    expect(() => validatePluginJson({ ...VALID, format: '3' })).toThrow('unsupported format "3"')
   })
 
-  it('passes when permissions block is omitted', () => {
-    const json = {
-      ...VALID,
-      runes: { example: { name: 'Zero Perm' } },
-    }
-    expect(() => validatePluginJson(json)).not.toThrow()
+  it('throws when runes is missing', () => {
+    const { runes: _, ...rest } = VALID
+    expect(() => validatePluginJson(rest)).toThrow('"runes" must be an object')
   })
 
-  it('passes when permissions block is empty', () => {
-    const json = {
-      ...VALID,
-      runes: { example: { name: 'Zero Perm', permissions: {} } },
-    }
-    expect(() => validatePluginJson(json)).not.toThrow()
+  it('requires a run block naming an isolate module', () => {
+    expect(() => validatePluginJson({ ...VALID, runes: { a: {} } })).toThrow('rune "a" has no run block')
+    expect(() => validatePluginJson({ ...VALID, runes: { a: { run: 'runes/a.js' } } })).toThrow('run.command must be a *.rune.js module')
   })
 
-  it('throws error if plugin rune permissions contain flat allowance arrays', () => {
-    const bad = {
-      format: '1',
-      runes: {
-        myrune: { permissions: { allow: ['fs.read:*'] } }
-      }
-    }
-    expect(() => validatePluginJson(bad)).toThrow()
+  it('refuses the format 1 fields and mode-scoped grants inside a block', () => {
+    expect(() => validatePluginJson({ ...VALID, runes: { a: { run: 'runes/a.rune.js', path: 'runes/a.js' } } })).toThrow('has "path"')
+    expect(() => validatePluginJson({ ...VALID, runes: { a: { run: { command: 'runes/a.rune.js', permissions: { run: { allow: [] } } } } } }))
+      .toThrow('run.permissions must be { "allow": [...], "deny": [...] }')
   })
+})
 
-  it('passes and warns if plugin rune permissions.run is empty', () => {
-    const spy = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    const json = {
-      format: '1',
-      runes: {
-        myrune: { permissions: { run: {} } }
-      }
-    }
-    expect(() => validatePluginJson(json)).not.toThrow()
-    expect(spy).toHaveBeenCalled()
-    spy.mockRestore()
+describe('validatePluginJson — format 1 is refused with its rewrite', () => {
+  it('names the migration and shows a rune rewritten', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'crunes-manifest-'))
+    mkdirSync(join(dir, 'runes'))
+    writeFileSync(join(dir, 'runes', 'hello.js'), 'export function run() {}\nexport function repl() {}\n')
+    let message = ''
+    try {
+      validatePluginJson({ format: '1', runes: { hello: { permissions: { run: { allow: ['fs.read:**'] } } } } }, dir)
+    } catch (err) { message = err.message }
+    expect(message).toContain('manifest format "1" is no longer read')
+    expect(message).toContain('"command": "runes/hello.rune.js"')
+    expect(message).toContain('"repl": "runes/hello.rune.js"')
+    expect(message).toContain('crunes migrate --plugin')
   })
 })

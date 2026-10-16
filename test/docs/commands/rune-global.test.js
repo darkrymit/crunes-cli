@@ -22,17 +22,17 @@ describe('docs rune global index', () => {
     await mkdir(join(tmp, '.crunes', 'runes'), { recursive: true })
     await writeFile(join(tmp, '.crunes', 'config.json'), JSON.stringify({
       runes: {
-        release: { name: 'Release', description: 'Release automation' },
-        count: { name: 'Counter', description: 'Counts things' },
+        release: { name: 'Release', description: 'Release automation', run: '.crunes/runes/release.rune.js' },
+        count: { name: 'Counter', description: 'Counts things', run: '.crunes/runes/count.rune.js' },
       },
     }))
-    await writeFile(join(tmp, '.crunes', 'runes', 'release.js'), [
+    await writeFile(join(tmp, '.crunes', 'runes', 'release.rune.js'), [
       'export async function args(b) {',
       '  return b.command("info", "Show context").command("git", "Stage and tag").build()',
       '}',
       'export async function run() { return [] }',
     ].join('\n'))
-    await writeFile(join(tmp, '.crunes', 'runes', 'count.js'), 'export async function run() { return [] }')
+    await writeFile(join(tmp, '.crunes', 'runes', 'count.rune.js'), 'export async function run() { return [] }')
     written = []
     vi.spyOn(process.stdout, 'write').mockImplementation((chunk) => { written.push(chunk); return true })
   })
@@ -58,11 +58,11 @@ describe('docs rune global index', () => {
   })
 
   it('lists healthy runes and exits 1 when one rune schema fails to build', async () => {
-    await writeFile(join(tmp, '.crunes', 'runes', 'broken.js'), 'export async function args() { throw new Error("boom") }')
+    await writeFile(join(tmp, '.crunes', 'runes', 'broken.rune.js'), 'export async function args() { throw new Error("boom") }')
     await writeFile(join(tmp, '.crunes', 'config.json'), JSON.stringify({
       runes: {
-        release: { name: 'Release', description: 'Release automation' },
-        broken: { name: 'Broken', description: 'Explodes' },
+        release: { name: 'Release', description: 'Release automation', run: '.crunes/runes/release.rune.js' },
+        broken: { name: 'Broken', description: 'Explodes', run: '.crunes/runes/broken.rune.js' },
       },
     }))
     const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {})
@@ -96,10 +96,10 @@ describe('docs rune with an explicit path entry', () => {
     await mkdir(join(tmp, '.crunes', 'runes', 'nested'), { recursive: true })
     await writeFile(join(tmp, '.crunes', 'config.json'), JSON.stringify({
       runes: {
-        nested: { path: '.crunes/runes/nested/index.js', name: 'Nested', description: 'Has an explicit path' },
+        nested: { run: '.crunes/runes/nested/index.rune.js', name: 'Nested', description: 'Has an explicit path' },
       },
     }))
-    await writeFile(join(tmp, '.crunes', 'runes', 'nested', 'index.js'), [
+    await writeFile(join(tmp, '.crunes', 'runes', 'nested', 'index.rune.js'), [
       'export async function args(b) { return b.option("--flag", "a flag").build() }',
       'export async function run() { return [] }',
     ].join('\n'))
@@ -126,7 +126,7 @@ describe('docs rune with an explicit path entry', () => {
   it('reports the file as a path relative to the project root', async () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {})
     await handler({ key: 'nested', path: [], projectRoot: tmp, configRoot: tmp })
-    expect(out()).toContain('.crunes/runes/nested/index.js')
+    expect(out()).toContain('.crunes/runes/nested/index.rune.js')
     expect(out()).not.toMatch(/[A-Za-z]:.*[A-Za-z]:/)
   })
 })

@@ -25,16 +25,18 @@ describe('validateConfig', () => {
     expect(() => validateConfig(bad)).toThrow()
   })
 
-  it('warns if local runes permissions block is empty', () => {
-    const spy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+  it('refuses a v1 entry, printing it rewritten with run and repl blocks', () => {
     const config = {
       runes: {
-        myrune: { permissions: { run: {} } }
+        myrune: { path: '.crunes/runes/myrune.js', permissions: { run: { allow: ['fs.read:*'] }, repl: { allow: [] } } }
       }
     }
-    validateConfig(config)
-    expect(spy).toHaveBeenCalled()
-    spy.mockRestore()
+    let message = ''
+    try { validateConfig(config) } catch (err) { message = err.message }
+    expect(message).toContain('runes["myrune"] uses the old entry shape')
+    expect(message).toContain('"command": ".crunes/runes/myrune.rune.js"')
+    expect(message).toContain('.crunes/runes/myrune.js → .crunes/runes/myrune.rune.js')
+    expect(message).toContain('crunes migrate')
   })
 
   it('throws on a plugin-rune override key missing the marketplace prefix', () => {
@@ -44,9 +46,8 @@ describe('validateConfig', () => {
       }
     }
     expect(() => validateConfig(config)).toThrow(
-      'config.json: runes["git:status"] has no path or plugin, so it can only be a plugin-rune ' +
-      'override — but "git" is missing the marketplace prefix. Use the full ' +
-      '"marketplace@plugin:status" form.'
+      'config.json: runes["git:status"] is a plugin-rune override — but "git" is missing the marketplace ' +
+      'prefix. Use the full "marketplace@plugin:status" form.'
     )
   })
 
@@ -59,10 +60,10 @@ describe('validateConfig', () => {
     expect(() => validateConfig(config)).not.toThrow()
   })
 
-  it('does not throw on a local rune entry whose key happens to contain a colon, if it has a path', () => {
+  it('does not throw on a local rune entry whose key happens to contain a colon, if it names a command', () => {
     const config = {
       runes: {
-        'weird:name': { path: '.crunes/runes/weird-name.js' }
+        'weird:name': { run: '.crunes/runes/weird-name.rune.js' }
       }
     }
     expect(() => validateConfig(config)).not.toThrow()
@@ -80,7 +81,7 @@ describe('validateConfig', () => {
   it('does not throw on an ordinary local rune key with no colon at all', () => {
     const config = {
       runes: {
-        myrune: { path: '.crunes/runes/myrune.js' }
+        myrune: { run: '.crunes/runes/myrune.rune.js' }
       }
     }
     expect(() => validateConfig(config)).not.toThrow()
@@ -160,14 +161,15 @@ describe('mergeConfigs', () => {
 })
 
 describe('absolutizeEntryPaths', () => {
-  it('resolves an explicit rune path against the layer base dir', () => {
-    const out = absolutizeEntryPaths({ runes: { serve: { path: 'runes/serve.js' } } }, '/store', 'global')
-    expect(out.runes.serve.path.replace(/\\/g, '/')).toBe(abs('/store/runes/serve.js'))
+  it('resolves a run command naming a file against the layer base dir', () => {
+    const out = absolutizeEntryPaths({ runes: { serve: { run: 'runes/serve.rune.js' } } }, '/store', 'global')
+    expect(out.runes.serve.run.command.replace(/\\/g, '/')).toBe(abs('/store/runes/serve.rune.js'))
   })
 
-  it('fills the global default path with no .crunes segment', () => {
+  it('gives a global entry no default command — nothing is found that was not declared', () => {
     const out = absolutizeEntryPaths({ runes: { serve: {} } }, '/store', 'global')
-    expect(out.runes.serve.path.replace(/\\/g, '/')).toBe(abs('/store/runes/serve.js'))
+    expect(out.runes.serve.run).toBeUndefined()
+    expect(out.runes.serve.path).toBeUndefined()
   })
 
   it('leaves a pathless project entry pathless, so it can override a global entry', () => {
@@ -207,23 +209,23 @@ describe('mergeConfigs templates', () => {
 })
 
 describe('partial override across layers', () => {
-  it('keeps the defining layer path when a later layer overrides only vars', () => {
+  it('keeps the defining layer command when a later layer overrides only vars', () => {
     const global = absolutizeEntryPaths(
-      { runes: { serve: { path: 'runes/serve.js', vars: { port: 3000 } } } }, '/store', 'global')
+      { runes: { serve: { run: 'runes/serve.rune.js', vars: { port: 3000 } } } }, '/store', 'global')
     const project = absolutizeEntryPaths(
       { runes: { serve: { vars: { port: 4000 } } } }, '/proj', 'project')
     const merged = mergeConfigs(global, project)
-    expect(merged.runes.serve.path.replace(/\\/g, '/')).toBe(abs('/store/runes/serve.js'))
+    expect(merged.runes.serve.run.command.replace(/\\/g, '/')).toBe(abs('/store/runes/serve.rune.js'))
     expect(merged.runes.serve.vars).toEqual({ port: 4000 })
   })
 
-  it('takes the overriding layer path when that layer supplies its own', () => {
+  it('takes the overriding layer command when that layer supplies its own', () => {
     const global = absolutizeEntryPaths(
-      { runes: { serve: { path: 'runes/serve.js' } } }, '/store', 'global')
+      { runes: { serve: { run: 'runes/serve.rune.js' } } }, '/store', 'global')
     const project = absolutizeEntryPaths(
-      { runes: { serve: { path: 'custom/serve.js' } } }, '/proj', 'project')
+      { runes: { serve: { run: 'custom/serve.rune.js' } } }, '/proj', 'project')
     const merged = mergeConfigs(global, project)
-    expect(merged.runes.serve.path.replace(/\\/g, '/')).toBe(abs('/proj/custom/serve.js'))
+    expect(merged.runes.serve.run.command.replace(/\\/g, '/')).toBe(abs('/proj/custom/serve.rune.js'))
   })
 })
 
@@ -273,7 +275,7 @@ describe('validateConfig with fileNames', () => {
       }
     }
     expect(() => validateConfig(config, 'config.local.json')).toThrow(
-      'config.local.json: runes["my-rune"].permissions must be lifecycle-scoped (e.g. permissions.run.allow)'
+      'config.local.json: runes["my-rune"] uses the old entry shape'
     )
   })
 })
