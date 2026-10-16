@@ -396,7 +396,7 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
     const child = spawnProcess(
       process.execPath,
       cliArgs,
-      { stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env, CRUNES_NO_TIMEOUT: '1' }, windowsHideConsole: true }
+      { stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env, CRUNES_NO_TIMEOUT: '1' }, windowsHide: true }
     )
     const stdinInput = opts?.stdin
     if (stdinInput !== undefined && stdinInput !== null) {
