@@ -5,11 +5,12 @@ const SCHEMA_KEYS = ['positionals', 'options', 'examples', 'commands']
 const NODE_KEYS = {
   root: SCHEMA_KEYS,
   command: ['name', 'description', ...SCHEMA_KEYS],
-  positional: ['spec', 'description', 'choices'],
-  option: ['flags', 'description', 'default', 'required', 'choices'],
+  positional: ['spec', 'description', 'type', 'choices'],
+  option: ['flags', 'description', 'type', 'default', 'required', 'choices'],
   example: ['usage', 'description'],
 }
 const POSITIONAL_SPEC = /^[<[]([a-zA-Z0-9_-]+)(\.\.\.)?[>\]]$/
+const VALUE_TYPES = ['string', 'number', 'integer']
 
 /** An args block written as an object of schema fields, rather than { command, permissions }. */
 export function isInlineSchema(block) {
@@ -61,19 +62,28 @@ function normaliseNode(node, where, kind) {
     const at = `${where}.positionals[${i}]`
     checkKeys(at, p, 'positional')
     if (typeof p.spec !== 'string' || !POSITIONAL_SPEC.test(p.spec)) fail(at, `"spec" must look like <name>, [name] or <names...>`)
+    if (p.type !== undefined && !VALUE_TYPES.includes(p.type)) fail(at, `"type" must be one of ${VALUE_TYPES.join(', ')}`)
     checkChoices(at, p.choices)
-    return { spec: p.spec, description: p.description ?? '', ...(p.choices && { choices: p.choices }) }
+    return { spec: p.spec, description: p.description ?? '', ...(p.type && { type: p.type }), ...(p.choices && { choices: p.choices }) }
   })
   out.options = list(where, node, 'options').map((o, i) => {
     const at = `${where}.options[${i}]`
     checkKeys(at, o, 'option')
     if (typeof o.flags !== 'string') fail(at, '"flags" must be a string such as "--min <percent>"')
-    try { parseFlags(o.flags) } catch (err) { fail(at, err.message) }
+    let flag
+    try { flag = parseFlags(o.flags) } catch (err) { fail(at, err.message) }
+    if (o.type !== undefined) {
+      const takesValue = flag.type !== 'boolean'
+      if (takesValue ? !VALUE_TYPES.includes(o.type) : o.type !== 'boolean') {
+        fail(at, `"type" must be ${takesValue ? `one of ${VALUE_TYPES.join(', ')} for an option that takes a value` : '"boolean" for a flag that takes no value'}`)
+      }
+    }
     if (o.required !== undefined && typeof o.required !== 'boolean') fail(at, '"required" must be true or false')
     checkChoices(at, o.choices)
     return {
       flags: o.flags,
       description: o.description ?? '',
+      ...(o.type && o.type !== 'boolean' && { type: o.type }),
       ...(o.default !== undefined && { def: o.default }),
       ...(o.required && { required: true }),
       ...(o.choices && { choices: o.choices }),
@@ -113,6 +123,13 @@ function nodeFor(schema, commands) {
 
 const shown = value => JSON.stringify(value)
 
+/** Why a value does not have the declared type, or null when it does. */
+function typeProblem(type, value) {
+  if (type === 'number' && !Number.isFinite(value)) return 'must be a number'
+  if (type === 'integer' && !Number.isInteger(value)) return 'must be an integer'
+  return null
+}
+
 /**
  * Enforce what a schema declares — required positionals and options, and allowed values —
  * against a parsed call. Throws with a message naming the argument and how to see the usage.
@@ -128,6 +145,10 @@ export function validateParsed(schema, parsed, key) {
     const value = parsed[name]
     const values = variadic ? (value ?? []) : (value === undefined ? [] : [value])
     if (required && values.length === 0) problems.push(`missing required ${p.spec}`)
+    for (const v of values) {
+      const problem = typeProblem(p.type, v)
+      if (problem) problems.push(`${p.spec} ${problem} — got ${shown(String(v))}`)
+    }
     if (p.choices) {
       for (const v of values) {
         if (!p.choices.map(String).includes(String(v))) problems.push(`${p.spec} must be one of ${p.choices.map(shown).join(', ')} — got ${shown(String(v))}`)
@@ -139,6 +160,12 @@ export function validateParsed(schema, parsed, key) {
     const { key: optKey } = parseFlags(o.flags)
     const value = parsed[optKey]
     if (o.required && value === undefined) problems.push(`missing required option ${o.flags}`)
+    if (value !== undefined) {
+      for (const v of Array.isArray(value) ? value : [value]) {
+        const problem = typeProblem(o.type, v)
+        if (problem) problems.push(`${o.flags} ${problem}${Number.isNaN(v) ? '' : ` — got ${shown(String(v))}`}`)
+      }
+    }
     if (o.choices && value !== undefined) {
       const values = Array.isArray(value) ? value : [value]
       for (const v of values) {
