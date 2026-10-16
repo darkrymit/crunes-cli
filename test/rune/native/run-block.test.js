@@ -101,3 +101,83 @@ describe('runRunBlock — an isolate module', () => {
     expect(result.data.content).toBe('fixed,x')
   })
 })
+
+describe('runRunBlock — JSON args schemas and validation', () => {
+  beforeAll(() => {
+    write('tools/env.sh', 'echo "args:${CRUNES_ARGS}"\necho "vars:${CRUNES_VARS}"\n')
+    write('tools/env.args.json', JSON.stringify({
+      positionals: [{ spec: '<module>', choices: ['auth', 'billing'] }],
+      options: [{ flags: '--min <percent>', default: '0' }],
+    }))
+  })
+
+  it('reads a .json schema file, applying its defaults', async () => {
+    const out = await run({ run: 'tools/env.sh', args: 'tools/env.args.json' }, ['auth'])
+    const parsed = JSON.parse(out.match(/args:(.*)/)[1])
+    expect(parsed.module).toBe('auth')
+    expect(parsed.min).toBe('0')
+  })
+
+  it('takes a schema written inline', async () => {
+    const out = await run({ run: 'tools/env.sh', args: { positionals: [{ spec: '<name>' }] } }, ['x'])
+    expect(JSON.parse(out.match(/args:(.*)/)[1]).name).toBe('x')
+  })
+
+  it('refuses a call outside the schema before the script starts', async () => {
+    await expect(run({ run: 'tools/env.sh', args: 'tools/env.args.json' }, ['payments']))
+      .rejects.toThrow('<module> must be one of "auth", "billing"')
+    await expect(run({ run: 'tools/env.sh', args: 'tools/env.args.json' }, []))
+      .rejects.toThrow('missing required <module>')
+  })
+
+  it('shows choices and defaults in --help', async () => {
+    const out = await run({ run: 'tools/env.sh', args: 'tools/env.args.json' }, ['--help'])
+    expect(out).toContain('[choices: "auth", "billing"]')
+    expect(out).toContain('[default: "0"]')
+  })
+
+  it('passes the rune\'s vars as CRUNES_VARS, an empty object when there are none', async () => {
+    expect(await run({ run: 'tools/env.sh', vars: { threshold: 80 } })).toContain('vars:{"threshold":80}')
+    expect(await run({ run: 'tools/env.sh' })).toContain('vars:{}')
+  })
+})
+
+describe('runRunBlock — structured output', () => {
+  const sectionLine = (name, content) =>
+    JSON.stringify({ type: 'section', section: { name, data: { type: 'markdown', content } } })
+
+  beforeAll(() => {
+    write('tools/sections.sh', [
+      'echo "plain one"',
+      `echo '${sectionLine('summary', 'S')}'`,
+      `echo '${JSON.stringify({ type: 'log', message: 'to stderr' })}'`,
+      `echo '${sectionLine('details', 'D')}'`,
+      'echo "plain two"',
+    ].join('\n') + '\n')
+  })
+
+  const entry = { run: { command: 'tools/sections.sh', output: 'sections' } }
+
+  it('captured: turns section lines into sections, emitted as they arrive, and keeps other lines as text', async () => {
+    const events = []
+    const result = await run(entry, [], { onEvent: e => events.push(e) })
+    expect(events.map(e => e.section.name)).toEqual(['summary', 'details'])
+    expect(events[0]).toMatchObject({ type: 'section', rune: 'k', instanceId: '1' })
+    expect(result.slice(0, 2).map(s => s.name)).toEqual(['summary', 'details'])
+    expect(result[2]).toBe('plain one\nplain two')
+  })
+
+  it('direct: prints sections as markdown and plain lines as they are, honouring a section filter', async () => {
+    let written = ''
+    const write = process.stdout.write
+    process.stdout.write = chunk => { written += chunk; return true }
+    try {
+      expect(await run(entry, [], { direct: true, sections: ['summary'] })).toEqual({ directExitCode: 0 })
+    } finally {
+      process.stdout.write = write
+    }
+    expect(written).toContain('plain one\n')
+    expect(written).toContain('## summary\nS')
+    expect(written).not.toContain('## details')
+  })
+})

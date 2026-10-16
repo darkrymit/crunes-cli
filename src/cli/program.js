@@ -379,12 +379,13 @@ export function buildProgram() {
     .description('Scaffold a new rune and register it in config')
     .addOption(new Option('--format <format>', 'rune output format').choices(['tree', 'markdown']))
     .option('--path <path>', 'file path for the rune (default: .crunes/runes/<key>.js)')
+    .addOption(new Option('--lang <lang>', 'scaffold a script rune instead of a sandboxed JS one').choices(['python', 'bash', 'node']))
     .option('--name <name>', 'human-readable label shown in crunes list')
     .option('--description <description>', 'short description of what context this rune provides')
     .option('-g, --global', 'operate on the global config (~/.crunes/config.json) instead of the project')
     .action(async (key, opts) => {
       const { handler } = await import('../rune/commands/create.js')
-      await handler({ key, format: opts.format, path: opts.path, name: opts.name, description: opts.description, yes: !!program.opts().yes, projectRoot: projectRoot(), configRoot: configRoot(), global: !!opts.global })
+      await handler({ key, format: opts.format, lang: opts.lang, path: opts.path, name: opts.name, description: opts.description, yes: !!program.opts().yes, projectRoot: projectRoot(), configRoot: configRoot(), global: !!opts.global })
     })
 
   program
