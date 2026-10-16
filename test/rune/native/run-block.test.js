@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, vi } from 'vitest'
-import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, writeFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { runRunBlock } from '../../../src/rune/native/run-block.js'
@@ -161,8 +161,10 @@ describe('runRunBlock — structured output', () => {
   it('captured: turns section lines into sections, emitted as they arrive, and keeps other lines as text', async () => {
     const events = []
     const result = await run(entry, [], { onEvent: e => events.push(e) })
-    expect(events.map(e => e.section.name)).toEqual(['summary', 'details'])
+    expect(events.filter(e => e.type === 'section').map(e => e.section.name)).toEqual(['summary', 'details'])
     expect(events[0]).toMatchObject({ type: 'section', rune: 'k', instanceId: '1' })
+    // A log line is framed like any rune's: an event, not raw standard error.
+    expect(events[1]).toEqual({ type: 'log', level: 'log', message: 'to stderr', rune: 'k', instanceId: '1' })
     expect(result.slice(0, 2).map(s => s.name)).toEqual(['summary', 'details'])
     expect(result[2]).toBe('plain one\nplain two')
   })
@@ -213,6 +215,13 @@ describe('runRunBlock — run.timeout', () => {
     const started = Date.now()
     await expect(run({ run: { command: 'tools/slow.sh', timeout: 0.5 } })).rejects.toThrow('timed out after 0.5s')
     expect(Date.now() - started).toBeLessThan(10_000)
+  })
+
+  it('stops the script before it can run on past a child that was stopped', async () => {
+    write('tools/after.sh', `sleep 30\necho ran-on > "${join(dir, 'ran-on.txt')}"\n`)
+    await expect(run({ run: { command: 'tools/after.sh', timeout: 0.5 } })).rejects.toThrow('timed out')
+    await new Promise(r => setTimeout(r, 300))
+    expect(existsSync(join(dir, 'ran-on.txt'))).toBe(false)
   })
 
   it('direct: ends with status 124, the convention of timeout(1)', async () => {

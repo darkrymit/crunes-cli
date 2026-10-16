@@ -14,15 +14,20 @@ function signalStatus(signal) {
 /**
  * Stop a timed-out script and the processes it started. A script's children hold its output
  * pipe open, so stopping the script alone would leave crunes waiting on them. Windows stops the
- * whole tree; elsewhere the script's direct children are signalled alongside it.
+ * whole tree. Elsewhere the script is signalled first — so it cannot run on once a child ends —
+ * and then the direct children it had, found before it was signalled, because a child whose
+ * parent has ended is no longer listed under it.
  */
 function stopTree(child, signal) {
   if (process.platform === 'win32') {
     spawnSync('taskkill', ['/pid', String(child.pid), '/T', '/F'], { windowsHide: true })
     return
   }
-  spawnSync('pkill', [`-${signal.replace(/^SIG/, '')}`, '-P', String(child.pid)])
+  const listed = spawnSync('pgrep', ['-P', String(child.pid)], { encoding: 'utf8' }).stdout ?? ''
   child.kill(signal)
+  for (const pid of listed.split('\n').filter(Boolean)) {
+    try { process.kill(Number(pid), signal) } catch { /* already gone */ }
+  }
 }
 
 function notFound(key, command, err) {
