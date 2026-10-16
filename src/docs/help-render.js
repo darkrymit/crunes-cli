@@ -167,6 +167,8 @@ export function formatRuneIndex(schema, meta) {
 
   const lines = [`Rune: ${key}${label ? ` — ${label}` : ''}`]
   if (meta?.relativePath) lines.push(`File (project-relative): ${meta.relativePath}`)
+  if (meta?.runs) lines.push(`Runs: ${meta.runs}`)
+  if (meta?.passThrough) lines.push('No argument schema — arguments are passed to it unchanged. Add an args block to document and parse them.')
 
   const usage = [`Usage: crunes ${verb(meta?.lifecycle)} ${key}`]
   if (specs) usage.push(specs)

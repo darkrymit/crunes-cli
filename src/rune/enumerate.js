@@ -1,5 +1,6 @@
 import { getRune } from './resolver.js'
 import { enabledPluginKeys } from '../core/config.js'
+import { runtimeOf } from './native/runtime.js'
 
 /**
  * Enumerate every rune visible to a project: local config runes first, then
@@ -20,6 +21,13 @@ export async function enumerateRunes(config) {
   for (const key of Object.keys(runes)) {
     if (/@[^:]+:/.test(key)) { overrideKeys.push(key); continue }
     const entry = getRune(config, key)
+    if (entry.run != null) {
+      const run = typeof entry.run === 'string' ? { command: entry.run } : entry.run
+      const runtime = runtimeOf(run.command)
+      const source = [run.command, ...(run.argv ?? [])].join(' ')
+      entries.push({ key, source, runtime, name: entry.name ?? null, description: entry.description ?? null })
+      continue
+    }
     const source = entry.plugin ? `→ ${entry.plugin}` : (entry.path ?? '')
     entries.push({ key, source, name: entry.name ?? null, description: entry.description ?? null })
   }

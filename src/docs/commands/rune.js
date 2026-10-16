@@ -7,6 +7,8 @@ import { computeEffectivePermissions } from '../../rune/permissions/permissions.
 import { output } from '../../shared/output.js'
 import { enumerateRunes } from '../../rune/enumerate.js'
 import { formatRuneIndex, formatCommandPage, formatGlobalIndex, selectNode, flattenCommands } from '../help-render.js'
+import { describeRunBlock, getRunBlockSchema } from '../../rune/native/run-block.js'
+import { isPathCommand, resolveInterpreter } from '../../rune/native/runtime.js'
 
 const SUGGESTIONS = {
   run: 'crunes docs run',
@@ -29,6 +31,7 @@ export async function resolveRuneDocs(config, key, projectRoot, configRoot) {
   if (!localEntry && !resolved) return null
 
   let runeFile, relativePath, basePerms, vars, displayName, displayDescription, batch
+  let native = null, runs = null
 
   if (resolved) {
     const { runeKey, pluginDir } = resolved
@@ -41,6 +44,29 @@ export async function resolveRuneDocs(config, key, projectRoot, configRoot) {
     displayName = runeDef.name ?? runeKey
     displayDescription = runeDef.description ?? null
     batch = runeDef.batch != null ? { allow: runeDef.batch.allow ?? [], deny: runeDef.batch.deny ?? [] } : null
+  } else if (localEntry.run != null) {
+    const desc = describeRunBlock(localEntry, configRoot)
+    const shown = isPathCommand(desc.command) ? relative(projectRoot, desc.command).replace(/\\/g, '/') : desc.command
+    if (desc.runtime === 'isolate') {
+      runeFile = desc.command
+      relativePath = shown
+      basePerms = { run: desc.permissions ?? {} }
+    } else {
+      native = desc
+      let interpreter = ''
+      try {
+        const found = resolveInterpreter(desc.runtime, projectRoot)
+        if (found) interpreter = ` (${[found.command, ...found.args].join(' ')})`
+      } catch (err) {
+        interpreter = ` (not found: ${err.message.split('\n')[0]})`
+      }
+      runs = `${[shown, ...desc.argv].join(' ')} · ${desc.runtime}${interpreter} · native, full access`
+      basePerms = {}
+    }
+    vars = localEntry.vars ?? {}
+    displayName = localEntry.name ?? key
+    displayDescription = localEntry.description ?? null
+    batch = localEntry.batch != null ? { allow: localEntry.batch.allow ?? [], deny: localEntry.batch.deny ?? [] } : null
   } else {
     runeFile = resolveRuneFilePath(localEntry, key, configRoot)
     relativePath = relative(projectRoot, runeFile).replace(/\\/g, '/')
@@ -57,21 +83,25 @@ export async function resolveRuneDocs(config, key, projectRoot, configRoot) {
   let schema = null
   let schemaError = null
   try {
-    schema = await getArgsSchema(runeFile, runEffective, projectRoot, { vars, runeKey: key })
+    schema = native
+      ? await getRunBlockSchema(native, projectRoot, { vars, runeKey: key })
+      : await getArgsSchema(runeFile, runEffective, projectRoot, { vars, runeKey: key })
   } catch (err) {
     schemaError = err.message
     output.warn(`Could not load args schema for "${key}": ${err.message}`)
   }
 
   let repl = null
-  try {
+  // A run-block rune has no REPL until repl blocks exist.
+  if (localEntry?.run == null) try {
     const { argsSchema, commandsSchema } = await getReplSchema(runeFile, replEffective, [], projectRoot, { vars, runeKey: key })
     if (argsSchema !== null || commandsSchema !== null) repl = { argsSchema, commandsSchema }
   } catch (err) {
     output.warn(`Could not load REPL schema for "${key}": ${err.message}`)
   }
 
-  return { key, name: displayName, description: displayDescription, relativePath, schema, schemaError, repl, batch }
+  const passThrough = native != null && schema == null && schemaError == null
+  return { key, name: displayName, description: displayDescription, relativePath, runs, passThrough, schema, schemaError, repl, batch }
 }
 
 /** `[{ path, description }]` — the index shape, deliberately without option detail. */
@@ -164,6 +194,7 @@ export async function handler({ key, path = [], format = 'text', projectRoot = p
         name: docs.name,
         description: docs.description,
         relativePath: docs.relativePath,
+        ...(docs.runs ? { runs: docs.runs } : {}),
         options: docs.schema?.options ?? [],
         positionals: docs.schema?.positionals ?? [],
         // Mirrors the text index: withheld while there are commands to drill into.
@@ -178,6 +209,8 @@ export async function handler({ key, path = [], format = 'text', projectRoot = p
         name: docs.name,
         description: docs.description,
         relativePath: docs.relativePath,
+        runs: docs.runs,
+        passThrough: docs.passThrough,
         repl: docs.repl ? { commands: docs.repl.commandsSchema?.commands ?? [] } : null,
         batch: docs.batch,
         includeBatch: true,

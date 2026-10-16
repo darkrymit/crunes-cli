@@ -129,7 +129,7 @@ export async function handler({
   try {
     runeEntry = await resolveRuneEntry(projectRoot, config, key, configRoot)
   } catch (err) {
-    output.error(`Rune "${key}" not found: ${err.message}`)
+    output.error(`Cannot start a REPL for "${key}": ${err.message}`)
     process.exit(1)
   }
 

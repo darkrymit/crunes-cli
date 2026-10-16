@@ -46,9 +46,13 @@ export async function handler({
     return;
   }
 
+  // A run-block rune names how it runs beside where it lives; native means unsandboxed.
+  const shownSource = ({ source, runtime }) =>
+    runtime ? `${source} (${runtime === 'isolate' ? 'isolate' : `${runtime}, native`})` : source;
+
   if (plain) {
-    for (const { key, name, description, source, layer } of entries) {
-      process.stdout.write(`${key}\t${name ?? ''}\t${description ?? ''}\t${source}\t${layer}\n`);
+    for (const { key, name, description, source, runtime, layer } of entries) {
+      process.stdout.write(`${key}\t${name ?? ''}\t${description ?? ''}\t${shownSource({ source, runtime })}\t${layer}\n`);
     }
     return;
   }
@@ -62,8 +66,8 @@ export async function handler({
     style: { head: ['cyan'] },
   });
 
-  for (const { key, name, description, source, layer } of entries) {
-    table.push([key, name ?? '', description ?? '', source, layer]);
+  for (const { key, name, description, source, runtime, layer } of entries) {
+    table.push([key, name ?? '', description ?? '', shownSource({ source, runtime }), layer]);
   }
 
   process.stdout.write(table.toString() + '\n');
