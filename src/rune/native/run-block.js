@@ -40,6 +40,7 @@ export function describeRunBlock(entry, configDir) {
     runtime: runtimeOf(command),
     output: run.output ?? 'text',
     pass: run.pass ?? 'raw',
+    timeout: run.timeout ?? null,
     permissions: run.permissions,
     argsInline: inline,
     argsModule: argsFile,
@@ -113,6 +114,7 @@ export async function runRunBlock({ dir, key, args, entry, opts = {}, configDir,
       instanceId,
       nodeModulesDir: join(getLocalBase(configDir), 'node_modules'),
       pluginDeps: null,
+      ...(desc.timeout != null && { isolateTimeoutMs: desc.timeout * 1000 }),
     })
   }
 
@@ -164,7 +166,7 @@ export async function runRunBlock({ dir, key, args, entry, opts = {}, configDir,
   }
 
   const shown = isPathCommand(desc.command) ? relative(dir, desc.command) || desc.command : desc.command
-  const spawnOpts = { key, file: shown, argv, env, cwd: dir, direct, stdin: opts.stdin ?? 'inherit' }
+  const spawnOpts = { key, file: shown, argv, env, cwd: dir, direct, stdin: opts.stdin ?? 'inherit', timeoutMs: desc.timeout != null ? desc.timeout * 1000 : null }
 
   if (!structured) {
     const result = await spawnNative(spawnOpts)

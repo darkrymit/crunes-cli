@@ -189,3 +189,15 @@ describe('validateConfig — run.pass', () => {
     expect(() => validateMergedRunBlocks({ runes: { a: { run: { command: 'git', pass: 'mapped' } } } })).toThrow('has no args block')
   })
 })
+
+describe('validateConfig — run.timeout', () => {
+  it('takes a positive number of seconds, for a script or an isolate module', () => {
+    expect(validate({ a: { run: { command: 'tools/a.sh', timeout: 90 } }, b: { run: { command: 'b.rune.js', timeout: 0.5 } } })).not.toThrow()
+  })
+
+  it('refuses anything else', () => {
+    for (const timeout of [0, -1, '90s', null]) {
+      expect(validate({ a: { run: { command: 'tools/a.sh', timeout } } })).toThrow('run.timeout must be a number of seconds')
+    }
+  })
+})
