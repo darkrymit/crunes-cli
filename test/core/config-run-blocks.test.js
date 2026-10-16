@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { resolve } from 'node:path'
 import { validateConfig, validateMergedRunBlocks, absolutizeEntryPaths, mergeConfigs } from '../../src/core/config.js'
 
 const validate = runes => () => validateConfig({ runes })
@@ -66,15 +67,15 @@ describe('absolutizeEntryPaths — run and args blocks', () => {
       a: { run: 'tools/a.py', args: 'a.args.rune.js' },
       b: { run: { command: 'git', argv: ['log'] } },
     } }, '/layer', 'project')
-    expect(out.runes.a.run).toEqual({ command: '/layer/tools/a.py' })
-    expect(out.runes.a.args).toEqual({ command: '/layer/a.args.rune.js' })
+    expect(out.runes.a.run).toEqual({ command: resolve('/layer', 'tools/a.py') })
+    expect(out.runes.a.args).toEqual({ command: resolve('/layer', 'a.args.rune.js') })
     expect(out.runes.b.run).toEqual({ command: 'git', argv: ['log'] })
   })
 
   it('gives a global run-block rune no default path', () => {
     const out = absolutizeEntryPaths({ runes: { a: { run: 'git' }, b: {} } }, '/store', 'global')
     expect(out.runes.a.path).toBeUndefined()
-    expect(out.runes.b.path).toBe('/store/runes/b.js')
+    expect(out.runes.b.path).toBe(resolve('/store', 'runes/b.js'))
   })
 })
 
@@ -101,7 +102,7 @@ describe('run blocks across layers', () => {
   it('lets a layer hold only grants for a command a lower layer declares', () => {
     expect(validate({ a: { run: { permissions: { allow: ['fs.read:x'] } } } })).not.toThrow()
     const merged = load({ a: { run: 'runes/a.rune.js' } }, { a: { run: { permissions: { allow: ['fs.read:x'] } } } })
-    expect(merged.runes.a.run).toEqual({ command: '/store/runes/a.rune.js', permissions: { allow: ['fs.read:x'] } })
+    expect(merged.runes.a.run).toEqual({ command: resolve('/store', 'runes/a.rune.js'), permissions: { allow: ['fs.read:x'] } })
   })
 
   it('refuses grants a layer adds to a native command from another layer', () => {
