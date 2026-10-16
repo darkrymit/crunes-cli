@@ -70,6 +70,55 @@
           ]
         }
       }
+    },
+    "test": {
+      "name": "Tests",
+      "description": "Run vitest on the given files or directories \u2014 a narrow surface over npx vitest run.",
+      "run": {
+        "command": "npx",
+        "argv": [
+          "vitest",
+          "run"
+        ],
+        "pass": "mapped",
+        "timeout": 600
+      },
+      "args": {
+        "positionals": [
+          {
+            "spec": "[paths...]",
+            "description": "Test files or directories; all tests when omitted"
+          }
+        ],
+        "options": [
+          {
+            "flags": "--name <pattern>",
+            "description": "Only tests whose name matches",
+            "to": [
+              "-t",
+              "{value}"
+            ]
+          },
+          {
+            "flags": "--update",
+            "description": "Update snapshots",
+            "to": "-u"
+          },
+          {
+            "flags": "--quiet",
+            "description": "Only the summary and failures",
+            "to": [
+              "--reporter",
+              "dot"
+            ]
+          }
+        ]
+      },
+      "batch": {
+        "allow": [
+          "*"
+        ]
+      }
     }
   },
   "plugins": {
