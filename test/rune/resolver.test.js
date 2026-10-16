@@ -262,3 +262,30 @@ describe('resolveRuneFromPlugins — ambiguity message shows full keys', () => {
     )
   })
 })
+
+describe('runRune — string results become sections', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  const run = () => runRune('/project', { runes: { hello: { path: 'h.js' } } }, 'hello', [])
+
+  it('turns a lone string into a markdown section named output', async () => {
+    runRuneInIsolate.mockResolvedValueOnce('hello')
+    expect(await run()).toEqual([
+      { name: 'output', attrs: {}, data: { type: 'markdown', content: 'hello' } },
+    ])
+  })
+
+  it('keeps sections and names each string in order, so none collide when de-duplicated by name', async () => {
+    const report = { name: 'report', attrs: {}, data: { type: 'markdown', content: 'R' } }
+    runRuneInIsolate.mockResolvedValueOnce(['a', report, 'b'])
+    const result = await run()
+    expect(result.map(s => s.name)).toEqual(['output', 'report', 'output-2'])
+    expect(result[1]).toBe(report)
+    expect(result[2].data).toEqual({ type: 'markdown', content: 'b' })
+  })
+
+  it('returns no sections for a void result', async () => {
+    runRuneInIsolate.mockResolvedValueOnce(undefined)
+    expect(await run()).toEqual([])
+  })
+})

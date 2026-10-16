@@ -188,10 +188,19 @@ export async function runRune(dir, config, key, args, opts = {}, _callStack = []
   return normaliseResult(result)
 }
 
+// A string result becomes a markdown section so rendering, JSONL and section
+// filters only ever see sections. Strings are named output, output-2, … because
+// the run command de-duplicates sections by name.
 function normaliseResult(result) {
   if (result == null) return []
-  if (Array.isArray(result)) return result
-  return [result]
+  const items = Array.isArray(result) ? result : [result]
+  let strings = 0
+  return items.map(item => {
+    if (typeof item !== 'string') return item
+    strings++
+    const name = strings === 1 ? 'output' : `output-${strings}`
+    return { name, attrs: {}, data: { type: 'markdown', content: item } }
+  })
 }
 
 /**
