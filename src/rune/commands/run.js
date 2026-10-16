@@ -180,7 +180,7 @@ export async function handler({
         const spaceIdx = matchString.indexOf(' ')
         const subject = spaceIdx === -1 ? matchString : matchString.slice(spaceIdx + 1)
         const lines = [`Batch not permitted for "${matchString}" — ${result.reason}.`, '']
-        lines.push(`  "batch" is a sibling of "permissions" on the rune entry, not inside it:`)
+        lines.push(`  "batch" is a field of the rune entry, beside "run" — not inside a block:`)
         lines.push('')
         lines.push(`    "runes": { "${seg.key}": { "batch": { "allow": ["${subject}"] } } }`)
         lines.push('')
