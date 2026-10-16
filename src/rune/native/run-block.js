@@ -8,7 +8,7 @@ import { isGlobMatch } from '../../shared/match.js'
 import { getLocalBase } from '../../store/index.js'
 import { isPathCommand, runtimeOf, resolveInterpreter, assertNotMissedRename } from './runtime.js'
 import { spawnNative } from './spawn.js'
-import { isInlineSchema, normaliseJsonSchema, loadJsonSchema, validateParsed } from './schema.js'
+import { isInlineSchema, normaliseJsonSchema, loadJsonSchema, validateParsed, mapToArgv, undeclaredArgs } from './schema.js'
 
 /** A block written as a string is shorthand for { command }. */
 export function normaliseBlock(block) {
@@ -39,6 +39,7 @@ export function describeRunBlock(entry, configDir) {
     argv: run.argv ?? [],
     runtime: runtimeOf(command),
     output: run.output ?? 'text',
+    pass: run.pass ?? 'raw',
     permissions: run.permissions,
     argsInline: inline,
     argsModule: argsFile,
@@ -99,7 +100,7 @@ function wantsHelp(rawArgs) {
  */
 export async function runRunBlock({ dir, key, args, entry, opts = {}, configDir, runeCallback, instanceId }) {
   const desc = describeRunBlock(entry, configDir)
-  const callArgs = [...desc.argv, ...args]
+  let callArgs = [...desc.argv, ...args]
 
   if (desc.runtime === 'isolate') {
     return runRuneInIsolate(desc.command, blockGrants(desc), callArgs, dir, {
@@ -137,6 +138,15 @@ export async function runRunBlock({ dir, key, args, entry, opts = {}, configDir,
       return { directExitCode: 0 }
     }
     validateParsed(schema, parsed, key)
+    // Mapped: the schema is the rune's whole surface. Nothing it does not declare reaches the
+    // program, and what it does declare is rewritten into the program's own arguments.
+    if (desc.pass === 'mapped') {
+      const undeclared = undeclaredArgs(schema, parsed, args)
+      if (undeclared.length) {
+        throw new Error(`Invalid arguments for "${key}":\n  ${undeclared.join('\n  ')}\nRun \`crunes run ${key} --help\` for usage.`)
+      }
+      callArgs = [...desc.argv, ...mapToArgv(schema, parsed)]
+    }
   }
 
   const interpreter = resolveInterpreter(desc.runtime, dir)

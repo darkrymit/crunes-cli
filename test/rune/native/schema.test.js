@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { mkdtempSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { isInlineSchema, normaliseJsonSchema, loadJsonSchema, validateParsed } from '../../../src/rune/native/schema.js'
+import { isInlineSchema, normaliseJsonSchema, loadJsonSchema, validateParsed, mapToArgv, undeclaredArgs } from '../../../src/rune/native/schema.js'
 import { parseArgs } from '../../../src/rune/api/args-parser.js'
 
 describe('normaliseJsonSchema — the JSON args format', () => {
@@ -101,5 +101,54 @@ describe('value types', () => {
     expect(() => normaliseJsonSchema({ options: [{ flags: '--dry', type: 'number' }] })).toThrow('"boolean" for a flag that takes no value')
     expect(() => normaliseJsonSchema({ options: [{ flags: '--n <n>', type: 'boolean' }] })).toThrow('for an option that takes a value')
     expect(() => normaliseJsonSchema({ positionals: [{ spec: '<a>', type: 'date' }] })).toThrow('"type" must be one of string, number, integer')
+  })
+})
+
+describe('mapToArgv — a schema rewritten into the program\'s own arguments', () => {
+  const schema = normaliseJsonSchema({
+    positionals: [{ spec: '[path]', to: ['--', '{value}'] }],
+    options: [
+      { flags: '--limit <n>', type: 'integer', default: 20, to: ['-n', '{value}'] },
+      { flags: '--since <date>', to: '--since={value}' },
+      { flags: '--graph', to: '--graph' },
+      { flags: '-a, --all' },
+      { flags: '--author <who>' },
+    ],
+  })
+  const map = argv => mapToArgv(schema, parseArgs(argv, schema))
+
+  it('maps options in declaration order, then positionals, filling {value}', () => {
+    expect(map(['src', '--since', '2 weeks ago', '--graph'])).toEqual(['-n', '20', '--since=2 weeks ago', '--graph', '--', 'src'])
+  })
+
+  it('passes an option without `to` as its own flag, and leaves out what is unset or false', () => {
+    expect(map(['-a', '--author', 'kim', '--limit', '5'])).toEqual(['-n', '5', '--all', '--author', 'kim'])
+    expect(map(['--no-graph'])).toEqual(['-n', '20'])
+  })
+
+  it('maps a matched command to its `to` tokens, or its name', () => {
+    const s = normaliseJsonSchema({ commands: [{ name: 'recent', to: ['log', '--oneline'], options: [{ flags: '--max <n>', to: '-n{value}' }] }, { name: 'show' }] })
+    expect(mapToArgv(s, parseArgs(['recent', '--max', '3'], s))).toEqual(['log', '--oneline', '-n3'])
+    expect(mapToArgv(s, parseArgs(['show'], s))).toEqual(['show'])
+  })
+
+  it('refuses a `to` that is not a string or strings', () => {
+    expect(() => normaliseJsonSchema({ options: [{ flags: '--x', to: 3 }] })).toThrow('"to" must be a string or an array of strings')
+  })
+})
+
+describe('undeclaredArgs — what a mapped rune will not pass on', () => {
+  const schema = normaliseJsonSchema({
+    positionals: [{ spec: '[path]' }],
+    options: [{ flags: '-v, --verbose' }, { flags: '-n, --limit <n>' }],
+  })
+  const check = argv => undeclaredArgs(schema, parseArgs(argv, schema), argv)
+
+  it('accepts declared long and short flags, clusters, values and --help', () => {
+    expect(check(['src', '-v', '--limit=3', '-vn5', '--no-verbose', '--help'])).toEqual([])
+  })
+
+  it('names unknown options and extra positionals', () => {
+    expect(check(['src', 'more', '--force', '-x'])).toEqual(['unknown option --force', 'unknown option -x', 'unexpected argument "more"'])
   })
 })

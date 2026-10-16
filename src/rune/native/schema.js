@@ -4,9 +4,9 @@ import { parseFlags } from '../api/args-parser.js'
 const SCHEMA_KEYS = ['positionals', 'options', 'examples', 'commands']
 const NODE_KEYS = {
   root: SCHEMA_KEYS,
-  command: ['name', 'description', ...SCHEMA_KEYS],
-  positional: ['spec', 'description', 'type', 'choices'],
-  option: ['flags', 'description', 'type', 'default', 'required', 'choices'],
+  command: ['name', 'description', 'to', ...SCHEMA_KEYS],
+  positional: ['spec', 'description', 'type', 'choices', 'to'],
+  option: ['flags', 'description', 'type', 'default', 'required', 'choices', 'to'],
   example: ['usage', 'description'],
 }
 const POSITIONAL_SPEC = /^[<[]([a-zA-Z0-9_-]+)(\.\.\.)?[>\]]$/
@@ -34,6 +34,12 @@ function checkChoices(where, choices) {
   }
 }
 
+function checkTo(where, to) {
+  if (to !== undefined && typeof to !== 'string' && !(Array.isArray(to) && to.every(t => typeof t === 'string'))) {
+    fail(where, '"to" must be a string or an array of strings — the program arguments this one becomes, with {value} for its value')
+  }
+}
+
 function list(where, node, field) {
   const value = node[field]
   if (value === undefined) return []
@@ -57,6 +63,8 @@ function normaliseNode(node, where, kind) {
     if (typeof node.name !== 'string' || !node.name) fail(where, '"name" must be a non-empty string')
     out.name = node.name
     out.description = node.description ?? ''
+    checkTo(where, node.to)
+    if (node.to !== undefined) out.to = node.to
   }
   out.positionals = list(where, node, 'positionals').map((p, i) => {
     const at = `${where}.positionals[${i}]`
@@ -64,7 +72,8 @@ function normaliseNode(node, where, kind) {
     if (typeof p.spec !== 'string' || !POSITIONAL_SPEC.test(p.spec)) fail(at, `"spec" must look like <name>, [name] or <names...>`)
     if (p.type !== undefined && !VALUE_TYPES.includes(p.type)) fail(at, `"type" must be one of ${VALUE_TYPES.join(', ')}`)
     checkChoices(at, p.choices)
-    return { spec: p.spec, description: p.description ?? '', ...(p.type && { type: p.type }), ...(p.choices && { choices: p.choices }) }
+    checkTo(at, p.to)
+    return { spec: p.spec, description: p.description ?? '', ...(p.type && { type: p.type }), ...(p.choices && { choices: p.choices }), ...(p.to !== undefined && { to: p.to }) }
   })
   out.options = list(where, node, 'options').map((o, i) => {
     const at = `${where}.options[${i}]`
@@ -80,6 +89,7 @@ function normaliseNode(node, where, kind) {
     }
     if (o.required !== undefined && typeof o.required !== 'boolean') fail(at, '"required" must be true or false')
     checkChoices(at, o.choices)
+    checkTo(at, o.to)
     return {
       flags: o.flags,
       description: o.description ?? '',
@@ -87,6 +97,7 @@ function normaliseNode(node, where, kind) {
       ...(o.default !== undefined && { def: o.default }),
       ...(o.required && { required: true }),
       ...(o.choices && { choices: o.choices }),
+      ...(o.to !== undefined && { to: o.to }),
     }
   })
   out.examples = list(where, node, 'examples').map((e, i) => {
@@ -175,4 +186,81 @@ export function validateParsed(schema, parsed, key) {
   }
 
   if (problems.length) throw new Error(`Invalid arguments for "${key}":\n  ${problems.join('\n  ')}\n${usage}`)
+}
+
+/** `to` tokens with {value} filled in. */
+function expand(to, value) {
+  return (Array.isArray(to) ? to : [to]).map(t => value === undefined ? t : t.replaceAll('{value}', String(value)))
+}
+
+/** The flag as the program would see it when an option declares no `to`: its long form, else its short one. */
+function flagToken(option, key) {
+  return /--/.test(option.flags) ? `--${key}` : `-${key}`
+}
+
+/**
+ * The program arguments a parsed call becomes in mapped mode: the matched command path, then
+ * every option in force in declaration order, then the positionals. Each argument becomes its
+ * `to` tokens — with {value} filled in — or, without one, its own flag and value. A boolean is
+ * passed only when true; an option the caller left unset and that has no default is omitted.
+ */
+export function mapToArgv(schema, parsed) {
+  const tokens = []
+  let node = schema
+  for (const name of parsed.$commands ?? []) {
+    node = (node.commands ?? []).find(c => c.name === name) ?? node
+    tokens.push(...expand(node.to ?? name))
+  }
+  for (const o of nodeFor(schema, parsed.$commands ?? []).options) {
+    const { key, type } = parseFlags(o.flags)
+    const value = parsed[key]
+    if (value === undefined || value === false) continue
+    if (type === 'boolean' && !o.type) {
+      if (value === true) tokens.push(...(o.to !== undefined ? expand(o.to) : [flagToken(o, key)]))
+      continue
+    }
+    for (const v of Array.isArray(value) ? value : [value]) {
+      tokens.push(...(o.to !== undefined ? expand(o.to, v) : [flagToken(o, key), String(v)]))
+    }
+  }
+  for (const p of node.positionals ?? []) {
+    const [, name] = p.spec.match(POSITIONAL_SPEC)
+    const value = parsed[name]
+    if (value === undefined) continue
+    for (const v of Array.isArray(value) ? value : [value]) tokens.push(...(p.to !== undefined ? expand(p.to, v) : [String(v)]))
+  }
+  return tokens
+}
+
+/**
+ * What a call passes that the schema does not declare: options it has no flag for, and
+ * positionals beyond the declared ones. Tokens after `--` are positionals.
+ */
+export function undeclaredArgs(schema, parsed, raw) {
+  const { options } = nodeFor(schema, parsed.$commands ?? [])
+  const long = new Set(['help'])
+  const short = new Map([['h', false]]) // short flag → whether it takes a value
+  for (const o of options) {
+    const { key, alias, type } = parseFlags(o.flags)
+    if (/--/.test(o.flags)) long.add(key)
+    else short.set(key, type !== 'boolean')
+    if (alias) short.set(alias, type !== 'boolean')
+    if (type === 'boolean') long.add(`no-${key}`)
+  }
+  const problems = []
+  for (const token of raw) {
+    if (token === '--') break
+    const longMatch = token.match(/^--([^=]+)/)
+    if (longMatch) {
+      if (!long.has(longMatch[1])) problems.push(`unknown option --${longMatch[1]}`)
+    } else if (/^-[^-\d]/.test(token)) {
+      // A cluster such as -vn5: each letter is a flag until one that takes a value, whose value is the rest.
+      for (const c of token.slice(1).split('=')[0]) {
+        if (!short.has(c)) { problems.push(`unknown option -${c}`); break }
+        if (short.get(c)) break
+      }
+    }
+  }
+  if (parsed.$rest?.length) problems.push(`unexpected argument${parsed.$rest.length > 1 ? 's' : ''} ${parsed.$rest.map(v => JSON.stringify(String(v))).join(' ')}`)
+  return problems
 }
