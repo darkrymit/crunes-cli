@@ -10,10 +10,10 @@ beforeEach(() => {
   emptyDir = mkdtempSync(path.join(os.tmpdir(), 'crunes-list-empty-'))
   store = mkdtempSync(path.join(os.tmpdir(), 'crunes-list-store-'))
   process.env.CRUNES_STORE = store
-  writeFileSync(path.join(store, 'config.json'), JSON.stringify({ runes: { serve: {} } }))
+  writeFileSync(path.join(store, 'config.json'), JSON.stringify({ runes: { serve: { run: 'runes/serve.rune.js' } } }))
   mkdirSync(path.join(dir, '.crunes'), { recursive: true })
   writeFileSync(path.join(dir, '.crunes', 'config.json'),
-    JSON.stringify({ runes: { build: { path: '.crunes/runes/build.js' } } }))
+    JSON.stringify({ runes: { build: { run: '.crunes/runes/build.rune.js' } } }))
 })
 
 describe('collectListRows', () => {

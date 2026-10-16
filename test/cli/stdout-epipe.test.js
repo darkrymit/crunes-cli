@@ -6,8 +6,8 @@ import { tmpdir } from 'node:os'
 
 const dir = mkdtempSync(join(tmpdir(), 'crunes-epipe-'))
 mkdirSync(join(dir, '.crunes', 'runes'), { recursive: true })
-writeFileSync(join(dir, '.crunes', 'config.json'), JSON.stringify({ runes: { many: { path: '.crunes/runes/many.js' } } }))
-writeFileSync(join(dir, '.crunes', 'runes', 'many.js'),
+writeFileSync(join(dir, '.crunes', 'config.json'), JSON.stringify({ runes: { many: { run: '.crunes/runes/many.rune.js' } } }))
+writeFileSync(join(dir, '.crunes', 'runes', 'many.rune.js'),
   "import { section } from '@utils'\n" +
   "export async function run() { return Array.from({ length: 5000 }, (_, i) => section.create('s' + i, { type: 'markdown', content: 'line ' + i })) }\n")
 

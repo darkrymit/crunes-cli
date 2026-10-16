@@ -24,7 +24,7 @@ Three tiers, first match wins:
 
 A bare key matching runes in two enabled plugins **throws and lists the qualified forms** rather than picking one. Silent shadowing would make it impossible to say which code actually ran, which matters more here than convenience because one of the candidates may be a stranger's.
 
-A config entry carrying a `plugin` field instead of a `path` is an alias: it re-dispatches to that plugin rune, optionally overriding its permissions and variables at the alias.
+A config entry carrying a `plugin` field instead of a `run` block is an alias: it re-dispatches to that plugin rune, optionally overriding its permissions and variables at the alias.
 
 ## Permissions
 
@@ -46,6 +46,16 @@ Without `repl: true` the child is `crunes run <key>` and needs `rune.run:<key>`;
 
 Because children are separate processes, **they do not share the parent's call stack**, so circular detection does not span them. Within one process the chain is tracked and a repeated key throws `CircularRuneError` formatted as `release → m → release`.
 
+## Native handlers
+
+A `run` block whose command is not a `*.rune.js` module never touches the isolate: `rune/native/` resolves the runtime from the file name, finds the interpreter, and spawns it. Run alone it is given the caller's streams and its exit code becomes crunes's; framed, its standard output is captured. Three things in that path are not obvious from the code:
+
+**A timed-out script is stopped with its children, parent first.** A script's children hold its output pipe open, so stopping the script alone leaves crunes waiting on them. The children are listed before the script is signalled — once it ends they are no longer listed under it — and the script goes first so it cannot run its next line after a child it was waiting on dies.
+
+**A sections script's log lines go through `onEvent` when framed.** Writing them to standard error directly works run alone and silently drops them from JSONL, where every line a rune produces must be an event.
+
+**Mapped arguments are checked against the raw tokens, not the parsed object.** The parser accepts any `--flag` it is given, so whether a call stayed on the schema's surface can only be read from what was typed. A short-flag cluster is read up to the first flag that takes a value.
+
 ## Decisions folded here
 
 **The section filter runs after execution, not inside the isolate.** `key[-s name]` matches against returned section names once the rune has finished. A rune may still filter internally for performance, but the full result is computed when it does not, so the filter can never change what a rune would have produced.
@@ -56,7 +66,7 @@ Because children are separate processes, **they do not share the parent's call s
 
 ## Gotchas
 
-**A flat `allow` is rejected, not ignored.** `{ "permissions": { "allow": [...] } }` fails validation at config load, naming the rune. A grant with no lifecycle has no meaning, and dropping it silently would leave a rune mysteriously unable to read anything.
+**Grants live in the block they apply to.** `run.permissions` and `repl.permissions` are flat `{ allow, deny }` lists; `scopedPermissions` (`core/rune-entry.js`) reshapes them into the mode-keyed form the permission engine and plugin consent still read. An entry-level `permissions` is the old shape and is refused at config load with the entry rewritten.
 
 **`repl` does not inherit from `run`.** A rune doing the same work in both modes declares the grant twice.
 

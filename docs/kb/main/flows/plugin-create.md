@@ -24,7 +24,7 @@ flowchart TD
 
 ## Two manifests, two jobs
 
-**`plugin.json`** is the runtime manifest. The CLI reads it at install and at execution: it declares the runes, the templates and the lifecycle-scoped permissions.
+**`plugin.json`** is the runtime manifest. The CLI reads it at install and at execution: in format `"2"` it names each rune's module in a `run` block (and `repl` for a REPL) with the grants inside the block, and declares the templates.
 
 **`marketplace.json`** is the publishing entry point, and it carries `source: "./"`.
 

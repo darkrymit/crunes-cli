@@ -37,12 +37,12 @@ describe('docs rune handler', () => {
     await mkdir(join(tmp, '.crunes', 'runes'), { recursive: true })
     await writeFile(join(tmp, '.crunes', 'config.json'), JSON.stringify({
       runes: {
-        release: { name: 'Release', description: 'Release automation' },
-        count: { name: 'Counter', description: 'Counts things' },
+        release: { name: 'Release', description: 'Release automation', run: '.crunes/runes/release.rune.js' },
+        count: { name: 'Counter', description: 'Counts things', run: '.crunes/runes/count.rune.js' },
       },
     }))
-    await writeFile(join(tmp, '.crunes', 'runes', 'release.js'), RELEASE_RUNE)
-    await writeFile(join(tmp, '.crunes', 'runes', 'count.js'), 'export async function run() { return [] }')
+    await writeFile(join(tmp, '.crunes', 'runes', 'release.rune.js'), RELEASE_RUNE)
+    await writeFile(join(tmp, '.crunes', 'runes', 'count.rune.js'), 'export async function run() { return [] }')
     written = []
     vi.spyOn(process.stdout, 'write').mockImplementation((chunk) => { written.push(chunk); return true })
   })
@@ -160,7 +160,7 @@ describe('docs rune handler — plugin runes', () => {
     loadRegistry.mockResolvedValue({ plugins: { 'my-org@git': { path: '/plugins/git', cacheDir: '/plugins/git' } } })
     loadPluginJson.mockResolvedValue({
       name: 'git', version: '1.0.0',
-      runes: { status: { name: 'Git Status', description: 'Shows status', permissions: {} } },
+      runes: { status: { name: 'Git Status', description: 'Shows status', run: 'runes/status.rune.js' } },
     })
 
     await handler({ key: 'my-org@git:status', path: [], projectRoot: tmp, configRoot: tmp })

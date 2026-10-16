@@ -29,35 +29,25 @@ writeFileSync(join(projectDir, '.crunes', 'config.json'), '{}')
 
 const baseConfig = {
   runes: {
-    hello: { path: 'runes/hello.js', permissions: { allow: [], deny: [] } },
+    hello: { run: { command: 'runes/hello.rune.js', permissions: { allow: [], deny: [] } } },
   },
 }
 
-describe('runRune — convention path', () => {
+describe('runRune — the run block names the module', () => {
   beforeEach(() => vi.clearAllMocks())
 
-  it('derives .crunes/runes/<key>.js when entry has no path field', async () => {
-    await runRune('/project', { runes: { hello: {} } }, 'hello', [])
+  it('runs the isolate module the run block names, relative to the config dir', async () => {
+    await runRune('/project', { runes: { hello: { run: 'custom/hello.rune.js' } } }, 'hello', [])
     expect(runRuneInIsolate).toHaveBeenCalledWith(
-      join('/project', '.crunes/runes/hello.js'),
+      join('/project', 'custom/hello.rune.js'),
       expect.anything(), [], '/project', expect.anything()
     )
   })
 
-  it('derives convention path relative to configDir', async () => {
-    await runRune('/project', { runes: { hello: {} } }, 'hello', [], { configDir: '/config' })
-    expect(runRuneInIsolate).toHaveBeenCalledWith(
-      join('/config', '.crunes/runes/hello.js'),
-      expect.anything(), [], '/project', expect.anything()
-    )
-  })
-
-  it('explicit path takes precedence over convention', async () => {
-    await runRune('/project', { runes: { hello: { path: 'custom/hello.js' } } }, 'hello', [])
-    expect(runRuneInIsolate).toHaveBeenCalledWith(
-      join('/project', 'custom/hello.js'),
-      expect.anything(), [], '/project', expect.anything()
-    )
+  it('passes the run block grants to the isolate', async () => {
+    await runRune('/project', { runes: { hello: { run: { command: 'h.rune.js', permissions: { allow: ['fs.read:src/**'] } } } } }, 'hello', [])
+    const effective = runRuneInIsolate.mock.calls[0][1]
+    expect(effective.allow).toEqual(['fs.read:./src/**'])
   })
 })
 
@@ -65,9 +55,9 @@ describe('runRune — project: prefix', () => {
   beforeEach(() => vi.clearAllMocks())
 
   it('project: prefix resolves from project config only', async () => {
-    await runRune('/project', { runes: { hello: { path: 'runes/hello.js' } } }, 'project:hello', [])
+    await runRune('/project', { runes: { hello: { run: 'runes/hello.rune.js' } } }, 'project:hello', [])
     expect(runRuneInIsolate).toHaveBeenCalledWith(
-      join('/project', 'runes/hello.js'),
+      join('/project', 'runes/hello.rune.js'),
       expect.anything(), [], '/project', expect.anything()
     )
   })
@@ -90,7 +80,7 @@ describe('runRune — configDir', () => {
   it('resolves local rune file from dir when configDir is not provided', async () => {
     await runRune('/project', baseConfig, 'hello', [], {})
     expect(runRuneInIsolate).toHaveBeenCalledWith(
-      join('/project', 'runes/hello.js'),
+      join('/project', 'runes/hello.rune.js'),
       expect.anything(),
       [],
       '/project',
@@ -101,7 +91,7 @@ describe('runRune — configDir', () => {
   it('resolves local rune file from configDir when provided', async () => {
     await runRune('/project', baseConfig, 'hello', [], { configDir: '/config-repo' })
     expect(runRuneInIsolate).toHaveBeenCalledWith(
-      join('/config-repo', 'runes/hello.js'),
+      join('/config-repo', 'runes/hello.rune.js'),
       expect.anything(),
       [],
       '/project',
@@ -120,28 +110,28 @@ describe('runRune — local npm imports via .crunes/node_modules', () => {
   beforeEach(() => vi.clearAllMocks())
 
   it('passes null as pluginDeps (allow-list is the only gate)', async () => {
-    const config = { runes: { hello: { path: 'runes/hello.js' } } }
+    const config = { runes: { hello: { run: 'runes/hello.rune.js' } } }
     await runRune('/project', config, 'hello', [])
     const opts = runRuneInIsolate.mock.calls[0][4]
     expect(opts.pluginDeps).toBeNull()
   })
 
   it('passes <configDir>/.crunes/node_modules as nodeModulesDir', async () => {
-    const config = { runes: { hello: { path: 'runes/hello.js' } } }
+    const config = { runes: { hello: { run: 'runes/hello.rune.js' } } }
     await runRune(projectDir, config, 'hello', [])
     const opts = runRuneInIsolate.mock.calls[0][4]
     expect(opts.nodeModulesDir).toBe(join(projectDir, '.crunes', 'node_modules'))
   })
 
   it('nodeModulesDir uses configDir when provided', async () => {
-    const config = { runes: { hello: { path: 'runes/hello.js' } } }
+    const config = { runes: { hello: { run: 'runes/hello.rune.js' } } }
     await runRune('/project', config, 'hello', [], { configDir: projectDir })
     const opts = runRuneInIsolate.mock.calls[0][4]
     expect(opts.nodeModulesDir).toBe(join(projectDir, '.crunes', 'node_modules'))
   })
 
   it('redirects nodeModulesDir into the store when the dir is not a project', async () => {
-    const config = { runes: { hello: { path: 'runes/hello.js' } } }
+    const config = { runes: { hello: { run: 'runes/hello.rune.js' } } }
     await runRune('/not-a-project', config, 'hello', [])
     const opts = runRuneInIsolate.mock.calls[0][4]
     expect(opts.nodeModulesDir).toBe(join(getLocalBase('/not-a-project'), 'node_modules'))
@@ -151,7 +141,7 @@ describe('runRune — local npm imports via .crunes/node_modules', () => {
 describe('runRune — plugin rune permission/vars override via runes["plugin:rune"]', () => {
   beforeEach(() => vi.clearAllMocks())
 
-  it('passes runes["plugin:rune"].permissions/.vars as projectPerms/projectVars to executePluginRune', async () => {
+  it('passes runes["plugin:rune"] block grants and vars as projectPerms/projectVars to executePluginRune', async () => {
     resolvePluginKeyScoped.mockReturnValue('my-plugin')
     loadRegistry.mockResolvedValue({
       plugins: { 'my-plugin': { path: '/plugins/my-plugin', cacheDir: '/plugins/my-plugin' } }
@@ -159,7 +149,7 @@ describe('runRune — plugin rune permission/vars override via runes["plugin:run
     loadPluginJson.mockResolvedValue({
       name: 'my-plugin',
       version: '1.0.0',
-      runes: { deploy: { permissions: {}, vars: {} } }
+      runes: { deploy: { run: 'runes/deploy.rune.js', vars: {} } }
     })
 
     const config = {
@@ -167,7 +157,7 @@ describe('runRune — plugin rune permission/vars override via runes["plugin:run
       runes: {
         'my-plugin:deploy': {
           vars: { region: 'us-east-1' },
-          permissions: { run: { allow: ['fs.read:src/**'] } }
+          run: { permissions: { allow: ['fs.read:src/**'] } }
         }
       }
     }
@@ -192,7 +182,7 @@ describe('runRune — plugin rune permission/vars override via runes["plugin:run
     loadPluginJson.mockResolvedValue({
       name: 'my-plugin',
       version: '1.0.0',
-      runes: { deploy: { permissions: {}, vars: {} } }
+      runes: { deploy: { run: 'runes/deploy.rune.js', vars: {} } }
     })
 
     const config = {
@@ -200,7 +190,7 @@ describe('runRune — plugin rune permission/vars override via runes["plugin:run
       runes: {
         'my-plugin:deploy': {
           vars: { region: 'eu-west-1' },
-          permissions: { run: { allow: ['fs.read:dist/**'] } }
+          run: { permissions: { allow: ['fs.read:dist/**'] } }
         }
       }
     }
@@ -228,7 +218,7 @@ describe('runRune — plugin rune permission/vars override via runes["plugin:run
     loadPluginJson.mockResolvedValue({
       name: 'my-org@my-plugin',
       version: '1.0.0',
-      runes: { deploy: { permissions: {}, vars: {} } }
+      runes: { deploy: { run: 'runes/deploy.rune.js', vars: {} } }
     })
 
     const config = { plugins: ['my-org@my-plugin'], runes: {} }
@@ -266,7 +256,7 @@ describe('resolveRuneFromPlugins — ambiguity message shows full keys', () => {
 describe('runRune — string results become sections', () => {
   beforeEach(() => vi.clearAllMocks())
 
-  const run = () => runRune('/project', { runes: { hello: { path: 'h.js' } } }, 'hello', [])
+  const run = () => runRune('/project', { runes: { hello: { run: 'h.rune.js' } } }, 'hello', [])
 
   it('turns a lone string into a markdown section named output', async () => {
     runRuneInIsolate.mockResolvedValueOnce('hello')

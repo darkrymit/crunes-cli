@@ -7,6 +7,92 @@ import { getStorePath } from '../../store/index.js'
 
 const VALID_FORMATS = ['tree', 'markdown']
 
+/** Script templates for `--lang`: each reads the contract's variables, so it runs as written. */
+const SCRIPT_LANGS = {
+  python: {
+    ext: 'py',
+    body: key => [
+      `import json`,
+      `import os`,
+      `import sys`,
+      ``,
+      `# A script rune: crunes runs this with the project's Python and passes`,
+      `#   sys.argv[1:]      the caller's arguments, unchanged`,
+      `#   CRUNES_ARGS       the parsed arguments as JSON, when the rune has an args schema`,
+      `#   CRUNES_VARS       the rune's configured vars as JSON`,
+      `# Whatever it prints is the rune's output.`,
+      ``,
+      `args = json.loads(os.environ.get("CRUNES_ARGS", "null"))`,
+      `rune_vars = json.loads(os.environ.get("CRUNES_VARS", "{}"))`,
+      ``,
+      `print("${key}:", sys.argv[1:])`,
+      ``,
+    ].join('\n'),
+  },
+  bash: {
+    ext: 'sh',
+    body: key => [
+      `# A script rune: crunes runs this with bash and passes`,
+      `#   "$@"              the caller's arguments, unchanged`,
+      `#   CRUNES_ARGS       the parsed arguments as JSON, when the rune has an args schema`,
+      `#   CRUNES_VARS       the rune's configured vars as JSON`,
+      `# Whatever it prints is the rune's output; its exit code is crunes's.`,
+      ``,
+      `echo "${key}: $*"`,
+      ``,
+    ].join('\n'),
+  },
+  node: {
+    ext: 'js',
+    body: key => [
+      `// A script rune: crunes runs this with Node, outside the sandbox, and passes`,
+      `//   process.argv.slice(2)  the caller's arguments, unchanged`,
+      `//   CRUNES_ARGS            the parsed arguments as JSON, when the rune has an args schema`,
+      `//   CRUNES_VARS            the rune's configured vars as JSON`,
+      `// Whatever it prints is the rune's output. To run in the sandbox instead, use a *.rune.js file.`,
+      ``,
+      `const args = JSON.parse(process.env.CRUNES_ARGS ?? 'null')`,
+      `const vars = JSON.parse(process.env.CRUNES_VARS ?? '{}')`,
+      ``,
+      `console.log('${key}:', process.argv.slice(2))`,
+      ``,
+    ].join('\n'),
+  },
+}
+
+export const VALID_LANGS = Object.keys(SCRIPT_LANGS)
+
+async function createScriptRune({ key, lang, runeRelPath, name, description, configRoot, global }) {
+  const spec = SCRIPT_LANGS[lang]
+  if (!spec) {
+    output.error(`Invalid --lang. Must be one of: ${VALID_LANGS.join(', ')}`)
+    process.exit(1)
+  }
+  if (!key) {
+    output.error('Missing required argument: <key>')
+    process.exit(1)
+  }
+  runeRelPath = runeRelPath ?? (global ? `runes/${key}.${spec.ext}` : `.crunes/runes/${key}.${spec.ext}`)
+  const runeAbsPath = join(global ? getStorePath() : configRoot, runeRelPath)
+
+  const configPath = getConfigPath({ configRoot, global })
+  const config = readRawConfig(configPath) ?? { runes: {} }
+  if (config.runes?.[key] != null) {
+    output.error(`Rune "${key}" already exists in ${configPath}.`)
+    process.exit(1)
+  }
+
+  await mkdir(dirname(runeAbsPath), { recursive: true })
+  await writeFile(runeAbsPath, spec.body(key))
+  config.runes = {
+    ...(config.runes ?? {}),
+    [key]: { ...(name && { name }), ...(description && { description }), run: runeRelPath },
+  }
+  await writeRawConfig(configPath, config)
+  output.success(`Created ${runeRelPath} (${lang}, native)`)
+  output.info(`Run: crunes run ${key}`)
+}
+
 export function template(key, format) {
   const imports = format === 'tree'
     ? `import { md, section, tree } from '@utils'`
@@ -60,6 +146,7 @@ export function template(key, format) {
 export async function handler({
   key,
   format,
+  lang,
   path: runeRelPath,
   name,
   description,
@@ -68,6 +155,10 @@ export async function handler({
   configRoot = projectRoot,
   global = false,
 } = {}) {
+  if (lang) {
+    await createScriptRune({ key, lang, runeRelPath, name, description, configRoot, global })
+    return
+  }
   const isNonInteractive = yes || !process.stdout.isTTY
 
   if (isNonInteractive) {
@@ -105,7 +196,7 @@ export async function handler({
     }
 
     if (!runeRelPath) {
-      const defaultPath = global ? `runes/${key}.js` : `.crunes/runes/${key}.js`
+      const defaultPath = global ? `runes/${key}.rune.js` : `.crunes/runes/${key}.rune.js`
       const result = await text({ message: 'File path?', initialValue: defaultPath })
       if (result === Symbol.for('clack:cancel')) { cancel('Cancelled.'); return }
       runeRelPath = result
@@ -124,7 +215,11 @@ export async function handler({
     }
   }
 
-  runeRelPath = runeRelPath ?? (global ? `runes/${key}.js` : `.crunes/runes/${key}.js`)
+  runeRelPath = runeRelPath ?? (global ? `runes/${key}.rune.js` : `.crunes/runes/${key}.rune.js`)
+  if (!/\.rune\.m?js$/i.test(runeRelPath)) {
+    output.error(`${runeRelPath}: a sandboxed rune's file must be named *.rune.js — the name is what runs it in the isolate.`)
+    process.exit(1)
+  }
   const baseRoot = global ? getStorePath() : configRoot
   const runeAbsPath = join(baseRoot, runeRelPath)
 
@@ -134,9 +229,9 @@ export async function handler({
   const configPath = getConfigPath({ configRoot, global })
   const config = readRawConfig(configPath) ?? { runes: {} }
   const entry = {
-    path: runeRelPath,
     ...(name && { name }),
     ...(description && { description }),
+    run: runeRelPath,
   }
   config.runes = { ...(config.runes ?? {}), [key]: entry }
   await writeRawConfig(configPath, config)

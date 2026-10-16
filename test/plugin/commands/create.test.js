@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mkdirSync, writeFileSync, rmSync, existsSync, readFileSync } from 'node:fs'
+import { validatePluginJson } from '../../../src/plugin/manifest.js'
 import { join } from 'node:path'
 import os from 'node:os'
 
@@ -151,7 +152,7 @@ describe('handler (non-interactive)', () => {
       for (const rel of [
         '.crunes-plugin/plugin.json',
         '.crunes-plugin/marketplace.json',
-        'runes/example.js',
+        'runes/example.rune.js',
         'templates/example-template.js',
         'README.md',
         'CHANGELOG.md',
@@ -165,16 +166,15 @@ describe('handler (non-interactive)', () => {
       const pj = JSON.parse(readFileSync(join(out, '.crunes-plugin', 'plugin.json'), 'utf8'))
       const mj = JSON.parse(readFileSync(join(out, '.crunes-plugin', 'marketplace.json'), 'utf8'))
       expect(pj.name).toBeUndefined()
-      expect(pj.format).toBe('1')
+      expect(pj.format).toBe('2')
       expect(mj.plugins[0].name).toBe('my-plugin')
     })
 
-    it('generates plugin.json with namespaced permissions schema', async () => {
+    it('generates a format 2 plugin.json that names the module and its grants in a run block', async () => {
       await handler({ ...BASE_OPTS, out, yes: true })
       const pj = JSON.parse(readFileSync(join(out, '.crunes-plugin', 'plugin.json'), 'utf8'))
-      expect(pj.runes.example.permissions).toEqual({
-        run: { allow: [], deny: [] },
-      })
+      expect(pj.runes.example.run).toEqual({ command: 'runes/example.rune.js', permissions: { allow: [], deny: [] } })
+      expect(() => validatePluginJson(pj)).not.toThrow()
     })
 
     it('defaults license to MIT when not provided in marketplace.json', async () => {
