@@ -1552,17 +1552,20 @@ export async function runRuneInIsolate(runeFile, effective, args, projectDir, {
     if (isVerbose) console.error(`[crunes:debug] parsing isolate result...`)
     return result
   } finally {
-    if (isVerbose) console.error(`[crunes:debug] disposing Isolate...`)
-    if (await context.eval('typeof __crunes_dispose !== "undefined"').catch(() => false)) {
-      await context.evalClosure(
-        `return (async () => { await __crunes_dispose() })()`,
-        [],
-        { result: { promise: true, copy: true } }
-      ).catch(() => {})
+    try {
+      if (isVerbose) console.error(`[crunes:debug] disposing Isolate...`)
+      if (await context.eval('typeof __crunes_dispose !== "undefined"').catch(() => false)) {
+        await context.evalClosure(
+          `return (async () => { await __crunes_dispose() })()`,
+          [],
+          { result: { promise: true, copy: true } }
+        ).catch(() => {})
+      }
+      await dispose()
+      isolate.dispose()
+    } finally {
+      clearInterval(keepAlive)
     }
-    await dispose()
-    isolate.dispose()
-    clearInterval(keepAlive)
   }
 }
 
