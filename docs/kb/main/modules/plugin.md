@@ -32,6 +32,10 @@ The snapshot is keyed **per rune, not per plugin**. Adding a rune to a plugin is
 
 The trade is against consent fatigue: a user re-approving an unchanged list on every patch release stops reading it, and a prompt nobody reads protects nothing.
 
+## Native runes are trusted per content, not per install
+
+A plugin rune whose `run` block names a script or program runs outside the sandbox, so install consent — which covers sandbox grants — does not make it runnable. `crunes plugin trust` records, in the registry entry's `trustedNative`, a digest of the run block, the argument schema and the script file; the resolver recomputes it on every run and refuses a rune whose digest is missing or different. `registerPlugin` carries `trustedNative` across a reinstall, which is safe precisely because it is pinned to content: an update that changes nothing keeps its trust, and one that changes the script loses it.
+
 ## Gotchas
 
 **The manifest must be at `.crunes-plugin/plugin.json`.** A `plugin.json` at the repository root is not found and not warned about; the install fails with *manifest not found* rather than naming the file it ignored.

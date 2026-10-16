@@ -55,7 +55,9 @@ It also stamps a display-only `LAYER` symbol, which is what `crunes list` and `c
 
 **A missing project config no longer throws.** `loadConfig` returns the global layer alone and marks the result `ROOTLESS`. Code that wrapped it in `try`/`catch` to survive `ENOENT` simply never takes that branch now; the catch still guards genuinely malformed JSON.
 
-**Entry paths coming out of `loadConfig` are absolute.** Anything comparing them to a relative literal, or joining them onto a project root, is wrong. `resolveRuneFilePath` accepts both forms for hand-built configs in tests.
+**Block commands coming out of `loadConfig` are absolute when they name a file.** A `run`, `args` or `repl` command that is a path is resolved against its layer before merging; a bare program name in `run` is left for `PATH`. Anything comparing a file command to a relative literal, or joining it onto a project root, is wrong. `resolveCommand` in `rune/native/run-block.js` accepts both forms for hand-built configs in tests.
+
+**The old entry shape is refused one layer at a time.** `path` and `permissions.<mode>` are explicit, so `validateConfig` refuses them with the entry printed rewritten (`rune-entry.js`, shared with `crunes migrate`). A block-less entry is not: one layer cannot tell a partial override from a rune that relied on the `.crunes/runes/<key>.js` fallback, so it is the merged check — no `run` command in any layer — that refuses it, naming `crunes migrate`.
 
 **There is no search upward.** `loadConfig(dir)` reads `join(dir, '.crunes', 'config.json')` and nothing else. Running from a subdirectory needs `--cwd`, or that directory is simply rootless and only global runes resolve. `--ccd` redirects only the project layer; the global layer still applies unless `CRUNES_NO_GLOBAL=1`.
 
