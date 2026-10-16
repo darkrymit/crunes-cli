@@ -32,11 +32,14 @@ export class InterpreterNotFoundError extends Error {
   }
 }
 
+/** Path functions for the platform being resolved for, which tests inject. */
+const pathFor = deps => deps.platform === 'win32' ? path.win32 : path.posix
+
 export function onPath(name, deps = defaultDeps()) {
   const names = deps.platform === 'win32' ? [`${name}.exe`, name] : [name]
   for (const dir of deps.pathDirs) {
     for (const n of names) {
-      const candidate = path.join(dir, n)
+      const candidate = pathFor(deps).join(dir, n)
       if (deps.exists(candidate)) return candidate
     }
   }
@@ -46,7 +49,8 @@ export function onPath(name, deps = defaultDeps()) {
 /** First Python that exists: CRUNES_PYTHON, the active virtualenv, a project .venv/ or venv/, then PATH. */
 export function findPython(projectDir, deps = defaultDeps()) {
   const win = deps.platform === 'win32'
-  const venvPython = dir => win ? path.join(dir, 'Scripts', 'python.exe') : path.join(dir, 'bin', 'python')
+  const p = pathFor(deps)
+  const venvPython = dir => win ? p.join(dir, 'Scripts', 'python.exe') : p.join(dir, 'bin', 'python')
   const tried = []
   const attempt = (label, candidate, args = [], missing = '(unset)') => {
     tried.push(candidate ? `${label}: ${candidate}` : `${label}: ${missing}`)
@@ -56,8 +60,8 @@ export function findPython(projectDir, deps = defaultDeps()) {
   const found =
     attempt('CRUNES_PYTHON', deps.env.CRUNES_PYTHON) ??
     attempt('VIRTUAL_ENV', deps.env.VIRTUAL_ENV && venvPython(deps.env.VIRTUAL_ENV)) ??
-    attempt('.venv', venvPython(path.join(projectDir, '.venv'))) ??
-    attempt('venv', venvPython(path.join(projectDir, 'venv'))) ??
+    attempt('.venv', venvPython(p.join(projectDir, '.venv'))) ??
+    attempt('venv', venvPython(p.join(projectDir, 'venv'))) ??
     attempt('python3', onPath('python3', deps), [], '(not on PATH)') ??
     attempt('python', onPath('python', deps), [], '(not on PATH)') ??
     (win ? attempt('py -3', onPath('py', deps), ['-3'], '(not on PATH)') : null)
