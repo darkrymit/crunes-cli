@@ -1416,6 +1416,10 @@ export async function runRuneInIsolate(runeFile, effective, args, projectDir, {
 
   if (isVerbose) console.error(`[crunes:debug] creating Isolate...`)
   const isolate = new ivm.Isolate({ memoryLimit: isolateMemoryMb })
+  // The isolate's setTimeout sits on unref'd host timers so a leftover timer cannot hold
+  // the process open after run() returns — which also means nothing holds it open while
+  // run() awaits one. This handle keeps the process alive for exactly the lifecycle call.
+  const keepAlive = setInterval(() => {}, 2 ** 30)
   let context
   try {
     if (isVerbose) console.error(`[crunes:debug] creating Context...`)
@@ -1558,6 +1562,7 @@ export async function runRuneInIsolate(runeFile, effective, args, projectDir, {
     }
     await dispose()
     isolate.dispose()
+    clearInterval(keepAlive)
   }
 }
 
