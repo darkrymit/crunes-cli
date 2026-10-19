@@ -28,7 +28,7 @@ A config entry carrying a `plugin` field instead of a `path` is an alias: it re-
 
 ## Permissions
 
-Effective permissions are the merge of plugin declarations, project overrides and auto-grants, flattened into allow and deny sets. The model itself is [a shared concept](kb:crunes-main/concepts/permission.md); what this module owns is how the set is computed and checked.
+Effective permissions are the merge of plugin declarations, project overrides and auto-grants, flattened into allow and deny sets. The model itself is [a shared concept](kb:crunes/concepts/permission.md); what this module owns is how the set is computed and checked.
 
 **Patterns are expanded into sibling forms at checker build time.** For `fs.*`, `cache.*` and `sqlite.*`, one written pattern becomes every equivalent spelling — relative, bare, absolute, `@project/`-prefixed, virtual-token — so a runtime value matches regardless of which form the rune author passed. Raw values then go straight to `checkPermission` with no normalisation at the call site, which is what keeps every call cheap and every check identical.
 
@@ -60,7 +60,7 @@ Because children are separate processes, **they do not share the parent's call s
 
 **`repl` does not inherit from `run`.** A rune doing the same work in both modes declares the grant twice.
 
-**Shell grants are per command position.** `git log | head -20` needs two grants, redirects need `fs.*` grants, and unscannable constructs are refused outright with no grant that overrides it. `crunes shell explain '<cmd>'` is the intended first move on a denial — the full rule is in [the permission concept](kb:crunes-main/concepts/permission.md).
+**Shell grants are per command position.** `git log | head -20` needs two grants, redirects need `fs.*` grants, and unscannable constructs are refused outright with no grant that overrides it. `crunes shell explain '<cmd>'` is the intended first move on a denial — the full rule is in [the permission concept](kb:crunes/concepts/permission.md).
 
 **A denial names the grant and where to put it.** `run` and `repl` append the config entry that resolves it, scoped to the lifecycle actually invoked. Before that existed, the error gave an exact token and no indication of which file, rune entry or lifecycle block it belonged in, which was a dead end for anyone who did not already know the config shape.
 
@@ -81,4 +81,4 @@ crunes docs args         # the args(builder) schema
 crunes docs utils        # every @utils namespace
 ```
 
-Those pages are generated from the TypeScript declarations, so they describe the installed version. A copy here would describe whichever version it was written against — the same reasoning as [skills state no API surface](kb:crunes-main/decisions/skills-state-no-api.md).
+Those pages are generated from the TypeScript declarations, so they describe the installed version. A copy here would describe whichever version it was written against — the same reasoning as [skills state no API surface](kb:crunes/decisions/skills-state-no-api.md).

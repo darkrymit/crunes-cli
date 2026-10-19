@@ -26,7 +26,7 @@ and all of `fs.glob:./**`, `fs.glob:./**/*`, `fs.glob:**` and `fs.glob:./*.js` a
 
 A grant is checked against the pattern the rune *asks with*, before anything is resolved. If patterns were glob-matched against each other, `./**` would subsume every narrower pattern and a grant meant to be specific could be widened by a cleverly shaped runtime pattern. Equality keeps the grant exactly as auditable as it reads.
 
-The consequence for rune authors is the real rule: **glob patterns a rune declares up front can be granted; patterns it builds at runtime cannot.** A rune that discovers a directory and globs inside it is asking with a string nobody could have written in advance. This is why the [kb plugin](kb:crunes-plugins-main/modules/kb.md) takes its roots from configuration rather than searching for them.
+The consequence for rune authors is the real rule: **glob patterns a rune declares up front can be granted; patterns it builds at runtime cannot.** A rune that discovers a directory and globs inside it is asking with a string nobody could have written in advance. This is why the [kb plugin](kb:crunes-plugins/modules/kb.md) takes its roots from configuration rather than searching for them.
 
 ## Finding the grant
 

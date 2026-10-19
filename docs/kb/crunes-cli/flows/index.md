@@ -1,5 +1,9 @@
 # Flows
 
+What the CLI does, in order, from a command's arguments to its result.
+
+## Documents
+
 * [crunes plugin create](/flows/plugin-create.md) - Scaffolds a plugin with two manifests, so the generated repository is simultaneously a plugin and the single-plugin marketplace that serves it.
 * [crunes plugin install](/flows/plugin-install.md) - Resolve from a marketplace, stage, validate the manifest, take consent, then write both registries — with provenance required at the front and staging cleanup guaranteed at the back.
 * [crunes repl](/flows/repl.md) - A session in one isolate — repl() initialises once, inputRepl() handles each event, and the host owns readline, slash commands, completion and multiline while the rune sees only cooked input events.

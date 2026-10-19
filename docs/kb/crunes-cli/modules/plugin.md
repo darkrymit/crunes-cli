@@ -8,7 +8,7 @@ resource: src/plugin/
 
 # plugin
 
-Install, uninstall, enable, disable, update and scaffold. The model — composite keys, consent snapshots, install-once-enable-per-project — is [a shared concept](kb:crunes-main/concepts/plugin.md); this document covers how the module implements it.
+Install, uninstall, enable, disable, update and scaffold. The model — composite keys, consent snapshots, install-once-enable-per-project — is [a shared concept](kb:crunes/concepts/plugin.md); this document covers how the module implements it.
 
 ## Two layers
 

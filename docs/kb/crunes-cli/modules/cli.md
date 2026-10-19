@@ -38,4 +38,4 @@ The trade is real: a syntax error or circular import inside a handler module is 
 
 **`completions install` can duplicate.** It checks for its exact hook line before appending to a shell profile. A line that was manually reformatted no longer matches, so a second install appends a second copy.
 
-**The command surface is generated, not listed here.** `crunes --help` and `crunes <group> --help` are the authority for which commands and subcommands exist. A count written into a document is the copy that goes wrong — the note claiming the `docs` group had ten subcommands while listing twelve was wrong for months, which is why [the layout spec](kb:crunes-main/specs/knowledge-base.md) forbids stating a total a tool can count.
+**The command surface is generated, not listed here.** `crunes --help` and `crunes <group> --help` are the authority for which commands and subcommands exist. A count written into a document is the copy that goes wrong — the note claiming the `docs` group had ten subcommands while listing twelve was wrong for months, which is why [the layout spec](kb:crunes/specs/knowledge-base.md) forbids stating a total a tool can count.

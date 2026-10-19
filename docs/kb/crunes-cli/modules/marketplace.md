@@ -8,7 +8,7 @@ resource: src/marketplace/
 
 # marketplace
 
-Registers sources and caches the plugin indexes they publish, so that installing a plugin reaches no network. The model is [a shared concept](kb:crunes-main/concepts/marketplace.md); this covers the implementation.
+Registers sources and caches the plugin indexes they publish, so that installing a plugin reaches no network. The model is [a shared concept](kb:crunes/concepts/marketplace.md); this covers the implementation.
 
 **Submodules:** `commands/` — `add`, `remove`, `list`, `search`, `update`, `browse`.
 

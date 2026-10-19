@@ -54,13 +54,13 @@
     },
     "crunes-plugins@kb:kb": {
       "vars": {
-        "roots": ["docs/kb/main"]
+        "roots": ["docs/kb/crunes-cli"]
       },
       "permissions": {
         "run": {
           "allow": [
-            "fs.glob:docs/kb/main/**/*.md",
-            "fs.read:docs/kb/main/**"
+            "fs.glob:docs/kb/crunes-cli/**/*.md",
+            "fs.read:docs/kb/crunes-cli/**"
           ]
         }
       }

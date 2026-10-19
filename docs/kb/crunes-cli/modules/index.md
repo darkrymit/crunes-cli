@@ -1,5 +1,9 @@
 # Modules
 
+One page per top-level directory under src/: its responsibility, the boundary it defends and the state it owns.
+
+## Documents
+
 * [cache](/modules/cache.md) - Named key/value buckets where every entry is its own JSON file, so concurrent runes never contend, with passive expiry that only a clear operation acts on.
 * [cli](/modules/cli.md) - The process entry point — two mutations to the runtime before Commander sees anything, lazy-loaded action handlers, and the global flags that configure output once for the whole process.
 * [core](/modules/core.md) - Three-layer config loading, the merge rules that decide what each layer may override, path absolutization per layer, and the circular-call error — deliberately holding no domain logic of its own.

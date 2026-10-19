@@ -10,7 +10,7 @@ resource: src/docs/
 
 Documentation is **compiled, not stored**. Nothing in this module serves prose someone wrote about the API; every page is rendered from a source that changes when the code changes.
 
-That property is why an agent holding only the CLI still gets an accurate reference, and why [the skills state no API surface](kb:crunes-main/decisions/skills-state-no-api.md).
+That property is why an agent holding only the CLI still gets an accurate reference, and why [the skills state no API surface](kb:crunes/decisions/skills-state-no-api.md).
 
 **Submodules:** `ts-walker.js` (normalises the TypeDoc AST), `ts-formatter.js` (renders it), `intro-compiler.js` (assembles the handbook), `help-render.js` (the shared renderer for rune help and `docs rune`), `commands/`.
 
