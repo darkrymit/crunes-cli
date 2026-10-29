@@ -47,6 +47,11 @@ describe('runRunBlock — captured (framed invocations)', () => {
     expect(await run({ run: 'tools/hello.mjs' }, ['x'])).toBe('node x')
   })
 
+  it.runIf(process.platform === 'win32')('runs Windows batch scripts (.cmd/.bat) with cmd.exe', async () => {
+    write('tools/hello.cmd', '@echo off\necho cmd output: %1 %2\n')
+    expect(await run({ run: 'tools/hello.cmd' }, ['hello', 'world'])).toBe('cmd output: hello world')
+  })
+
   it('fails the rune on a non-zero exit, naming the status', async () => {
     await expect(run({ run: 'tools/fail.sh' })).rejects.toThrow('exited with status 7')
   })

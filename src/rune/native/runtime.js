@@ -12,6 +12,8 @@ const RUNTIME_BY_EXTENSION = {
   '.cjs': 'node',
   '.py': 'python',
   '.sh': 'bash',
+  '.cmd': 'cmd',
+  '.bat': 'cmd',
 }
 
 /**
@@ -86,6 +88,11 @@ export function resolveInterpreter(runtime, projectDir) {
     }
     case 'bash':
       return { command: resolveShell('bash').path, args: [] }
+    case 'cmd':
+      if (process.platform !== 'win32') {
+        throw new Error('Windows batch scripts (.cmd/.bat) can only run on Windows.')
+      }
+      return { command: process.env.COMSPEC || 'cmd.exe', args: ['/d', '/s', '/c'] }
     default:
       return null
   }

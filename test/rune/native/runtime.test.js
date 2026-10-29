@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { mkdtempSync, writeFileSync } from 'node:fs'
 import { join, win32 } from 'node:path'
 import { tmpdir } from 'node:os'
-import { isPathCommand, runtimeOf, findPython, assertNotMissedRename, InterpreterNotFoundError } from '../../../src/rune/native/runtime.js'
+import { isPathCommand, runtimeOf, findPython, resolveInterpreter, assertNotMissedRename, InterpreterNotFoundError } from '../../../src/rune/native/runtime.js'
 
 describe('isPathCommand — a command is a file when a shell would treat it as one', () => {
   it.each([
@@ -22,6 +22,8 @@ describe('runtimeOf — the file name selects the runtime', () => {
     ['tools/types.cjs', 'node'],
     ['tools/cov.py', 'python'],
     ['tools/check.sh', 'bash'],
+    ['tools/build.cmd', 'cmd'],
+    ['tools/build.bat', 'cmd'],
     ['tools/report', 'file'],
     ['tools/report.rb', 'file'],
     ['git', 'program'],
@@ -93,5 +95,18 @@ describe('assertNotMissedRename — a plain .js handler importing @utils is refu
 
   it('only applies to the node runtime', () => {
     expect(() => assertNotMissedRename(file('e.py', "from '@utils'\n"), 'python', dir)).not.toThrow()
+  })
+})
+
+describe('resolveInterpreter — cmd runtime on Windows', () => {
+  it.runIf(process.platform === 'win32')('returns cmd.exe with /d /s /c on Windows', () => {
+    expect(resolveInterpreter('cmd', '/proj')).toEqual({
+      command: process.env.COMSPEC || 'cmd.exe',
+      args: ['/d', '/s', '/c'],
+    })
+  })
+
+  it.skipIf(process.platform === 'win32')('refuses cmd runtime on non-Windows', () => {
+    expect(() => resolveInterpreter('cmd', '/proj')).toThrow('Windows batch scripts')
   })
 })

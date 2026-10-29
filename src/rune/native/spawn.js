@@ -132,7 +132,7 @@ export function spawnNative({ key, file, argv, env, cwd, direct, stdin = 'inheri
         reject(new Error(`Rune "${key}" exited with status ${status}${signal ? ` (${signal})` : ''}.`))
         return
       }
-      resolve({ stdout: stdout.endsWith('\n') ? stdout.slice(0, -1) : stdout })
+      resolve({ stdout: stdout.replace(/\r?\n$/, '') })
     })
   })
 }
