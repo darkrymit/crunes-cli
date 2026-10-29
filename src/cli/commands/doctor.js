@@ -16,6 +16,8 @@ export function checkRunBlockRunes(config, projectRoot) {
   const results = []
   for (const [key, entry] of Object.entries(config?.runes ?? {})) {
     if (entry?.run == null) continue
+    const run = typeof entry.run === 'string' ? { command: entry.run } : entry.run
+    if (!run?.command) continue
     const desc = describeRunBlock(entry, projectRoot)
     if (desc.runtime === 'isolate') {
       results.push({ ok: true, message: `${key} → isolate` })

@@ -18,6 +18,7 @@ export function normaliseBlock(block) {
 
 /** A path command resolves against the config directory; a bare program name is left for PATH. */
 export function resolveCommand(command, configDir) {
+  if (!command) return null
   return isPathCommand(command) && !isAbsolute(command) ? join(configDir, command) : command
 }
 
