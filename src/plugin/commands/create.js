@@ -6,7 +6,7 @@ import { output } from '../../shared/output.js'
 
 export function pluginJson({ name, description, author, license }) {
   return JSON.stringify({
-    format: '2',
+    format: '1',
     runes: {
       example: {
         name: 'Example Rune',

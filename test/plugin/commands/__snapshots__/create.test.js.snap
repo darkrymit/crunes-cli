@@ -96,7 +96,7 @@ exports[`marketplaceJson > matches snapshot 1`] = `
 
 exports[`pluginJson > matches snapshot 1`] = `
 "{
-  "format": "2",
+  "format": "1",
   "runes": {
     "example": {
       "name": "Example Rune",

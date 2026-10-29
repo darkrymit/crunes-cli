@@ -4,7 +4,6 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { handler } from '../../../src/cli/commands/migrate.js'
 import { loadConfig } from '../../../src/core/config.js'
-import { validatePluginJson } from '../../../src/plugin/manifest.js'
 
 let dir
 beforeEach(() => {
@@ -59,29 +58,5 @@ describe('crunes migrate — a project', () => {
     await handler({ configRoot: dir, dryRun: true })
     expect(readJson(join(dir, '.crunes', 'config.json'))).toEqual({ runes: { a: {} } })
     expect(existsSync(join(dir, '.crunes', 'runes', 'a.js'))).toBe(true)
-  })
-})
-
-describe('crunes migrate --plugin', () => {
-  it('rewrites a format 1 manifest as format 2', async () => {
-    mkdirSync(join(dir, '.crunes-plugin'))
-    mkdirSync(join(dir, 'runes'))
-    writeFileSync(join(dir, 'runes', 'hello.js'), 'export function run() {}\n')
-    writeFileSync(join(dir, 'runes', 'other.js'), 'export function run() {}\n')
-    writeFileSync(join(dir, '.crunes-plugin', 'plugin.json'), JSON.stringify({
-      format: '1', name: 'p', version: '1.0.0',
-      runes: { hello: { description: 'Hi', permissions: { run: { allow: ['fs.read:**'] } } }, other: { path: 'runes/other.js' } },
-    }))
-
-    await handler({ configRoot: dir, pluginDir: dir })
-
-    const json = readJson(join(dir, '.crunes-plugin', 'plugin.json'))
-    expect(json.format).toBe('2')
-    expect(json.runes).toEqual({
-      hello: { description: 'Hi', run: { command: 'runes/hello.rune.js', permissions: { allow: ['fs.read:**'] } } },
-      other: { run: 'runes/other.rune.js' },
-    })
-    expect(() => validatePluginJson(json)).not.toThrow()
-    expect(existsSync(join(dir, 'runes', 'hello.rune.js'))).toBe(true)
   })
 })

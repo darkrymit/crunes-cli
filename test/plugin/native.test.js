@@ -16,7 +16,7 @@ const config = { plugins: { 'mkt@tools': true }, runes: { 'mkt@tools:hello': { v
 beforeAll(async () => {
   process.env.CRUNES_STORE = store
   write(join(pluginDir, '.crunes-plugin', 'plugin.json'), JSON.stringify({
-    format: '2',
+    format: '1',
     runes: {
       hello: { run: { command: 'scripts/hello.sh', argv: ['--from-plugin'] }, vars: { who: 'plugin' } },
       iso: { run: 'runes/iso.rune.js' },

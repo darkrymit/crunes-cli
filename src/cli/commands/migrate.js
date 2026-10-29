@@ -31,19 +31,8 @@ function readJson(file) {
  * and a real one compute the same plan; every layer is planned before any module is renamed,
  * because a layer's pathless entries are recognised by the v1 file still being in place.
  */
-export function planMigration({ configRoot, global = false, pluginDir = null }) {
+export function planMigration({ configRoot, global = false }) {
   const files = []
-  if (pluginDir) {
-    const file = join(pluginDir, '.crunes-plugin', 'plugin.json')
-    const json = readJson(file)
-    if (json.format === '1') {
-      const { changed, renames } = migrateRunes(json.runes, pluginDir, key => `runes/${key}.js`)
-      json.format = '2'
-      files.push({ file, json, changed, renames })
-    }
-    return files
-  }
-
   const layers = global
     ? [{ file: join(getStorePath(), 'config.json'), base: getStorePath(), layer: 'global' }]
     : [
@@ -62,8 +51,8 @@ export function planMigration({ configRoot, global = false, pluginDir = null }) 
   return files
 }
 
-export async function handler({ configRoot, global = false, pluginDir = null, dryRun = false }) {
-  const plan = planMigration({ configRoot, global, pluginDir })
+export async function handler({ configRoot, global = false, dryRun = false }) {
+  const plan = planMigration({ configRoot, global })
   const shown = file => relative(process.cwd(), file).replace(/\\/g, '/') || file
 
   if (plan.length === 0) {
@@ -74,7 +63,7 @@ export async function handler({ configRoot, global = false, pluginDir = null, dr
   const renames = new Map()
   for (const { file, json, changed, renames: needed } of plan) {
     output.info(`${shown(file)}: ${changed.length} entr${changed.length === 1 ? 'y' : 'ies'} rewritten (${changed.join(', ')})`)
-    if (dryRun) output.info(JSON.stringify(pluginDir ? json : { runes: Object.fromEntries(changed.map(k => [k, json.runes[k]])) }, null, 2))
+    if (dryRun) output.info(JSON.stringify({ runes: Object.fromEntries(changed.map(k => [k, json.runes[k]])) }, null, 2))
     for (const r of needed) renames.set(r.from, r.to)
   }
   for (const [from, to] of renames) {

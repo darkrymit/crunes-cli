@@ -166,11 +166,11 @@ describe('handler (non-interactive)', () => {
       const pj = JSON.parse(readFileSync(join(out, '.crunes-plugin', 'plugin.json'), 'utf8'))
       const mj = JSON.parse(readFileSync(join(out, '.crunes-plugin', 'marketplace.json'), 'utf8'))
       expect(pj.name).toBeUndefined()
-      expect(pj.format).toBe('2')
+      expect(pj.format).toBe('1')
       expect(mj.plugins[0].name).toBe('my-plugin')
     })
 
-    it('generates a format 2 plugin.json that names the module and its grants in a run block', async () => {
+    it('generates a format 1 plugin.json that names the module and its grants in a run block', async () => {
       await handler({ ...BASE_OPTS, out, yes: true })
       const pj = JSON.parse(readFileSync(join(out, '.crunes-plugin', 'plugin.json'), 'utf8'))
       expect(pj.runes.example.run).toEqual({ command: 'runes/example.rune.js', permissions: { allow: [], deny: [] } })
