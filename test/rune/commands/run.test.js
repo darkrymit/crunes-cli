@@ -366,26 +366,35 @@ describe('handler — progressive streaming and console logs', () => {
     })
   })
 
-  it('log event with level renders [instanceId:rune:log:level] prefix in text mode', async () => {
+  it('a log line from a rune run alone goes to standard error, unlabelled', async () => {
     runRune.mockImplementation(async (dir, config, key, args, opts) => {
       opts.onEvent({ type: 'log', level: 'info', message: 'hello', rune: 'docs', instanceId: '1' })
+      opts.onEvent({ type: 'section', section: { name: 'sec1', data: { type: 'markdown', content: 'c1' } }, rune: 'docs', instanceId: '1' })
       return []
     })
     let stdoutWritten = ''
+    let stderrWritten = ''
     vi.spyOn(process.stdout, 'write').mockImplementation(s => { stdoutWritten += s })
+    vi.spyOn(process.stderr, 'write').mockImplementation(s => { stderrWritten += s })
     await handler({ segments: [{ key: 'docs', sections: null, runeArgs: [] }], format: 'text' })
-    expect(stdoutWritten).toContain('[1:docs:log:info] hello')
+    expect(stderrWritten).toBe('hello\n')
+    expect(stdoutWritten).toBe('## sec1\nc1\n\n')
   })
 
-  it('log event with meta appends attrs in text mode', async () => {
+  it('in a batch, log lines go to standard error labelled with level and attrs', async () => {
     runRune.mockImplementation(async (dir, config, key, args, opts) => {
       opts.onEvent({ type: 'log', level: 'warn', message: 'slow', meta: { ms: 1200 }, rune: 'docs', instanceId: '1' })
+      opts.onEvent({ type: 'section', section: { name: 'sec1', data: { type: 'markdown', content: 'c1' } }, rune: 'docs', instanceId: '1' })
       return []
     })
     let stdoutWritten = ''
+    let stderrWritten = ''
     vi.spyOn(process.stdout, 'write').mockImplementation(s => { stdoutWritten += s })
-    await handler({ segments: [{ key: 'docs', sections: null, runeArgs: [] }], format: 'text' })
-    expect(stdoutWritten).toContain('[1:docs:log:warn] slow [ms: 1200]')
+    vi.spyOn(process.stderr, 'write').mockImplementation(s => { stderrWritten += s })
+    loadConfig.mockReturnValue({ runes: { docs: { batch: true } } })
+    await handler({ segments: [{ key: 'docs', sections: null, runeArgs: [] }], format: 'text', isBatch: true })
+    expect(stderrWritten).toContain('[1:docs:log:warn] slow [ms: 1200]')
+    expect(stdoutWritten).toBe('[1:docs:section] sec1\nc1\n\n')
   })
 
   it('log event with level and meta emits structured JSONL', async () => {
@@ -562,3 +571,45 @@ describe('handler — batch permission enforcement', () => {
   })
 })
 
+
+describe('handler — direct and framed invocations', () => {
+  beforeEach(() => {
+    loadConfig.mockReturnValue({ runes: { a: { run: 'a.sh', batch: { allow: ['*'] } }, b: { run: 'b.sh', batch: { allow: ['*'] } } } })
+    vi.spyOn(process.stdout, 'write').mockImplementation(() => {})
+    vi.spyOn(process, 'exit').mockImplementation(() => {})
+    runRune.mockResolvedValue([])
+  })
+
+  afterEach(() => { vi.clearAllMocks(); vi.restoreAllMocks() })
+
+  const seg = key => ({ key, sections: null, runeArgs: [] })
+  const optsOf = call => runRune.mock.calls[call][4]
+
+  it('runs a single rune in text format directly, with standard input', async () => {
+    await handler({ segments: [seg('a')] })
+    expect(optsOf(0)).toMatchObject({ direct: true, stdin: 'inherit' })
+  })
+
+  it('frames JSONL output, even for a single rune', async () => {
+    await handler({ segments: [seg('a')], format: 'jsonl' })
+    expect(optsOf(0).direct).toBe(false)
+  })
+
+  it('frames a batch and closes standard input for its runes', async () => {
+    await handler({ segments: [seg('a'), seg('b')], isBatch: true })
+    expect(optsOf(0)).toMatchObject({ direct: false, stdin: 'ignore' })
+    expect(optsOf(1)).toMatchObject({ direct: false, stdin: 'ignore' })
+  })
+
+  it('frames a batch of one', async () => {
+    await handler({ segments: [seg('a')], isBatch: true })
+    expect(optsOf(0).direct).toBe(false)
+  })
+
+  it('exits with the status a direct script returned, printing nothing', async () => {
+    runRune.mockResolvedValue({ directExitCode: 4 })
+    await handler({ segments: [seg('a')] })
+    expect(process.exit).toHaveBeenCalledWith(4)
+    expect(process.stdout.write).not.toHaveBeenCalled()
+  })
+})

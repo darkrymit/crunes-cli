@@ -1,5 +1,7 @@
 import * as p from '@clack/prompts'
 import { output } from '../shared/output.js'
+import { scopedPermissions, blockOf } from '../core/rune-entry.js'
+import { isNativeRune } from './native.js'
 
 function collectAllow(permissions) {
   const all = []
@@ -15,13 +17,20 @@ export function formatConsentScreen(pluginName, pluginJson) {
   const lines = [`${pluginName} requests the following permissions:\n`]
 
   for (const [runeKey, rune] of Object.entries(pluginJson.runes)) {
-    const allow = collectAllow(rune.permissions)
+    const allow = collectAllow(scopedPermissions(rune))
     if (allow.length === 0) continue
     lines.push(`  ${runeKey}`)
     for (const perm of allow) {
       lines.push(`          ${perm}`)
     }
     lines.push('')
+  }
+
+  const natives = Object.entries(pluginJson.runes).filter(([, rune]) => isNativeRune(rune))
+  if (natives.length) {
+    lines.push('Native runes — these run outside the sandbox, with your full access:\n')
+    for (const [runeKey, rune] of natives) lines.push(`  ${runeKey}  runs ${blockOf(rune, 'run').command}`)
+    lines.push('', `They will not run until you review and trust them: crunes plugin trust ${pluginName}`, '')
   }
 
   return lines.join('\n')
@@ -42,7 +51,7 @@ export async function promptConsent(pluginName, pluginJson, { yes = false } = {}
 export function diffPermissions(oldConsented, newPluginJson) {
   const added = {}
   for (const [runeKey, rune] of Object.entries(newPluginJson.runes)) {
-    const newPerms = collectAllow(rune.permissions)
+    const newPerms = collectAllow(scopedPermissions(rune))
     const oldPerms = oldConsented[runeKey] ?? []
     const newOnes  = newPerms.filter(perm => !oldPerms.includes(perm))
     if (newOnes.length > 0) added[runeKey] = newOnes

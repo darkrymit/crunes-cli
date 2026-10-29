@@ -36,9 +36,9 @@ describe('help renderer drift', () => {
   beforeEach(async () => {
     tmp = await mkdtemp(join(tmpdir(), 'crunes-drift-'))
     await mkdir(join(tmp, '.crunes', 'runes'), { recursive: true })
-    runeFile = join(tmp, '.crunes', 'runes', 'r.js')
+    runeFile = join(tmp, '.crunes', 'runes', 'r.rune.js')
     await writeFile(runeFile, RUNE)
-    await writeFile(join(tmp, '.crunes', 'config.json'), JSON.stringify({ runes: { r: {} } }))
+    await writeFile(join(tmp, '.crunes', 'config.json'), JSON.stringify({ runes: { r: { run: '.crunes/runes/r.rune.js' } } }))
   })
 
   afterEach(async () => {

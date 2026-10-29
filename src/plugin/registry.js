@@ -24,7 +24,11 @@ export async function saveRegistry(data) {
 export async function registerPlugin(entry) {
   const registry = await loadRegistry()
   const key = `${entry.marketplaceName}@${entry.name}`
+  // Trust in native runes survives a reinstall or update; it is pinned to what was reviewed,
+  // so a rune that changed is refused at run time until trusted again.
+  const trustedNative = registry.plugins[key]?.trustedNative
   registry.plugins[key] = {
+    ...(trustedNative && { trustedNative }),
     version:              entry.version,
     path:                 entry.path,
     cacheDir:             entry.cacheDir ?? entry.path,

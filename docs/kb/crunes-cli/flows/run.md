@@ -81,6 +81,12 @@ A rune therefore has two ways to produce a section and need not choose deliberat
 
 The section filter (`key[-s name]`) applies to this output after the rune finishes, never inside the isolate.
 
+## One rune reads like a program; several are labelled
+
+A single rune in text format is **direct**: sections print as plain markdown, and log lines go to standard error unlabelled. A batch, JSONL, a job or `bench` is **framed**: each text line is labelled `[instance:key:type]` so one rune's output can be told from another's. In every text mode, results go to standard output and logs to standard error — the label was standing in for that separation, and is only needed when several runes share a stream.
+
+A script rune run alone goes further: crunes captures nothing, and the script's streams and exit code are the caller's own. The deciding flag is computed once in the run command and passed down as `direct`.
+
 ## The JSONL format is also a wire protocol
 
 `--format jsonl` is not only for humans piping output. It is what `rune.exec` parses when one rune calls another as a child process, so the same render path serves interactive streaming and inter-rune communication.

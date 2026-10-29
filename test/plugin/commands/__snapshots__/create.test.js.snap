@@ -13,8 +13,7 @@ exports[`exampleRune > matches snapshot 1`] = `
 "// Ready-to-run rune — runs directly from the plugin install location.
 // Users activate it by adding your plugin to their project config.
 //
-// permissions (plugin.json):
-//   run:
+// permissions (plugin.json, inside this rune's run block):
 //     allow: []  — add patterns like fs.read:./** if you use utils.fs
 //     deny:  []
 
@@ -97,13 +96,14 @@ exports[`marketplaceJson > matches snapshot 1`] = `
 
 exports[`pluginJson > matches snapshot 1`] = `
 "{
-  "format": "1",
+  "format": "2",
   "runes": {
     "example": {
       "name": "Example Rune",
       "description": "Replace with your rune description",
-      "permissions": {
-        "run": {
+      "run": {
+        "command": "runes/example.rune.js",
+        "permissions": {
           "allow": [],
           "deny": []
         }

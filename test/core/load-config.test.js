@@ -30,23 +30,23 @@ const writeProject = (root, obj) => {
 
 describe('loadConfig layering', () => {
   it('returns the global layer alone and marks rootless when no project config exists', () => {
-    writeGlobal({ runes: { serve: { path: 'runes/serve.js' } } })
+    writeGlobal({ runes: { serve: { run: 'runes/serve.rune.js' } } })
     const config = loadConfig(dir)
     expect(config[ROOTLESS]).toBe(true)
-    expect(config.runes.serve.path.replace(/\\/g, '/')).toBe(path.join(store, 'runes/serve.js').replace(/\\/g, '/'))
+    expect(config.runes.serve.run.command.replace(/\\/g, '/')).toBe(path.join(store, 'runes/serve.rune.js').replace(/\\/g, '/'))
   })
 
   it('is not rootless once a project config exists', () => {
-    writeGlobal({ runes: { serve: {} } })
+    writeGlobal({ runes: { serve: { run: 'runes/serve.rune.js' } } })
     writeProject(dir, { runes: {} })
     expect(loadConfig(dir)[ROOTLESS]).toBe(false)
   })
 
   it('lets the project layer override a global rune var while keeping the global path', () => {
-    writeGlobal({ runes: { serve: { path: 'runes/serve.js', vars: { port: 3000 } } } })
+    writeGlobal({ runes: { serve: { run: 'runes/serve.rune.js', vars: { port: 3000 } } } })
     writeProject(dir, { runes: { serve: { vars: { port: 4000 } } } })
     const config = loadConfig(dir)
-    expect(config.runes.serve.path.replace(/\\/g, '/')).toBe(path.join(store, 'runes/serve.js').replace(/\\/g, '/'))
+    expect(config.runes.serve.run.command.replace(/\\/g, '/')).toBe(path.join(store, 'runes/serve.rune.js').replace(/\\/g, '/'))
     expect(config.runes.serve.vars).toEqual({ port: 4000 })
   })
 
@@ -57,14 +57,14 @@ describe('loadConfig layering', () => {
   })
 
   it('tags the winning layer for display', () => {
-    writeGlobal({ runes: { serve: {} } })
+    writeGlobal({ runes: { serve: { run: 'runes/serve.rune.js' } } })
     writeProject(dir, { runes: {} })
     expect(loadConfig(dir).runes.serve[LAYER]).toBe('global')
   })
 
   it('skips the global layer entirely under CRUNES_NO_GLOBAL', () => {
     process.env.CRUNES_NO_GLOBAL = '1'
-    writeGlobal({ runes: { serve: {} } })
+    writeGlobal({ runes: { serve: { run: 'runes/serve.rune.js' } } })
     writeProject(dir, { runes: {} })
     expect(loadConfig(dir).runes.serve).toBeUndefined()
   })

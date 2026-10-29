@@ -1,5 +1,10 @@
 import yargsParser from 'yargs-parser'
 
+// Values stay as typed unless the schema declares a number: "1.10" and "007" are versions and ids,
+// not 1.1 and 7. Options declared with a number type are still coerced.
+const YARGS_CONFIGURATION = { 'parse-numbers': false, 'parse-positional-numbers': false }
+const NUMBER_TYPES = ['number', 'integer']
+
 const FLAG_SHORT = /^-([a-zA-Z])$/
 const FLAG_LONG  = /^--([a-zA-Z][a-zA-Z0-9-]*)(?:\s+<([a-zA-Z0-9_-]+)>|\s+\[([a-zA-Z0-9_-]+)\])?$/
 
@@ -29,9 +34,10 @@ export function parseFlags(flagStr) {
 
 export function buildYargsConfig(schema) {
   if (!schema) return {}
-  const cfg = { alias: {}, boolean: [], number: [], string: [], default: {} }
+  const cfg = { alias: {}, boolean: [], number: [], string: [], default: {}, configuration: YARGS_CONFIGURATION }
   for (const opt of schema.options ?? []) {
-    const { key, alias, type } = parseFlags(opt.flags)
+    const { key, alias, type: flagType } = parseFlags(opt.flags)
+    const type = NUMBER_TYPES.includes(opt.type) ? 'number' : flagType
     if (alias) cfg.alias[alias] = key
     if (type === 'boolean') cfg.boolean.push(key)
     else if (type === 'number') cfg.number.push(key)
@@ -39,6 +45,12 @@ export function buildYargsConfig(schema) {
     if (opt.def !== undefined) cfg.default[key] = opt.def
   }
   return cfg
+}
+
+// A value that is not a number is kept as typed, so validation can name it.
+function toNumber(value) {
+  const n = Number(value)
+  return value !== '' && Number.isFinite(n) ? n : value
 }
 
 export function mapPositionals(parsed, positionals, offset = 0) {
@@ -54,6 +66,7 @@ export function mapPositionals(parsed, positionals, offset = 0) {
       if (varMatch) {
         const key = varMatch[1]
         parsed[key] = parsed._.slice(i + offset)
+        if (NUMBER_TYPES.includes(positionals[i].type)) parsed[key] = parsed[key].map(toNumber)
         consumedCount = parsed._.length // Consumes all remaining positionals
         break
       }
@@ -64,7 +77,7 @@ export function mapPositionals(parsed, positionals, offset = 0) {
         const key = match[1]
         const val = parsed._[i + offset]
         if (val !== undefined) {
-          parsed[key] = val
+          parsed[key] = NUMBER_TYPES.includes(positionals[i].type) ? toNumber(val) : val
           consumedCount = i + 1
         }
       }
@@ -77,7 +90,7 @@ export function mapPositionals(parsed, positionals, offset = 0) {
 
 export function parseArgs(rawArgs, schema) {
   if (!schema) {
-    const parsed = yargsParser(rawArgs, {})
+    const parsed = yargsParser(rawArgs, { configuration: YARGS_CONFIGURATION })
     parsed.$raw = rawArgs
     return parsed
   }

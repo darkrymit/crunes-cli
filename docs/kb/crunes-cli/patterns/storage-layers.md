@@ -18,7 +18,7 @@ The split is what makes a plugin *install once, enable anywhere, restrict per pr
 
 ## The store root is the global config directory
 
-There is no `.crunes/` segment inside the store. `<store>/config.json` is the global config, global runes are `<store>/runes/<key>.js`, templates `<store>/templates/<name>.js`. `~/.crunes` already *is* the config directory, and expecting `~/.crunes/.crunes/config.json` is the most common mistake made when writing a global path by hand.
+There is no `.crunes/` segment inside the store. `<store>/config.json` is the global config, a global rune's module is conventionally `<store>/runes/<key>.rune.js` — named in its `run` block, never found by convention — templates `<store>/templates/<name>.js`. `~/.crunes` already *is* the config directory, and expecting `~/.crunes/.crunes/config.json` is the most common mistake made when writing a global path by hand.
 
 ## One module computes every path
 

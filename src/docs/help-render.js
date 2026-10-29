@@ -82,11 +82,20 @@ function verb(lifecycle) {
   return lifecycle === 'repl' ? 'repl' : 'run'
 }
 
+// choices and required only come from a JSON schema; a builder schema never sets them.
+const choicesNote = choices => choices ? `  [choices: ${choices.map(c => JSON.stringify(c)).join(', ')}]` : ''
+const typeNote = type => type ? `  [${type}]` : ''
+
 function optionRows(options, indent = '  ') {
   return (options ?? []).map(opt => {
     const def = opt.def !== undefined ? `  [default: ${JSON.stringify(opt.def)}]` : ''
-    return row(opt.flags, `${opt.description ?? ''}${def}`, indent)
+    const required = opt.required ? '  [required]' : ''
+    return row(opt.flags, `${opt.description ?? ''}${typeNote(opt.type)}${def}${required}${choicesNote(opt.choices)}`, indent)
   })
+}
+
+function positionalRow(p, indent) {
+  return row(p.spec ?? '', `${p.description ?? ''}${typeNote(p.type)}${choicesNote(p.choices)}`, indent)
 }
 
 function exampleLines(examples, indent = '  ') {
@@ -125,7 +134,7 @@ export function formatCommandPage(node, meta) {
   if (positionals.length > 0) {
     lines.push('')
     lines.push('Positionals:')
-    for (const p of positionals) lines.push(row(p.spec ?? '', p.description))
+    for (const p of positionals) lines.push(positionalRow(p))
   }
 
   const options = node?.options ?? []
@@ -167,6 +176,8 @@ export function formatRuneIndex(schema, meta) {
 
   const lines = [`Rune: ${key}${label ? ` — ${label}` : ''}`]
   if (meta?.relativePath) lines.push(`File (project-relative): ${meta.relativePath}`)
+  if (meta?.runs) lines.push(`Runs: ${meta.runs}`)
+  if (meta?.passThrough) lines.push('No argument schema — arguments are passed to it unchanged. Add an args block to document and parse them.')
 
   const usage = [`Usage: crunes ${verb(meta?.lifecycle)} ${key}`]
   if (specs) usage.push(specs)
@@ -179,7 +190,7 @@ export function formatRuneIndex(schema, meta) {
   if (positionals.length > 0) {
     lines.push('')
     lines.push('Positionals:')
-    for (const p of positionals) lines.push(row(p.spec ?? '', p.description))
+    for (const p of positionals) lines.push(positionalRow(p))
   }
 
   const options = schema?.options ?? []

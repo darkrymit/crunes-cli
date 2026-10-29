@@ -11,7 +11,7 @@
   ],
   "scripts": {
     "build": "typedoc --options typedoc.json && typedoc --options typedoc-lifecycle.json && typedoc --options typedoc-globals.json && node build.mjs",
-    "prepack": "node build.mjs",
+    "prepack": "npm run build",
     "test": "vitest run"
   },
   "dependencies": {

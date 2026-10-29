@@ -19,6 +19,7 @@ import { hash, hashAsHex, hashAsBase64, hmac, hmacAsHex, hmacAsBase64, encrypt, 
 import { computeEffectivePermissions, makePermissionChecker } from '../permissions/permissions.js'
 import { isVerbose } from '../../shared/output.js'
 import * as EMBEDDED from './embedded.js'
+import { scopedPermissions, blockModule } from '../../core/rune-entry.js'
 import { parseArgs } from '../api/args-parser.js'
 import { RuneSession } from '../api/rune.js'
 import { readSchemaCache, writeSchemaCache } from '../schema-cache.js'
@@ -44,9 +45,11 @@ const staticModulePaths = {
   console: path.join(__isolationDir, './console-bootstrap.js'),
 }
 
-export function getPluginRunePath(pluginDir, runeKey, pluginJson) {
-  const runeRelPath = (pluginJson.runes?.[runeKey])?.path ?? `runes/${runeKey}.js`
-  return path.join(pluginDir, runeRelPath)
+/** The module a plugin rune's block names; a rune without a repl block has no REPL. */
+export function getPluginRunePath(pluginDir, runeKey, pluginJson, mode = 'run') {
+  const file = blockModule(pluginJson.runes?.[runeKey], mode, pluginDir)
+  if (!file) throw new Error(`Plugin rune "${runeKey}" has no ${mode} block`)
+  return file
 }
 
 async function compileStaticModule(isolate, key) {
@@ -1872,7 +1875,7 @@ export async function getReplSchema(runeFile, effective, args, projectDir, {
  * Compute effective permissions and run a plugin rune. Convenience wrapper for core.js.
  */
 export async function executePluginRune({ pluginDir, pluginCacheDir, runeKey, pluginJson, projectPerms, projectVars = {}, args, projectDir, opts, runeCallback, sections, lifecycle = 'run', onEvent = null, instanceId = '1', }) {
-  const runePerms     = pluginJson.runes[runeKey]?.permissions ?? {}
+  const runePerms     = scopedPermissions(pluginJson.runes[runeKey]) ?? {}
   const effective     = computeEffectivePermissions(runePerms, projectPerms, lifecycle)
   const runeVars      = pluginJson.runes[runeKey]?.vars ?? {}
   const effectiveVars = { ...runeVars, ...projectVars }

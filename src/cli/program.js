@@ -206,6 +206,17 @@ export function buildProgram() {
     })
 
   program
+    .command('migrate')
+    .description('Rewrite rune entries from path/permissions to run and repl blocks, renaming isolate modules to *.rune.js')
+    .option('-g, --global', 'migrate the global config (~/.crunes/config.json) instead of the project')
+    .option('--plugin <dir>', 'migrate a plugin manifest to format "2"')
+    .option('--dry-run', 'print the rewrite without writing or renaming anything')
+    .action(async (opts) => {
+      const { handler } = await import('./commands/migrate.js')
+      await handler({ configRoot: configRoot(), global: !!opts.global, pluginDir: opts.plugin ?? null, dryRun: !!opts.dryRun })
+    })
+
+  program
     .command('bench [args...]')
     .description('Time rune execution and report fast, ok, or slow.')
     .addHelpText('after',
@@ -379,12 +390,25 @@ export function buildProgram() {
     .description('Scaffold a new rune and register it in config')
     .addOption(new Option('--format <format>', 'rune output format').choices(['tree', 'markdown']))
     .option('--path <path>', 'file path for the rune (default: .crunes/runes/<key>.js)')
+    .addOption(new Option('--lang <lang>', 'scaffold a script rune instead of a sandboxed JS one').choices(['python', 'bash', 'node']))
     .option('--name <name>', 'human-readable label shown in crunes list')
     .option('--description <description>', 'short description of what context this rune provides')
     .option('-g, --global', 'operate on the global config (~/.crunes/config.json) instead of the project')
     .action(async (key, opts) => {
       const { handler } = await import('../rune/commands/create.js')
-      await handler({ key, format: opts.format, path: opts.path, name: opts.name, description: opts.description, yes: !!program.opts().yes, projectRoot: projectRoot(), configRoot: configRoot(), global: !!opts.global })
+      await handler({ key, format: opts.format, lang: opts.lang, path: opts.path, name: opts.name, description: opts.description, yes: !!program.opts().yes, projectRoot: projectRoot(), configRoot: configRoot(), global: !!opts.global })
+    })
+
+  program
+    .command('add <key> <command> [argv...]')
+    .description('Register an existing script or program as a rune (fixed arguments go after --)')
+    .option('--name <name>', 'human-readable label shown in crunes list')
+    .option('--description <description>', 'short description of what the rune does')
+    .option('-g, --global', 'operate on the global config (~/.crunes/config.json) instead of the project')
+    .addHelpText('after', '\nExamples:\n  crunes add coverage tools/coverage.py --description "Test coverage per module"\n  crunes add log git -- log --oneline -n 20')
+    .action(async (key, command, argv, opts) => {
+      const { handler } = await import('../rune/commands/add.js')
+      await handler({ key, command, argv, name: opts.name, description: opts.description, configRoot: configRoot(), global: !!opts.global })
     })
 
   // Plugin management commands
@@ -423,6 +447,14 @@ export function buildProgram() {
     .action(async (name) => {
       const { handler } = await import('../plugin/commands/update.js')
       await handler({ name, projectRoot: projectRoot(), configRoot: configRoot() })
+    })
+
+  plugin
+    .command('trust <plugin> [rune]')
+    .description('Review a plugin\'s native runes — scripts that run outside the sandbox — and trust them to run')
+    .action(async (name, rune) => {
+      const { handler } = await import('../plugin/commands/trust.js')
+      await handler({ name, rune: rune ?? null, yes: !!program.opts().yes })
     })
 
   plugin

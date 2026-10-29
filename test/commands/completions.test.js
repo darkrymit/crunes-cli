@@ -6,7 +6,7 @@ import { resolveCompletions } from '../../src/cli/commands/completions.js'
 import { buildProgram } from '../../src/cli/program.js'
 
 const program = buildProgram()
-const TOP = ['run','repl','docs','version','doctor','bench','list','job','shell','cache','schema','sqlite','init','create','plugin','template','marketplace','completions']
+const TOP = ['run','repl','docs','version','doctor','migrate','bench','list','job','shell','cache','schema','sqlite','init','create','add','plugin','template','marketplace','completions']
 
 describe('resolveCompletions — top level', () => {
   it('returns all subcommands when only crunes typed', () => {
@@ -55,7 +55,7 @@ describe('resolveCompletions — rune key commands', () => {
 describe('resolveCompletions — plugin subcommands', () => {
   it('returns plugin subcommands', () => {
     expect(resolveCompletions(['crunes', 'plugin', ''], program)).toEqual(
-      ['install', 'uninstall', 'list', 'update', 'enable', 'disable', 'create']
+      ['install', 'uninstall', 'list', 'update', 'trust', 'enable', 'disable', 'create']
     )
   })
 

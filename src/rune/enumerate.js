@@ -1,5 +1,8 @@
+import { isNativeRune } from '../plugin/native.js'
+import { blockOf } from '../core/rune-entry.js'
 import { getRune } from './resolver.js'
 import { enabledPluginKeys } from '../core/config.js'
+import { runtimeOf } from './native/runtime.js'
 
 /**
  * Enumerate every rune visible to a project: local config runes first, then
@@ -20,7 +23,14 @@ export async function enumerateRunes(config) {
   for (const key of Object.keys(runes)) {
     if (/@[^:]+:/.test(key)) { overrideKeys.push(key); continue }
     const entry = getRune(config, key)
-    const source = entry.plugin ? `→ ${entry.plugin}` : (entry.path ?? '')
+    if (entry.run != null) {
+      const run = typeof entry.run === 'string' ? { command: entry.run } : entry.run
+      const runtime = runtimeOf(run.command)
+      const source = [run.command, ...(run.argv ?? [])].join(' ')
+      entries.push({ key, source, runtime, name: entry.name ?? null, description: entry.description ?? null })
+      continue
+    }
+    const source = entry.plugin ? `→ ${entry.plugin}` : ''
     entries.push({ key, source, name: entry.name ?? null, description: entry.description ?? null })
   }
 
@@ -49,6 +59,7 @@ export async function enumerateRunes(config) {
             entries.push({
               key: displayKey,
               source: `plugin: ${pluginKey}`,
+              ...(isNativeRune(runeEntry) && { runtime: runtimeOf(blockOf(runeEntry, 'run').command) }),
               name: runeEntry.name ?? null,
               description: runeEntry.description ?? null,
             })
@@ -67,7 +78,7 @@ export async function enumerateRunes(config) {
     const shortName = key.slice(key.indexOf('@') + 1, key.lastIndexOf(':'))
     if (entries.some(e => e.key === `${shortName}:${runeKey}`)) continue
     const entry = getRune(config, key)
-    entries.push({ key, source: entry.path ?? '', name: entry.name ?? null, description: entry.description ?? null })
+    entries.push({ key, source: '', name: entry.name ?? null, description: entry.description ?? null })
   }
 
   return entries

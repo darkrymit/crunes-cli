@@ -331,3 +331,15 @@ describe('formatGlobalIndex', () => {
     expect(formatGlobalIndex(ENTRIES)).toMatchSnapshot()
   })
 })
+
+describe('help for JSON schemas — required and choices', () => {
+  it('annotates options and positionals that declare them', async () => {
+    const { formatRuneIndex } = await import('../../src/docs/help-render.js')
+    const text = formatRuneIndex({
+      positionals: [{ spec: '<module>', description: 'Module', choices: ['auth', 'billing'] }],
+      options: [{ flags: '--token <t>', description: 'Token', required: true }],
+    }, { key: 'cov' })
+    expect(text).toContain('Module  [choices: "auth", "billing"]')
+    expect(text).toContain('Token  [required]')
+  })
+})
