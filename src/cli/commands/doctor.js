@@ -7,6 +7,41 @@ import { existsSync } from 'node:fs'
 import { loadJsonSchema } from '../../rune/native/schema.js'
 import { relative } from 'node:path'
 import { resolveInterpreter, assertNotMissedRename, onPath } from '../../rune/native/runtime.js'
+import { loadRegistry } from '../../plugin/registry.js'
+import { loadPluginJson } from '../../plugin/manifest.js'
+import { isNativeRune, trustDigest, trustState } from '../../plugin/native.js'
+
+/**
+ * Audit installed plugins for native runes and their trust status.
+ */
+export async function checkPluginNativeTrust(config) {
+  const results = []
+  let registry
+  try { registry = await loadRegistry() } catch { return results }
+  const enabled = new Set(Object.entries(config?.plugins ?? {}).filter(([, v]) => v).map(([k]) => k))
+
+  for (const [pluginKey, regEntry] of Object.entries(registry.plugins ?? {})) {
+    if (!enabled.has(pluginKey) || !regEntry?.path) continue
+    try {
+      const pj = await loadPluginJson(regEntry.path)
+      for (const [runeKey, runeDef] of Object.entries(pj.runes ?? {})) {
+        if (!isNativeRune(runeDef)) continue
+        const digest = trustDigest(regEntry.path, runeDef)
+        const state = trustState(regEntry, runeKey, digest)
+        if (state === 'trusted') {
+          results.push({ ok: true, message: `plugin ${pluginKey}:${runeKey} native script trusted` })
+        } else if (state === 'changed') {
+          results.push({ ok: false, message: `plugin ${pluginKey}:${runeKey} changed since trusted (run: crunes plugin trust ${pluginKey} ${runeKey})` })
+        } else {
+          results.push({ ok: false, message: `plugin ${pluginKey}:${runeKey} runs natively outside sandbox and is not yet trusted (run: crunes plugin trust ${pluginKey} ${runeKey})` })
+        }
+      }
+    } catch {
+      // ignore unreadable plugin manifests
+    }
+  }
+  return results
+}
 
 /**
  * One line per rune declared with a run block: what runs it, or why it cannot run.
@@ -106,6 +141,10 @@ export async function handler({ projectRoot = process.cwd() } = {}) {
     for (const { ok, message } of checkRunBlockRunes(config, projectRoot)) {
       if (ok) output.success(message)
       else { output.error(message); anyFailed = true }
+    }
+    for (const { ok, message } of await checkPluginNativeTrust(config)) {
+      if (ok) output.success(message)
+      else { output.info(message) }
     }
   }
 

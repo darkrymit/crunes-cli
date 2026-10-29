@@ -17,8 +17,9 @@ export function buildProgram() {
     .option('--verbose', 'print full error stack traces and other verbose output')
 
   program.hook('preAction', (_thisCommand, actionCommand) => {
-    configureOutput({ plain: !!program.opts().plain, verbose: !!program.opts().verbose })
-    if (program.opts().verbose) {
+    const opts = { ...program.opts(), ...actionCommand.opts() }
+    configureOutput({ plain: !!opts.plain, verbose: !!opts.verbose })
+    if (opts.verbose) {
       console.error(`[crunes:debug] Executing command: ${actionCommand.name()}`)
     }
   })
@@ -200,6 +201,7 @@ export function buildProgram() {
   program
     .command('doctor')
     .description('Verify environment and project setup')
+    .option('-p, --plain', 'plain output: no colors, no box-drawing, plain symbols — optimised for AI/pipe use')
     .action(async () => {
       const { handler } = await import('./commands/doctor.js')
       await handler({ projectRoot: projectRoot() })
@@ -250,10 +252,11 @@ export function buildProgram() {
     .command('list')
     .description('List all registered runes')
     .addOption(new Option('--format <format>', 'output format').choices(['text', 'json']).default('text'))
+    .option('-p, --plain', 'plain output: no colors, no box-drawing, plain symbols — optimised for AI/pipe use')
     .option('-g, --global', 'list only runes from the global config (~/.crunes/config.json)')
     .action(async (opts) => {
       const { handler } = await import('../rune/commands/list.js')
-      await handler({ format: opts.format, plain: !!program.opts().plain, projectRoot: projectRoot(), configRoot: configRoot(), global: !!opts.global })
+      await handler({ format: opts.format, plain: !!program.opts().plain || !!opts.plain, projectRoot: projectRoot(), configRoot: configRoot(), global: !!opts.global })
     })
 
   // Job management commands
@@ -435,9 +438,10 @@ export function buildProgram() {
     .command('list')
     .description('List installed plugins')
     .addOption(new Option('--format <format>', 'output format').choices(['text', 'json']).default('text'))
+    .option('-p, --plain', 'plain output: no colors, no box-drawing, plain symbols — optimised for AI/pipe use')
     .action(async (opts) => {
       const { handler } = await import('../plugin/commands/list.js')
-      await handler({ format: opts.format })
+      await handler({ format: opts.format, projectRoot: projectRoot() })
     })
 
   plugin
@@ -550,6 +554,7 @@ export function buildProgram() {
   marketplace
     .command('list')
     .description('List configured marketplace sources')
+    .option('-p, --plain', 'plain output: no colors, no box-drawing, plain symbols — optimised for AI/pipe use')
     .action(async () => {
       const { handler } = await import('../marketplace/commands/list.js')
       await handler()
