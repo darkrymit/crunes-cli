@@ -1,5 +1,5 @@
 import * as esbuild from 'esbuild'
-import { chmodSync } from 'node:fs'
+import { chmodSync, rmSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 
 // Plugin: intercepts `import * as EMBEDDED from './embedded.js'` in runner.js
@@ -41,6 +41,8 @@ const embedIsolateSourcesPlugin = {
     })
   },
 }
+
+try { rmSync('dist/chunks', { recursive: true, force: true }) } catch {}
 
 await esbuild.build({
   entryPoints: ['src/cli/cli.js'],

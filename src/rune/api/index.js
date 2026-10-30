@@ -37,8 +37,13 @@ export function createSectionUtils(patterns) {
 export function createUtils(dir, checkPermission = null, pluginDir = null, permissions = { allow: [], deny: [] }, vars = {}, requestedSections = null, pluginId = null, projectName = undefined) {
   const fs     = createFsUtils(dir, checkPermission, pluginDir, pluginId)
   const sqlite = createSqliteUtils(dir, checkPermission, { pluginId, projectName })
-  const ws     = createWsUtils(checkPermission)
-  const db     = createDbUtils(dir, checkPermission)
+  let _ws
+  let _db
+  let _archive
+  let _yaml
+  let _xml
+  let _csv
+
   const utils  = {
     md,
     tree: treeUtils,
@@ -46,27 +51,39 @@ export function createUtils(dir, checkPermission = null, pluginDir = null, permi
     fs,
     shell:   createShellUtils(dir, checkPermission),
     json:    createJsonUtils(dir, fs),
-    yaml:    createYamlUtils(dir, fs),
-    xml:     createXmlUtils(dir, fs),
-    csv:     createCsvUtils(dir, fs),
+    get yaml() {
+      return _yaml ??= createYamlUtils(dir, fs)
+    },
+    get xml() {
+      return _xml ??= createXmlUtils(dir, fs)
+    },
+    get csv() {
+      return _csv ??= createCsvUtils(dir, fs)
+    },
     http:    createHttpUtils(checkPermission),
     env:     createEnvUtils(dir, checkPermission, permissions),
     vars:    createVarsUtils(vars),
     os:      createOsInfo(),
-    archive: createArchiveUtils(dir, checkPermission),
+    get archive() {
+      return _archive ??= createArchiveUtils(dir, checkPermission)
+    },
     cache:   createCacheUtils(dir, checkPermission, { pluginId, projectName }),
     sqlite,
-    ws,
-    db,
+    get ws() {
+      return _ws ??= createWsUtils(checkPermission)
+    },
+    get db() {
+      return _db ??= createDbUtils(dir, checkPermission)
+    },
     notify:  createNotifyUtils(checkPermission),
   }
   return {
     utils,
     dispose: async () => {
       sqlite.dispose()
-      ws.dispose()
+      if (_ws) _ws.dispose()
       utils.http.disposeServers()
-      await db.dispose()
+      if (_db) await _db.dispose()
       utils.shell.dispose()
     }
   }

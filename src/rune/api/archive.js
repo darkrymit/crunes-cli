@@ -2,9 +2,27 @@ import fs from 'node:fs/promises'
 import { createWriteStream } from 'node:fs'
 import { pipeline } from 'node:stream/promises'
 import path from 'node:path'
-import unzipper from 'unzipper'
-import { ZipArchive } from 'archiver'
-import { create as tarCreate, extract as tarExtract, list as tarList } from 'tar'
+import { createRequire } from 'node:module'
+
+const require = createRequire(import.meta.url)
+
+let _unzipper
+function getUnzipper() {
+  if (!_unzipper) _unzipper = require('unzipper')
+  return _unzipper
+}
+
+let _archiver
+function getArchiver() {
+  if (!_archiver) _archiver = require('archiver')
+  return _archiver
+}
+
+let _tar
+function getTar() {
+  if (!_tar) _tar = require('tar')
+  return _tar
+}
 
 function canonicalizePath(dir, inputPath) {
   const p = inputPath.replace(/\\/g, '/')
@@ -40,7 +58,7 @@ export function createArchiveUtils(dir, checkPermission) {
       const srcAbs = resolveToAbs(dir, source)
       const dstAbs = resolveToAbs(dir, dest)
 
-      const directory = await unzipper.Open.file(srcAbs)
+      const directory = await getUnzipper().Open.file(srcAbs)
       for (const file of directory.files) {
         assertNoSlip(dstAbs, file.path)
       }
@@ -65,6 +83,7 @@ export function createArchiveUtils(dir, checkPermission) {
 
       await new Promise((resolve, reject) => {
         const output = createWriteStream(dstAbs)
+        const { ZipArchive } = getArchiver()
         const arc = new ZipArchive({ zlib: { level: 9 } })
         output.on('close', resolve)
         arc.on('error', reject)
@@ -96,6 +115,7 @@ export function createArchiveUtils(dir, checkPermission) {
         useGzip = buf[0] === 0x1f && buf[1] === 0x8b
       }
 
+      const { create: tarCreate, extract: tarExtract, list: tarList } = getTar()
       const entries = []
       await tarList({ file: srcAbs, onentry: (e) => entries.push(e.path) })
       for (const p of entries) {
@@ -112,6 +132,7 @@ export function createArchiveUtils(dir, checkPermission) {
       const dstAbs = resolveToAbs(dir, dest)
       await fs.mkdir(path.dirname(dstAbs), { recursive: true })
 
+      const { create: tarCreate } = getTar()
       const stat = await fs.stat(srcAbs)
       if (stat.isDirectory()) {
         await tarCreate({ gzip, file: dstAbs, cwd: srcAbs }, ['.'])
@@ -125,6 +146,7 @@ export function createArchiveUtils(dir, checkPermission) {
       if (checkPermission) checkPermission('fs.read', srcToken)
       const srcAbs = resolveToAbs(dir, source)
       
+      const { ZipArchive } = getArchiver()
       const arc = new ZipArchive({ zlib: { level: 9 } })
       fs.stat(srcAbs).then(stat => {
         if (stat.isDirectory()) {
@@ -145,7 +167,7 @@ export function createArchiveUtils(dir, checkPermission) {
       const dstAbs = resolveToAbs(dir, dest)
       
       const activePromises = new Set()
-      const parser = unzipper.Parse()
+      const parser = getUnzipper().Parse()
       parser.on('entry', (entry) => {
         try {
           assertNoSlip(dstAbs, entry.path)
@@ -213,6 +235,7 @@ export function createArchiveUtils(dir, checkPermission) {
       if (checkPermission) checkPermission('fs.read', srcToken)
       const srcAbs = resolveToAbs(dir, source)
       
+      const { create: tarCreate } = getTar()
       const stat = await fs.stat(srcAbs)
       if (stat.isDirectory()) {
         return tarCreate({ gzip, cwd: srcAbs }, ['.'])
@@ -228,6 +251,7 @@ export function createArchiveUtils(dir, checkPermission) {
       
       await fs.mkdir(dstAbs, { recursive: true })
       
+      const { extract: tarExtract } = getTar()
       const extractor = tarExtract({
         gzip,
         cwd: dstAbs,
