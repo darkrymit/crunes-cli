@@ -79,6 +79,9 @@ export async function bundleNpmPackage(absEntryPath) {
  *   4. Zero-trust default          → PermissionError
  */
 export function createModuleResolver(isolate, pluginDir, pluginNodeModules, pluginDeps, effectiveAllow, effectiveDeny, projectDir = null, pluginRootDir = null, virtualModules = new Map()) {
+  const hasWildcardAllow = (effectiveAllow ?? []).some(p => p === '*' || p === '*:*')
+  const hasWildcardDeny  = (effectiveDeny ?? []).some(p => p === '*' || p === '*:*')
+
   // Cache compiled modules to avoid re-compiling within one isolate lifetime
   const cache = new Map()
   // isolated-vm Module objects expose no .filename property — track it ourselves
@@ -140,8 +143,8 @@ export function createModuleResolver(isolate, pluginDir, pluginNodeModules, plug
       }
       const normalizedRel = './' + rel.replace(/\\/g, '/')
       const token = `fs.read:${normalizedRel}`
-      const allowed = isGlobMatch(token, effectiveAllow)
-      const denied = effectiveDeny.length > 0 && isGlobMatch(token, effectiveDeny)
+      const allowed = hasWildcardAllow || isGlobMatch(token, effectiveAllow)
+      const denied = hasWildcardDeny || (effectiveDeny.length > 0 && isGlobMatch(token, effectiveDeny))
       if (!allowed || denied) {
         throw new Error(`PermissionError: '${specifier}' — add 'fs.read:${normalizedRel}' to allow list.`)
       }
@@ -166,8 +169,8 @@ export function createModuleResolver(isolate, pluginDir, pluginNodeModules, plug
         }
         const normalizedRel = './' + rel.replace(/\\/g, '/')
         const token = `fs.read:${normalizedRel}`
-        const allowed = isGlobMatch(token, effectiveAllow)
-        const denied = effectiveDeny.length > 0 && isGlobMatch(token, effectiveDeny)
+        const allowed = hasWildcardAllow || isGlobMatch(token, effectiveAllow)
+        const denied = hasWildcardDeny || (effectiveDeny.length > 0 && isGlobMatch(token, effectiveDeny))
         if (!allowed || denied) {
           throw new Error(`PermissionError: '${specifier}' — add 'fs.read:${normalizedRel}' to allow list.`)
         }
@@ -182,9 +185,10 @@ export function createModuleResolver(isolate, pluginDir, pluginNodeModules, plug
 
     // Step 3 — declared npm dep: must be in effectiveAllow; if pluginDeps is non-null, must also be declared there
     const moduleToken = `module:${specifier}`
-    const isAllowed = isGlobMatch(moduleToken, effectiveAllow)
+    const isAllowed = hasWildcardAllow || isGlobMatch(moduleToken, effectiveAllow)
+    const isModuleDenied = hasWildcardDeny || (effectiveDeny.length > 0 && isGlobMatch(moduleToken, effectiveDeny))
     const isDeclared = pluginDeps === null || Object.prototype.hasOwnProperty.call(pluginDeps, specifier)
-    if (isAllowed && isDeclared) {
+    if (isAllowed && !isModuleDenied && isDeclared) {
       const pkgDir = path.join(pluginNodeModules, specifier)
       const pkgJsonPath = path.join(pkgDir, 'package.json')
       let absEntry
@@ -200,8 +204,7 @@ export function createModuleResolver(isolate, pluginDir, pluginNodeModules, plug
     if (builtinMsg) {
       throw new Error(`PermissionError: '${specifier}' — ${builtinMsg}`)
     }
-    const isDenied = effectiveDeny.length > 0 && isGlobMatch(moduleToken, effectiveDeny)
-    if (isDenied) {
+    if (isModuleDenied) {
       throw new Error(`PermissionError: '${specifier}' is explicitly denied.`)
     }
 

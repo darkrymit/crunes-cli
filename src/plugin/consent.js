@@ -21,7 +21,11 @@ export function formatConsentScreen(pluginName, pluginJson) {
     if (allow.length === 0) continue
     lines.push(`  ${runeKey}`)
     for (const perm of allow) {
-      lines.push(`          ${perm}`)
+      if (perm === '*' || perm === '*:*') {
+        lines.push(`          * (UNRESTRICTED: allows all filesystem, shell, network, and environment operations)`)
+      } else {
+        lines.push(`          ${perm}`)
+      }
     }
     lines.push('')
   }

@@ -159,6 +159,7 @@ function normalizeFsPath(raw) {
 }
 
 function normalizePattern(perm) {
+  if (perm === '*' || perm === '*:*') return '*'
   if (perm.startsWith('fs.glob:')) {
     const rest = perm.slice('fs.glob:'.length)
     const dColonIdx = rest.indexOf('::')
@@ -219,6 +220,9 @@ export function computeEffectivePermissions(pluginPerms, projectPerms, lifecycle
  * siblings at build time so runtime path values match regardless of their form.
  */
 export function makePermissionChecker(effective, ctx = null) {
+  const hasWildcardAllow = (effective.allow ?? []).some(p => p === '*' || p === '*:*')
+  const hasWildcardDeny  = (effective.deny  ?? []).some(p => p === '*' || p === '*:*')
+
   const buckets = new Map()
   const getBucket = cap => {
     if (!buckets.has(cap)) buckets.set(cap, { allow: [], deny: [] })
@@ -232,10 +236,12 @@ export function makePermissionChecker(effective, ctx = null) {
   // caller already went through computeEffectivePermissions — and keeps declared
   // and runtime values in the same shape when they passed raw values instead.
   for (const p of effective.allow.map(normalizePattern)) {
+    if (p === '*') continue
     if (p.startsWith('fs.glob:')) { globBucket.allow.push(p.slice('fs.glob:'.length)); continue }
     for (const expanded of expandPattern(p, ctx)) getBucket(capOf(expanded)).allow.push(expanded)
   }
   for (const p of effective.deny.map(normalizePattern)) {
+    if (p === '*') continue
     if (p.startsWith('fs.glob:')) { globBucket.deny.push(p.slice('fs.glob:'.length)); continue }
     for (const expanded of expandPattern(p, ctx)) getBucket(capOf(expanded)).deny.push(expanded)
   }
@@ -246,8 +252,8 @@ export function makePermissionChecker(effective, ctx = null) {
   }
   const checkBatchAndThrow = (capability, value, matchFn) => {
     const b       = buckets.get(capability) ?? { allow: [], deny: [] }
-    const allowed = b.allow.length > 0 && matchFn(pvs(b.allow, capability))
-    const denied  = b.deny.length  > 0 && matchFn(pvs(b.deny,  capability))
+    const allowed = hasWildcardAllow || (b.allow.length > 0 && matchFn(pvs(b.allow, capability)))
+    const denied  = hasWildcardDeny  || (b.deny.length  > 0 && matchFn(pvs(b.deny,  capability)))
     if (!allowed || denied) throw new PermissionError(capability, value)
   }
 
@@ -269,8 +275,8 @@ export function makePermissionChecker(effective, ctx = null) {
       }
       case 'fs.glob': {
         const resolvedCwd = (absCwd ?? absDir).replace(/\\/g, '/')
-        const allowed = globBucket.allow.length > 0 && matchGlobPermission(value, resolvedCwd, globBucket.allow, globCtx)
-        const denied  = globBucket.deny.length  > 0 && matchGlobPermission(value, resolvedCwd, globBucket.deny,  globCtx)
+        const allowed = hasWildcardAllow || (globBucket.allow.length > 0 && matchGlobPermission(value, resolvedCwd, globBucket.allow, globCtx))
+        const denied  = hasWildcardDeny  || (globBucket.deny.length  > 0 && matchGlobPermission(value, resolvedCwd, globBucket.deny,  globCtx))
         if (!allowed || denied) throw new PermissionError(capability, value)
         return
       }
@@ -294,7 +300,9 @@ export function makePermissionChecker(effective, ctx = null) {
       case 'shell.job.write':
       case 'notify.send': {
         const b = buckets.get(capability)
-        if (!b?.allow.length || b.deny.length > 0) throw new PermissionError(capability, '')
+        const allowed = hasWildcardAllow || (b?.allow.length > 0)
+        const denied  = hasWildcardDeny  || (b?.deny.length > 0)
+        if (!allowed || denied) throw new PermissionError(capability, '')
         return
       }
       case 'http.fetch':
@@ -327,6 +335,7 @@ export function makePermissionChecker(effective, ctx = null) {
         return
       }
       default:
+        if (hasWildcardAllow && !hasWildcardDeny) return
         throw new PermissionError(capability, value ?? '')
     }
   }

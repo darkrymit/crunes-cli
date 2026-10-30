@@ -15,7 +15,9 @@ export function createEnvUtils(dir, checkPermission, permissions) {
   const fileCache = new Map()
 
   function resolve(key) {
-    for (const pattern of permissions.allow) {
+    const hasWildcard = permissions.allow.some(p => p === '*' || p === '*:*')
+    const patterns = hasWildcard ? ['env.read:*', ...permissions.allow] : permissions.allow
+    for (const pattern of patterns) {
       if (!pattern.startsWith('env.read:')) continue
       const { sources, keyPatterns } = parseEnvPattern(pattern)
       const keyOk = keyPatterns.some(pat => isWildcardMatch(key, pat))
