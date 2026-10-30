@@ -2,9 +2,16 @@ import fsPromises from 'node:fs/promises'
 import { createReadStream, createWriteStream, realpathSync } from 'node:fs'
 import path from 'node:path'
 import { glob } from 'tinyglobby'
-import chokidar from 'chokidar'
+import { createRequire } from 'node:module'
 import picomatch from 'picomatch'
 import { resolvePath } from './utils.js'
+
+const require = createRequire(import.meta.url)
+let _chokidar
+function getChokidar() {
+  if (!_chokidar) _chokidar = require('chokidar')
+  return _chokidar
+}
 
 function stripBom(str) {
   return str.charCodeAt(0) === 0xfeff ? str.slice(1) : str
@@ -295,7 +302,7 @@ export function createFsUtils(dir, checkPermission, pluginDir = null, pluginId =
         }, debounce))
       }
 
-      const watcher = chokidar.watch(watchRoot, {
+      const watcher = getChokidar().watch(watchRoot, {
         ignoreInitial: true,
         persistent: false,
       })

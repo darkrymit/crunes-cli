@@ -1,6 +1,17 @@
 import path from 'node:path'
-import { XMLParser, XMLBuilder, XMLValidator } from 'fast-xml-parser'
-import { JSONPath } from 'jsonpath-plus'
+import { createRequire } from 'node:module'
+
+const require = createRequire(import.meta.url)
+let _xmlLib
+function getXml() {
+  if (!_xmlLib) _xmlLib = require('fast-xml-parser')
+  return _xmlLib
+}
+let _jsonPathLib
+function getJsonPath() {
+  if (!_jsonPathLib) _jsonPathLib = require('jsonpath-plus').JSONPath
+  return _jsonPathLib
+}
 
 const PARSER_OPTS = {
   ignoreAttributes: false,
@@ -19,6 +30,7 @@ class XmlParseError extends Error {
 }
 
 export function parseXml(text, displayPath = '<string>') {
+  const { XMLValidator, XMLParser } = getXml()
   const validation = XMLValidator.validate(text)
   if (validation !== true) {
     const { err } = validation
@@ -32,6 +44,7 @@ export function parseXml(text, displayPath = '<string>') {
 }
 
 export function stringifyXml(data, { indent = 2 } = {}) {
+  const { XMLBuilder } = getXml()
   const builder = new XMLBuilder({
     ...PARSER_OPTS,
     format: true,
@@ -70,6 +83,7 @@ export function createXmlUtils(dir, fsUtils) {
     async readPath(relPath, jsonPath, fallback = undefined) {
       const obj = await this.read(relPath, { throw: false })
       if (obj === null) return fallback
+      const JSONPath = getJsonPath()
       const results = JSONPath({ path: jsonPath, json: obj, wrap: true })
       return results.length === 0 ? fallback : results[0]
     },
@@ -77,6 +91,7 @@ export function createXmlUtils(dir, fsUtils) {
     async readPathAll(relPath, jsonPath, fallback = []) {
       const obj = await this.read(relPath, { throw: false })
       if (obj === null) return fallback
+      const JSONPath = getJsonPath()
       const results = JSONPath({ path: jsonPath, json: obj, wrap: true })
       return results.length === 0 ? fallback : results
     },
@@ -91,6 +106,7 @@ export function createXmlUtils(dir, fsUtils) {
       const data = await this.read(relPath)
 
       let matched = false
+      const JSONPath = getJsonPath()
       JSONPath({
         path: jsonPath,
         json: data,

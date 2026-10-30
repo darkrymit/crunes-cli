@@ -1,10 +1,26 @@
 import path from 'node:path'
 import { createReadStream } from 'node:fs'
 import { Transform } from 'node:stream'
-import { parse as csvParse } from 'csv-parse'
-import { stringify as csvStringify } from 'csv-stringify'
-import { parse as csvParseSync } from 'csv-parse/sync'
-import { stringify as csvStringifySync } from 'csv-stringify/sync'
+import { createRequire } from 'node:module'
+
+const require = createRequire(import.meta.url)
+let _csvLib
+function getCsv() {
+  if (!_csvLib) {
+    _csvLib = {
+      csvParse: require('csv-parse').parse,
+      csvStringify: require('csv-stringify').stringify,
+      csvParseSync: require('csv-parse/sync').parse,
+      csvStringifySync: require('csv-stringify/sync').stringify,
+    }
+  }
+  return _csvLib
+}
+
+function csvParse(...args) { return getCsv().csvParse(...args) }
+function csvStringify(...args) { return getCsv().csvStringify(...args) }
+function csvParseSync(...args) { return getCsv().csvParseSync(...args) }
+function csvStringifySync(...args) { return getCsv().csvStringifySync(...args) }
 
 class CsvParseError extends Error {
   constructor(message, filePath) {

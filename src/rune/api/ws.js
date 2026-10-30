@@ -1,6 +1,13 @@
 import { createServer as createHttpServer } from 'node:http'
-import { WebSocket, WebSocketServer } from 'ws'
+import { createRequire } from 'node:module'
 import { compilePath } from './http.js'
+
+const require = createRequire(import.meta.url)
+let _wsLib
+function getWs() {
+  if (!_wsLib) _wsLib = require('ws')
+  return _wsLib
+}
 
 class WsSession {
   constructor(url, options) {
@@ -22,6 +29,7 @@ class WsSession {
     if (this.state !== 'CREATED') throw new Error(`Cannot open socket in state ${this.state}`)
     return new Promise((resolve, reject) => {
       const wsOpts = this.options.headers ? { headers: this.options.headers } : undefined
+      const { WebSocket } = getWs()
       const socket = new WebSocket(this.url, wsOpts)
       this.socket = socket
       let opened = false
@@ -218,6 +226,7 @@ class WsServerSession {
   open() {
     if (this._state !== 'CREATED') return Promise.reject(new Error('WS server already open'))
     return new Promise((resolve, reject) => {
+      const { WebSocketServer } = getWs()
       this._wss = new WebSocketServer({ noServer: true })
 
       this._wss.on('error', (err) => {

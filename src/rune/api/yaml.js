@@ -1,6 +1,17 @@
 import path from 'node:path'
-import { parseDocument, Document, isMap, isSeq, isScalar, isAlias, Pair } from 'yaml'
-import { JSONPath } from 'jsonpath-plus'
+import { createRequire } from 'node:module'
+
+const require = createRequire(import.meta.url)
+let _yamlLib
+function getYaml() {
+  if (!_yamlLib) _yamlLib = require('yaml')
+  return _yamlLib
+}
+let _jsonPathLib
+function getJsonPath() {
+  if (!_jsonPathLib) _jsonPathLib = require('jsonpath-plus').JSONPath
+  return _jsonPathLib
+}
 
 class YamlParseError extends Error {
   constructor(message, filePath) {
@@ -23,6 +34,7 @@ function trimComment(raw) {
 
 function docToJs(node) {
   if (node == null) return null
+  const { isAlias, isScalar, isSeq, isMap } = getYaml()
   if (isAlias(node)) return docToJs(node.resolve())
   if (isScalar(node)) return node.value
   if (isSeq(node)) return node.items.map(item => docToJs(item))
@@ -95,6 +107,7 @@ function buildNode(doc, data, arrayItemComments = {}) {
     }
 
     const map = doc.createNode({})
+    const { isSeq, isScalar, Pair } = getYaml()
 
     for (const k of Object.keys(data)) {
       if (k.startsWith('#')) continue
@@ -121,6 +134,7 @@ function buildNode(doc, data, arrayItemComments = {}) {
 }
 
 export function parseYaml(text, displayPath = '<string>') {
+  const { parseDocument } = getYaml()
   let doc
   try { doc = parseDocument(text) } catch (err) { wrapParseError(err, displayPath) }
   if (doc.errors.length > 0) wrapParseError(doc.errors[0], displayPath)
@@ -133,6 +147,7 @@ export function parseYaml(text, displayPath = '<string>') {
 }
 
 export function stringifyYaml(data, { indent = 2 } = {}) {
+  const { Document } = getYaml()
   const doc = new Document()
   let head = null
   let tail = null
@@ -178,6 +193,7 @@ export function createYamlUtils(dir, fsUtils) {
     async readPath(relPath, jsonPath, fallback = undefined) {
       const obj = await this.read(relPath, { throw: false })
       if (obj === null) return fallback
+      const JSONPath = getJsonPath()
       const results = JSONPath({ path: jsonPath, json: obj, wrap: true })
       return results.length === 0 ? fallback : results[0]
     },
@@ -185,6 +201,7 @@ export function createYamlUtils(dir, fsUtils) {
     async readPathAll(relPath, jsonPath, fallback = []) {
       const obj = await this.read(relPath, { throw: false })
       if (obj === null) return fallback
+      const JSONPath = getJsonPath()
       const results = JSONPath({ path: jsonPath, json: obj, wrap: true })
       return results.length === 0 ? fallback : results
     },
@@ -196,6 +213,7 @@ export function createYamlUtils(dir, fsUtils) {
       const data = missing ? {} : await this.read(relPath)
 
       let matched = false
+      const JSONPath = getJsonPath()
       JSONPath({
         path: jsonPath,
         json: data,
