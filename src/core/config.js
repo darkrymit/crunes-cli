@@ -269,6 +269,16 @@ export function defaultRuneFile(runeKey, layer) {
   return runeKey.includes(':') ? null : layer === 'global' ? `runes/${runeKey}.js` : `.crunes/runes/${runeKey}.js`
 }
 
+export function normaliseRune(entry) {
+  return entry
+}
+
+export function getRune(config, key) {
+  const raw = (config.runes ?? {})[key]
+  if (raw == null) return null
+  return normaliseRune(raw)
+}
+
 export const ROOTLESS = Symbol.for('crunes.rootless')
 
 function readLayer(filePath, label, base, layer) {

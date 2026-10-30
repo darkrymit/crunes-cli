@@ -2,17 +2,14 @@ import { join } from 'node:path'
 import { loadRegistry, resolvePluginKeyScoped } from '../plugin/registry.js'
 import { isNativeRune, trustDigest, trustState, untrustedError } from '../plugin/native.js'
 import { loadPluginJson } from '../plugin/manifest.js'
-import { executePluginRune, runRuneInRepl, getPluginRunePath } from './isolation/runner.js'
 import { computeEffectivePermissions } from './permissions/permissions.js'
 import { CircularRuneError } from '../core/errors.js'
-import { enabledPluginKeys } from '../core/config.js'
+import { enabledPluginKeys, getRune, normaliseRune } from '../core/config.js'
 import { getLocalBase, getStorePath } from '../store/index.js'
 import { runRunBlock } from './native/run-block.js'
 import { scopedPermissions, blockModule } from '../core/rune-entry.js'
 
-export function normaliseRune(entry) {
-  return entry
-}
+export { getRune, normaliseRune }
 
 /** Which config layers a lookup consulted, for "Unknown key" diagnostics. */
 export function describeConfigLayers(configDir) {
@@ -23,12 +20,6 @@ export function describeConfigLayers(configDir) {
       ? 'global config (skipped: CRUNES_NO_GLOBAL=1)'
       : `global config (${join(getStorePath(), 'config.json')})`,
   ].join(', ')
-}
-
-export function getRune(config, key) {
-  const raw = (config.runes ?? {})[key]
-  if (raw == null) return null
-  return normaliseRune(raw)
 }
 
 export async function resolvePluginRune(config, key) {
@@ -104,6 +95,7 @@ async function runPluginMatch({ match, pluginJson, projectPerms, projectVars, ke
     })
     return result?.directExitCode !== undefined ? result : normaliseResult(result)
   }
+  const { executePluginRune } = await import('./isolation/runner.js')
   const result = await executePluginRune({
     pluginDir, pluginCacheDir, runeKey, pluginJson, projectPerms, projectVars, args,
     projectDir: dir, opts: config, runeCallback,
@@ -212,7 +204,8 @@ export async function resolveRuneEntry(projectDir, config, key, configDir = proj
     )
     const vars = { ...(pluginJson.runes[runeKey]?.vars ?? {}), ...(config.runes?.[`${pluginKey}:${runeKey}`]?.vars ?? {}) }
     return {
-      createReplSession(args, opts = {}) {
+      async createReplSession(args, opts = {}) {
+        const { getPluginRunePath, runRuneInRepl } = await import('./isolation/runner.js')
         const runeFile = getPluginRunePath(pluginDir, runeKey, pluginJson, 'repl')
         const nodeModulesDir = join(pluginCacheDir, 'node_modules')
         return runRuneInRepl(runeFile, effective, args, projectDir, {
@@ -239,7 +232,8 @@ export async function resolveRuneEntry(projectDir, config, key, configDir = proj
     const effective = computeEffectivePermissions(scopedPermissions(entry) ?? {}, undefined, 'repl')
     const vars = entry.vars ?? {}
     return {
-      createReplSession(args, opts = {}) {
+      async createReplSession(args, opts = {}) {
+        const { runRuneInRepl } = await import('./isolation/runner.js')
         return runRuneInRepl(runeFile, effective, args, projectDir, {
           vars,
           runeKey: key,
@@ -264,7 +258,8 @@ export async function resolveRuneEntry(projectDir, config, key, configDir = proj
     )
     const vars = { ...(pluginJson.runes[runeKey]?.vars ?? {}), ...(config.runes?.[`${pluginKey}:${runeKey}`]?.vars ?? {}) }
     return {
-      createReplSession(args, opts = {}) {
+      async createReplSession(args, opts = {}) {
+        const { getPluginRunePath, runRuneInRepl } = await import('./isolation/runner.js')
         const runeFile = getPluginRunePath(pluginDir, runeKey, pluginJson, 'repl')
         const nodeModulesDir = join(pluginCacheDir, 'node_modules')
         return runRuneInRepl(runeFile, effective, args, projectDir, {

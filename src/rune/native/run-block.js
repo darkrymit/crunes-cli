@@ -1,5 +1,4 @@
 import { isAbsolute, join, relative } from 'node:path'
-import { runRuneInIsolate, getArgsSchema } from '../isolation/runner.js'
 import { computeEffectivePermissions } from '../permissions/permissions.js'
 import { parseArgs } from '../api/args-parser.js'
 import { formatRuneIndex, formatCommandPage, selectNode } from '../../docs/help-render.js'
@@ -59,6 +58,7 @@ export async function getRunBlockSchema(desc, projectDir, { vars = {}, runeKey =
   if (/\.json$/i.test(desc.argsModule)) {
     return loadJsonSchema(desc.argsModule, relative(projectDir, desc.argsModule).replace(/\\/g, '/') || desc.argsModule)
   }
+  const { getArgsSchema } = await import('../isolation/runner.js')
   return getArgsSchema(desc.argsModule, blockGrants({ permissions: desc.argsPermissions }), projectDir, { vars, runeKey })
 }
 
@@ -105,6 +105,7 @@ export async function runRunBlock({ dir, key, args, entry, opts = {}, configDir,
   let callArgs = [...desc.argv, ...args]
 
   if (desc.runtime === 'isolate') {
+    const { runRuneInIsolate } = await import('../isolation/runner.js')
     return runRuneInIsolate(desc.command, blockGrants(desc), callArgs, dir, {
       runeCallback,
       sections: opts.sections ?? null,

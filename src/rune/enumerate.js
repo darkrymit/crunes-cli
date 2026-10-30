@@ -1,7 +1,6 @@
 import { isNativeRune } from '../plugin/native.js'
 import { blockOf } from '../core/rune-entry.js'
-import { getRune } from './resolver.js'
-import { enabledPluginKeys } from '../core/config.js'
+import { enabledPluginKeys, getRune } from '../core/config.js'
 import { runtimeOf } from './native/runtime.js'
 
 /**
