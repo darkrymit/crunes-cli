@@ -4,7 +4,7 @@ import { intro, outro, confirm, cancel } from '@clack/prompts'
 import { loadConfig } from '../../core/config.js'
 import { loadRegistry, resolvePluginKey } from '../../plugin/registry.js'
 import { loadPluginJson } from '../../plugin/manifest.js'
-import { migrateEntry } from '../../core/rune-entry.js'
+import { isolateName } from '../../core/rune-entry.js'
 import { output } from '../../shared/output.js'
 
 /**
@@ -157,11 +157,13 @@ export async function handler({
 
   const resolvedName = name ?? templateMeta.name
   const resolvedDesc = description ?? templateMeta.description
-  // A template declares mode-scoped grants; the rune entry carries them in its run and repl blocks.
+  const command = isolateName(runeRelPath)
+  const perms = templateMeta.permissions
   const configEntry = {
     ...(resolvedName && { name: resolvedName }),
     ...(resolvedDesc && { description: resolvedDesc }),
-    ...migrateEntry({ path: runeRelPath, permissions: templateMeta.permissions }, { base: projectRoot }).entry,
+    run: perms?.run ? { command, permissions: perms.run } : command,
+    ...(perms?.repl && { repl: { command, permissions: perms.repl } }),
   }
   config.runes = { ...(config.runes ?? {}), [outputKey]: configEntry }
 

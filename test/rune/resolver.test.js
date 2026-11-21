@@ -153,7 +153,7 @@ describe('runRune — plugin rune permission/vars override via runes["plugin:run
     })
 
     const config = {
-      plugins: ['my-plugin'],
+      plugins: { 'my-plugin': true },
       runes: {
         'my-plugin:deploy': {
           vars: { region: 'us-east-1' },
@@ -186,7 +186,7 @@ describe('runRune — plugin rune permission/vars override via runes["plugin:run
     })
 
     const config = {
-      plugins: ['my-plugin'],
+      plugins: { 'my-plugin': true },
       runes: {
         'my-plugin:deploy': {
           vars: { region: 'eu-west-1' },
@@ -221,7 +221,7 @@ describe('runRune — plugin rune permission/vars override via runes["plugin:run
       runes: { deploy: { run: 'runes/deploy.rune.js', vars: {} } }
     })
 
-    const config = { plugins: ['my-org@my-plugin'], runes: {} }
+    const config = { plugins: { 'my-org@my-plugin': true }, runes: {} }
     await runRune('/project', config, 'my-plugin:deploy', [])
 
     expect(executePluginRune).toHaveBeenCalled()
@@ -244,7 +244,7 @@ describe('resolveRuneFromPlugins — ambiguity message shows full keys', () => {
       throw new Error('unexpected dir')
     })
 
-    const config = { plugins: ['sole-market@git', 'other-market@docker-tools'], runes: {} }
+    const config = { plugins: { 'sole-market@git': true, 'other-market@docker-tools': true }, runes: {} }
 
     await expect(runRune('/project', config, 'info', [])).rejects.toThrow(
       '"info" matches runes in multiple plugins: sole-market@git, other-market@docker-tools. ' +

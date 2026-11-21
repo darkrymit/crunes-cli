@@ -38,7 +38,7 @@ describe('crunes list — unified listing', () => {
       runes: {
         'local-rune': { run: 'runes/local.rune.js', name: 'Local Rune', description: 'Local' }
       },
-      plugins: ['mkt@plug']
+      plugins: { 'mkt@plug': true }
     })
 
     await handler({ format: 'json', plain: false, projectRoot: '/p', configRoot: '/p' })

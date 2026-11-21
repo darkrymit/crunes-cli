@@ -3,7 +3,6 @@ import { join, resolve } from 'node:path'
 import { getStorePath } from '../store/index.js'
 import { isPathCommand } from '../shared/command.js'
 import { isInlineSchema, normaliseJsonSchema } from '../rune/native/schema.js'
-import { migrateEntry, v1EntryError } from './rune-entry.js'
 
 function isObject(item) {
   return item && typeof item === 'object' && !Array.isArray(item)
@@ -51,7 +50,6 @@ export function absolutizeEntryPaths(config, baseDir, layer) {
 }
 
 export function coercePlugins(plugins) {
-  if (Array.isArray(plugins)) return Object.fromEntries(plugins.map(k => [k, true]))
   return isObject(plugins) ? { ...plugins } : {}
 }
 
@@ -178,8 +176,7 @@ function validateEntry(runeKey, entry, fileName, partial) {
   const run = entry.run == null ? null : validateBlockShape(`${at}.run`, entry.run, RUN_BLOCK_KEYS, fileName)
   if (!partial && (run == null || run.command === undefined)) {
     throw new Error(
-      `${fileName}: ${at} has no run block naming its command in any config layer — a rune runs only what its entry declares. ` +
-      `An entry written for the old .crunes/runes/<key>.js convention is rewritten by \`crunes migrate\`.`
+      `${fileName}: ${at} has no run block naming its command in any config layer — a rune runs only what its entry declares.`
     )
   }
   if (run?.argv != null && (!Array.isArray(run.argv) || run.argv.some(a => typeof a !== 'string'))) {
@@ -237,20 +234,13 @@ export function validateMergedRunBlocks(config, label = 'config') {
   }
 }
 
-/**
- * Per-layer checks. base and layer, when given, let a v1 entry be refused with its rewrite:
- * the rewrite needs the layer's directory to find the file the v1 fallback would have used.
- */
-export function validateConfig(config, fileName = 'config.json', { base = null, layer = 'project' } = {}) {
+export function validateConfig(config, fileName = 'config.json') {
   if (config.runes && typeof config.runes === 'object') {
     for (const [runeKey, entry] of Object.entries(config.runes)) {
       if (!isObject(entry)) continue
-      // Only explicit v1 fields are refused here: whether a block-less entry relied on the fallback
-      // file cannot be told from one layer, and the merged check names the migration for it.
-      const rewritten = (entry.path !== undefined || entry.permissions !== undefined)
-        ? migrateEntry(entry, { base: base ?? '.', defaultFile: base ? defaultRuneFile(runeKey, layer) : null })
-        : null
-      if (rewritten) throw v1EntryError(fileName, `runes["${runeKey}"]`, rewritten)
+      if (entry.path !== undefined || entry.permissions !== undefined) {
+        throw new Error(`${fileName}: runes["${runeKey}"] uses unsupported legacy fields (path / permissions); declare a run block instead.`)
+      }
       validateEntry(runeKey, entry, fileName, true)
     }
   }
@@ -262,11 +252,6 @@ export function validateConfig(config, fileName = 'config.json', { base = null, 
       }
     }
   }
-}
-
-/** Where the v1 fallback looked for a pathless rune in a layer. */
-export function defaultRuneFile(runeKey, layer) {
-  return runeKey.includes(':') ? null : layer === 'global' ? `runes/${runeKey}.js` : `.crunes/runes/${runeKey}.js`
 }
 
 export function normaliseRune(entry) {

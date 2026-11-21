@@ -155,7 +155,7 @@ describe('docs rune handler — plugin runes', () => {
   it('resolves a fully-qualified plugin:rune key and renders its index', async () => {
     const { loadRegistry, resolvePluginKeyScoped } = await import('../../../src/plugin/registry.js')
     const { loadPluginJson } = await import('../../../src/plugin/manifest.js')
-    await writeFile(join(tmp, '.crunes', 'config.json'), JSON.stringify({ runes: {}, plugins: ['my-org@git'] }))
+    await writeFile(join(tmp, '.crunes', 'config.json'), JSON.stringify({ runes: {}, plugins: { 'my-org@git': true } }))
     resolvePluginKeyScoped.mockReturnValue('my-org@git')
     loadRegistry.mockResolvedValue({ plugins: { 'my-org@git': { path: '/plugins/git', cacheDir: '/plugins/git' } } })
     loadPluginJson.mockResolvedValue({
@@ -171,7 +171,7 @@ describe('docs rune handler — plugin runes', () => {
     const { loadRegistry, resolvePluginKeyScoped } = await import('../../../src/plugin/registry.js')
     const { loadPluginJson } = await import('../../../src/plugin/manifest.js')
     await writeFile(join(tmp, '.crunes', 'config.json'), JSON.stringify({
-      runes: {}, plugins: ['sole-market@git', 'other-market@docker-tools'],
+      runes: {}, plugins: { 'sole-market@git': true, 'other-market@docker-tools': true },
     }))
     resolvePluginKeyScoped.mockReturnValue(null)
     loadRegistry.mockResolvedValue({

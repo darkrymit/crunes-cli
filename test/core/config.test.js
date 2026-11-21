@@ -25,18 +25,13 @@ describe('validateConfig', () => {
     expect(() => validateConfig(bad)).toThrow()
   })
 
-  it('refuses a v1 entry, printing it rewritten with run and repl blocks', () => {
+  it('refuses a rune entry with legacy path or permissions fields', () => {
     const config = {
       runes: {
         myrune: { path: '.crunes/runes/myrune.js', permissions: { run: { allow: ['fs.read:*'] }, repl: { allow: [] } } }
       }
     }
-    let message = ''
-    try { validateConfig(config) } catch (err) { message = err.message }
-    expect(message).toContain('runes["myrune"] uses the old entry shape')
-    expect(message).toContain('"command": ".crunes/runes/myrune.rune.js"')
-    expect(message).toContain('.crunes/runes/myrune.js → .crunes/runes/myrune.rune.js')
-    expect(message).toContain('crunes migrate')
+    expect(() => validateConfig(config)).toThrow('runes["myrune"] uses unsupported legacy fields (path / permissions)')
   })
 
   it('throws on a plugin-rune override key missing the marketplace prefix', () => {
@@ -230,13 +225,10 @@ describe('partial override across layers', () => {
 })
 
 describe('plugins as a boolean map', () => {
-  it('coerces a legacy array into an all-true map', () => {
-    expect(coercePlugins(['a@x', 'b@y'])).toEqual({ 'a@x': true, 'b@y': true })
-  })
-
-  it('passes a map through unchanged and treats missing as empty', () => {
+  it('passes a map through unchanged and treats non-map as empty', () => {
     expect(coercePlugins({ 'a@x': false })).toEqual({ 'a@x': false })
     expect(coercePlugins(undefined)).toEqual({})
+    expect(coercePlugins(['a@x'])).toEqual({})
   })
 
   it('merges maps last-wins so a later layer can disable', () => {
@@ -244,17 +236,8 @@ describe('plugins as a boolean map', () => {
     expect(result.plugins).toEqual({ 'a@x': false })
   })
 
-  it('coerces a legacy array on either side of a merge', () => {
-    const result = mergeConfigs({ plugins: ['a@x'] }, { plugins: { 'b@y': true } })
-    expect(result.plugins).toEqual({ 'a@x': true, 'b@y': true })
-  })
-
   it('lists only keys explicitly enabled', () => {
     expect(enabledPluginKeys({ plugins: { 'a@x': true, 'b@y': false } })).toEqual(['a@x'])
-  })
-
-  it('lists keys from a legacy array config', () => {
-    expect(enabledPluginKeys({ plugins: ['a@x'] })).toEqual(['a@x'])
   })
 })
 
@@ -275,7 +258,7 @@ describe('validateConfig with fileNames', () => {
       }
     }
     expect(() => validateConfig(config, 'config.local.json')).toThrow(
-      'config.local.json: runes["my-rune"] uses the old entry shape'
+      'config.local.json: runes["my-rune"] uses unsupported legacy fields (path / permissions)'
     )
   })
 })

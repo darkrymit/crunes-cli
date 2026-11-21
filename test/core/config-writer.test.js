@@ -37,9 +37,9 @@ describe('writeRawConfig', () => {
 })
 
 describe('setPluginEnabled', () => {
-  it('converts a legacy array to map form on write', async () => {
+  it('adds an enabled plugin to the map on write', async () => {
     const p = path.join(dir, 'config.json')
-    writeFileSync(p, JSON.stringify({ plugins: ['a@x'] }))
+    writeFileSync(p, JSON.stringify({ plugins: { 'a@x': true } }))
     await setPluginEnabled(p, 'b@y', true)
     expect(JSON.parse(readFileSync(p, 'utf8')).plugins).toEqual({ 'a@x': true, 'b@y': true })
   })

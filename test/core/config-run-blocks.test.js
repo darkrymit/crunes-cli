@@ -16,7 +16,7 @@ describe('validateConfig — run and args blocks', () => {
   })
 
   it('refuses path and run together', () => {
-    expect(validate({ a: { path: 'a.js', run: 'a.py' } })).toThrow('uses the old entry shape')
+    expect(validate({ a: { path: 'a.js', run: 'a.py' } })).toThrow('uses unsupported legacy fields (path / permissions)')
   })
 
   it('refuses plugin and run together', () => {
@@ -29,7 +29,7 @@ describe('validateConfig — run and args blocks', () => {
   })
 
   it('refuses entry-level permissions, pointing at the block', () => {
-    expect(validate({ a: { run: 'a.rune.js', permissions: { run: { allow: [] } } } })).toThrow('uses the old entry shape')
+    expect(validate({ a: { run: 'a.rune.js', permissions: { run: { allow: [] } } } })).toThrow('uses unsupported legacy fields (path / permissions)')
   })
 
   it('refuses grants on a native handler, because nothing would enforce them', () => {

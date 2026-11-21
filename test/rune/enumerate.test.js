@@ -41,14 +41,14 @@ describe('enumerateRunes', () => {
   it('appends enabled-plugin runes with a short-name prefixed key', async () => {
     loadRegistry.mockResolvedValue({ plugins: { 'scope@git': { path: '/p/git' } } })
     loadPluginJson.mockResolvedValue({ runes: { status: { name: 'Status', description: 'Git status' } } })
-    const out = await enumerateRunes({ runes: {}, plugins: ['scope@git'] })
+    const out = await enumerateRunes({ runes: {}, plugins: { 'scope@git': true } })
     expect(out).toEqual([{ key: 'git:status', source: 'plugin: scope@git', name: 'Status', description: 'Git status' }])
   })
 
   it('does not overwrite a local rune that shares a plugin display key', async () => {
     loadRegistry.mockResolvedValue({ plugins: { 'scope@git': { path: '/p/git' } } })
     loadPluginJson.mockResolvedValue({ runes: { status: { name: 'Plugin version' } } })
-    const config = { runes: { 'git:status': { run: 'local.rune.js', name: 'Local version' } }, plugins: ['scope@git'] }
+    const config = { runes: { 'git:status': { run: 'local.rune.js', name: 'Local version' } }, plugins: { 'scope@git': true } }
     const out = await enumerateRunes(config)
     expect(out).toHaveLength(1)
     expect(out[0].name).toBe('Local version')
@@ -57,12 +57,12 @@ describe('enumerateRunes', () => {
   it('skips a plugin whose manifest cannot be loaded', async () => {
     loadRegistry.mockResolvedValue({ plugins: { 'scope@git': { path: '/p/git' } } })
     loadPluginJson.mockRejectedValue(new Error('bad manifest'))
-    expect(await enumerateRunes({ runes: {}, plugins: ['scope@git'] })).toEqual([])
+    expect(await enumerateRunes({ runes: {}, plugins: { 'scope@git': true } })).toEqual([])
   })
 
   it('swallows a registry failure and returns local runes only', async () => {
     loadRegistry.mockRejectedValue(new Error('no registry'))
-    const config = { runes: { greet: { run: 'g.rune.js' } }, plugins: ['scope@git'] }
+    const config = { runes: { greet: { run: 'g.rune.js' } }, plugins: { 'scope@git': true } }
     const out = await enumerateRunes(config)
     expect(out.map(e => e.key)).toEqual(['greet'])
   })
@@ -72,7 +72,7 @@ describe('enumerateRunes', () => {
     loadPluginJson.mockResolvedValue({ runes: { status: { name: 'Status', description: 'Git status' } } })
     const config = {
       runes: { 'scope@git:status': { vars: { depth: 5 } } },
-      plugins: ['scope@git'],
+      plugins: { 'scope@git': true },
     }
     const out = await enumerateRunes(config)
     // The override modifies the plugin's rune; it is not a second rune, and it
@@ -84,7 +84,7 @@ describe('enumerateRunes', () => {
 
   it('still lists a qualified override when its plugin is not enabled', async () => {
     loadRegistry.mockResolvedValue({ plugins: {} })
-    const config = { runes: { 'scope@git:status': { vars: { depth: 5 } } }, plugins: [] }
+    const config = { runes: { 'scope@git:status': { vars: { depth: 5 } } }, plugins: {} }
     const out = await enumerateRunes(config)
     expect(out.map(e => e.key)).toEqual(['scope@git:status'])
   })

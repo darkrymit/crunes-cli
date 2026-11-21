@@ -20,7 +20,7 @@ beforeEach(async () => {
   await mkdir(join(configRoot, '.crunes'), { recursive: true })
   await writeFile(
     join(configRoot, '.crunes', 'config.json'),
-    JSON.stringify({ plugins: ['official@git'] }, null, 2)
+    JSON.stringify({ plugins: { 'official@git': true } }, null, 2)
   )
   vi.mocked(loadRegistry).mockResolvedValue({ plugins: { 'official@git': { path: '/fake' } } })
   vi.mocked(resolvePluginKey).mockReturnValue('official@myplugin')
@@ -53,7 +53,7 @@ describe('disable handler — configRoot', () => {
     // Pre-seed configRoot with a plugin to disable
     await writeFile(
       join(configRoot, '.crunes', 'config.json'),
-      JSON.stringify({ plugins: ['official@git', 'official@myplugin'] }, null, 2)
+      JSON.stringify({ plugins: { 'official@git': true, 'official@myplugin': true } }, null, 2)
     )
 
     await disableHandler({ name: 'myplugin', projectRoot, configRoot })
@@ -75,7 +75,7 @@ describe('disable handler — scoped resolution, no global registry lookup', () 
     await mkdir(join(tmp1, '.crunes'), { recursive: true })
     await writeFile(
       join(tmp1, '.crunes', 'config.json'),
-      JSON.stringify({ plugins: ['my-org@git'] }, null, 2)
+      JSON.stringify({ plugins: { 'my-org@git': true } }, null, 2)
     )
 
     // loadRegistry mock (from the outer beforeEach) would normally report crunes-plugins@git too,
@@ -93,7 +93,7 @@ describe('disable handler — scoped resolution, no global registry lookup', () 
     await mkdir(join(tmp2, '.crunes'), { recursive: true })
     await writeFile(
       join(tmp2, '.crunes', 'config.json'),
-      JSON.stringify({ plugins: ['my-org@git', 'crunes-plugins@git'] }, null, 2)
+      JSON.stringify({ plugins: { 'my-org@git': true, 'crunes-plugins@git': true } }, null, 2)
     )
     const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {})
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
