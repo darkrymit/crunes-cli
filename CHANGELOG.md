@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.1] - 2026-11-21
+
+### Removed
+- **Config migration & legacy compat**: Removed `crunes migrate`, `migrateEntry` / `v1EntryError`, `defaultRuneFile`, and legacy `plugins` array coercion (`0.10.0` remains the migration bridge release). Entries with `path` / `permissions` are rejected cleanly with a prompt to declare a `run` block.
+
 ## [0.10.0] - 2026-11-21
 
 ### Added
