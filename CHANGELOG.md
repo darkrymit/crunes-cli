@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0] - 2026-11-21
+
+### Added
+- **Script runes & direct output (`MVP0`)**: Native script runes (`bash`, `python`, `node`, or direct CLI executables) with `run` / `repl` blocks, `args` schema validation, `--lang` scaffolding, `crunes add`, `crunes migrate`, and direct stdio passthrough on single runs
+- **Wildcard isolate permission grant**: Support `allow: ["*"]` for unrestricted isolate grants while preserving `deny` precedence
+- **CLI & doctor improvements**: Support `-p` on subcommands, audit plugin native trust in `crunes doctor`, and show status in `crunes plugin list`
+
+### Changed
+- **BREAKING — Config v2 (`run` / `repl` blocks)**: Rune entries use `run` and `repl` blocks (replacing top-level `path` / `permissions`), with isolate modules named `*.rune.js`; plugin manifests retain format 1
+- **Performance**: Decouple the isolate runner from `enumerate` and native script execution, and lazy-load heavy dependencies in `fs`, `ws`, `xml`, `yaml`, `csv`, and `archive` utils
+
+### Fixed
+- **Plain string return from `run()`**: Render a plain string returned from `run()` as an output section
+- **Timer keepalive**: Keep the process alive while a rune awaits a timer
+- **Quiet EPIPE exit**: Exit quietly when the reader of standard output closes early
+- **Windows console window**: Hide the console window for `rune.exec` and `RuneSession` spawns on Windows
+- **`crunes doctor` overrides**: Handle plugin override entries without `command`
+
 ## [0.9.0] - 2026-09-24
 
 ### Added
