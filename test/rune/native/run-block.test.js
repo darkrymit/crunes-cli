@@ -43,6 +43,18 @@ describe('runRunBlock — captured (framed invocations)', () => {
     expect(out).toContain('args:none')
   })
 
+  it('does not leak an outer CRUNES_ARGS into a script rune without an args schema', async () => {
+    const prev = process.env.CRUNES_ARGS
+    process.env.CRUNES_ARGS = '{"from":"outer"}'
+    try {
+      const out = await run({ run: 'tools/echo.sh' })
+      expect(out).toContain('args:none')
+    } finally {
+      if (prev === undefined) delete process.env.CRUNES_ARGS
+      else process.env.CRUNES_ARGS = prev
+    }
+  })
+
   it('runs Node scripts with the Node crunes runs on', async () => {
     expect(await run({ run: 'tools/hello.mjs' }, ['x'])).toBe('node x')
   })

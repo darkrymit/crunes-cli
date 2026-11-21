@@ -167,6 +167,8 @@ export async function runRunBlock({ dir, key, args, entry, opts = {}, configDir,
     CRUNES_VARS: JSON.stringify(entry.vars ?? {}),
     ...extraEnv,
   }
+  // Do not leak an outer crunes invocation's CRUNES_ARGS into a schema-less child script rune.
+  if (!parsed && !('CRUNES_ARGS' in (extraEnv ?? {}))) delete env.CRUNES_ARGS
 
   const shown = isPathCommand(desc.command) ? relative(dir, desc.command) || desc.command : desc.command
   const spawnOpts = { key, file: shown, argv, env, cwd: dir, direct, stdin: opts.stdin ?? 'inherit', timeoutMs: desc.timeout != null ? desc.timeout * 1000 : null }
