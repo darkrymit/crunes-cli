@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.2] - 2026-11-22
+
+### Added
+- **Isolate `stdin` (`@utils`)**: Grant-free, lazy, cached `stdin` (`isTTY`, `read({ maxBytes })`, `readBytes({ maxBytes })`) for single-invocation `run` runes
+- **Scoped `rune.exec` / `rune.spawn` `opts.cwd`**: Relative `projectDir`-contained, symlink-checked, `fs.read`-gated `cwd` option for cross-directory rune dispatch
+- **Plugin & dual-mode scaffolders**: `--multi` on `crunes plugin create`, plus `--plugin` / `--project` disambiguation and auto-detection on `crunes create`
+
+### Changed
+- **Unified `{src,test}/` rune layout**: `crunes create` and `crunes plugin create` now scaffold `{src/index.rune.js, test/<name>.test.js}` by default, with `types-utils` and KB docs aligned
+
 ## [0.10.1] - 2026-11-21
 
 ### Removed
