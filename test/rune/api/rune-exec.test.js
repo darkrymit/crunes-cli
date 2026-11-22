@@ -1,4 +1,8 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
+import { mkdtempSync, mkdirSync, rmSync } from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
+import { resolveRuneExecCwd } from '../../../src/rune/isolation/runner.js'
 
 describe('rune.exec — JSONL result parsing', () => {
   it('parses JSONL stdout and returns RuneResult shape', async () => {
@@ -75,5 +79,36 @@ describe('rune.exec — repl CLI args construction', () => {
     expect(cliArgs).toContain('repl')
     expect(cliArgs).not.toContain('run')
     expect(cliArgs).not.toContain('--')
+  })
+})
+
+describe('resolveRuneExecCwd — containment & permission gating', () => {
+  it('returns projectDir when cwd is omitted', () => {
+    const check = vi.fn()
+    expect(resolveRuneExecCwd('/proj', undefined, check)).toBe('/proj')
+    expect(check).not.toHaveBeenCalled()
+  })
+
+  it('resolves relative subdir inside projectDir and checks fs.read', () => {
+    const tmp = mkdtempSync(path.join(os.tmpdir(), 'crunes-cwd-'))
+    const sub = path.join(tmp, 'plugins', 'token')
+    mkdirSync(sub, { recursive: true })
+    try {
+      const check = vi.fn()
+      expect(resolveRuneExecCwd(tmp, 'plugins/token', check)).toBe(sub)
+      expect(check).toHaveBeenCalledWith('fs.read', 'plugins/token')
+    } finally {
+      rmSync(tmp, { recursive: true, force: true })
+    }
+  })
+
+  it('rejects absolute paths and .. escapes', () => {
+    const tmp = mkdtempSync(path.join(os.tmpdir(), 'crunes-cwd-esc-'))
+    try {
+      expect(() => resolveRuneExecCwd(tmp, '../outside', () => {})).toThrow(/escapes projectDir/)
+      expect(() => resolveRuneExecCwd(tmp, tmp, () => {})).toThrow(/must be relative/)
+    } finally {
+      rmSync(tmp, { recursive: true, force: true })
+    }
   })
 })

@@ -16,6 +16,7 @@ import { createSqliteUtils } from './sqlite.js'
 import { createWsUtils } from './ws.js'
 import { createDbUtils } from './db.js'
 import { createNotifyUtils } from './notify.js'
+import { createStdinUtils } from './stdin.js'
 import { isGlobMatch } from '../../shared/match.js'
 
 export function createSectionUtils(patterns) {
@@ -34,7 +35,7 @@ export function createSectionUtils(patterns) {
   }
 }
 
-export function createUtils(dir, checkPermission = null, pluginDir = null, permissions = { allow: [], deny: [] }, vars = {}, requestedSections = null, pluginId = null, projectName = undefined) {
+export function createUtils(dir, checkPermission = null, pluginDir = null, permissions = { allow: [], deny: [] }, vars = {}, requestedSections = null, pluginId = null, projectName = undefined, { allowStdin = true } = {}) {
   const fs     = createFsUtils(dir, checkPermission, pluginDir, pluginId)
   const sqlite = createSqliteUtils(dir, checkPermission, { pluginId, projectName })
   let _ws
@@ -76,6 +77,7 @@ export function createUtils(dir, checkPermission = null, pluginDir = null, permi
       return _db ??= createDbUtils(dir, checkPermission)
     },
     notify:  createNotifyUtils(checkPermission),
+    stdin:   createStdinUtils({ allowStdin }),
   }
   return {
     utils,

@@ -4,7 +4,7 @@ import { spawnSync } from 'node:child_process'
 import { intro, outro, text, confirm, cancel } from '@clack/prompts'
 import { output } from '../../shared/output.js'
 
-export function pluginJson({ name, description, author, license }) {
+export function pluginJson({ name, description, author, license, multi = false }) {
   return JSON.stringify({
     format: '1',
     runes: {
@@ -12,7 +12,7 @@ export function pluginJson({ name, description, author, license }) {
         name: 'Example Rune',
         description: 'Replace with your rune description',
         run: {
-          command: 'runes/example.rune.js',
+          command: multi ? 'runes/example/src/index.rune.js' : 'src/index.rune.js',
           permissions: {
             allow: [],
             deny: [],
@@ -115,6 +115,10 @@ export function changelogMd() {
   return `# Changelog\n\n## 1.0.0\n\n- Initial release\n`
 }
 
+export function exampleTest() {
+  return `import { describe, it } from 'node:test'\nimport assert from 'node:assert/strict'\n\ndescribe('example rune', () => {\n  it('placeholder', () => {\n    assert.ok(true)\n  })\n})\n`
+}
+
 function getGitAuthor() {
   const result = spawnSync('git', ['config', 'user.name'], { encoding: 'utf8' })
   return result.status === 0 ? result.stdout.trim() : ''
@@ -126,6 +130,7 @@ export async function handler({
   author,
   license,
   out,
+  multi = false,
   yes = false,
   projectRoot = process.cwd(),
 } = {}) {
@@ -180,12 +185,20 @@ export async function handler({
     if (!ok || ok === Symbol.for('clack:cancel')) { cancel('Cancelled.'); return }
   }
 
-  const opts = { name, description, author, license }
+  const opts = { name, description, author, license, multi }
+
+  const runeEntry = multi
+    ? join(outDir, 'runes', 'example', 'src', 'index.rune.js')
+    : join(outDir, 'src', 'index.rune.js')
+  const testEntry = multi
+    ? join(outDir, 'runes', 'example', 'test', 'example.test.js')
+    : join(outDir, 'test', `${name}.test.js`)
 
   const files = [
     [join(outDir, '.crunes-plugin', 'plugin.json'), pluginJson(opts)],
     [join(outDir, '.crunes-plugin', 'marketplace.json'), marketplaceJson(opts)],
-    [join(outDir, 'runes', 'example.rune.js'), exampleRune()],
+    [runeEntry, exampleRune()],
+    [testEntry, exampleTest()],
     [join(outDir, 'templates', 'example-template.js'), exampleTemplate()],
     [join(outDir, 'README.md'), readmeMd(opts)],
     [join(outDir, 'CHANGELOG.md'), changelogMd()],

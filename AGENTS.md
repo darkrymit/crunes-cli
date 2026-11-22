@@ -82,7 +82,7 @@ npm test && npm run build && node dist/cli.js --help
 
 In a directory with no `.crunes/config.json`, crunes runs **rootless** — global layer only, and no local
 state (caches, sqlite, jobs, schemas, `node_modules`) is written outside the store. `~/.crunes` **is** the
-global config dir, so global rune paths are `runes/<key>.js`, with no `.crunes/` segment.
+global config dir, so global rune paths are `runes/<key>/src/index.rune.js` (or `src/index.<ext>`), with no `.crunes/` segment.
 `CRUNES_NO_GLOBAL=1` skips the global layer.
 
 **Prefixes:** `local:<key>` forces local config resolution. `<plugin>:<key>` forces a specific plugin resolver.

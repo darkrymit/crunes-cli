@@ -381,14 +381,16 @@ export function buildProgram() {
     .command('create [new-rune]')
     .description('Scaffold a new rune and register it in config')
     .addOption(new Option('--format <format>', 'rune output format').choices(['tree', 'markdown']))
-    .option('--path <path>', 'file path for the rune (default: .crunes/runes/<key>.js)')
+    .option('--path <path>', 'file path for the rune (default: .crunes/runes/<key>/src/index.rune.js)')
     .addOption(new Option('--lang <lang>', 'scaffold a script rune instead of a sandboxed JS one').choices(['python', 'bash', 'node']))
     .option('--name <name>', 'human-readable label shown in crunes list')
     .option('--description <description>', 'short description of what context this rune provides')
     .option('-g, --global', 'operate on the global config (~/.crunes/config.json) instead of the project')
+    .option('--plugin', 'register the rune in .crunes-plugin/plugin.json instead of .crunes/config.json')
+    .option('--project', 'register the rune in .crunes/config.json even when .crunes-plugin/plugin.json exists')
     .action(async (key, opts) => {
       const { handler } = await import('../rune/commands/create.js')
-      await handler({ key, format: opts.format, lang: opts.lang, path: opts.path, name: opts.name, description: opts.description, yes: !!program.opts().yes, projectRoot: projectRoot(), configRoot: configRoot(), global: !!opts.global })
+      await handler({ key, format: opts.format, lang: opts.lang, path: opts.path, name: opts.name, description: opts.description, yes: !!program.opts().yes, projectRoot: projectRoot(), configRoot: configRoot(), global: !!opts.global, plugin: !!opts.plugin, project: !!opts.project })
     })
 
   program
@@ -475,9 +477,10 @@ export function buildProgram() {
     .option('--author <name>', 'author name (default: git config user.name)')
     .option('--license <spdx>', 'SPDX license identifier (default: MIT)')
     .option('--out <path>', 'output directory (default: ./<name>)')
+    .option('--multi', 'scaffold under runes/example/{src,test}/ for a multi-rune plugin')
     .action(async (name, opts) => {
       const { handler } = await import('../plugin/commands/create.js')
-      await handler({ name, description: opts.description, author: opts.author, license: opts.license, out: opts.out, yes: !!program.opts().yes, projectRoot: projectRoot() })
+      await handler({ name, description: opts.description, author: opts.author, license: opts.license, out: opts.out, multi: !!opts.multi, yes: !!program.opts().yes, projectRoot: projectRoot() })
     })
 
   // Template commands

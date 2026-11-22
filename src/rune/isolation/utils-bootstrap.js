@@ -8,6 +8,7 @@ import { selectNode, toSegments, formatRuneIndex, formatCommandPage } from '../.
 
 const __vars = JSON.parse($__vars)
 const __os = Object.freeze(JSON.parse($__os))
+const __stdinIsTTY = Boolean($__stdin_is_tty)
 
 import { TextEncoder, TextDecoder } from 'fast-text-encoding'
 import { ReadableStream, WritableStream, TransformStream, ByteLengthQueuingStrategy, CountQueuingStrategy } from 'web-streams-polyfill'
@@ -1253,6 +1254,17 @@ globalThis.utils = {
     has: (key) => Object.hasOwn(__vars, key),
   },
   os: __os,
+  stdin: {
+    get isTTY() { return __stdinIsTTY },
+    readBytes: async (opts) => {
+      const ab = await $__utils_stdin_read_bytes.apply(undefined, [opts], { arguments: { copy: true }, result: { promise: true, copy: true } })
+      return ab ? new Uint8Array(ab) : null
+    },
+    read: async (opts) => {
+      const bytes = await globalThis.utils.stdin.readBytes(opts)
+      return bytes ? new TextDecoder().decode(bytes) : null
+    },
+  },
   archive: {
     zip:     (s, d) => $__utils_archive_zip.apply(undefined,     [s, d], { result: { promise: true } }),
     unzip:   (s, d) => $__utils_archive_unzip.apply(undefined,   [s, d], { result: { promise: true } }),
@@ -1807,7 +1819,7 @@ globalThis.utils = {
   tree,
 }
 
-export const { fs, shell, section, rune, json, yaml, xml, csv, http, env, vars, os, archive, cache, sqlite, db, crypt, codec, ws, time, notify } = globalThis.utils
+export const { fs, shell, section, rune, json, yaml, xml, csv, http, env, vars, os, stdin, archive, cache, sqlite, db, crypt, codec, ws, time, notify } = globalThis.utils
 export { md, tree }
 
 // ─── Global Sandbox Timers ───────────────────────────────────────────────────

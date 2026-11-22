@@ -147,18 +147,27 @@ describe('handler (non-interactive)', () => {
       rmSync(tmp, { recursive: true, force: true })
     })
 
-    it('creates all 6 expected files', async () => {
+    it('creates all 7 expected files (default 1-rune {src,test} layout)', async () => {
       await handler({ ...BASE_OPTS, out, yes: true })
       for (const rel of [
         '.crunes-plugin/plugin.json',
         '.crunes-plugin/marketplace.json',
-        'runes/example.rune.js',
+        'src/index.rune.js',
+        'test/my-plugin.test.js',
         'templates/example-template.js',
         'README.md',
         'CHANGELOG.md',
       ]) {
         expect(existsSync(join(out, rel)), rel).toBe(true)
       }
+    })
+
+    it('scaffolds under runes/example/{src,test} when multi is true', async () => {
+      await handler({ ...BASE_OPTS, out, multi: true, yes: true })
+      expect(existsSync(join(out, 'runes/example/src/index.rune.js'))).toBe(true)
+      expect(existsSync(join(out, 'runes/example/test/example.test.js'))).toBe(true)
+      const pj = JSON.parse(readFileSync(join(out, '.crunes-plugin', 'plugin.json'), 'utf8'))
+      expect(pj.runes.example.run.command).toBe('runes/example/src/index.rune.js')
     })
 
     it('writes valid plugin.json and marketplace.json with correct name', async () => {
@@ -173,7 +182,7 @@ describe('handler (non-interactive)', () => {
     it('generates a format 1 plugin.json that names the module and its grants in a run block', async () => {
       await handler({ ...BASE_OPTS, out, yes: true })
       const pj = JSON.parse(readFileSync(join(out, '.crunes-plugin', 'plugin.json'), 'utf8'))
-      expect(pj.runes.example.run).toEqual({ command: 'runes/example.rune.js', permissions: { allow: [], deny: [] } })
+      expect(pj.runes.example.run).toEqual({ command: 'src/index.rune.js', permissions: { allow: [], deny: [] } })
       expect(() => validatePluginJson(pj)).not.toThrow()
     })
 

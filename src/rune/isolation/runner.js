@@ -66,6 +66,27 @@ async function compileStaticModule(isolate, key) {
  */
 const VALID_SIGNALS = new Set(['SIGTERM', 'SIGKILL', 'SIGINT', 'SIGHUP', 'SIGUSR1', 'SIGUSR2'])
 
+export function resolveRuneExecCwd(projectDir, cwdOpt, checkPermission) {
+  if (cwdOpt == null || cwdOpt === '') return projectDir
+  if (typeof cwdOpt !== 'string') throw new TypeError('rune.exec: opts.cwd must be a string')
+  if (path.isAbsolute(cwdOpt)) {
+    throw new RangeError(`rune.exec: cwd "${cwdOpt}" must be relative to projectDir`)
+  }
+  const resolved = path.resolve(projectDir, cwdOpt)
+  const rel = path.relative(projectDir, resolved)
+  if (rel.startsWith('..') || path.isAbsolute(rel)) {
+    throw new RangeError(`rune.exec: cwd "${cwdOpt}" escapes projectDir`)
+  }
+  const realRoot = fsSync.realpathSync.native(projectDir)
+  const realTarget = fsSync.realpathSync.native(resolved)
+  const realRel = path.relative(realRoot, realTarget)
+  if (realRel.startsWith('..') || path.isAbsolute(realRel)) {
+    throw new RangeError(`rune.exec: symlinked cwd "${cwdOpt}" escapes projectDir`)
+  }
+  if (checkPermission) checkPermission('fs.read', cwdOpt)
+  return resolved
+}
+
 async function injectUtils(isolate, context, utils, _runeCallback, vars, projectDir, checkPermission, sections, onEvent, runeContext) {
   const currentRuneKey = runeContext?.key ?? null
   const jail = context.global
@@ -392,10 +413,11 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
     } else {
       checkPermission('rune.run', runeKey)
     }
+    const targetCwd = resolveRuneExecCwd(projectDir, opts?.cwd, checkPermission)
     const cliPath = process.argv[1]
     const cliArgs = repl
-      ? [cliPath, '--cwd', projectDir, 'repl', '--format', 'jsonl', runeKey, ...(args ?? [])]
-      : [cliPath, '--cwd', projectDir, 'run', '--format', 'jsonl', runeKey, ...(args ?? [])]
+      ? [cliPath, '--cwd', targetCwd, 'repl', '--format', 'jsonl', runeKey, ...(args ?? [])]
+      : [cliPath, '--cwd', targetCwd, 'run', '--format', 'jsonl', runeKey, ...(args ?? [])]
     const child = spawnProcess(
       process.execPath,
       cliArgs,
@@ -435,7 +457,8 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
     } else {
       checkPermission('rune.run', runeKey)
     }
-    const session = new RuneSession(runeKey, args, { cliPath: process.argv[1], projectDir, repl })
+    const targetCwd = resolveRuneExecCwd(projectDir, opts?.cwd, checkPermission)
+    const session = new RuneSession(runeKey, args, { cliPath: process.argv[1], projectDir: targetCwd, repl })
     const id = String(nextShellHandle++)
     shellHandles.set(id, session)
     return id
@@ -1328,6 +1351,14 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
   await jail.set('$__performance_now', new ivm.Reference(() => performance.now()))
   await jail.set('$__vars', JSON.stringify(vars))
   await jail.set('$__os', JSON.stringify(createOsInfo()))
+  await jail.set('$__stdin_is_tty', Boolean(utils.stdin?.isTTY))
+  await jail.set('$__utils_stdin_read_bytes', new ivm.Reference(async (opts) => {
+    const bytes = await utils.stdin.readBytes(opts)
+    if (!bytes) return null
+    const copy = new Uint8Array(bytes.length)
+    copy.set(bytes)
+    return copy.buffer
+  }))
   await jail.set('$__projectDir', projectDir)
   await jail.set('$__rune_key',             runeContext?.key ?? null)
   await jail.set('$__rune_lifecycle',       runeContext?.lifecycle ?? 'run')
@@ -1415,7 +1446,7 @@ export async function runRuneInIsolate(runeFile, effective, args, projectDir, {
       .catch(() => {})
   }
   const checkPermission = makePermissionChecker(augmented, { dir: projectDir, pluginId, pluginDir })
-  const { utils, dispose } = createUtils(projectDir, checkPermission, pluginDir ?? null, augmented, vars, sections, pluginId)
+  const { utils, dispose } = createUtils(projectDir, checkPermission, pluginDir ?? null, augmented, vars, sections, pluginId, undefined, { allowStdin: lifecycle === 'run' })
 
   if (isVerbose) console.error(`[crunes:debug] creating Isolate...`)
   const isolate = new ivm.Isolate({ memoryLimit: isolateMemoryMb })
@@ -1619,7 +1650,7 @@ export async function getArgsSchema(runeFile, effective, projectDir, {
     deny: effective.deny,
   }
   const checkPermission = makePermissionChecker(augmented, { dir: projectDir })
-  const { utils, dispose } = createUtils(projectDir, checkPermission, pluginDir ?? null, augmented, vars, null, null)
+  const { utils, dispose } = createUtils(projectDir, checkPermission, pluginDir ?? null, augmented, vars, null, null, undefined, { allowStdin: false })
   const isolate = new ivm.Isolate({ memoryLimit: isolateMemoryMb })
   try {
     const context = await isolate.createContext()
@@ -1734,7 +1765,7 @@ export async function getReplSchema(runeFile, effective, args, projectDir, {
     deny: effective.deny,
   }
   const checkPermission = makePermissionChecker(augmented, { dir: projectDir })
-  const { utils, dispose } = createUtils(projectDir, checkPermission, pluginDir ?? null, augmented, vars, null, null)
+  const { utils, dispose } = createUtils(projectDir, checkPermission, pluginDir ?? null, augmented, vars, null, null, undefined, { allowStdin: false })
   const isolate = new ivm.Isolate({ memoryLimit: isolateMemoryMb })
   try {
     const context = await isolate.createContext()
@@ -1921,7 +1952,7 @@ export async function runRuneInRepl(runeFile, effective, args, projectDir, {
       .catch(() => {})
   }
   const checkPermission = makePermissionChecker(augmented, { dir: projectDir, pluginId, pluginDir })
-  const { utils, dispose: disposeUtils } = createUtils(projectDir, checkPermission, pluginDir ?? null, augmented, vars, null, pluginId)
+  const { utils, dispose: disposeUtils } = createUtils(projectDir, checkPermission, pluginDir ?? null, augmented, vars, null, pluginId, undefined, { allowStdin: false })
 
   const isolate = new ivm.Isolate({ memoryLimit: isolateMemoryMb })
   const context = await isolate.createContext()

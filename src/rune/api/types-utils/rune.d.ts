@@ -53,8 +53,9 @@ declare namespace rune {
    * `*` matches any characters (e.g. `rune.run:myplugin:*`).
    *
    * When `repl: true`, `opts.stdin` is written to the child's stdin before awaiting exit.
+   * When `opts.cwd` is set, it must be relative to the project root and permitted by `fs.read`.
    */
-  function exec(key: string, args?: string[], opts?: { repl?: boolean; stdin?: string }): Promise<RuneResult>
+  function exec(key: string, args?: string[], opts?: { repl?: boolean; stdin?: string; cwd?: string }): Promise<RuneResult>
 
   /**
    * Spawns a rune as a streaming subprocess session.
@@ -64,8 +65,9 @@ declare namespace rune {
    *
    * When `repl: true`, the returned session exposes `write()`, `writeEof()`,
    * `writeInterrupt()`, and `stdin.write()` for interactive communication.
+   * When `opts.cwd` is set, it must be relative to the project root and permitted by `fs.read`.
    */
-  function spawn(key: string, args?: string[], opts?: { repl?: boolean }): RuneSession
+  function spawn(key: string, args?: string[], opts?: { repl?: boolean; cwd?: string }): RuneSession
 
   /** Result returned by rune.exec() */
   interface RuneResult {

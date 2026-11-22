@@ -102,7 +102,7 @@ exports[`pluginJson > matches snapshot 1`] = `
       "name": "Example Rune",
       "description": "Replace with your rune description",
       "run": {
-        "command": "runes/example.rune.js",
+        "command": "src/index.rune.js",
         "permissions": {
           "allow": [],
           "deny": []

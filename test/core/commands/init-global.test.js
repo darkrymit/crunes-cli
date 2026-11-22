@@ -27,8 +27,9 @@ describe('create -g', () => {
     await initHandler({ yes: true, global: true, projectRoot: dir })
     await createHandler({ key: 'serve', format: 'markdown', global: true, yes: true, projectRoot: dir, configRoot: dir })
     const store = process.env.CRUNES_STORE
-    expect(existsSync(path.join(store, 'runes', 'serve.rune.js'))).toBe(true)
+    expect(existsSync(path.join(store, 'runes', 'serve', 'src', 'index.rune.js'))).toBe(true)
+    expect(existsSync(path.join(store, 'runes', 'serve', 'test', 'serve.test.js'))).toBe(true)
     const config = JSON.parse(readFileSync(path.join(store, 'config.json'), 'utf8'))
-    expect(config.runes.serve.run).toBe('runes/serve.rune.js')
+    expect(config.runes.serve.run).toBe('runes/serve/src/index.rune.js')
   })
 })

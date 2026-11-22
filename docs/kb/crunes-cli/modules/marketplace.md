@@ -40,4 +40,4 @@ The registry key is the `name` field inside the downloaded index, not the source
 
 **A rename breaks every external reference.** The registry re-keys itself, but scripts, config and documentation naming the old marketplace fail with *marketplace not found*, and nothing rewrites them.
 
-**Relative paths resolve against the index's parent for `.crunes-plugin/` layouts.** For a repository serving its own marketplace, the base is the directory *containing* `.crunes-plugin/`, so `./plugins/git` in the index means the repository root rather than the manifest folder. This is what makes the self-serving layout work, and it is surprising until you know it.
+**Relative paths resolve against the index's parent for `.crunes-plugin/` layouts.** For a repository serving its own marketplace, the base is the directory *containing* `.crunes-plugin/`, so `./plugins/kb` in the index means the repository root rather than the manifest folder. This is what makes the self-serving layout work, and it is surprising until you know it.
