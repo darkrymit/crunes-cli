@@ -17,7 +17,7 @@
   "dependencies": {
     "comment-json": "^5.0.0",
     "esbuild": "^0.28.0",
-    "isolated-vm": "^6.1.2"
+    "isolated-vm": "^7.0.2"
   },
   "optionalDependencies": {
     "better-sqlite3": "^12.10.0"
@@ -58,6 +58,6 @@
   "license": "MIT",
   "author": "DarkRymit",
   "engines": {
-    "node": ">=22"
+    "node": ">=24"
   }
 }
