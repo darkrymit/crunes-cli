@@ -1,6 +1,6 @@
 # shared
 
-General-purpose utilities with no domain coupling. Consumed by multiple feature modules. Full docs: `docs/kb/main/modules/shared.md`
+General-purpose utilities with no domain coupling. Consumed by multiple feature modules. Full docs: `docs/kb/crunes-cli/modules/shared.md`
 
 ## Files
 

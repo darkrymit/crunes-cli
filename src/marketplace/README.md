@@ -1,6 +1,6 @@
 # marketplace
 
-Plugin marketplace source management: register, remove, list, and search marketplace source URLs; browse and refresh cached plugin indexes. Full docs: `docs/kb/main/modules/marketplace.md`
+Plugin marketplace source management: register, remove, list, and search marketplace source URLs; browse and refresh cached plugin indexes. Full docs: `docs/kb/crunes-cli/modules/marketplace.md`
 
 ## Files
 

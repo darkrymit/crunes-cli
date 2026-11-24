@@ -66,7 +66,7 @@ A `run` block whose command is not a `*.rune.js` module never touches the isolat
 
 ## Gotchas
 
-**Grants live in the block they apply to.** `run.permissions` and `repl.permissions` are flat `{ allow, deny }` lists; `scopedPermissions` (`core/rune-entry.js`) reshapes them into the mode-keyed form the permission engine and plugin consent still read. An entry-level `permissions` is the old shape and is refused at config load with the entry rewritten.
+**Grants live in the block they apply to.** `run.permissions` and `repl.permissions` are flat `{ allow, deny }` lists; `scopedPermissions` (`core/rune-entry.js`) reshapes them into the mode-keyed form the permission engine and plugin consent still read. An entry-level `permissions` is refused at config load, with a prompt to declare a `run` block.
 
 **`repl` does not inherit from `run`.** A rune doing the same work in both modes declares the grant twice.
 

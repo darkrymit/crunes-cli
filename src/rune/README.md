@@ -1,6 +1,6 @@
 # rune
 
-Everything related to executing context runes: key resolution, sandboxed execution, and the utils API exposed to rune code. Full docs: `docs/kb/main/modules/rune.md`
+Everything related to executing context runes: key resolution, sandboxed execution, and the utils API exposed to rune code. Full docs: `docs/kb/crunes-cli/modules/rune.md`
 
 ## Files
 

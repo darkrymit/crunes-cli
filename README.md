@@ -24,7 +24,7 @@ Install globally via `npm`:
 npm install -g @darkrymit/crunes-cli
 ```
 
-*Requires Node.js ≥ 22.*
+*Requires Node.js ≥ 24.*
 
 ---
 
@@ -38,7 +38,7 @@ cd your-project
 # Initialize .crunes/config.json
 crunes init
 
-# Scaffold a new rune (.crunes/runes/fetch-status.js)
+# Scaffold a new rune (.crunes/runes/fetch-status/src/index.rune.js)
 crunes create fetch-status
 
 # Run the rune and output the markdown sections
@@ -69,6 +69,7 @@ crunes job kill <id>                 # Forcefully terminate a running background
 
 # Templates, Plugins, and Markets
 crunes template list                 # List available rune templates
+crunes template create <name>        # Scaffold a new rune template
 crunes template apply <name>         # Copy a template as a new local rune
 crunes plugin install <pkg>          # Install a secure plugin from marketplace
 crunes plugin list                   # List active marketplace plugins

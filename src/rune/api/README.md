@@ -1,6 +1,6 @@
 # rune/api
 
-The `utils` object injected into every rune at runtime. `index.js` assembles the full object from its constituent modules. Full docs: `docs/kb/main/modules/rune.md`
+The `utils` object injected into every rune at runtime. `index.js` assembles the full object from its constituent modules. Full docs: `docs/kb/crunes-cli/modules/rune.md`
 
 ## Files
 
