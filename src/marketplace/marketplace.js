@@ -127,7 +127,8 @@ async function fetchMarketplace(name, entry) {
   const cacheDir = getMarketplaceCacheDir(name)
   try {
     const data = JSON.parse(await fs.readFile(path.join(cacheDir, 'marketplace.json'), 'utf8'))
-    return { data, resolvedPath: cacheDir }
+    const resolvedPath = classified.type === 'github' ? `github:${classified.resolved}` : cacheDir
+    return { data, resolvedPath }
   } catch (err) {
     if (err.code === 'ENOENT') throw new Error(`Marketplace "${name}" not cached. Run: crunes marketplace update ${name}`)
     throw err
@@ -256,6 +257,10 @@ export async function resolveFromMarketplace(marketplaceName, pluginName) {
 
 function resolvePluginSource(source, marketplaceResolvedPath) {
   if (!isLocalPath(source)) return source
+  if (marketplaceResolvedPath.startsWith('github:')) {
+    const subpath = source.replace(/^\.?[\\/]+/, '').replace(/\\/g, '/')
+    return subpath ? `${marketplaceResolvedPath}#${subpath}` : marketplaceResolvedPath
+  }
   if (marketplaceResolvedPath.startsWith('http://') || marketplaceResolvedPath.startsWith('https://')) {
     return new URL(source, marketplaceResolvedPath).href
   }

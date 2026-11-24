@@ -25,19 +25,20 @@ function collectAllowFromRune(rune) {
 }
 
 /**
- * Resolve a source string to { type, resolved }
+ * Resolve a source string to { type, resolved, subpath? }
  *   type: 'local' | 'github' | 'git' | 'npm'
  */
-function classifySource(source) {
+export function classifySource(source) {
   if (source.startsWith('.') || source.startsWith('/') || source.startsWith('~') || /^[A-Za-z]:[/\\]/.test(source)) {
     return { type: 'local', resolved: source.replace(/^~/, os.homedir()) }
   }
   if (source.startsWith('https://') || source.startsWith('git+')) {
     return { type: 'git', resolved: source }
   }
-  if (/^[\w-]+\/[\w.-]+$/.test(source) || source.startsWith('github:')) {
-    const repo = source.replace(/^github:/, '')
-    return { type: 'github', resolved: `https://github.com/${repo}` }
+  const [baseSource, subpath] = source.split('#')
+  if (/^[\w-]+\/[\w.-]+$/.test(baseSource) || baseSource.startsWith('github:')) {
+    const repo = baseSource.replace(/^github:/, '')
+    return { type: 'github', resolved: `https://github.com/${repo}`, ...(subpath && { subpath }) }
   }
   return { type: 'npm', resolved: source }
 }
@@ -87,20 +88,24 @@ export async function installPlugin(source, projectDir, provenance = {}, options
   }
   await ensureStoreDirs()
 
-  const { type, resolved } = classifySource(source)
+  const { type, resolved, subpath } = classifySource(source)
 
   // For local installs, load plugin.json first to get name/version
+  let tempRoot = null
   let stagingDir
   if (type === 'local') {
     stagingDir = path.resolve(resolved)
   } else {
-    stagingDir = path.join(os.tmpdir(), `crunes-install-${Date.now()}`)
-    await fs.mkdir(stagingDir, { recursive: true })
+    tempRoot = path.join(os.tmpdir(), `crunes-install-${Date.now()}`)
+    await fs.mkdir(tempRoot, { recursive: true })
+    stagingDir = tempRoot
   }
 
   try {
-    if (type === 'github') await downloadGitHub(resolved, stagingDir)
-    else if (type === 'git') await downloadGit(resolved, stagingDir)
+    if (type === 'github') {
+      await downloadGitHub(resolved, tempRoot)
+      if (subpath) stagingDir = path.join(tempRoot, subpath)
+    } else if (type === 'git') await downloadGit(resolved, stagingDir)
     else if (type === 'npm') await downloadNpm(resolved, stagingDir)
     // local: stagingDir already points to the plugin
 
@@ -149,8 +154,8 @@ export async function installPlugin(source, projectDir, provenance = {}, options
 
     return { installed: true, name: pluginKey, version }
   } finally {
-    if (type !== 'local') {
-      await fs.rm(stagingDir, { recursive: true, force: true }).catch(() => {})
+    if (tempRoot) {
+      await fs.rm(tempRoot, { recursive: true, force: true }).catch(() => {})
     }
   }
 }

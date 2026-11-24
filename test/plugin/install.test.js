@@ -8,7 +8,7 @@ vi.mock('../../src/plugin/registry.js', () => ({
 }))
 vi.mock('../../src/core/config.js', () => ({ loadConfig: vi.fn() }))
 
-import { uninstallPlugin } from '../../src/plugin/install.js'
+import { uninstallPlugin, classifySource } from '../../src/plugin/install.js'
 import { loadRegistry, removePlugin } from '../../src/plugin/registry.js'
 
 beforeEach(() => {
@@ -46,5 +46,22 @@ describe('uninstallPlugin', () => {
 
     await expect(uninstallPlugin('mkt@missing', null))
       .rejects.toThrow('not installed')
+  })
+})
+
+describe('classifySource', () => {
+  it('parses github:owner/repo#subpath into github type and subpath', () => {
+    expect(classifySource('github:darkrymit/crunes-plugins#plugins/token')).toEqual({
+      type: 'github',
+      resolved: 'https://github.com/darkrymit/crunes-plugins',
+      subpath: 'plugins/token',
+    })
+  })
+
+  it('parses bare owner/repo without subpath', () => {
+    expect(classifySource('darkrymit/crunes-plugins')).toEqual({
+      type: 'github',
+      resolved: 'https://github.com/darkrymit/crunes-plugins',
+    })
   })
 })
