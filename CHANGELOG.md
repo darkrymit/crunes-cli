@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.0] - 2026-11-24
+
+### Added
+- **Script templates**: `template apply` accepts a template in any runtime; a script is printed and applied only once confirmed or with `-y`
+- **`template create --lang`**: Scaffolds a Python, bash or Node template
+
+### Changed
+- **BREAKING — template folders**: A template is a `{src,test}` folder copied whole; its `path` and `template apply --path` name a folder, and single-file templates and string entries are not supported
+- **Script trust covers the args file**: Plugin scripts whose `args` names a file need trusting again
+
+### Fixed
+- **Ctrl+C in prompts**: Cancelling no longer counts as an answer, including overwrite prompts
+- **`docs rune`**: Resolves plugin aliases and plugin runes as `run` does (#12)
+
+---
+
 ## [0.11.3] - 2026-11-24
 
 ### Fixed
