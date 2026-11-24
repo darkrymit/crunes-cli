@@ -1,4 +1,4 @@
-import { fs, json, shell, section, md, rune } from '@utils'
+import { fs, json, shell, section, md, rune, os } from '@utils'
 
 export async function args(b) {
   return b
@@ -102,8 +102,10 @@ async function runBump(args) {
     throw new Error('⚠ Missing required positional argument: <type> (major, minor, patch, or explicit version)')
   }
 
+  const winShell = os.platform === 'win32' ? { shell: 'cmd' } : {}
+
   console.log('⚡ Running test suite before release bump...')
-  const tests = await shell.exec('npm test', { timeout: 600000, throw: false })
+  const tests = await shell.exec('npm test', { timeout: 600000, throw: false, ...winShell })
   if (!tests.ok) {
     throw new Error(`⚠ Test suite failed (exit ${tests.exitCode}):\n${tests.stdout}\n${tests.stderr}`)
   }
@@ -221,10 +223,10 @@ async function runBump(args) {
 
   // 4. NPM compile & sync
   console.log('⚡ Synchronizing package-lock.json (running npm install)...')
-  await shell.exec('npm install')
+  await shell.exec('npm install', winShell)
 
   console.log('⚡ Compiling esbuild bundle (running npm run build)...')
-  await shell.exec('npm run build')
+  await shell.exec('npm run build', winShell)
 
   console.log('🎉 Successfully bumped version files and synced lockfile/bundles!')
   return section.create('bump-status', {
