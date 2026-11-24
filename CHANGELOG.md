@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.0] - 2026-11-24
+
+### Added
+- **Test shim**: `@darkrymit/crunes-cli/test` and `/test/register` resolve `@utils`, `@plugin/*` and `@project/*` in plain Node, with `setupCrunesTest` for permission checks and per-namespace mocks
+- **Scaffolds**: `rune create` and `plugin create` generate `setupCrunesTest` tests instead of placeholder asserts
+
+### Fixed
+- **Release rune on Windows**: run `npm` commands via `cmd` so Volta shims work when `MSYS_NO_PATHCONV` is set
+
+---
+
 ## [0.12.0] - 2026-11-24
 
 ### Added
