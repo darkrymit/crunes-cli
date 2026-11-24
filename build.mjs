@@ -42,6 +42,23 @@ const embedIsolateSourcesPlugin = {
   },
 }
 
+// Plugin: src/rune/api/*.js lazy-load heavy libraries through a local `require` made with
+// createRequire, which esbuild does not follow — the libraries would be missing from the
+// published package, where they are devDependencies. Dropping that line leaves a plain
+// `require(...)`, which esbuild bundles and still evaluates on first call.
+const CREATE_REQUIRE_LINE = /^const require = createRequire\(import\.meta\.url\)\r?$/m
+
+const bundleLazyRequiresPlugin = {
+  name: 'bundle-lazy-requires',
+  setup(build) {
+    build.onLoad({ filter: /[\\/]src[\\/]rune[\\/]api[\\/][^\\/]+\.js$/ }, async (args) => {
+      const source = await readFile(args.path, 'utf8')
+      if (!CREATE_REQUIRE_LINE.test(source)) return undefined
+      return { contents: source.replace(CREATE_REQUIRE_LINE, ''), loader: 'js' }
+    })
+  },
+}
+
 try { rmSync('dist/chunks', { recursive: true, force: true }) } catch {}
 
 await esbuild.build({
@@ -54,7 +71,7 @@ await esbuild.build({
   chunkNames: 'chunks/[name]-[hash]',
   external: ['isolated-vm', 'better-sqlite3', '@aws-sdk/client-s3', 'esbuild', 'comment-json'],
   inject: ['./require-shim.js'],
-  plugins: [embedIsolateSourcesPlugin],
+  plugins: [embedIsolateSourcesPlugin, bundleLazyRequiresPlugin],
 })
 
 // Make executable on Unix/macOS
