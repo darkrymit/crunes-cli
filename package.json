@@ -59,5 +59,10 @@
   "author": "DarkRymit",
   "engines": {
     "node": ">=24"
+  },
+  "exports": {
+    ".": "./dist/cli.js",
+    "./test": "./dist/test/index.js",
+    "./test/register": "./dist/test/register.js"
   }
 }

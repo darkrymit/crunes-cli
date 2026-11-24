@@ -74,5 +74,21 @@ await esbuild.build({
   plugins: [embedIsolateSourcesPlugin, bundleLazyRequiresPlugin],
 })
 
+await esbuild.build({
+  entryPoints: {
+    'test/index': 'src/test/index.js',
+    'test/register': 'src/test/register.js',
+  },
+  bundle: true,
+  platform: 'node',
+  format: 'esm',
+  outdir: 'dist',
+  splitting: true,
+  chunkNames: 'chunks/[name]-[hash]',
+  external: ['isolated-vm', 'better-sqlite3', '@aws-sdk/client-s3', 'esbuild', 'comment-json'],
+  inject: ['./require-shim.js'],
+  plugins: [bundleLazyRequiresPlugin],
+})
+
 // Make executable on Unix/macOS
 try { chmodSync('dist/cli.js', 0o755) } catch {}

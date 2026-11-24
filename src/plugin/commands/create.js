@@ -117,7 +117,7 @@ export function changelogMd() {
 }
 
 export function exampleTest() {
-  return `import { describe, it } from 'node:test'\nimport assert from 'node:assert/strict'\n\ndescribe('example rune', () => {\n  it('placeholder', () => {\n    assert.ok(true)\n  })\n})\n`
+  return runeTestTemplate('example')
 }
 
 function getGitAuthor() {
