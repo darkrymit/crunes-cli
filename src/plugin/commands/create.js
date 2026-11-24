@@ -1,7 +1,7 @@
 import { mkdir, writeFile, readdir } from 'node:fs/promises'
 import { join, resolve, dirname } from 'node:path'
 import { spawnSync } from 'node:child_process'
-import { intro, outro, text, confirm, cancel } from '@clack/prompts'
+import { intro, outro, text, confirm, cancel, isCancel } from '@clack/prompts'
 import { output } from '../../shared/output.js'
 import { runeTestTemplate } from '../../rune/commands/create.js'
 
@@ -150,25 +150,25 @@ export async function handler({
 
     if (!name) {
       const r = await text({ message: 'Plugin name?', validate: v => v ? undefined : 'Required' })
-      if (r === Symbol.for('clack:cancel')) { cancel('Cancelled.'); return }
+      if (isCancel(r)) { cancel('Cancelled.'); return }
       name = r
     }
 
     if (!description) {
       const r = await text({ message: 'Description?', validate: v => v ? undefined : 'Required' })
-      if (r === Symbol.for('clack:cancel')) { cancel('Cancelled.'); return }
+      if (isCancel(r)) { cancel('Cancelled.'); return }
       description = r
     }
 
     if (author === undefined) {
       const r = await text({ message: 'Author?', initialValue: getGitAuthor() })
-      if (r === Symbol.for('clack:cancel')) { cancel('Cancelled.'); return }
+      if (isCancel(r)) { cancel('Cancelled.'); return }
       author = r
     }
 
     if (license === undefined) {
       const r = await text({ message: 'License?', initialValue: 'MIT' })
-      if (r === Symbol.for('clack:cancel')) { cancel('Cancelled.'); return }
+      if (isCancel(r)) { cancel('Cancelled.'); return }
       license = r
     }
   }
@@ -183,7 +183,7 @@ export async function handler({
       process.exit(1)
     }
     const ok = await confirm({ message: `"${outDir}" already exists and is not empty. Overwrite?` })
-    if (!ok || ok === Symbol.for('clack:cancel')) { cancel('Cancelled.'); return }
+    if (!ok || isCancel(ok)) { cancel('Cancelled.'); return }
   }
 
   const opts = { name, description, author, license, multi }

@@ -1,6 +1,6 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join, dirname } from 'node:path'
-import { intro, outro, text, cancel } from '@clack/prompts'
+import { intro, outro, text, cancel, isCancel } from '@clack/prompts'
 import { output } from '../../shared/output.js'
 import { getConfigPath, readRawConfig, writeRawConfig } from '../../core/config-writer.js'
 import { getStorePath } from '../../store/index.js'
@@ -65,26 +65,26 @@ export async function handler({
 
     if (!name) {
       const result = await text({ message: 'Template name?', validate: v => v ? undefined : 'Required' })
-      if (result === Symbol.for('clack:cancel')) { cancel('Cancelled.'); return }
+      if (isCancel(result)) { cancel('Cancelled.'); return }
       name = result
     }
 
     if (!templateRelPath) {
       const defaultPath = global ? `templates/${name}` : `.crunes/templates/${name}`
       const result = await text({ message: 'Folder?', initialValue: defaultPath })
-      if (result === Symbol.for('clack:cancel')) { cancel('Cancelled.'); return }
+      if (isCancel(result)) { cancel('Cancelled.'); return }
       templateRelPath = result
     }
 
     if (!templateName) {
       const result = await text({ message: 'Display name? (optional)', placeholder: 'Human-readable label for crunes template list' })
-      if (result === Symbol.for('clack:cancel')) { cancel('Cancelled.'); return }
+      if (isCancel(result)) { cancel('Cancelled.'); return }
       templateName = result || undefined
     }
 
     if (!description) {
       const result = await text({ message: 'Description? (optional)', placeholder: 'What kind of rune does this template produce?' })
-      if (result === Symbol.for('clack:cancel')) { cancel('Cancelled.'); return }
+      if (isCancel(result)) { cancel('Cancelled.'); return }
       description = result || undefined
     }
   }

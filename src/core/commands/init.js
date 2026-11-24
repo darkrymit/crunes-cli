@@ -1,6 +1,6 @@
 import { mkdirSync, writeFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
-import { intro, outro, confirm, cancel } from '@clack/prompts';
+import { intro, outro, confirm, cancel, isCancel } from '@clack/prompts';
 import { output } from '../../shared/output.js';
 import { getConfigPath } from '../config-writer.js';
 
@@ -29,7 +29,7 @@ export async function handler({
         initialValue: false,
       });
 
-      if (!overwrite || overwrite === Symbol.for('clack:cancel')) {
+      if (!overwrite || isCancel(overwrite)) {
         cancel('Cancelled.');
         return;
       }

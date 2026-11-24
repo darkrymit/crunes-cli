@@ -1,7 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { join, dirname } from 'node:path'
-import { intro, outro, text, select, cancel } from '@clack/prompts'
+import { intro, outro, text, select, cancel, isCancel } from '@clack/prompts'
 import { output } from '../../shared/output.js'
 import { getConfigPath, readRawConfig, writeRawConfig } from '../../core/config-writer.js'
 import { getStorePath } from '../../store/index.js'
@@ -50,7 +50,7 @@ async function resolveTarget({ configRoot, global, plugin, project, isNonInterac
         { value: 'project', label: 'project (.crunes/config.json)', hint: 'dev-time project rune' },
       ],
     })
-    if (picked === Symbol.for('clack:cancel')) return null
+    if (isCancel(picked)) return null
     return picked
   }
 
@@ -287,7 +287,7 @@ export async function handler({
 
     if (!key) {
       const result = await text({ message: 'Rune key?', validate: v => v ? undefined : 'Required' })
-      if (result === Symbol.for('clack:cancel')) { cancel('Cancelled.'); return }
+      if (isCancel(result)) { cancel('Cancelled.'); return }
       key = result
     }
 
@@ -299,26 +299,26 @@ export async function handler({
           { value: 'markdown', label: 'markdown', hint: 'freeform markdown content' },
         ],
       })
-      if (result === Symbol.for('clack:cancel')) { cancel('Cancelled.'); return }
+      if (isCancel(result)) { cancel('Cancelled.'); return }
       format = result
     }
 
     if (!runeRelPath) {
       const defaultPath = defaultRunePaths({ target, key, ext: 'rune.js', pluginManifest }).runeRelPath
       const result = await text({ message: 'File path?', initialValue: defaultPath })
-      if (result === Symbol.for('clack:cancel')) { cancel('Cancelled.'); return }
+      if (isCancel(result)) { cancel('Cancelled.'); return }
       runeRelPath = result
     }
 
     if (!name) {
       const result = await text({ message: 'Name? (optional)', placeholder: 'Human-readable label for crunes list' })
-      if (result === Symbol.for('clack:cancel')) { cancel('Cancelled.'); return }
+      if (isCancel(result)) { cancel('Cancelled.'); return }
       name = result || undefined
     }
 
     if (!description) {
       const result = await text({ message: 'Description? (optional)', placeholder: 'What context does this rune provide?' })
-      if (result === Symbol.for('clack:cancel')) { cancel('Cancelled.'); return }
+      if (isCancel(result)) { cancel('Cancelled.'); return }
       description = result || undefined
     }
   }
