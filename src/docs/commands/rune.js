@@ -1,4 +1,4 @@
-import { relative } from 'node:path'
+import { join, relative } from 'node:path'
 import { loadConfig } from '../../core/config.js'
 import { getRune, resolvePluginRune, resolveRuneFromPlugins } from '../../rune/resolver.js'
 import { scopedPermissions, blockModule } from '../../core/rune-entry.js'
@@ -29,16 +29,22 @@ export async function resolveRuneDocs(config, key, projectRoot, configRoot) {
   if (!pluginMatch && !localEntry) {
     autoMatch = await resolveRuneFromPlugins(config, key)
   }
-  const resolved = pluginMatch ?? autoMatch
+  let aliasMatch = null
+  if (localEntry?.plugin) {
+    aliasMatch = await resolvePluginRune(config, localEntry.plugin)
+    if (!aliasMatch) throw new Error(`Plugin alias "${key}" → "${localEntry.plugin}" is not enabled or installed.`)
+  }
+  const resolved = pluginMatch ?? autoMatch ?? aliasMatch
   if (!localEntry && !resolved) return null
 
-  let runeFile, replFile = null, relativePath, basePerms, vars, displayName, displayDescription, batch
+  let runeFile, replFile = null, relativePath, basePerms, projectPerms, vars, pluginOpts = {}, displayName, displayDescription, batch
   let native = null, runs = null
 
   if (resolved) {
-    const { runeKey, pluginDir } = resolved
+    const { pluginKey, runeKey, pluginDir, pluginCacheDir } = resolved
     const pluginJson = await loadPluginJson(pluginDir)
     const runeDef = pluginJson.runes[runeKey] ?? {}
+    const override = config.runes?.[`${pluginKey}:${runeKey}`]
     if (isNativeRune(runeDef)) {
       native = describeRunBlock({ run: runeDef.run, args: runeDef.args }, pluginDir)
       runs = `${[runeDef.run.command ?? runeDef.run, ...native.argv].join(' ')} · ${native.runtime} · plugin script, native, full access — runs only once trusted (crunes plugin trust)`
@@ -48,10 +54,18 @@ export async function resolveRuneDocs(config, key, projectRoot, configRoot) {
     if (runeDef.repl != null) replFile = getPluginRunePath(pluginDir, runeKey, pluginJson, 'repl')
     relativePath = undefined
     basePerms = scopedPermissions(runeDef) ?? {}
-    vars = runeDef.vars ?? {}
-    displayName = runeDef.name ?? runeKey
-    displayDescription = runeDef.description ?? null
-    batch = runeDef.batch != null ? { allow: runeDef.batch.allow ?? [], deny: runeDef.batch.deny ?? [] } : null
+    // Same precedence as runRune: an alias entry's own grants and vars, else the override's.
+    projectPerms = scopedPermissions(localEntry) ?? scopedPermissions(override)
+    vars = { ...(runeDef.vars ?? {}), ...(localEntry?.vars ?? override?.vars ?? {}) }
+    pluginOpts = {
+      pluginDir,
+      nodeModulesDir: join(pluginCacheDir, 'node_modules'),
+      pluginDeps: pluginJson.dependencies ?? {},
+    }
+    displayName = localEntry?.name ?? runeDef.name ?? runeKey
+    displayDescription = localEntry?.description ?? runeDef.description ?? null
+    const batchBlock = localEntry ? localEntry.batch : runeDef.batch
+    batch = batchBlock != null ? { allow: batchBlock.allow ?? [], deny: batchBlock.deny ?? [] } : null
   } else {
     const desc = describeRunBlock(localEntry, configRoot)
     replFile = blockModule(localEntry, 'repl', configRoot)
@@ -78,15 +92,15 @@ export async function resolveRuneDocs(config, key, projectRoot, configRoot) {
     batch = localEntry.batch != null ? { allow: localEntry.batch.allow ?? [], deny: localEntry.batch.deny ?? [] } : null
   }
 
-  const runEffective = computeEffectivePermissions(basePerms, undefined, 'run')
-  const replEffective = computeEffectivePermissions(basePerms, undefined, 'repl')
+  const runEffective = computeEffectivePermissions(basePerms, projectPerms, 'run')
+  const replEffective = computeEffectivePermissions(basePerms, projectPerms, 'repl')
 
   let schema = null
   let schemaError = null
   try {
     schema = native
       ? await getRunBlockSchema(native, projectRoot, { vars, runeKey: key })
-      : await getArgsSchema(runeFile, runEffective, projectRoot, { vars, runeKey: key })
+      : await getArgsSchema(runeFile, runEffective, projectRoot, { ...pluginOpts, vars, runeKey: key })
   } catch (err) {
     schemaError = err.message
     output.warn(`Could not load args schema for "${key}": ${err.message}`)
@@ -94,7 +108,7 @@ export async function resolveRuneDocs(config, key, projectRoot, configRoot) {
 
   let repl = null
   if (replFile) try {
-    const { argsSchema, commandsSchema } = await getReplSchema(replFile, replEffective, [], projectRoot, { vars, runeKey: key })
+    const { argsSchema, commandsSchema } = await getReplSchema(replFile, replEffective, [], projectRoot, { ...pluginOpts, vars, runeKey: key })
     if (argsSchema !== null || commandsSchema !== null) repl = { argsSchema, commandsSchema }
   } catch (err) {
     output.warn(`Could not load REPL schema for "${key}": ${err.message}`)
