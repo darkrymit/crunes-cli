@@ -3,6 +3,7 @@ import path from 'node:path'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import os from 'node:os'
+import { extract as tarExtract } from 'tar'
 import { getMarketplacesJsonPath, getMarketplaceCacheDir, ensureStoreDirs } from '../store/index.js'
 
 const execFileAsync = promisify(execFile)
@@ -81,7 +82,7 @@ async function downloadMarketplaceJson(classified) {
       if (!tarball) throw new Error(`npm pack produced no tarball for ${classified.resolved}`)
       const extractDir = path.join(tmp, 'extracted')
       await fs.mkdir(extractDir, { recursive: true })
-      await execFileAsync('tar', ['-xzf', path.join(tmp, tarball), '-C', extractDir, '--strip-components=1'], { shell: process.platform === 'win32' })
+      await tarExtract({ file: path.join(tmp, tarball), cwd: extractDir, strip: 1 })
       const raw = await fs.readFile(path.join(extractDir, '.crunes-plugin', 'marketplace.json'), 'utf8')
       return JSON.parse(raw)
     } finally {

@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.2] - 2026-11-24
+
+### Fixed
+- **Windows tarball extraction in plugin & marketplace installs**: replaced shell `tar -xzf` calls with bundled `tar.extract({ strip: 1 })` so Windows drive-letter temp paths (`C:\...`) do not fail under GNU `tar` (`Cannot connect to C: resolve failed`)
+
+---
+
 ## [0.11.1] - 2026-11-24
 
 ### Fixed

@@ -3,6 +3,7 @@ import path from 'node:path'
 import os from 'node:os'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
+import { extract as tarExtract } from 'tar'
 import { loadPluginJson } from './manifest.js'
 import { getPluginCacheDir, ensureStoreDirs } from '../store/index.js'
 import { registerPlugin, loadRegistry, removePlugin } from './registry.js'
@@ -51,7 +52,7 @@ async function downloadGitHub(repoUrl, destDir) {
   const buf = Buffer.from(await res.arrayBuffer())
   const tarPath = path.join(destDir, 'plugin.tar.gz')
   await fs.writeFile(tarPath, buf)
-  await execFileAsync('tar', ['-xzf', tarPath, '-C', destDir, '--strip-components=1'], { shell: process.platform === 'win32' })
+  await tarExtract({ file: tarPath, cwd: destDir, strip: 1 })
   await fs.rm(tarPath)
 }
 
@@ -68,7 +69,7 @@ async function downloadNpm(packageName, destDir) {
     const tarball = files.find(f => f.endsWith('.tgz'))
     if (!tarball) throw new Error(`npm pack produced no tarball for ${packageName}`)
     await fs.mkdir(destDir, { recursive: true })
-    await execFileAsync('tar', ['-xzf', path.join(tmp, tarball), '-C', destDir, '--strip-components=1'], { shell: process.platform === 'win32' })
+    await tarExtract({ file: path.join(tmp, tarball), cwd: destDir, strip: 1 })
   } finally {
     await fs.rm(tmp, { recursive: true, force: true })
   }
