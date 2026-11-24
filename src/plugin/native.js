@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import { join, isAbsolute } from 'node:path'
 import { blockOf } from '../core/rune-entry.js'
 import { isPathCommand } from '../shared/command.js'
+import { isInlineSchema } from '../rune/native/schema.js'
 import { loadRegistry, saveRegistry } from './registry.js'
 
 const ISOLATE_MODULE = /\.rune\.m?js$/i
@@ -20,15 +21,22 @@ export function nativeRuneFile(pluginDir, rune) {
   return isAbsolute(command) ? command : join(pluginDir, command)
 }
 
+/** The schema file a native plugin rune names in `args`, or null when it is inline or absent. */
+function argsFile(pluginDir, rune) {
+  if (rune.args == null || isInlineSchema(rune.args)) return null
+  const { command } = blockOf(rune, 'args')
+  return isAbsolute(command) ? command : join(pluginDir, command)
+}
+
 /**
  * What trust is granted to: the run block as declared, the argument schema in front of it,
- * and the content of the script it names. Any change to any of them is a different rune.
+ * and the content of the script and schema file they name. Any change to any of them is a different rune.
  */
 export function trustDigest(pluginDir, rune) {
   const hash = createHash('sha256')
   hash.update(JSON.stringify({ run: blockOf(rune, 'run'), args: rune.args ?? null }))
-  const file = nativeRuneFile(pluginDir, rune)
-  if (file) {
+  for (const file of [nativeRuneFile(pluginDir, rune), argsFile(pluginDir, rune)]) {
+    if (!file) continue
     try { hash.update(readFileSync(file)) } catch { hash.update('missing') }
   }
   return hash.digest('hex')

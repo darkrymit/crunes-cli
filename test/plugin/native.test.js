@@ -73,6 +73,21 @@ describe('native plugin runes — explicit trust', () => {
     await expect(runRune(project, config, 'tools:hello', [])).rejects.toThrow('has changed since it was trusted')
   })
 
+  it.each([['a path', 'scripts/args.json'], ['a block', { command: 'scripts/args.json' }]])('counts a change to an args schema file named as %s as a change', async (_, args) => {
+    const { trustDigest } = await import('../../src/plugin/native.js')
+    const rune = { run: 'scripts/hello.sh', args }
+    write(join(pluginDir, 'scripts', 'args.json'), '{"options":[]}')
+    const before = trustDigest(pluginDir, rune)
+    expect(trustDigest(pluginDir, rune)).toBe(before)
+    write(join(pluginDir, 'scripts', 'args.json'), '{"positionals":[]}')
+    expect(trustDigest(pluginDir, rune)).not.toBe(before)
+  })
+
+  it('digests a rune with an inline args schema', async () => {
+    const { trustDigest } = await import('../../src/plugin/native.js')
+    expect(trustDigest(pluginDir, { run: 'scripts/hello.sh', args: { options: [] } })).toMatch(/^[0-9a-f]{64}$/)
+  })
+
   it('leaves isolate runes in the same plugin alone', async () => {
     const result = await runRune(project, config, 'tools:iso', [])
     expect(result[0].data.content).toBe('iso')
