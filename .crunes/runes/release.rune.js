@@ -103,7 +103,10 @@ async function runBump(args) {
   }
 
   console.log('⚡ Running test suite before release bump...')
-  await shell.exec('npm test', { timeout: 600000 })
+  const tests = await shell.exec('npm test', { timeout: 600000, throw: false })
+  if (!tests.ok) {
+    throw new Error(`⚠ Test suite failed (exit ${tests.exitCode}):\n${tests.stdout}\n${tests.stderr}`)
+  }
 
   const currentVersion = await json.readPath('package.json', '$.version', '')
   if (!currentVersion) {
