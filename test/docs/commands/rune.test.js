@@ -193,4 +193,91 @@ describe('docs rune handler — plugin runes', () => {
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('"info" matches runes in multiple plugins: sole-market@git, other-market@docker-tools'))
     expect(exitSpy).toHaveBeenCalledWith(1)
   })
+
+  describe('with a plugin installed outside the project', () => {
+    let pluginDir
+
+    // The rune imports a sibling file and registers the commands named in its vars.
+    beforeEach(async () => {
+      pluginDir = await mkdtemp(join(tmpdir(), 'crunes-docs-plugin-src-'))
+      await writeFile(join(pluginDir, 'index.rune.js'), [
+        'import { describe } from "./helper.js"',
+        'import { vars } from "@utils"',
+        'export function args(b) {',
+        '  for (const name of vars.read("enable", [])) b.command(name, describe(name), c => c.option("--deep", "Deep " + name))',
+        '  return b',
+        '}',
+        'export async function run() { return [] }',
+      ].join('\n'))
+      await writeFile(join(pluginDir, 'helper.js'), 'export const describe = name => `Runs ${name}`\n')
+
+      const { loadRegistry, resolvePluginKeyScoped } = await import('../../../src/plugin/registry.js')
+      const { loadPluginJson } = await import('../../../src/plugin/manifest.js')
+      resolvePluginKeyScoped.mockImplementation((part) => (part === 'my-org@tool' ? 'my-org@tool' : null))
+      loadRegistry.mockResolvedValue({ plugins: { 'my-org@tool': { path: pluginDir, cacheDir: pluginDir } } })
+      loadPluginJson.mockResolvedValue({
+        name: 'tool', version: '1.0.0',
+        runes: {
+          tool: {
+            name: 'Tool', description: 'Plugin tool', vars: { enable: ['status'] },
+            run: { command: 'index.rune.js', permissions: { allow: [] } },
+          },
+        },
+      })
+    })
+
+    afterEach(() => rm(pluginDir, { recursive: true, force: true }))
+
+    const writeConfig = (runes) => writeFile(
+      join(tmp, '.crunes', 'config.json'),
+      JSON.stringify({ runes, plugins: { 'my-org@tool': true } }),
+    )
+    const docs = (key, path = []) => handler({ key, path, projectRoot: tmp, configRoot: tmp })
+    const out = () => written.join('')
+
+    it('renders the index of a plugin rune that imports a sibling file', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      await writeConfig({})
+      await docs('my-org@tool:tool')
+      expect(out()).toContain('Runs status')
+      expect(warnSpy).not.toHaveBeenCalled()
+    })
+
+    it('applies the vars of a project override of a plugin rune', async () => {
+      await writeConfig({ 'my-org@tool:tool': { vars: { enable: ['deploy'] } } })
+      await docs('my-org@tool:tool')
+      expect(out()).toContain('Runs deploy')
+      expect(out()).not.toContain('Runs status')
+    })
+
+    it('renders an alias under its own key with its vars and batch block', async () => {
+      await writeConfig({ t: { plugin: 'my-org@tool:tool', vars: { enable: ['deploy'] }, batch: { allow: ['deploy*'] } } })
+      await docs('t')
+      expect(out()).toContain('Rune: t — Plugin tool')
+      expect(out()).toContain('Runs deploy')
+      expect(out()).not.toContain('Runs status')
+      expect(out()).toContain('allow: deploy*')
+    })
+
+    it('an alias without vars falls back to the override of the rune it names', async () => {
+      await writeConfig({ t: { plugin: 'my-org@tool:tool' }, 'my-org@tool:tool': { vars: { enable: ['deploy'] } } })
+      await docs('t')
+      expect(out()).toContain('Runs deploy')
+    })
+
+    it('drills into a command of an alias', async () => {
+      await writeConfig({ t: { plugin: 'my-org@tool:tool' } })
+      await docs('t', ['status'])
+      expect(out()).toContain('Deep status')
+    })
+
+    it('names the plugin an alias points at when it is not installed', async () => {
+      await writeConfig({ t: { plugin: 'my-org@gone:tool' } })
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {})
+      await docs('t')
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('Plugin alias "t" → "my-org@gone:tool" is not enabled or installed.'))
+      expect(exitSpy).toHaveBeenCalledWith(1)
+    })
+  })
 })
