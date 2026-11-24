@@ -26,31 +26,23 @@ describe('resolveTemplate — convention path', () => {
   beforeEach(async () => { tmp = await makeTmp() })
   afterEach(async () => { await rm(tmp, { recursive: true, force: true }) })
 
-  it('derives .crunes/templates/<key>.js when entry has no path field', async () => {
+  it('derives .crunes/templates/<key> when entry has no path field', async () => {
     await writeFile(join(tmp, '.crunes/config.json'), JSON.stringify({
       templates: { mytemplate: { name: 'My Template' } }
     }))
     const result = await resolveTemplate(null, 'mytemplate', tmp)
     expect(result.type).toBe('local')
-    expect(result.entry.path).toBe('.crunes/templates/mytemplate.js')
+    expect(result.entry.path).toBe('.crunes/templates/mytemplate')
   })
 
   it('explicit path takes precedence over convention', async () => {
     await writeFile(join(tmp, '.crunes/config.json'), JSON.stringify({
-      templates: { mytemplate: { path: 'custom/tmpl.js', name: 'My Template' } }
+      templates: { mytemplate: { path: 'custom/tmpl', name: 'My Template' } }
     }))
     const result = await resolveTemplate(null, 'mytemplate', tmp)
     expect(result.type).toBe('local')
     // absolutized against the layer that declared it
-    expect(result.entry.path).toBe(join(tmp, 'custom/tmpl.js'))
-  })
-
-  it('string entry (legacy shorthand) still works', async () => {
-    await writeFile(join(tmp, '.crunes/config.json'), JSON.stringify({
-      templates: { mytemplate: '.crunes/templates/mytemplate.js' }
-    }))
-    const result = await resolveTemplate(null, 'mytemplate', tmp)
-    expect(result.type).toBe('local')
+    expect(result.entry.path).toBe(join(tmp, 'custom/tmpl'))
   })
 })
 
@@ -74,7 +66,7 @@ describe('resolveTemplate — project: source prefix', () => {
     expect(result).toBeNull()
   })
 
-  it('sourceName "local" no longer short-circuits to project lookup', async () => {
+  it('sourceName "local" names a plugin, not the project', async () => {
     await writeFile(join(tmp, '.crunes/config.json'), JSON.stringify({
       templates: { mytemplate: { name: 'My Template' } }
     }))
@@ -86,7 +78,7 @@ describe('resolveTemplate — project: source prefix', () => {
 describe('resolveTemplate — plugin template custom path', () => {
   beforeEach(() => vi.clearAllMocks())
 
-  it('uses templates/<key>.js convention when plugin template has no path', async () => {
+  it('uses templates/<key> convention when plugin template has no path', async () => {
     vi.mocked(loadRegistry).mockResolvedValue({
       plugins: { 'mp@myplugin': { path: '/plugins/myplugin' } }
     })
@@ -106,11 +98,11 @@ describe('resolveTemplate — plugin template custom path', () => {
     })
     vi.mocked(loadPluginJson).mockResolvedValue({
       templates: {
-        greeting: { path: 'lib/templates/greeting.js', name: 'Greeting', permissions: { use: { allow: [] } } }
+        greeting: { path: 'lib/templates/greeting', name: 'Greeting', permissions: { use: { allow: [] } } }
       }
     })
     const result = await resolveTemplate(null, 'greeting', '/project')
-    expect(result.templateMeta.path).toBe('lib/templates/greeting.js')
+    expect(result.templateMeta.path).toBe('lib/templates/greeting')
   })
 })
 

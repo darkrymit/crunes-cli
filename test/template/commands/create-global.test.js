@@ -15,8 +15,8 @@ describe('template create -g', () => {
   it('writes the template under the store and registers it globally', async () => {
     await createTemplateHandler({ name: 'base', global: true, yes: true, projectRoot, configRoot: projectRoot })
     const store = process.env.CRUNES_STORE
-    expect(existsSync(path.join(store, 'templates', 'base.js'))).toBe(true)
+    expect(existsSync(path.join(store, 'templates', 'base', 'src', 'index.rune.js'))).toBe(true)
     const config = JSON.parse(readFileSync(path.join(store, 'config.json'), 'utf8'))
-    expect(config.templates.base.path).toBe('templates/base.js')
+    expect(config.templates.base.path).toBe('templates/base')
   })
 })

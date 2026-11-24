@@ -7,6 +7,21 @@ import { blockOf } from '../../core/rune-entry.js'
 
 const SHOWN_LINES = 80
 
+/** The file a native rune runs and its content, cut to what fits a review. */
+export function scriptLines(file) {
+  const lines = [`  file: ${file}`, '']
+  let content
+  try { content = readFileSync(file, 'utf8') } catch { content = null }
+  if (content == null) {
+    lines.push('  (the file is missing)')
+  } else {
+    const all = content.replace(/\n$/, '').split('\n')
+    for (const line of all.slice(0, SHOWN_LINES)) lines.push(`  │ ${line}`)
+    if (all.length > SHOWN_LINES) lines.push(`  │ … ${all.length - SHOWN_LINES} more lines — read the whole file before trusting it`)
+  }
+  return lines
+}
+
 /** What a native plugin rune runs, and — for a script — what the script says. */
 export function describeForReview(pluginKey, runeKey, rune, pluginDir, state) {
   const run = blockOf(rune, 'run')
@@ -17,18 +32,7 @@ export function describeForReview(pluginKey, runeKey, rune, pluginDir, state) {
     `  command: ${[run.command, ...(run.argv ?? [])].join(' ')}${file ? '' : '  (a program on PATH)'}`,
   ]
   if (rune.args != null) lines.push(`  arguments: ${run.pass === 'mapped' ? 'mapped from its schema — nothing else reaches the program' : 'passed through as given'}`)
-  if (file) {
-    let content
-    try { content = readFileSync(file, 'utf8') } catch { content = null }
-    lines.push(`  file: ${file}`, '')
-    if (content == null) {
-      lines.push('  (the file is missing)')
-    } else {
-      const all = content.replace(/\n$/, '').split('\n')
-      for (const line of all.slice(0, SHOWN_LINES)) lines.push(`  │ ${line}`)
-      if (all.length > SHOWN_LINES) lines.push(`  │ … ${all.length - SHOWN_LINES} more lines — read the whole file before trusting it`)
-    }
-  }
+  if (file) lines.push(...scriptLines(file))
   return lines.join('\n')
 }
 

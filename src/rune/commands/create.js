@@ -8,7 +8,7 @@ import { getStorePath } from '../../store/index.js'
 
 const VALID_FORMATS = ['tree', 'markdown']
 
-function runeTestTemplate(key) {
+export function runeTestTemplate(key) {
   return [
     `import { describe, it } from 'node:test'`,
     `import assert from 'node:assert/strict'`,
@@ -110,7 +110,7 @@ async function registerRune({ target, configRoot, key, name, description, runeRe
 }
 
 /** Script templates for `--lang`: each reads the contract's variables, so it runs as written. */
-const SCRIPT_LANGS = {
+export const SCRIPT_LANGS = {
   python: {
     ext: 'py',
     body: key => [

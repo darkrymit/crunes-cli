@@ -4,6 +4,7 @@ import { intro, outro, text, cancel } from '@clack/prompts'
 import { output } from '../../shared/output.js'
 import { getConfigPath, readRawConfig, writeRawConfig } from '../../core/config-writer.js'
 import { getStorePath } from '../../store/index.js'
+import { runeTestTemplate, SCRIPT_LANGS, VALID_LANGS } from '../../rune/commands/create.js'
 
 export function templateStub(name) {
   return [
@@ -39,6 +40,7 @@ export function templateStub(name) {
 export async function handler({
   name,
   path: templateRelPath,
+  lang,
   templateName,
   description,
   yes = false,
@@ -47,6 +49,11 @@ export async function handler({
   global = false,
 } = {}) {
   const isNonInteractive = yes || !process.stdout.isTTY
+
+  if (lang && !VALID_LANGS.includes(lang)) {
+    output.error(`Invalid --lang. Must be one of: ${VALID_LANGS.join(', ')}`)
+    process.exit(1)
+  }
 
   if (isNonInteractive) {
     if (!name) {
@@ -63,8 +70,8 @@ export async function handler({
     }
 
     if (!templateRelPath) {
-      const defaultPath = global ? `templates/${name}.js` : `.crunes/templates/${name}.js`
-      const result = await text({ message: 'File path?', initialValue: defaultPath })
+      const defaultPath = global ? `templates/${name}` : `.crunes/templates/${name}`
+      const result = await text({ message: 'Folder?', initialValue: defaultPath })
       if (result === Symbol.for('clack:cancel')) { cancel('Cancelled.'); return }
       templateRelPath = result
     }
@@ -82,12 +89,20 @@ export async function handler({
     }
   }
 
-  templateRelPath = templateRelPath ?? (global ? `templates/${name}.js` : `.crunes/templates/${name}.js`)
+  templateRelPath = templateRelPath ?? (global ? `templates/${name}` : `.crunes/templates/${name}`)
   const baseRoot = global ? getStorePath() : configRoot
-  const templateAbsPath = join(baseRoot, templateRelPath)
+  const script = lang ? SCRIPT_LANGS[lang] : null
+  const files = [
+    script
+      ? [join(baseRoot, templateRelPath, 'src', `index.${script.ext}`), script.body(name)]
+      : [join(baseRoot, templateRelPath, 'src', 'index.rune.js'), templateStub(name)],
+    [join(baseRoot, templateRelPath, 'test', `${name}.test.js`), runeTestTemplate(name)],
+  ]
 
-  await mkdir(dirname(templateAbsPath), { recursive: true })
-  await writeFile(templateAbsPath, templateStub(name))
+  for (const [filePath, content] of files) {
+    await mkdir(dirname(filePath), { recursive: true })
+    await writeFile(filePath, content)
+  }
 
   const configPath = getConfigPath({ configRoot, global })
   const config = readRawConfig(configPath) ?? { runes: {} }

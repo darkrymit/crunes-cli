@@ -1,11 +1,40 @@
 import fs from 'node:fs/promises'
+import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { intro, outro, confirm, cancel } from '@clack/prompts'
 import { loadConfig } from '../../core/config.js'
 import { loadRegistry, resolvePluginKey } from '../../plugin/registry.js'
 import { loadPluginJson } from '../../plugin/manifest.js'
-import { isolateName } from '../../core/rune-entry.js'
+import { scriptLines } from '../../plugin/commands/trust.js'
+import { runtimeOf } from '../../rune/native/runtime.js'
 import { output } from '../../shared/output.js'
+
+const ENTRY_FILE = /^index(\.rune)?\.[^.]+$/i
+
+/** The `src/index.*` files crunes has a runtime for; a template has exactly one. */
+async function findEntries(templateDir) {
+  let files
+  try { files = await fs.readdir(path.join(templateDir, 'src'), { withFileTypes: true }) } catch { return [] }
+  return files
+    .filter(f => f.isFile() && ENTRY_FILE.test(f.name) && runtimeOf(`./${f.name}`) !== 'file')
+    .map(f => `src/${f.name}`)
+}
+
+/** What a script template runs, what the script says, and what else is copied beside it. */
+async function describeScript(templateName, templateDir, entry) {
+  const files = await fs.readdir(templateDir, { recursive: true, withFileTypes: true })
+  const others = files
+    .filter(f => !f.isDirectory())
+    .map(f => path.relative(templateDir, path.join(f.parentPath, f.name)).replace(/\\/g, '/'))
+    .filter(f => f !== entry)
+    .sort()
+  return [
+    `Template "${templateName}" runs natively, outside the sandbox, with your full access`,
+    `  command: ${entry}`,
+    ...scriptLines(path.join(templateDir, entry)),
+    ...(others.length ? ['', `  also copied: ${others.join(', ')}`] : []),
+  ].join('\n')
+}
 
 /**
  * Resolve a template given an optional source name and template name.
@@ -19,13 +48,13 @@ export async function resolveTemplate(sourceName, templateName, projectRoot) {
     const templates = config.templates ?? {}
     const entry = templates[templateName]
     if (entry !== undefined) {
-      if (typeof entry === 'string' || entry.path) {
+      if (entry.path) {
         return { type: 'local', templateName, entry }
       }
       if (entry.plugin) {
         return { type: 'shortcut', templateName, entry }
       }
-      return { type: 'local', templateName, entry: { ...entry, path: `.crunes/templates/${templateName}.js` } }
+      return { type: 'local', templateName, entry: { ...entry, path: `.crunes/templates/${templateName}` } }
     }
     if (sourceName === 'project') return null
   }
@@ -62,7 +91,7 @@ export async function resolveTemplate(sourceName, templateName, projectRoot) {
 export async function handler({
   ref,
   key,
-  path: runeRelPath,
+  path: runePath,
   name,
   description,
   yes = false,
@@ -88,32 +117,17 @@ export async function handler({
   }
 
   const outputKey = key ?? templateName
-  runeRelPath = runeRelPath ?? `.crunes/runes/${outputKey}.rune.js`
-  if (!/\.rune\.m?js$/i.test(runeRelPath)) {
-    output.error(`${runeRelPath}: a sandboxed rune's file must be named *.rune.js — the name is what runs it in the isolate.`)
-    process.exit(1)
-  }
-  const runeAbsPath = path.join(projectRoot, runeRelPath)
+  const runeRelDir = (runePath ?? `.crunes/runes/${outputKey}`).replace(/[/\\]+$/, '')
+  const runeAbsDir = path.join(projectRoot, runeRelDir)
 
   if (!isNonInteractive) intro('crunes template apply')
 
-  // Confirm overwrite if file exists
-  try {
-    await fs.access(runeAbsPath)
-    if (!isNonInteractive) {
-      const ok = await confirm({ message: `${runeRelPath} already exists. Overwrite?` })
-      if (!ok || ok === Symbol.for('clack:cancel')) { cancel('Cancelled.'); process.exit(0) }
-    }
-  } catch { /* file doesn't exist */ }
-
-  await fs.mkdir(path.dirname(runeAbsPath), { recursive: true })
-
   let templateMeta = {}
+  let templateDir
 
   if (resolved.type === 'local') {
-    const localPath = typeof resolved.entry === 'string' ? resolved.entry : resolved.entry.path
-    await fs.copyFile(path.resolve(projectRoot, localPath), runeAbsPath)
-    templateMeta = typeof resolved.entry === 'string' ? {} : resolved.entry
+    templateDir = path.resolve(projectRoot, resolved.entry.path)
+    templateMeta = resolved.entry
 
   } else if (resolved.type === 'shortcut') {
     // Resolve to plugin: "pluginBareName:templateKey"
@@ -138,17 +152,44 @@ export async function handler({
       output.error(`Template shortcut "${templateName}" → "${pluginRef}" not found in plugin.`)
       process.exit(1)
     }
-    const templateRelPath = meta?.path ?? `templates/${pluginTemplateKey}.js`
-    const srcPath = path.join(pluginEntry.path, templateRelPath)
-    await fs.copyFile(srcPath, runeAbsPath)
+    templateDir = path.join(pluginEntry.path, meta.path ?? `templates/${pluginTemplateKey}`)
     templateMeta = { ...meta, ...(resolved.entry.name && { name: resolved.entry.name }), ...(resolved.entry.description && { description: resolved.entry.description }) }
 
   } else if (resolved.type === 'plugin') {
-    const templateRelPath = resolved.templateMeta?.path ?? `templates/${resolved.templateName}.js`
-    const srcPath = path.join(resolved.pluginEntry.path, templateRelPath)
-    await fs.copyFile(srcPath, runeAbsPath)
+    templateDir = path.join(resolved.pluginEntry.path, resolved.templateMeta.path ?? `templates/${resolved.templateName}`)
     templateMeta = resolved.templateMeta
   }
+
+  const entries = await findEntries(templateDir)
+  if (entries.length !== 1) {
+    output.error(`Template "${templateName}" needs exactly one src/index.* entry in ${templateDir} — found ${entries.length ? entries.join(', ') : 'none'}.`)
+    process.exit(1)
+  }
+  const [entry] = entries
+
+  if (runtimeOf(`./${entry}`) !== 'isolate') {
+    if (templateMeta.permissions) {
+      output.error(`Template "${templateName}" declares permissions, but ${entry} runs natively with full access, so grants would not apply to it.`)
+      process.exit(1)
+    }
+    console.log((await describeScript(templateName, templateDir, entry)) + '\n')
+    if (!yes) {
+      if (isNonInteractive) {
+        output.error('Applying a script template is a decision to make after reading it. Run this in a terminal, or pass -y (crunes -y template apply …) once you have reviewed it.')
+        process.exit(1)
+      }
+      const ok = await confirm({ message: 'Apply this script to run with your full access?' })
+      if (ok !== true) { cancel('Cancelled.'); process.exit(0) }
+    }
+  }
+
+  // Confirm overwrite if the rune folder exists
+  if (!isNonInteractive && existsSync(runeAbsDir)) {
+    const ok = await confirm({ message: `${runeRelDir} already exists. Overwrite?` })
+    if (ok !== true) { cancel('Cancelled.'); process.exit(0) }
+  }
+
+  await fs.cp(templateDir, runeAbsDir, { recursive: true })
 
   // Register rune in config
   const configPath = path.join(configRoot ?? projectRoot, '.crunes', 'config.json')
@@ -157,7 +198,7 @@ export async function handler({
 
   const resolvedName = name ?? templateMeta.name
   const resolvedDesc = description ?? templateMeta.description
-  const command = isolateName(runeRelPath)
+  const command = `${runeRelDir}/${entry}`
   const perms = templateMeta.permissions
   const configEntry = {
     ...(resolvedName && { name: resolvedName }),
@@ -172,9 +213,9 @@ export async function handler({
   await fs.rename(tmp, configPath)
 
   if (!isNonInteractive) {
-    outro(`Created ${runeRelPath}\nRun: crunes run ${outputKey}`)
+    outro(`Created ${runeRelDir}\nRun: crunes run ${outputKey}`)
   } else {
-    output.success(`Created ${runeRelPath}`)
+    output.success(`Created ${runeRelDir}`)
     output.info(`Run: crunes run ${outputKey}`)
   }
 }

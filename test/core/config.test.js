@@ -189,15 +189,15 @@ describe('absolutizeEntryPaths', () => {
 
   it('resolves template paths the same way', () => {
     const out = absolutizeEntryPaths({ templates: { base: {} } }, '/store', 'global')
-    expect(out.templates.base.path.replace(/\\/g, '/')).toBe(abs('/store/templates/base.js'))
+    expect(out.templates.base.path.replace(/\\/g, '/')).toBe(abs('/store/templates/base'))
   })
 })
 
 describe('mergeConfigs templates', () => {
   it('merges templates per key instead of replacing the whole map', () => {
     const result = mergeConfigs(
-      { templates: { a: { path: '/store/templates/a.js' } } },
-      { templates: { b: { path: '/proj/.crunes/templates/b.js' } } }
+      { templates: { a: { path: '/store/templates/a' } } },
+      { templates: { b: { path: '/proj/.crunes/templates/b' } } }
     )
     expect(Object.keys(result.templates).sort()).toEqual(['a', 'b'])
   })

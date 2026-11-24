@@ -2,7 +2,7 @@
 
 Centralised path helpers for the crunes store directory (`~/.crunes/` or `$CRUNES_STORE`). No logic — only path resolution and directory bootstrapping. Full docs: `docs/kb/main/modules/store.md`
 
-The store root doubles as the **global config directory**: `<store>/config.json` is the lowest config layer, with global runes at `<store>/runes/<key>.js` and templates at `<store>/templates/<name>.js` — no `.crunes/` segment.
+The store root doubles as the **global config directory**: `<store>/config.json` is the lowest config layer, with global runes at `<store>/runes/<key>/` and templates at `<store>/templates/<name>/` — no `.crunes/` segment.
 
 ## Files
 

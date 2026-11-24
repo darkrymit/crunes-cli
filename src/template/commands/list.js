@@ -19,9 +19,7 @@ export async function handler({
     try { config = loadConfig(configRoot ?? projectRoot) } catch {}
     const templates = config.templates ?? {}
     for (const [name, entry] of Object.entries(templates)) {
-      if (typeof entry === 'string') {
-        results.push({ source: 'project', template: name, name, description: '' })
-      } else if (entry.path) {
+      if (entry.path) {
         results.push({ source: 'project', template: name, name: entry.name ?? name, description: entry.description ?? '' })
       } else if (entry.plugin) {
         results.push({ source: 'project', template: name, name: entry.name ?? name, description: entry.description ?? '', plugin: entry.plugin })

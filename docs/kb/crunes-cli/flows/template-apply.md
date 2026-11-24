@@ -1,7 +1,7 @@
 ---
 type: flow
 title: crunes template apply
-description: Resolve a template through project config then plugins, copy the file, and write a runnable rune entry carrying the template's declared permissions — with shortcut entries letting a project rename a plugin's template.
+description: Resolve a template through project config then plugins, copy its folder, and write a runnable rune entry carrying the template's declared permissions — with shortcut entries letting a project rename a plugin's template.
 tags: [flow, template, scaffolding]
 resource: src/template/commands/apply.js
 ---
@@ -22,10 +22,16 @@ flowchart TD
     is_shortcut -->|no| resolve_path
     scan_plugins --> ambiguous{more than one match?}
     ambiguous -->|yes| refuse[exit, listing every match]
-    ambiguous -->|no| resolve_path[resolve the template file path]
+    ambiguous -->|no| resolve_path[resolve the template folder]
     resolve_plugin --> resolve_path
-    resolve_path --> copy_file[copy into the project's runes directory]
-    copy_file --> write_entry[write the rune entry with merged metadata]
+    resolve_path --> has_entry{exactly one src/index.* entry?}
+    has_entry -->|no| refuse_entry[exit before writing anything]
+    has_entry -->|yes| is_script{a script?}
+    is_script -->|no| copy_folder
+    is_script -->|yes| approve{shown, then approved?}
+    approve -->|no| refuse_entry
+    approve -->|yes| copy_folder[copy the folder into the project's runes directory]
+    copy_folder --> write_entry[write the rune entry with merged metadata]
     write_entry --> finished([runnable])
 ```
 
@@ -38,6 +44,14 @@ So a project may deliberately shadow a plugin template with its own, and still r
 ## Permissions come along
 
 A plugin template carries its declared permissions into the resulting rune entry. The user gets a rune that runs correctly on first invocation instead of one that fails on its first `fs.read` and has to be wired by hand.
+
+## A script template is approved before it is copied
+
+An entry that is not a `*.rune.js` / `*.rune.mjs` module runs natively. Apply prints the script as [plugin trust](/modules/plugin.md) does, lists the other files copied with it, and asks in a terminal. Without a terminal it exits before writing anything unless `--yes` is given.
+
+The approval covers this copy only and records no digest: the result is an ordinary project rune, owned by the project from then on. This holds for every source, so a plugin template is not a way around plugin trust.
+
+A script template that declares `permissions` is refused, because grants do not apply to a native rune.
 
 ## Shortcut entries rename without forking
 
@@ -53,6 +67,6 @@ The config write uses a temp-file rename, so an interrupted apply leaves the pre
 
 The entry itself **replaces** any existing one with the same key, with no merge of existing permissions or vars. That makes apply idempotent and predictable, and it means re-applying over a rune whose permissions were hand-tuned discards the tuning.
 
-On the file itself: a TTY prompts before overwriting, while `--yes` or any non-TTY context — CI, an agent — proceeds silently. The config entry is overwritten either way.
+On the folder itself: a TTY prompts before overwriting, while `--yes` or any non-TTY context — CI, an agent — proceeds without asking. Matching files are overwritten and any other file already in the folder stays. The config entry is overwritten either way.
 
-`--as <key>` moves the rune key and the default file path together; `--path` moves only the file.
+`--as <key>` moves the rune key and the default folder together; `--path` moves only the folder.

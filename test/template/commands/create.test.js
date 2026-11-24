@@ -62,16 +62,32 @@ describe('handler (non-interactive)', () => {
   })
 
   describe('file creation', () => {
-    it('creates template file at default path under configRoot', async () => {
+    it('creates the template folder at default path under configRoot', async () => {
       await handler({ name: 'mytemplate', yes: true, projectRoot: tmp, configRoot: tmp })
-      expect(existsSync(join(tmp, '.crunes', 'templates', 'mytemplate.js'))).toBe(true)
+      expect(existsSync(join(tmp, '.crunes', 'templates', 'mytemplate', 'src', 'index.rune.js'))).toBe(true)
+      expect(existsSync(join(tmp, '.crunes', 'templates', 'mytemplate', 'test', 'mytemplate.test.js'))).toBe(true)
     })
 
-    it('creates template file with modern run(args) signature', async () => {
+    it('creates a template entry exporting run(args)', async () => {
       await handler({ name: 'mytemplate', yes: true, projectRoot: tmp, configRoot: tmp })
-      const content = readFileSync(join(tmp, '.crunes', 'templates', 'mytemplate.js'), 'utf8')
+      const content = readFileSync(join(tmp, '.crunes', 'templates', 'mytemplate', 'src', 'index.rune.js'), 'utf8')
       expect(content).toMatch(/export async function run\(args\)/)
       expect(content).toContain("from '@utils'")
+    })
+  })
+
+  describe('--lang', () => {
+    it.each([['python', 'py'], ['bash', 'sh'], ['node', 'js']])('%s scaffolds a src/index.%s entry', async (lang, ext) => {
+      await handler({ name: 'job', lang, yes: true, projectRoot: tmp, configRoot: tmp })
+      const dir = join(tmp, '.crunes', 'templates', 'job')
+      expect(readFileSync(join(dir, 'src', `index.${ext}`), 'utf8')).toContain('CRUNES_ARGS')
+      expect(existsSync(join(dir, 'src', 'index.rune.js'))).toBe(false)
+      expect(existsSync(join(dir, 'test', 'job.test.js'))).toBe(true)
+    })
+
+    it('exits 1 and writes nothing for an unknown language', async () => {
+      await expect(handler({ name: 'job', lang: 'ruby', yes: true, projectRoot: tmp, configRoot: tmp })).rejects.toThrow('process.exit(1)')
+      expect(existsSync(join(tmp, '.crunes'))).toBe(false)
     })
   })
 
@@ -80,7 +96,7 @@ describe('handler (non-interactive)', () => {
       await handler({ name: 'mytemplate', yes: true, projectRoot: tmp, configRoot: tmp })
       const config = JSON.parse(readFileSync(join(tmp, '.crunes', 'config.json'), 'utf8'))
       expect(config.templates.mytemplate).toBeDefined()
-      expect(config.templates.mytemplate.path).toBe('.crunes/templates/mytemplate.js')
+      expect(config.templates.mytemplate.path).toBe('.crunes/templates/mytemplate')
     })
 
     it('stores templateName and description in config when provided', async () => {

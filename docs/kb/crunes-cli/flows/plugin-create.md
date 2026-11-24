@@ -43,7 +43,7 @@ This is the whole local development loop, and it exists because [provenance is r
 
 `src/index.rune.js` exports `async function run(args)`. This matters because the old `use(args)` name still appears in older plugins and **fails only at invocation**, not at install — the scaffold exists partly to stop that name propagating.
 
-`templates/example-template.js` is structurally the same file with a different destiny: it is meant to be copied into a user's project by [`template apply`](/flows/template-apply.md) and run as a local rune from there.
+`templates/example-template/` is structurally the same `{src,test}` project with a different destiny: it is meant to be copied into a user's project by [`template apply`](/flows/template-apply.md) and run as a local rune from there.
 
 ## Two failure behaviours worth knowing
 

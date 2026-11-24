@@ -147,14 +147,15 @@ describe('handler (non-interactive)', () => {
       rmSync(tmp, { recursive: true, force: true })
     })
 
-    it('creates all 7 expected files (default 1-rune {src,test} layout)', async () => {
+    it('creates all 8 expected files (default 1-rune {src,test} layout)', async () => {
       await handler({ ...BASE_OPTS, out, yes: true })
       for (const rel of [
         '.crunes-plugin/plugin.json',
         '.crunes-plugin/marketplace.json',
         'src/index.rune.js',
         'test/my-plugin.test.js',
-        'templates/example-template.js',
+        'templates/example-template/src/index.rune.js',
+        'templates/example-template/test/example-template.test.js',
         'README.md',
         'CHANGELOG.md',
       ]) {

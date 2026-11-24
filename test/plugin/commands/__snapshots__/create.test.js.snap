@@ -41,7 +41,7 @@ export async function run(args) {
 
 exports[`exampleTemplate > matches snapshot 1`] = `
 "// Template rune — copied into the user's project by \`crunes template apply\`.
-// Edit this file to define what a new rune looks like when scaffolded from your plugin.
+// Edit this folder to define what a new rune looks like when scaffolded from your plugin.
 //
 // permissions (plugin.json):
 //   run:

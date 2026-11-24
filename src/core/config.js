@@ -16,7 +16,7 @@ const BLOCKS = ['run', 'args', 'repl']
  * Resolve every file a config section names against the layer's own base dir, before layers
  * are merged, so a higher layer that overrides one field keeps the file the lower layer meant.
  * Rune entries name files in blocks; templates keep `path`, and the global layer's default
- * template path (`templates/<key>.js`).
+ * template path (`templates/<key>`).
  */
 function absolutizeSection(section, kind, baseDir, layer) {
   const out = {}
@@ -26,7 +26,7 @@ function absolutizeSection(section, kind, baseDir, layer) {
     if (kind === 'templates') {
       const isPluginRef = Boolean(entry.plugin) || key.includes(':')
       if (entry.path) copy.path = resolve(baseDir, entry.path)
-      else if (layer === 'global' && !isPluginRef) copy.path = resolve(baseDir, `templates/${key}.js`)
+      else if (layer === 'global' && !isPluginRef) copy.path = resolve(baseDir, `templates/${key}`)
       out[key] = copy
       continue
     }

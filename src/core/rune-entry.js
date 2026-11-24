@@ -1,7 +1,5 @@
 import { join, isAbsolute } from 'node:path'
 
-const ISOLATE_MODULE = /\.rune\.m?js$/i
-
 /** A block written as a string is shorthand for { command }. */
 export function blockOf(entry, name) {
   const block = entry?.[name]
@@ -27,10 +25,4 @@ export function blockModule(entry, mode, base) {
   const command = blockOf(entry, mode)?.command
   if (!command) return null
   return isAbsolute(command) ? command : join(base, command)
-}
-
-/** `x.js` → `x.rune.js`, `x.mjs` → `x.rune.mjs`; a name that already says isolate is kept. */
-export function isolateName(file) {
-  if (ISOLATE_MODULE.test(file)) return file
-  return file.replace(/\.(m?js)$/i, '.rune.$1')
 }

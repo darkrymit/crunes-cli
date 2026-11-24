@@ -497,7 +497,7 @@ export function buildProgram() {
 
   template
     .command('apply <template>')
-    .description('Copy a template into the project as a new rune and register it in config.')
+    .description('Copy a template folder into the project as a new rune and register it in config.')
     .addHelpText('after',
       '\nKey prefixes:\n' +
       '  project:name  — use a template defined in this project\'s config\n' +
@@ -505,7 +505,7 @@ export function buildProgram() {
       '  name          — auto-resolve: project config first, then installed plugins'
     )
     .option('--as <new-rune>', 'register the rune under a different key (default: template name)')
-    .option('--path <path>', 'file path for the rune (default: .crunes/runes/<key>.js)')
+    .option('--path <path>', 'folder for the rune (default: .crunes/runes/<key>)')
     .option('--name <name>', 'human-readable label shown in crunes list')
     .option('--description <description>', 'short description of what context this rune provides')
     .action(async (ref, opts) => {
@@ -515,14 +515,15 @@ export function buildProgram() {
 
   template
     .command('create [new-template]')
-    .description('Scaffold a new template file and register it in config')
-    .option('--path <path>', 'file path for the template (default: .crunes/templates/<name>.js)')
+    .description('Scaffold a new template folder and register it in config')
+    .option('--path <path>', 'folder for the template (default: .crunes/templates/<name>)')
+    .addOption(new Option('--lang <lang>', 'scaffold a script template instead of a sandboxed JS one').choices(['python', 'bash', 'node']))
     .option('--name <name>', 'display label shown in crunes template list (separate from the template key)')
     .option('--description <description>', 'short description of what kind of rune this template produces')
     .option('-g, --global', 'operate on the global config (~/.crunes/config.json) instead of the project')
     .action(async (name, opts) => {
       const { handler } = await import('../template/commands/create.js')
-      await handler({ name, path: opts.path, templateName: opts.name, description: opts.description, yes: !!program.opts().yes, projectRoot: projectRoot(), configRoot: configRoot(), global: !!opts.global })
+      await handler({ name, path: opts.path, lang: opts.lang, templateName: opts.name, description: opts.description, yes: !!program.opts().yes, projectRoot: projectRoot(), configRoot: configRoot(), global: !!opts.global })
     })
 
   // Marketplace commands

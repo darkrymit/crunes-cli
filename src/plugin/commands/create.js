@@ -3,6 +3,7 @@ import { join, resolve, dirname } from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { intro, outro, text, confirm, cancel } from '@clack/prompts'
 import { output } from '../../shared/output.js'
+import { runeTestTemplate } from '../../rune/commands/create.js'
 
 export function pluginJson({ name, description, author, license, multi = false }) {
   return JSON.stringify({
@@ -79,7 +80,7 @@ export async function run(args) {
 
 export function exampleTemplate() {
   return `// Template rune — copied into the user's project by \`crunes template apply\`.
-// Edit this file to define what a new rune looks like when scaffolded from your plugin.
+// Edit this folder to define what a new rune looks like when scaffolded from your plugin.
 //
 // permissions (plugin.json):
 //   run:
@@ -199,7 +200,8 @@ export async function handler({
     [join(outDir, '.crunes-plugin', 'marketplace.json'), marketplaceJson(opts)],
     [runeEntry, exampleRune()],
     [testEntry, exampleTest()],
-    [join(outDir, 'templates', 'example-template.js'), exampleTemplate()],
+    [join(outDir, 'templates', 'example-template', 'src', 'index.rune.js'), exampleTemplate()],
+    [join(outDir, 'templates', 'example-template', 'test', 'example-template.test.js'), runeTestTemplate('example-template')],
     [join(outDir, 'README.md'), readmeMd(opts)],
     [join(outDir, 'CHANGELOG.md'), changelogMd()],
   ]
