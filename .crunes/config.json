@@ -122,7 +122,6 @@
     }
   },
   "plugins": {
-    "crunes-plugins@git": true,
     "crunes-plugins@kb": true
   }
 }

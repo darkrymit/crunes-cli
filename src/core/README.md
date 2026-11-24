@@ -10,7 +10,7 @@ Shared domain logic used across multiple feature modules: config loading/merging
   - `coercePlugins(plugins)` / `enabledPluginKeys(config)` — `plugins` is a boolean map; anything else is treated as empty. `enabledPluginKeys` returns only keys set to exactly `true`.
   - `validateConfig(config, fileName?, { base, layer }?)` — validates one layer: refuses an entry-level `path` or `permissions`, checks block shapes, and that `plugins` values are booleans.
 - **config-writer.js** — the single writer for `config.json`. `getConfigPath({ configRoot, global })` — `<store>/config.json` when global (no `.crunes/` segment), else `<configRoot>/.crunes/config.json`. `readRawConfig(path)` — parsed object or `null` if absent. `writeRawConfig(path, config)` — atomic temp-file write. `setPluginEnabled(path, key, enabled)` — sets one plugin key. **Writers only ever touch raw file contents** — a merged config object must never be persisted, or absolutized paths would leak to disk.
-- **errors.js** — `CircularRuneError` — thrown when a rune call chain loops back on itself; carries the full `chain` array.
+- **errors.js** — `CircularRuneError` — thrown when a rune call chain loops back on itself; the chain is in the message.
 - **commands/init.js** — `handler({ yes, projectRoot, global })` — creates `config.json` in the project (plus a `.gitignore` scaffold) or, with `global`, at the store root.
 
 ## Related Modules
