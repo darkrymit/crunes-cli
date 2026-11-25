@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.14.2] - 2026-11-25
+
+### Added
+- **Composable arg guards**: Added rune.guard(args, opts), rune.unknownCommand(), rune.unknownOptions(), and rune.missingPositionals() on @utils.rune with fuzzy command suggestions
+
+### Changed
+- **crunes create template**: New runes scaffold -h, --help and rune.guard(args) at the top of run()
+
+---
+
 ## [0.14.1] - 2026-11-25
 
 ### Added
