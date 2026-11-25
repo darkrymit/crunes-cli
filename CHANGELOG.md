@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.14.1] - 2026-11-25
+
+### Added
+- **zstd in `fs.readLinesStream`**: `decompress: 'zstd'` reads compressed files line by line
+- **`sqlite.open` in `setupCrunesTest`**: Plugin tests can open databases with the same permission checks
+
+### Changed
+- **Read-only `sqlite.open`**: With only a read grant, an existing database opens read-only and a missing one is an error
+
+### Fixed
+- Security: **`sqlite.open`** checks permissions before touching disk; a rune without a grant could create folders and database files anywhere the user can write
+
+---
+
 ## [0.14.0] - 2026-11-25
 
 ### Added
