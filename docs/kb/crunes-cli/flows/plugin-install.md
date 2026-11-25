@@ -60,4 +60,4 @@ Order matters at each step.
 
 The global registry records what is installed on the machine; the project config records that it is enabled here. Both are written only after consent.
 
-The project write uses an atomic temp-file rename, and **silently skips when there is no project config** — installing from a rootless directory registers the plugin on the machine without enabling it anywhere.
+The project write uses an atomic temp-file rename, and **silently skips when there is no project config** — installing from a rootless directory registers the plugin on the machine without enabling it anywhere. With `-g` the target is the global config, which is created when absent. A config that exists but cannot be read or written fails the install loudly.

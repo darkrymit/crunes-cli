@@ -200,11 +200,12 @@ async function updatePlugin(pluginKey, newPluginDir, newPluginJson, projectDir, 
 
 async function setEnabled(projectDir, pluginKey, enabled, global) {
   if (!projectDir && !global) return
-  try {
-    await setPluginEnabled(getConfigPath({ configRoot: projectDir, global }), pluginKey, enabled)
-  } catch {
-    // No config to update — skip
+  const configPath = getConfigPath({ configRoot: projectDir, global })
+  if (readRawConfig(configPath) === null) {
+    if (!global) return // rootless install: registered, enabled nowhere
+    await writeRawConfig(configPath, { runes: {} })
   }
+  await setPluginEnabled(configPath, pluginKey, enabled)
 }
 
 /** Uninstall drops the key outright: a `false` would outlive the plugin. */
