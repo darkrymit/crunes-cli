@@ -9,7 +9,8 @@ import { createOsInfo } from '../api/os.js'
 import { createModuleResolver } from './resolver.js'
 import { DENY_BUILTINS } from './builtins.js'
 import { createJob, getJob } from '../../job/index.js'
-import { updateJobPid, jobStdoutPath, jobStderrPath, jobStdinPath } from '../../job/registry.js'
+import { updateJobPid, jobStdoutPath, jobStderrPath, jobStdinPath, jobPgidPath } from '../../job/registry.js'
+import { killWindowsShellJob } from '../../job/kill-tree.js'
 import { spawnDetachedJob } from '../../job/spawn-detached.js'
 import { EOF_SENTINEL } from '../../job/stdin-tail.js'
 import fsSync from 'node:fs'
@@ -337,7 +338,7 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
   await jail.set('$__utils_shell_job_start', asyncRef(async (cmd, opts) => {
     checkPermission('shell.job.start', cmd)
     return utils.shell.createShellJob(cmd, opts, {
-      createJob, updateJobPid, jobStdoutPath, jobStderrPath, jobStdinPath,
+      createJob, updateJobPid, jobStdoutPath, jobStderrPath, jobStdinPath, jobPgidPath,
       spawnedBy: currentRuneKey, projectDir,
     })
   }))
@@ -362,7 +363,7 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
     const record = await getJob(projectDir, id)
     if (!record) return
     if (process.platform === 'win32') {
-      try { spawnProcess('taskkill', ['/F', '/T', '/PID', String(record.pid)], { stdio: 'ignore' }) } catch {}
+      await killWindowsShellJob(projectDir, record)
     } else {
       try { process.kill(-record.pid, sig) } catch {}
     }

@@ -257,7 +257,7 @@ export function createShellUtils(dir, checkPermission) {
     return new ShellSession(cmd, { dir, ...opts, activeSessions })
   }
 
-  async function createShellJob(cmd, opts, { createJob, updateJobPid, jobStdoutPath, jobStderrPath, jobStdinPath, spawnedBy, projectDir: jobProjectDir }) {
+  async function createShellJob(cmd, opts, { createJob, updateJobPid, jobStdoutPath, jobStderrPath, jobStdinPath, jobPgidPath, spawnedBy, projectDir: jobProjectDir }) {
     const repl = opts?.repl ?? false
     checkShellCommand(cmd, resolveShell(opts?.shell).kind, checkPermission)
     const { id } = await createJob(null, {
@@ -269,14 +269,18 @@ export function createShellUtils(dir, checkPermission) {
     if (repl) {
       const stdinLog = jobStdinPath(jobProjectDir, id)
       fs.writeFileSync(stdinLog, '')
+      const jobShell = resolveShell(opts?.shell)
+      // Only the process group lets the kill find what a Git Bash exec detaches (see job/kill-tree.js).
+      const recordGroup = process.platform === 'win32' && jobShell.kind !== 'cmd'
       // Wrapper process: tails stdinLog and feeds lines into the real child's stdin.
       // Runs detached so it outlives the parent; kill(wrapperPid) kills the full tree.
       const wrapperEnv = {
         ...childEnv,
-        CRUNES_SHELL_CMD:  cmd,
+        CRUNES_SHELL_CMD:  recordGroup ? `cat /proc/$$/pgid > "$CRUNES_JOB_PGID"; ${cmd}` : cmd,
         CRUNES_SHELL_CWD:  jobProjectDir,
         CRUNES_STDIN_LOG:  stdinLog,
-        CRUNES_SHELL_PATH: resolveShell(opts?.shell).path,
+        CRUNES_SHELL_PATH: jobShell.path,
+        ...(recordGroup ? { CRUNES_JOB_PGID: jobPgidPath(jobProjectDir, id) } : {}),
       }
       const wrapper = `
 const {spawn}=require('child_process'),{openSync,closeSync,statSync,readSync}=require('fs')
