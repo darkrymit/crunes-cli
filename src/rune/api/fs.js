@@ -1,5 +1,7 @@
 import fsPromises from 'node:fs/promises'
 import { createReadStream, createWriteStream, realpathSync } from 'node:fs'
+import { pipeline } from 'node:stream'
+import { createZstdDecompress } from 'node:zlib'
 import path from 'node:path'
 import { glob } from 'tinyglobby'
 import { createRequire } from 'node:module'
@@ -112,7 +114,7 @@ const LINE_BATCH_BYTES = 256 * 1024
 
 // Lines are split on raw bytes and decoded whole, so a multi-byte character is never cut
 // at a chunk edge. Filtering happens before decoding: a skipped line costs no string.
-async function* readLineBatches(abs, needles) {
+async function* readLineBatches(abs, needles, decompress) {
   let batch = []
   let batchBytes = 0
   let pending = []
@@ -127,7 +129,10 @@ async function* readLineBatches(abs, needles) {
     batch.push(line.toString('utf8'))
     batchBytes += line.length + 1
   }
-  for await (const chunk of createReadStream(abs, { highWaterMark: 1024 * 1024 })) {
+  const file = createReadStream(abs, { highWaterMark: 1024 * 1024 })
+  // Destroying either end, as an early stop does, destroys both; read errors reach the loop.
+  const source = decompress ? pipeline(file, createZstdDecompress(), () => {}) : file
+  for await (const chunk of source) {
     let start = 0
     let nl
     while ((nl = chunk.indexOf(0x0a, start)) !== -1) {
@@ -317,11 +322,12 @@ export function createFsUtils(dir, checkPermission, pluginDir = null, pluginId =
       return createReadStream(abs)
     },
 
-    readLinesIter(relPath, { contains } = {}) {
+    readLinesIter(relPath, { contains, decompress } = {}) {
+      if (decompress != null && decompress !== 'zstd') throw new TypeError(`fs.readLinesStream: unsupported decompress "${decompress}", expected "zstd"`)
       if (contains != null && !Array.isArray(contains)) throw new TypeError('fs.readLinesStream: contains must be an array of strings')
       const abs   = resolvePath(relPath, ctx())
       if (checkPermission) checkPermission('fs.read', relPath)
-      return readLineBatches(abs, contains?.map(s => Buffer.from(s, 'utf8')) ?? null)
+      return readLineBatches(abs, contains?.map(s => Buffer.from(s, 'utf8')) ?? null, decompress === 'zstd')
     },
 
     async appendStreamRef(relPath) {

@@ -185,8 +185,9 @@ declare namespace fs {
    * Requires `fs.read:<path>` permission.
    * @param path Relative file path
    * @param opts.contains Only yield lines containing at least one of these exact strings. Skipped lines never enter the sandbox.
+   * @param opts.decompress Decompress the file while reading it. A file cut off mid-way ends early without an error.
    */
-  function readLinesStream(path: string, opts?: { contains?: string[] }): ReadableStream<string>
+  function readLinesStream(path: string, opts?: { contains?: string[]; decompress?: 'zstd' }): ReadableStream<string>
 
   /**
    * Writes to a file chunk-by-chunk using a UTF-8 string stream.
