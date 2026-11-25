@@ -31,6 +31,41 @@ declare namespace rune {
    */
   function commandsSchema(): CommandSchema[] | null
 
+  interface GuardOptions {
+    help?: boolean
+    unknownCommand?: boolean
+    unknownOptions?: boolean
+    requireCommand?: boolean
+    requiredPositionals?: boolean
+    fuzzy?: boolean
+    commands?: string[]
+    schema?: ArgSchema | null
+  }
+
+  /**
+   * Checks whether `args` hit an unknown command at root (`$command === ''` with `$rest`).
+   * Returns a markdown error section (with fuzzy suggestions using `rune.key()`), or `null`.
+   */
+  function unknownCommand(args: Record<string, any>, opts?: { fuzzy?: boolean; commands?: string[]; schema?: ArgSchema | null }): RuneSection | null
+
+  /**
+   * Checks whether `args` contains flags not declared in `args()` for the matched command path.
+   * Returns a markdown error section, or `null`.
+   */
+  function unknownOptions(args: Record<string, any>, opts?: { schema?: ArgSchema | null }): RuneSection | null
+
+  /**
+   * Checks whether any required `<positional>` parameter for the matched command is missing.
+   * Returns scoped `helpSection(args.$command)` (or an error section when `help: false`), or `null`.
+   */
+  function missingPositionals(args: Record<string, any>, opts?: { help?: boolean; schema?: ArgSchema | null }): RuneSection | null
+
+  /**
+   * Composes `unknownCommand` -> `--help` -> `unknownOptions` -> missing root command -> `missingPositionals`.
+   * Returns a `RuneSection` when execution should stop, or `null` to proceed.
+   */
+  function guard(args: Record<string, any>, opts?: GuardOptions): RuneSection | null
+
   /** Root-level arg schema — no name or description (those belong to CommandSchema). */
   interface ArgSchema {
     options:     { flags: string; description: string; def?: any }[]

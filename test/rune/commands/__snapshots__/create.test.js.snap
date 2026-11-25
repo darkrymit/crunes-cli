@@ -6,19 +6,21 @@ exports[`template > markdown format matches snapshot 1`] = `
 //     allow: []  — add patterns like fs.read:./** if you use utils.fs
 //     deny:  []
 
-import { md, section } from '@utils'
+import { md, rune, section } from '@utils'
 
-// export async function args(b) {
-//   return b
-//     .option('-v, --verbose', 'Verbose output', false)
-//     .build()
-// }
+export async function args(b) {
+  return b
+    .option('-h, --help', 'Show help')
+    .option('-v, --verbose', 'Verbose output', false)
+}
 
 export async function run(args) {
+  const stop = rune.guard(args)
+  if (stop) return stop
+
   // args._         — data positionals (command tokens stripped)
   // args.$rest     — unmapped positional arguments
-  // args.verbose   — named flag (if args export is defined above)
-  // utils.fs.cwd() — absolute path to the project root
+  // args.verbose   — named flag (defined in args() above)
 
   const content = [
     md.h3('mykey'),
@@ -35,19 +37,21 @@ exports[`template > tree format matches snapshot 1`] = `
 //     allow: []  — add patterns like fs.read:./** if you use utils.fs
 //     deny:  []
 
-import { md, section, tree } from '@utils'
+import { md, rune, section, tree } from '@utils'
 
-// export async function args(b) {
-//   return b
-//     .option('-v, --verbose', 'Verbose output', false)
-//     .build()
-// }
+export async function args(b) {
+  return b
+    .option('-h, --help', 'Show help')
+    .option('-v, --verbose', 'Verbose output', false)
+}
 
 export async function run(args) {
+  const stop = rune.guard(args)
+  if (stop) return stop
+
   // args._         — data positionals (command tokens stripped)
   // args.$rest     — unmapped positional arguments
-  // args.verbose   — named flag (if args export is defined above)
-  // utils.fs.cwd() — absolute path to the project root
+  // args.verbose   — named flag (defined in args() above)
 
   const root = tree.node('mykey', 'Root description', [
     tree.node('child', 'Child description'),

@@ -1937,3 +1937,163 @@ globalThis.utils.rune.helpSection    = (path) =>
 globalThis.utils.rune.argsSchema     = () => __runeArgsSchema
 globalThis.utils.rune.commandsSchema = () => __runeCommandsSchema?.commands ?? null
 
+function __collectCommands(node, prefix = [], out = []) {
+  for (const cmd of node?.commands ?? []) {
+    const next = [...prefix, cmd.name]
+    out.push(next.join(' '))
+    __collectCommands(cmd, next, out)
+  }
+  return out
+}
+
+function __resolveSchemaNode(schema, commands) {
+  let node = schema
+  const options = [...(schema?.options ?? [])]
+  for (const name of commands ?? []) {
+    const match = node?.commands?.find(c => c.name === name)
+    if (!match) break
+    node = match
+    options.push(...(match.options ?? []))
+  }
+  return { node, options }
+}
+
+function __allowedArgKeys(node, options) {
+  const allowed = new Set(['_', '$command', '$commands', '$rest', '$raw'])
+  for (const opt of options ?? []) {
+    for (const part of String(opt.flags ?? '').split(',')) {
+      const p = part.trim()
+      const sm = p.match(/^-([a-zA-Z])$/)
+      if (sm) { allowed.add(sm[1]); continue }
+      const lm = p.match(/^--([a-zA-Z][a-zA-Z0-9-]*)(?:\s|$)/)
+      if (lm) {
+        const raw = lm[1]
+        allowed.add(raw)
+        allowed.add(raw.replace(/-([a-zA-Z0-9])/g, (_, c) => c.toUpperCase()))
+      }
+    }
+  }
+  for (const pos of node?.positionals ?? []) {
+    const m = String(pos.spec ?? '').match(/^[<\[](?:([a-zA-Z0-9_-]+?)(?:\.\.\.)?)[>\]]$/)
+    if (m) allowed.add(m[1])
+  }
+  return allowed
+}
+
+function __errorSectionName() {
+  const base = (__runeKey ?? 'rune').split(':').pop() || 'rune'
+  return `${base}-error`
+}
+
+globalThis.utils.rune.unknownCommand = (args, opts = {}) => {
+  const schema = opts.schema ?? __runeArgsSchema
+  const commands = opts.commands ?? __collectCommands(schema)
+  if (!commands || commands.length === 0) return null
+  if (args?.$command || !Array.isArray(args?.$rest) || args.$rest.length === 0) return null
+
+  const input = args.$rest.join(' ')
+  const prefix = __runeKey ?? 'rune'
+  let hint = `\n\nRun \`${prefix} --help\` to see all commands.`
+  if (opts.fuzzy !== false) {
+    const cmd = input.toLowerCase()
+    const tokens = cmd.split(/\s+/).filter(w => w.length > 1)
+    const suggestions = commands.filter(k => {
+      if (k === cmd) return true
+      const kTokens = k.split(/\s+/)
+      return tokens.some(w => kTokens.some(kt => {
+        if (kt === w || kt.startsWith(w) || kt.includes(w)) return true
+        if (w.length < 3 || Math.abs(kt.length - w.length) > 2) return false
+        const dp = Array.from({ length: w.length + 1 }, (_, i) => i)
+        for (let j = 1; j <= kt.length; j++) {
+          let prev = dp[0]
+          dp[0] = j
+          for (let i = 1; i <= w.length; i++) {
+            const tmp = dp[i]
+            dp[i] = w[i - 1] === kt[j - 1] ? prev : 1 + Math.min(prev, dp[i], dp[i - 1])
+            prev = tmp
+          }
+        }
+        return dp[w.length] <= (w.length <= 4 ? 1 : 2)
+      }))
+    })
+    if (suggestions.length > 0) {
+      hint = `\n\nDid you mean?\n${suggestions.map(s => `  ${prefix} ${s}`).join('\n')}\n\nRun \`${prefix} --help\` to see all commands.`
+    }
+  }
+  return globalThis.utils.section.create(__errorSectionName(), {
+    type: 'markdown',
+    content: `**[Unknown command]** \`${input}\`${hint}`,
+  })
+}
+
+globalThis.utils.rune.unknownOptions = (args, opts = {}) => {
+  const schema = opts.schema ?? __runeArgsSchema
+  if (!schema || !args || typeof args !== 'object') return null
+  const { node, options } = __resolveSchemaNode(schema, args.$commands ?? toSegments(args.$command))
+  const allowed = __allowedArgKeys(node, options)
+  const rawKeys = Object.keys(args).filter(k => !allowed.has(k))
+  if (rawKeys.length === 0) return null
+
+  const rawSet = new Set(rawKeys)
+  const deduped = rawKeys.filter(k => {
+    const kebab = k.replace(/([A-Z])/g, '-$1').toLowerCase()
+    return kebab === k || !rawSet.has(kebab)
+  })
+  const formatted = deduped.map(k => (k.length === 1 ? `-${k}` : `--${k}`))
+  const prefix = __runeKey ?? 'rune'
+  const cmdPart = args.$command ? ` ${args.$command}` : ''
+  return globalThis.utils.section.create(__errorSectionName(), {
+    type: 'markdown',
+    content: `**[Unknown option]** ${formatted.join(', ')}\n\nRun \`${prefix}${cmdPart} --help\` to see valid options.`,
+  })
+}
+
+globalThis.utils.rune.missingPositionals = (args, opts = {}) => {
+  const schema = opts.schema ?? __runeArgsSchema
+  if (!schema || !args || typeof args !== 'object') return null
+  const { node } = __resolveSchemaNode(schema, args.$commands ?? toSegments(args.$command))
+  const missing = []
+  for (const pos of node?.positionals ?? []) {
+    const m = String(pos.spec ?? '').match(/^<([a-zA-Z0-9_-]+?)(\.\.\.)?>$/)
+    if (!m) continue
+    const [, name, variadic] = m
+    const val = args[name]
+    if (variadic ? (!Array.isArray(val) || val.length === 0) : (val === undefined || val === '')) {
+      missing.push(pos.spec)
+    }
+  }
+  if (missing.length === 0) return null
+  if (opts.help !== false && __runeArgsSchema) {
+    return globalThis.utils.rune.helpSection(args.$command)
+  }
+  return globalThis.utils.section.create(__errorSectionName(), {
+    type: 'markdown',
+    content: `**[Missing argument]** ${missing.join(', ')}`,
+  })
+}
+
+globalThis.utils.rune.guard = (args, opts = {}) => {
+  const schema = opts.schema ?? __runeArgsSchema
+  if (opts.unknownCommand !== false) {
+    const uc = globalThis.utils.rune.unknownCommand(args, opts)
+    if (uc) return uc
+  }
+  if (opts.help !== false && args?.help) {
+    return globalThis.utils.rune.helpSection(args.$command)
+  }
+  if (opts.unknownOptions !== false) {
+    const uo = globalThis.utils.rune.unknownOptions(args, opts)
+    if (uo) return uo
+  }
+  const hasCommands = Array.isArray(schema?.commands) && schema.commands.length > 0
+  if (opts.requireCommand !== false && hasCommands && !args?.$command) {
+    return globalThis.utils.rune.helpSection()
+  }
+  if (opts.requiredPositionals !== false) {
+    const mp = globalThis.utils.rune.missingPositionals(args, opts)
+    if (mp) return mp
+  }
+  return null
+}
+
+

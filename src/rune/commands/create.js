@@ -209,8 +209,8 @@ async function createScriptRune({ key, lang, runeRelPath, name, description, con
 
 export function template(key, format) {
   const imports = format === 'tree'
-    ? `import { md, section, tree } from '@utils'`
-    : `import { md, section } from '@utils'`
+    ? `import { md, rune, section, tree } from '@utils'`
+    : `import { md, rune, section } from '@utils'`
 
   const header = [
     `// permissions:`,
@@ -220,17 +220,19 @@ export function template(key, format) {
     ``,
     imports,
     ``,
-    `// export async function args(b) {`,
-    `//   return b`,
-    `//     .option('-v, --verbose', 'Verbose output', false)`,
-    `//     .build()`,
-    `// }`,
+    `export async function args(b) {`,
+    `  return b`,
+    `    .option('-h, --help', 'Show help')`,
+    `    .option('-v, --verbose', 'Verbose output', false)`,
+    `}`,
     ``,
     `export async function run(args) {`,
+    `  const stop = rune.guard(args)`,
+    `  if (stop) return stop`,
+    ``,
     `  // args._         — data positionals (command tokens stripped)`,
     `  // args.$rest     — unmapped positional arguments`,
-    `  // args.verbose   — named flag (if args export is defined above)`,
-    `  // utils.fs.cwd() — absolute path to the project root`,
+    `  // args.verbose   — named flag (defined in args() above)`,
   ].join('\n')
 
   if (format === 'tree') {
