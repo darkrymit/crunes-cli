@@ -8,6 +8,7 @@ function jobDir(projectDir, id)    { return join(getLocalBase(projectDir), 'jobs
 export function jobStdoutPath(projectDir, id) { return join(jobDir(projectDir, id), 'stdout.log') }
 export function jobStderrPath(projectDir, id) { return join(jobDir(projectDir, id), 'stderr.log') }
 export function jobStdinPath(projectDir, id)  { return join(jobDir(projectDir, id), 'stdin.log') }
+export function jobPgidPath(projectDir, id)   { return join(jobDir(projectDir, id), 'pgid') }
 
 export async function updateJobPid(projectDir, id, pid) {
   const record = await getJob(projectDir, id)

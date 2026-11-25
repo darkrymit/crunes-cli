@@ -1,4 +1,5 @@
 import { listJobs, deleteJob, resolveJobId } from '../registry.js'
+import { killWindowsShellJob } from '../kill-tree.js'
 
 export async function handler({ id, projectDir }) {
   const jobs = await listJobs(projectDir)
@@ -13,7 +14,11 @@ export async function handler({ id, projectDir }) {
 
   const record = jobs.find(j => j.id === resolvedId)
 
-  try { process.kill(record.pid, 'SIGTERM') } catch { /* already gone */ }
+  if (process.platform === 'win32' && record.type === 'shell') {
+    await killWindowsShellJob(projectDir, record)
+  } else {
+    try { process.kill(record.pid, 'SIGTERM') } catch { /* already gone */ }
+  }
   await deleteJob(projectDir, record.id)
   console.log(`Sent SIGTERM to job ${record.id.slice(0, 8)} (${record.runeKey ?? 'unknown'})`)
 }
