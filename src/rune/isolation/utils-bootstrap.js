@@ -592,6 +592,22 @@ globalThis.utils = {
     readStream: (path) => {
       return globalThis.utils.fs.readBytesStream(path).pipeThrough(new TextDecoderStream())
     },
+    readLinesStream: (path, opts) => {
+      let streamId = null
+      return new ReadableStream({
+        async start() {
+          streamId = await $__utils_fs_readLines.apply(undefined, [path, opts], { arguments: { copy: true }, result: { promise: true } })
+        },
+        async pull(controller) {
+          const lines = await $__utils_fs_readLines_next.apply(undefined, [streamId], { result: { promise: true, copy: true } })
+          if (lines === null) controller.close()
+          else for (const line of lines) controller.enqueue(line)
+        },
+        async cancel() {
+          if (streamId !== null) await $__utils_fs_readLines_cancel.apply(undefined, [streamId], { result: { promise: true } })
+        }
+      })
+    },
     writeBytesStream: (path) => {
       let streamId = null
       return new WritableStream({

@@ -40,6 +40,24 @@ function createTestRune() {
   }
 }
 
+function createTestFs(fs) {
+  return {
+    ...fs,
+    readLinesStream(path, opts) {
+      let iter
+      return new ReadableStream({
+        async start() { iter = fs.readLinesIter(path, opts) },
+        async pull(controller) {
+          const { value, done } = await iter.next()
+          if (done) controller.close()
+          else for (const line of value) controller.enqueue(line)
+        },
+        async cancel() { await iter.return() },
+      })
+    },
+  }
+}
+
 export function setupCrunesTest({
   cwd = process.cwd(),
   projectRoot = cwd,
@@ -77,6 +95,7 @@ export function setupCrunesTest({
 
   const merged = {
     ...utils,
+    fs: createTestFs(utils.fs),
     crypt: createTestCrypt(),
     codec: { ...codecApi },
     time: { after: ms => new Promise(resolve => setTimeout(resolve, ms)) },

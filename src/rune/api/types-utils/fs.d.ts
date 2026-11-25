@@ -180,6 +180,15 @@ declare namespace fs {
   function readStream(path: string): ReadableStream<string>
 
   /**
+   * Reads a file line-by-line without loading it whole, so file size is not bound by the sandbox memory limit.
+   * Lines carry no line terminator (LF or CRLF). Cancelling the stream closes the file.
+   * Requires `fs.read:<path>` permission.
+   * @param path Relative file path
+   * @param opts.contains Only yield lines containing at least one of these exact strings. Skipped lines never enter the sandbox.
+   */
+  function readLinesStream(path: string, opts?: { contains?: string[] }): ReadableStream<string>
+
+  /**
    * Writes to a file chunk-by-chunk using a UTF-8 string stream.
    * Requires `fs.write:<path>` permission.
    * @param path Relative file path

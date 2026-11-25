@@ -33,6 +33,45 @@ function sliceLines(content, from, to) {
   return sliced.join('\n') + (hadTrailing ? '\n' : '')
 }
 
+const LINE_BATCH_BYTES = 256 * 1024
+
+// Lines are split on raw bytes and decoded whole, so a multi-byte character is never cut
+// at a chunk edge. Filtering happens before decoding: a skipped line costs no string.
+async function* readLineBatches(abs, needles) {
+  let batch = []
+  let batchBytes = 0
+  let pending = []
+  let isFirst = true
+  const take = (line) => {
+    if (isFirst) {
+      isFirst = false
+      if (line[0] === 0xef && line[1] === 0xbb && line[2] === 0xbf) line = line.subarray(3)
+    }
+    if (line.at(-1) === 0x0d) line = line.subarray(0, -1)
+    if (needles && !needles.some(n => line.includes(n))) return
+    batch.push(line.toString('utf8'))
+    batchBytes += line.length + 1
+  }
+  for await (const chunk of createReadStream(abs, { highWaterMark: 1024 * 1024 })) {
+    let start = 0
+    let nl
+    while ((nl = chunk.indexOf(0x0a, start)) !== -1) {
+      const piece = chunk.subarray(start, nl)
+      take(pending.length ? Buffer.concat([...pending, piece]) : piece)
+      pending = []
+      start = nl + 1
+      if (batchBytes >= LINE_BATCH_BYTES) {
+        yield batch
+        batch = []
+        batchBytes = 0
+      }
+    }
+    if (start < chunk.length) pending.push(chunk.subarray(start))
+  }
+  if (pending.length) take(Buffer.concat(pending))
+  if (batch.length) yield batch
+}
+
 export function createFsUtils(dir, checkPermission, pluginDir = null, pluginId = null, storeDir = null) {
   const ctx = () => ({ dir, pluginDir, pluginId, storeDir })
 
@@ -199,6 +238,13 @@ export function createFsUtils(dir, checkPermission, pluginDir = null, pluginId =
       const abs   = resolvePath(relPath, ctx())
       if (checkPermission) checkPermission('fs.read', relPath)
       return createReadStream(abs)
+    },
+
+    readLinesIter(relPath, { contains } = {}) {
+      if (contains != null && !Array.isArray(contains)) throw new TypeError('fs.readLinesStream: contains must be an array of strings')
+      const abs   = resolvePath(relPath, ctx())
+      if (checkPermission) checkPermission('fs.read', relPath)
+      return readLineBatches(abs, contains?.map(s => Buffer.from(s, 'utf8')) ?? null)
     },
 
     async appendStreamRef(relPath) {

@@ -88,7 +88,7 @@ export function resolveRuneExecCwd(projectDir, cwdOpt, checkPermission) {
   return resolved
 }
 
-async function injectUtils(isolate, context, utils, _runeCallback, vars, projectDir, checkPermission, sections, onEvent, runeContext) {
+async function injectUtils(isolate, context, utils, _runeCallback, vars, projectDir, checkPermission, sections, onEvent, runeContext, memoryMb) {
   const currentRuneKey = runeContext?.key ?? null
   const jail = context.global
   // Wrap async Reference callbacks so their rejected promises are caught on the
@@ -101,7 +101,14 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
   })
 
   await jail.set('$__utils_fs_read', new ivm.Reference(async (relPath, opts) => {
-    return utils.fs.read(relPath, opts)
+    const content = await utils.fs.read(relPath, opts)
+    // Text larger than the isolate aborts the whole process while being copied in. V8 stores
+    // a string at two bytes per character as soon as one character is outside Latin-1.
+    const limit = memoryMb * 1024 * 1024
+    if (content && content.length * 2 > limit && (content.length > limit || /[^\u0000-\u00ff]/.test(content))) {
+      throw new Error(`fs.read: "${relPath}" does not fit in the ${memoryMb} MB sandbox. Read it with fs.readLinesStream() instead.`)
+    }
+    return content
   }))
   await jail.set('$__utils_fs_resolve', new ivm.Reference(async (relPath) => {
     return utils.fs.resolve(relPath)
@@ -194,6 +201,28 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
     const copy = new Uint8Array(value.length)
     copy.set(value)
     return copy.buffer
+  }))
+
+  await jail.set('$__utils_fs_readLines', asyncRef(async (relPath, opts) => {
+    const iter = utils.fs.readLinesIter(relPath, opts)
+    const id = nextStreamId++
+    streams.set(id, iter)
+    return id
+  }))
+  await jail.set('$__utils_fs_readLines_next', asyncRef(async (id) => {
+    const iter = streams.get(id)
+    if (!iter) throw new Error(`Invalid line stream ID: ${id}`)
+    const { value, done } = await iter.next()
+    if (done) {
+      streams.delete(id)
+      return null
+    }
+    return value
+  }))
+  await jail.set('$__utils_fs_readLines_cancel', asyncRef(async (id) => {
+    const iter = streams.get(id)
+    streams.delete(id)
+    await iter?.return()
   }))
 
   await jail.set('$__utils_fs_writeStream', new ivm.Reference(async (relPath) => {
@@ -1473,7 +1502,7 @@ export async function runRuneInIsolate(runeFile, effective, args, projectDir, {
         runeContext.argsSchema = await getArgsSchema(runeFile, effective, projectDir, { vars, nodeModulesDir, pluginDeps, pluginDir, pluginId, runeKey })
       } catch { /* schema unavailable, help renders empty */ }
     }
-    const utilsMod = await injectUtils(isolate, context, utils, runeCallback, vars, projectDir, checkPermission, sections, wrappedOnEvent, runeContext)
+    const utilsMod = await injectUtils(isolate, context, utils, runeCallback, vars, projectDir, checkPermission, sections, wrappedOnEvent, runeContext, isolateMemoryMb)
     await injectConsole(isolate, context, wrappedOnEvent)
 
     if (pluginDir != null) {
@@ -1659,7 +1688,7 @@ export async function getArgsSchema(runeFile, effective, projectDir, {
       const msg = DENY_BUILTINS.get(spec) ?? `Sandbox escape blocked. Cannot require '${spec}' on host.`
       throw new Error(`PermissionError: ${msg}`)
     }))
-    const utilsMod = await injectUtils(isolate, context, utils, null, vars, projectDir, checkPermission, null, null, null)
+    const utilsMod = await injectUtils(isolate, context, utils, null, vars, projectDir, checkPermission, null, null, null, isolateMemoryMb)
     await injectConsole(isolate, context, null)
     if (pluginDir != null) await context.global.set('CRUNES_PLUGIN_ROOT', pluginDir)
 
@@ -1774,7 +1803,7 @@ export async function getReplSchema(runeFile, effective, args, projectDir, {
       const msg = DENY_BUILTINS.get(spec) ?? `Sandbox escape blocked. Cannot require '${spec}' on host.`
       throw new Error(`PermissionError: ${msg}`)
     }))
-    const utilsMod = await injectUtils(isolate, context, utils, null, vars, projectDir, checkPermission, null, null, null)
+    const utilsMod = await injectUtils(isolate, context, utils, null, vars, projectDir, checkPermission, null, null, null, isolateMemoryMb)
     await injectConsole(isolate, context, null)
     if (pluginDir != null) await context.global.set('CRUNES_PLUGIN_ROOT', pluginDir)
 
@@ -1970,7 +1999,7 @@ export async function runRuneInRepl(runeFile, effective, args, projectDir, {
     runeContext.commandsSchema = commandsSchema ?? null
   } catch { /* schema unavailable, help renders empty */ }
 
-  const utilsMod = await injectUtils(isolate, context, utils, null, vars, projectDir, checkPermission, null, wrappedOnEvent, runeContext)
+  const utilsMod = await injectUtils(isolate, context, utils, null, vars, projectDir, checkPermission, null, wrappedOnEvent, runeContext, isolateMemoryMb)
   await injectConsole(isolate, context, wrappedOnEvent)
 
   if (pluginDir != null) await context.global.set('CRUNES_PLUGIN_ROOT', pluginDir)
