@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.14.0] - 2026-11-25
+
+### Added
+- **`fs.readLinesStream`**: Reads a file line by line without loading it whole; `contains` keeps unwanted lines out of the sandbox. Also available in `setupCrunesTest`
+
+### Changed
+- **`fs.read` line ranges**: Head and tail ranges read only what they need
+- **Oversized `fs.read`**: Text that cannot fit the sandbox raises a clear error instead of aborting the process
+- **Unreadable config on install**: A project or global config that cannot be read or written now fails `plugin install`
+
+### Fixed
+- **`plugin install -g`**: Creates the global config when missing instead of leaving the plugin disabled
+
+---
+
 ## [0.13.0] - 2026-11-24
 
 ### Added
