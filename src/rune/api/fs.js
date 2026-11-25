@@ -33,6 +33,81 @@ function sliceLines(content, from, to) {
   return sliced.join('\n') + (hadTrailing ? '\n' : '')
 }
 
+const RANGE_CHUNK_BYTES = 64 * 1024
+
+/** Bytes of the last `count` lines, read backwards; `whole` when that is the entire file. */
+async function readTailBytes(handle, size, count) {
+  const chunks = []
+  let pos = size
+  let seen = 0
+  while (pos > 0) {
+    const length = Math.min(RANGE_CHUNK_BYTES, pos)
+    pos -= length
+    const chunk = Buffer.alloc(length)
+    const { bytesRead } = await handle.read(chunk, 0, length, pos)
+    if (bytesRead !== length) return null
+    // A newline that ends the file closes the last line; it does not start another.
+    let at = pos + length === size && chunk[length - 1] === 0x0a ? length - 1 : length
+    while (at > 0 && (at = chunk.lastIndexOf(0x0a, at - 1)) !== -1) {
+      if (++seen === count) {
+        chunks.unshift(chunk.subarray(at + 1))
+        return { bytes: Buffer.concat(chunks), whole: false }
+      }
+    }
+    chunks.unshift(chunk)
+  }
+  return { bytes: Buffer.concat(chunks), whole: true }
+}
+
+/** Bytes of the first `count` lines without the last line's newline; `whole` when the file has fewer. */
+async function readHeadBytes(handle, size, count) {
+  const chunks = []
+  let pos = 0
+  let seen = 0
+  while (pos < size) {
+    const length = Math.min(RANGE_CHUNK_BYTES, size - pos)
+    const chunk = Buffer.alloc(length)
+    const { bytesRead } = await handle.read(chunk, 0, length, pos)
+    if (bytesRead !== length) return null
+    pos += length
+    let at = -1
+    while ((at = chunk.indexOf(0x0a, at + 1)) !== -1) {
+      if (++seen === count) {
+        chunks.push(chunk.subarray(0, at))
+        return { bytes: Buffer.concat(chunks), whole: false }
+      }
+    }
+    chunks.push(chunk)
+  }
+  return { bytes: Buffer.concat(chunks), whole: true }
+}
+
+/**
+ * Reads a leading or trailing line range without loading the rest of the file. Returns undefined
+ * when the range or file needs the plain path. Must return exactly what sliceLines would.
+ */
+async function readEdgeLines(abs, from, to) {
+  const isTail = Number.isInteger(from) && from < 0 && to == null
+  const isHead = Number.isInteger(to) && to >= 1 && (from == null || (Number.isInteger(from) && from >= 1))
+  if (!isTail && !isHead) return undefined
+  const handle = await fsPromises.open(abs, 'r')
+  try {
+    const stat = await handle.stat()
+    if (!stat.isFile() || stat.size === 0) return undefined
+    const part = isTail ? await readTailBytes(handle, stat.size, -from) : await readHeadBytes(handle, stat.size, to)
+    if (!part) return undefined
+    if (part.whole) return sliceLines(stripBom(part.bytes.toString('utf8')), from, to)
+    if (isTail) return part.bytes.toString('utf8')
+    const last = Buffer.alloc(1)
+    await handle.read(last, 0, 1, stat.size - 1)
+    const lines = stripBom(part.bytes.toString('utf8')).split('\n').slice(from == null ? 0 : from - 1)
+    if (lines.length === 0) return ''
+    return lines.join('\n') + (last[0] === 0x0a ? '\n' : '')
+  } finally {
+    await handle.close()
+  }
+}
+
 const LINE_BATCH_BYTES = 256 * 1024
 
 // Lines are split on raw bytes and decoded whole, so a multi-byte character is never cut
@@ -80,6 +155,8 @@ export function createFsUtils(dir, checkPermission, pluginDir = null, pluginId =
       const abs   = resolvePath(relPath, ctx())
       if (checkPermission) checkPermission('fs.read', relPath)
       try {
+        const edge = await readEdgeLines(abs, from, to)
+        if (edge !== undefined) return edge
         const content = stripBom(await fsPromises.readFile(abs, 'utf8'))
         return sliceLines(content, from, to)
       } catch (err) {
