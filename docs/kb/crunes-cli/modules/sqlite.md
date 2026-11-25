@@ -18,6 +18,10 @@ In WAL mode SQLite keeps two auxiliary files beside the database. They are trans
 
 **Deleting a database must remove all three files.** A deletion that removes only the main file leaves sidecars that mean nothing on their own. Missing sidecars are not an error — a database never opened in WAL mode has none — so the delete succeeds either way.
 
+## Opening is checked, not only querying
+
+Opening a database creates the file, its folder and its WAL mode, so `sqlite.open` checks grants before it touches disk. A write grant opens normally. A read grant alone opens an existing file read-only and never creates one, which is what makes it safe to read a database that belongs to another program. No grant is an error.
+
 ## The management query is read-only
 
 `crunes sqlite query` opens read-only and rejects writes. This is a usability guard, not a security boundary: it prevents the common accident of mutating data from a command meant to inspect it. Intentional writes go through the rune API, where permissions apply.

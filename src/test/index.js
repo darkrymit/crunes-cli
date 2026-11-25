@@ -58,6 +58,27 @@ function createTestFs(fs) {
   }
 }
 
+function createTestSqlite(sqlite) {
+  return {
+    async open(location, name) {
+      const handle = await sqlite.openHandle(location, name ?? undefined)
+      const db = {
+        query: async (sql, params) => handle.query(sql, params),
+        get: async (sql, params) => handle.get(sql, params),
+        exec: async (sql, params) => handle.exec(sql, params),
+        run: async (sql) => handle.run(sql),
+        transaction: async (fn) => {
+          await db.exec('BEGIN')
+          try { await fn(); await db.exec('COMMIT') }
+          catch (e) { await db.exec('ROLLBACK'); throw e }
+        },
+        close: async () => handle.close(),
+      }
+      return db
+    },
+  }
+}
+
 export function setupCrunesTest({
   cwd = process.cwd(),
   projectRoot = cwd,
@@ -96,6 +117,7 @@ export function setupCrunesTest({
   const merged = {
     ...utils,
     fs: createTestFs(utils.fs),
+    sqlite: createTestSqlite(utils.sqlite),
     crypt: createTestCrypt(),
     codec: { ...codecApi },
     time: { after: ms => new Promise(resolve => setTimeout(resolve, ms)) },

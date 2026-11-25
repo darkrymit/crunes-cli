@@ -211,15 +211,14 @@ describe('createSqliteUtils â€” permissions', () => {
     expect(spy).toHaveBeenCalledWith('sqlite.read', './data::mydb')
   })
 
-  it('PermissionError thrown by exec when sqlite.write not granted', async () => {
+  it('PermissionError thrown by open when nothing is granted', async () => {
     const checker = makePermissionChecker({ allow: [], deny: [] })
     sqlite = createSqliteUtils(tmp, checker)
-    const h = await sqlite.openHandle('./data', 'mydb')
-    expect(() => h.exec('CREATE TABLE t (id INTEGER)')).toThrow(PermissionError)
+    await expect(sqlite.openHandle('./data', 'mydb')).rejects.toThrow(PermissionError)
   })
 
-  it('PermissionError thrown by query when sqlite.read not granted', async () => {
-    const checker = makePermissionChecker({ allow: [], deny: [] })
+  it('PermissionError thrown by query when only sqlite.write is granted', async () => {
+    const checker = makePermissionChecker({ allow: ['sqlite.write:./data::mydb'], deny: [] })
     sqlite = createSqliteUtils(tmp, checker)
     const h = await sqlite.openHandle('./data', 'mydb')
     expect(() => h.query('SELECT 1')).toThrow(PermissionError)
@@ -227,6 +226,7 @@ describe('createSqliteUtils â€” permissions', () => {
 
   it('sqlite.read granted allows query but not exec', async () => {
     const checker = makePermissionChecker({ allow: ['sqlite.read:./data::mydb'], deny: [] })
+    ;(await createSqliteUtils(tmp, null).openHandle('./data', 'mydb')).close()
     sqlite = createSqliteUtils(tmp, checker)
     const h = await sqlite.openHandle('./data', 'mydb')
     expect(() => h.query('SELECT 1')).not.toThrow()
@@ -348,7 +348,9 @@ describe('SqliteHandle â€” run', () => {
   })
 
   it('requires sqlite.write permission', async () => {
-    const sqlite = createSqliteUtils(tmp, makePermissionChecker({ allow: [], deny: [] }), { pluginId: 'plug@1.0.0' })
+    const owner = createSqliteUtils(tmp, null, { pluginId: 'plug@1.0.0' })
+    ;(await owner.openHandle('@global-plugin-sqlite', 'test')).close()
+    const sqlite = createSqliteUtils(tmp, makePermissionChecker({ allow: ['sqlite.read:@global-plugin-sqlite::test'], deny: [] }), { pluginId: 'plug@1.0.0' })
     const h = await sqlite.openHandle('@global-plugin-sqlite', 'test')
     expect(() => h.run('CREATE TABLE t (id INTEGER)')).toThrow(PermissionError)
     h.close()

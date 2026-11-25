@@ -11,6 +11,9 @@ declare namespace sqlite {
    * path segments (e.g. `sqlite.read:@local-sqlite/**`). In the name part, `*` matches any characters
    * (e.g. `sqlite.read:@local-sqlite/**::my-*`).
    *
+   * Opening requires a read or a write grant. With only a read grant the database must exist and is opened
+   * read-only, which is the safe way to read a database another program owns.
+   *
    * @param location Storage scope:
    *   - `@local-sqlite` — stored under `.crunes/sqlite/project/` in the local project directory. **Most common choice for project runes.**
    *   - `@local-plugin-sqlite` — stored under `.crunes/sqlite/plugins/<id>/`, namespaced to the current plugin. Use when the rune is distributed as a plugin.

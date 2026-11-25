@@ -1,6 +1,7 @@
-import { mkdirSync } from 'node:fs'
+import { existsSync, mkdirSync } from 'node:fs'
 import path from 'node:path'
 import { resolvePath } from './utils.js'
+import { PermissionError } from '../permissions/permissions.js'
 
 async function loadDatabase() {
   try {
@@ -31,10 +32,33 @@ function resolveFileName(name) {
   return /\.\w+$/.test(name) ? name : `${name}.sqlite`
 }
 
+function isGranted(check) {
+  if (!check) return true
+  try {
+    check()
+    return true
+  } catch (err) {
+    if (err instanceof PermissionError) return false
+    throw err
+  }
+}
+
+// Opening is already a disk operation: it creates the file and sets its journal mode. Without a
+// write grant the file is opened read-only, which leaves a database another program owns alone.
+function openDatabase(Database, dbPath, checkRead, checkWrite) {
+  if (isGranted(checkWrite)) {
+    mkdirSync(path.dirname(dbPath), { recursive: true })
+    const db = new Database(dbPath)
+    db.pragma('journal_mode = WAL')
+    return db
+  }
+  checkRead()
+  if (!existsSync(dbPath)) throw new Error(`sqlite.open: no database at ${dbPath}, and creating one needs a sqlite.write grant`)
+  return new Database(dbPath, { readonly: true, fileMustExist: true })
+}
+
 function makeHandle(Database, dbPath, checkRead, checkWrite, connections) {
-  mkdirSync(path.dirname(dbPath), { recursive: true })
-  const db = new Database(dbPath)
-  db.pragma('journal_mode = WAL')
+  const db = openDatabase(Database, dbPath, checkRead, checkWrite)
   connections.push(db)
   return {
     query(sql, params = []) {

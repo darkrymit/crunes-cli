@@ -1049,7 +1049,7 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
   const sqliteHandles    = new Map()
   let   nextSqliteHandle = 0
 
-  await jail.set('$__utils_sqlite_open', new ivm.Reference(async (location, name) => {
+  await jail.set('$__utils_sqlite_open', asyncRef(async (location, name) => {
     const handle = await utils.sqlite.openHandle(location, name ?? 'default')
     const id = String(nextSqliteHandle++)
     sqliteHandles.set(id, handle)
