@@ -945,8 +945,11 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
       await onChunk.apply(undefined, [null, { ok: res.ok, status: res.status, statusText: res.statusText, headers: headerPairs }], {
         arguments: { copy: true }, result: { promise: true }
       })
-      for await (const chunk of res.body) {
-        await onChunk.apply(undefined, [chunk, null], { arguments: { copy: true }, result: { promise: true } })
+      // A 204, 205 or 304 response, or a HEAD request, has a null body.
+      if (res.body) {
+        for await (const chunk of res.body) {
+          await onChunk.apply(undefined, [chunk, null], { arguments: { copy: true }, result: { promise: true } })
+        }
       }
       await onEnd.apply(undefined, [], { result: { promise: true } })
     } catch (err) {

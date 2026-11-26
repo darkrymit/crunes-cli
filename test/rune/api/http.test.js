@@ -1,6 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { createServer } from 'http'
+import fs from 'node:fs/promises'
+import path from 'node:path'
+import { tmpdir } from 'node:os'
 import { createHttpUtils, FetchError } from '../../../src/rune/api/http.js'
 import { PermissionError } from '../../../src/rune/permissions/permissions.js'
+import { runRuneInIsolate } from '../../../src/rune/isolation/runner.js'
 
 function makeResponse({ ok = true, status = 200, statusText = 'OK', headers = {}, body = '' } = {}) {
   const bodyBytes = typeof body === 'string' ? new TextEncoder().encode(body) : body
@@ -158,5 +163,33 @@ describe('createHttpUtils — streaming and new body types', () => {
     await fetch('https://example.com', { method: 'POST', body: bytes })
     const callBody = globalThis.fetch.mock.calls[0][1].body
     expect(callBody).toBeInstanceOf(Uint8Array)
+  })
+})
+
+describe('fetch inside the isolate', () => {
+  let server, port, tmpDir
+
+  beforeEach(async () => {
+    server = createServer((_req, res) => { res.statusCode = 204; res.end() })
+    await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
+    port = server.address().port
+    tmpDir = await fs.mkdtemp(path.join(tmpdir(), 'crunes-http-test-'))
+  })
+
+  afterEach(async () => {
+    await new Promise(resolve => server.close(resolve))
+    await fs.rm(tmpDir, { recursive: true, force: true })
+  })
+
+  it('reads a response without a body (204) as an empty string', async () => {
+    const runeFile = path.join(tmpDir, 'fetch-204.js')
+    await fs.writeFile(runeFile, `
+      export async function run() {
+        const res = await fetch('http://127.0.0.1:${port}/')
+        return { status: res.status, text: await res.text() }
+      }
+    `, 'utf8')
+    const res = await runRuneInIsolate(runeFile, { allow: ['http.fetch:**'], deny: [] }, [], tmpDir)
+    expect(res).toEqual({ status: 204, text: '' })
   })
 })
