@@ -91,6 +91,8 @@ export function resolveRuneExecCwd(projectDir, cwdOpt, checkPermission) {
 async function injectUtils(isolate, context, utils, _runeCallback, vars, projectDir, checkPermission, sections, onEvent, runeContext, memoryMb) {
   const currentRuneKey = runeContext?.key ?? null
   const jail = context.global
+  const setOps = []
+  const setGlobal = (k, v) => setOps.push(jail.set(k, v))
   // Wrap async Reference callbacks so their rejected promises are caught on the
   // host side, preventing Node unhandledRejection events. ivm still receives the
   // rejection via its own internal .then() chain and propagates it into the isolate.
@@ -100,7 +102,7 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
     return p
   })
 
-  await jail.set('$__utils_fs_read', new ivm.Reference(async (relPath, opts) => {
+  setGlobal('$__utils_fs_read', new ivm.Reference(async (relPath, opts) => {
     const content = await utils.fs.read(relPath, opts)
     // Text larger than the isolate aborts the whole process while being copied in. V8 stores
     // a string at two bytes per character as soon as one character is outside Latin-1.
@@ -110,60 +112,60 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
     }
     return content
   }))
-  await jail.set('$__utils_fs_resolve', new ivm.Reference(async (relPath) => {
+  setGlobal('$__utils_fs_resolve', new ivm.Reference(async (relPath) => {
     return utils.fs.resolve(relPath)
   }))
-  await jail.set('$__utils_fs_exists', new ivm.Reference(async (relPath) => {
+  setGlobal('$__utils_fs_exists', new ivm.Reference(async (relPath) => {
     return utils.fs.exists(relPath)
   }))
-  await jail.set('$__utils_fs_glob', new ivm.Reference(async (pattern, opts) => {
+  setGlobal('$__utils_fs_glob', new ivm.Reference(async (pattern, opts) => {
     return utils.fs.glob(pattern, opts)
   }))
-  await jail.set('$__utils_fs_write', new ivm.Reference(async (relPath, content) => {
+  setGlobal('$__utils_fs_write', new ivm.Reference(async (relPath, content) => {
     return utils.fs.write(relPath, content)
   }))
-  await jail.set('$__utils_fs_copy', new ivm.Reference(async (src, dest) => {
+  setGlobal('$__utils_fs_copy', new ivm.Reference(async (src, dest) => {
     await utils.fs.copy(src, dest)
   }))
-  await jail.set('$__utils_fs_remove', new ivm.Reference(async (relPath, opts) => {
+  setGlobal('$__utils_fs_remove', new ivm.Reference(async (relPath, opts) => {
     return utils.fs.remove(relPath, opts)
   }))
-  await jail.set('$__utils_fs_move', new ivm.Reference(async (src, dest) => {
+  setGlobal('$__utils_fs_move', new ivm.Reference(async (src, dest) => {
     return utils.fs.move(src, dest)
   }))
-  await jail.set('$__utils_fs_stat', new ivm.Reference(async (relPath) => {
+  setGlobal('$__utils_fs_stat', new ivm.Reference(async (relPath) => {
     return utils.fs.stat(relPath)
   }))
-  await jail.set('$__utils_fs_mkdir', new ivm.Reference(async (relPath) => {
+  setGlobal('$__utils_fs_mkdir', new ivm.Reference(async (relPath) => {
     return utils.fs.mkdir(relPath)
   }))
-  await jail.set('$__utils_fs_read_bytes', new ivm.Reference(async (relPath, opts) => {
+  setGlobal('$__utils_fs_read_bytes', new ivm.Reference(async (relPath, opts) => {
     const bytes = await utils.fs.readBytes(relPath, opts)
     if (!bytes) return null
     const copy = new Uint8Array(bytes.length)
     copy.set(bytes)
     return copy.buffer
   }))
-  await jail.set('$__utils_fs_write_bytes', new ivm.Reference(async (relPath, arrayBuffer, byteOffset, byteLength) => {
+  setGlobal('$__utils_fs_write_bytes', new ivm.Reference(async (relPath, arrayBuffer, byteOffset, byteLength) => {
     const bytes = new Uint8Array(arrayBuffer, byteOffset ?? 0, byteLength ?? arrayBuffer.byteLength)
     return utils.fs.writeBytes(relPath, bytes)
   }))
-  await jail.set('$__utils_fs_append', new ivm.Reference(async (relPath, content) => {
+  setGlobal('$__utils_fs_append', new ivm.Reference(async (relPath, content) => {
     return utils.fs.append(relPath, content)
   }))
-  await jail.set('$__utils_fs_append_bytes', new ivm.Reference(async (relPath, arrayBuffer, byteOffset, byteLength) => {
+  setGlobal('$__utils_fs_append_bytes', new ivm.Reference(async (relPath, arrayBuffer, byteOffset, byteLength) => {
     const bytes = new Uint8Array(arrayBuffer, byteOffset ?? 0, byteLength ?? arrayBuffer.byteLength)
     return utils.fs.appendBytes(relPath, bytes)
   }))
-  await jail.set('$__utils_fs_chmod', new ivm.Reference(async (relPath, mode) => {
+  setGlobal('$__utils_fs_chmod', new ivm.Reference(async (relPath, mode) => {
     return utils.fs.chmod(relPath, mode)
   }))
-  await jail.set('$__utils_fs_prepend', new ivm.Reference(async (relPath, content) => {
+  setGlobal('$__utils_fs_prepend', new ivm.Reference(async (relPath, content) => {
     return utils.fs.prepend(relPath, content)
   }))
   const watchers = new Map()
   let nextWatcherId = 1
-  await jail.set('$__utils_fs_watch', new ivm.Reference((patternRef, callbackRef, optsRef) => {
+  setGlobal('$__utils_fs_watch', new ivm.Reference((patternRef, callbackRef, optsRef) => {
     const pattern = typeof patternRef === 'object' && patternRef.copySync ? patternRef.copySync() : patternRef
     const opts    = typeof optsRef    === 'object' && optsRef.copySync    ? optsRef.copySync()    : (optsRef ?? {})
     const id = nextWatcherId++
@@ -173,7 +175,7 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
     watchers.set(id, handle)
     return id
   }))
-  await jail.set('$__utils_fs_watch_stop', new ivm.Reference((id) => {
+  setGlobal('$__utils_fs_watch_stop', new ivm.Reference((id) => {
     const handle = watchers.get(id)
     if (handle) {
       handle.stop()
@@ -184,13 +186,13 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
   const streams = new Map()
   let nextStreamId = 1
 
-  await jail.set('$__utils_fs_readStream', new ivm.Reference(async (relPath) => {
+  setGlobal('$__utils_fs_readStream', new ivm.Reference(async (relPath) => {
     const iter = utils.fs.readStreamIter(relPath)[Symbol.asyncIterator]()
     const id = nextStreamId++
     streams.set(id, iter)
     return id
   }))
-  await jail.set('$__utils_fs_readStream_next', new ivm.Reference(async (id) => {
+  setGlobal('$__utils_fs_readStream_next', new ivm.Reference(async (id) => {
     const iter = streams.get(id)
     if (!iter) throw new Error(`Invalid read stream ID: ${id}`)
     const { value, done } = await iter.next()
@@ -203,13 +205,13 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
     return copy.buffer
   }))
 
-  await jail.set('$__utils_fs_readLines', asyncRef(async (relPath, opts) => {
+  setGlobal('$__utils_fs_readLines', asyncRef(async (relPath, opts) => {
     const iter = utils.fs.readLinesIter(relPath, opts)
     const id = nextStreamId++
     streams.set(id, iter)
     return id
   }))
-  await jail.set('$__utils_fs_readLines_next', asyncRef(async (id) => {
+  setGlobal('$__utils_fs_readLines_next', asyncRef(async (id) => {
     const iter = streams.get(id)
     if (!iter) throw new Error(`Invalid line stream ID: ${id}`)
     const { value, done } = await iter.next()
@@ -219,31 +221,31 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
     }
     return value
   }))
-  await jail.set('$__utils_fs_readLines_cancel', asyncRef(async (id) => {
+  setGlobal('$__utils_fs_readLines_cancel', asyncRef(async (id) => {
     const iter = streams.get(id)
     streams.delete(id)
     await iter?.return()
   }))
 
-  await jail.set('$__utils_fs_writeStream', new ivm.Reference(async (relPath) => {
+  setGlobal('$__utils_fs_writeStream', new ivm.Reference(async (relPath) => {
     const ref = await utils.fs.writeStreamRef(relPath)
     const id = nextStreamId++
     streams.set(id, ref)
     return id
   }))
-  await jail.set('$__utils_fs_appendStream', new ivm.Reference(async (relPath) => {
+  setGlobal('$__utils_fs_appendStream', new ivm.Reference(async (relPath) => {
     const ref = await utils.fs.appendStreamRef(relPath)
     const id = nextStreamId++
     streams.set(id, ref)
     return id
   }))
-  await jail.set('$__utils_fs_writeStream_write', new ivm.Reference(async (id, arrayBuffer, byteOffset, byteLength) => {
+  setGlobal('$__utils_fs_writeStream_write', new ivm.Reference(async (id, arrayBuffer, byteOffset, byteLength) => {
     const ref = streams.get(id)
     if (!ref) throw new Error(`Invalid write stream ID: ${id}`)
     const bytes = new Uint8Array(arrayBuffer, byteOffset ?? 0, byteLength ?? arrayBuffer.byteLength)
     await ref.write(bytes)
   }))
-  await jail.set('$__utils_fs_writeStream_close', new ivm.Reference(async (id) => {
+  setGlobal('$__utils_fs_writeStream_close', new ivm.Reference(async (id) => {
     const ref = streams.get(id)
     if (!ref) throw new Error(`Invalid write stream ID: ${id}`)
     await ref.close()
@@ -252,7 +254,7 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
   const shellHandles = new Map()
   let nextShellHandle = 0
 
-  await jail.set('$__utils_shell_exec', asyncRef(async (cmd, opts, stdinStreamId) => {
+  setGlobal('$__utils_shell_exec', asyncRef(async (cmd, opts, stdinStreamId) => {
     let stdinStream
     if (stdinStreamId !== undefined && stdinStreamId !== null) {
       const { PassThrough } = await import('node:stream')
@@ -319,17 +321,17 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
     }
     return res
   }))
-  await jail.set('$__utils_shell_spawn_open', new ivm.Reference((cmd, opts) => {
+  setGlobal('$__utils_shell_spawn_open', new ivm.Reference((cmd, opts) => {
     const session = utils.shell.spawn(cmd, opts)
     const id = String(nextShellHandle++)
     shellHandles.set(id, session)
     return id
   }))
-  await jail.set('$__utils_shell_spawn_start', new ivm.Reference((id) => {
+  setGlobal('$__utils_shell_spawn_start', new ivm.Reference((id) => {
     const handle = shellHandles.get(id)
     if (handle) handle.open()
   }))
-  await jail.set('$__utils_shell_spawn_write', new ivm.Reference((idRef, chunkRef) => {
+  setGlobal('$__utils_shell_spawn_write', new ivm.Reference((idRef, chunkRef) => {
     const id = typeof idRef === 'object' && idRef.copySync ? idRef.copySync() : idRef
     const chunk = typeof chunkRef === 'object' && chunkRef.copySync ? chunkRef.copySync() : chunkRef
     const handle = shellHandles.get(id)
@@ -341,13 +343,13 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
       }
     }
   }))
-  await jail.set('$__utils_shell_spawn_end', new ivm.Reference((id) => {
+  setGlobal('$__utils_shell_spawn_end', new ivm.Reference((id) => {
     const handle = shellHandles.get(id)
     if (handle) {
       handle.proc.stdin.end()
     }
   }))
-  await jail.set('$__utils_shell_spawn_on', new ivm.Reference((idRef, typeRef, eventRef, callbackRef) => {
+  setGlobal('$__utils_shell_spawn_on', new ivm.Reference((idRef, typeRef, eventRef, callbackRef) => {
     const id = typeof idRef === 'object' && idRef.copySync ? idRef.copySync() : idRef
     const type = typeof typeRef === 'object' && typeRef.copySync ? typeRef.copySync() : typeRef
     const event = typeof eventRef === 'object' && eventRef.copySync ? eventRef.copySync() : eventRef
@@ -356,7 +358,7 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
       handle.setHandler(type, event, callbackRef)
     }
   }))
-  await jail.set('$__utils_shell_spawn_kill', new ivm.Reference((id, signal) => {
+  setGlobal('$__utils_shell_spawn_kill', new ivm.Reference((id, signal) => {
     const handle = shellHandles.get(id)
     if (handle) {
       handle.kill(signal ?? undefined)
@@ -364,28 +366,28 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
     }
   }))
 
-  await jail.set('$__utils_shell_job_start', asyncRef(async (cmd, opts) => {
+  setGlobal('$__utils_shell_job_start', asyncRef(async (cmd, opts) => {
     checkPermission('shell.job.start', cmd)
     return utils.shell.createShellJob(cmd, opts, {
       createJob, updateJobPid, jobStdoutPath, jobStderrPath, jobStdinPath, jobPgidPath,
       spawnedBy: currentRuneKey, projectDir,
     })
   }))
-  await jail.set('$__utils_shell_job_write', asyncRef(async (id, text) => {
+  setGlobal('$__utils_shell_job_write', asyncRef(async (id, text) => {
     checkPermission('shell.job.write', null)
     const record = await getJob(projectDir, id)
     if (!record) throw new Error(`Unknown job: ${id}`)
     const logPath = jobStdinPath(projectDir, id)
     await fsSync.promises.appendFile(logPath, text + '\n', 'utf8')
   }))
-  await jail.set('$__utils_shell_job_write_eof', asyncRef(async (id) => {
+  setGlobal('$__utils_shell_job_write_eof', asyncRef(async (id) => {
     checkPermission('shell.job.write', null)
     const record = await getJob(projectDir, id)
     if (!record) throw new Error(`Unknown job: ${id}`)
     const logPath = jobStdinPath(projectDir, id)
     await fsSync.promises.appendFile(logPath, EOF_SENTINEL + '\n', 'utf8')
   }))
-  await jail.set('$__utils_shell_job_kill', asyncRef(async (id, signal) => {
+  setGlobal('$__utils_shell_job_kill', asyncRef(async (id, signal) => {
     checkPermission('shell.job.kill', null)
     const sig = signal ?? 'SIGTERM'
     if (!VALID_SIGNALS.has(sig)) throw new Error(`Invalid signal: ${sig}`)
@@ -397,13 +399,13 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
       try { process.kill(-record.pid, sig) } catch {}
     }
   }))
-  await jail.set('$__utils_shell_job_exists', asyncRef(async (id) => {
+  setGlobal('$__utils_shell_job_exists', asyncRef(async (id) => {
     checkPermission('shell.job.exists', null)
     const record = await getJob(projectDir, id)
     if (!record) return false
     try { process.kill(record.pid, 0); return true } catch { return false }
   }))
-  await jail.set('$__utils_shell_job_stdout', asyncRef(async (id) => {
+  setGlobal('$__utils_shell_job_stdout', asyncRef(async (id) => {
     checkPermission('shell.job.read', null)
     const record = await getJob(projectDir, id)
     if (!record) throw new Error(`Unknown job: ${id}`)
@@ -411,7 +413,7 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
     if (!fsSync.existsSync(logPath)) return ''
     return fsSync.promises.readFile(logPath, 'utf8')
   }))
-  await jail.set('$__utils_shell_job_stderr', asyncRef(async (id) => {
+  setGlobal('$__utils_shell_job_stderr', asyncRef(async (id) => {
     checkPermission('shell.job.read', null)
     const record = await getJob(projectDir, id)
     if (!record) throw new Error(`Unknown job: ${id}`)
@@ -420,23 +422,23 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
     return fsSync.promises.readFile(logPath, 'utf8')
   }))
 
-  await jail.set('$__utils_section_emit', new ivm.Reference((sectionOrArray) => {
+  setGlobal('$__utils_section_emit', new ivm.Reference((sectionOrArray) => {
     const items = Array.isArray(sectionOrArray) ? sectionOrArray : [sectionOrArray]
     for (const section of items) {
       if (sections) sections.push(section)
       if (onEvent) onEvent({ type: 'section', section })
     }
   }))
-  await jail.set('$__utils_section_create', new ivm.Reference((name, data, opts) => {
+  setGlobal('$__utils_section_create', new ivm.Reference((name, data, opts) => {
     return utils.section.create(name, data, opts)
   }))
-  await jail.set('$__utils_section_match', new ivm.Reference((sectionName, patterns) => {
+  setGlobal('$__utils_section_match', new ivm.Reference((sectionName, patterns) => {
     return utils.section.match(sectionName, patterns)
   }))
-  await jail.set('$__utils_section_selected', new ivm.Reference(() => {
+  setGlobal('$__utils_section_selected', new ivm.Reference(() => {
     return utils.section.selected() ?? undefined
   }))
-  await jail.set('$__utils_rune_exec', asyncRef(async (runeKey, args, opts) => {
+  setGlobal('$__utils_rune_exec', asyncRef(async (runeKey, args, opts) => {
     const repl = opts?.repl === true
     if (repl) {
       checkPermission('rune.repl', runeKey)
@@ -480,7 +482,7 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
     }
     return { sections, stdout, stderr, exitCode, ok: exitCode === 0 }
   }))
-  await jail.set('$__utils_rune_spawn_open', new ivm.Reference((runeKey, args, opts) => {
+  setGlobal('$__utils_rune_spawn_open', new ivm.Reference((runeKey, args, opts) => {
     const repl = opts?.repl === true
     if (repl) {
       checkPermission('rune.repl', runeKey)
@@ -493,42 +495,42 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
     shellHandles.set(id, session)
     return id
   }))
-  await jail.set('$__utils_rune_spawn_start', new ivm.Reference((id) => {
+  setGlobal('$__utils_rune_spawn_start', new ivm.Reference((id) => {
     const handle = shellHandles.get(id)
     if (handle) handle.open()
   }))
-  await jail.set('$__utils_rune_spawn_on', new ivm.Reference((idRef, typeRef, eventRef, callbackRef) => {
+  setGlobal('$__utils_rune_spawn_on', new ivm.Reference((idRef, typeRef, eventRef, callbackRef) => {
     const id = typeof idRef === 'object' && idRef.copySync ? idRef.copySync() : idRef
     const type = typeof typeRef === 'object' && typeRef.copySync ? typeRef.copySync() : typeRef
     const event = typeof eventRef === 'object' && eventRef.copySync ? eventRef.copySync() : eventRef
     const handle = shellHandles.get(id)
     if (handle) handle.setHandler(type, event, callbackRef)
   }))
-  await jail.set('$__utils_rune_spawn_kill', new ivm.Reference((id, signal) => {
+  setGlobal('$__utils_rune_spawn_kill', new ivm.Reference((id, signal) => {
     const handle = shellHandles.get(id)
     if (handle) { handle.kill(signal ?? undefined); shellHandles.delete(id) }
   }))
-  await jail.set('$__utils_rune_spawn_write', new ivm.Reference((id, text) => {
+  setGlobal('$__utils_rune_spawn_write', new ivm.Reference((id, text) => {
     const handle = shellHandles.get(id)
     if (handle) handle.write(text)
   }))
-  await jail.set('$__utils_rune_spawn_write_command', new ivm.Reference((id, nameOrText, args) => {
+  setGlobal('$__utils_rune_spawn_write_command', new ivm.Reference((id, nameOrText, args) => {
     const handle = shellHandles.get(id)
     if (handle) handle.writeCommand(nameOrText, args ?? undefined)
   }))
-  await jail.set('$__utils_rune_spawn_write_eof', new ivm.Reference((id) => {
+  setGlobal('$__utils_rune_spawn_write_eof', new ivm.Reference((id) => {
     const handle = shellHandles.get(id)
     if (handle) handle.writeEof()
   }))
-  await jail.set('$__utils_rune_spawn_write_interrupt', new ivm.Reference((id) => {
+  setGlobal('$__utils_rune_spawn_write_interrupt', new ivm.Reference((id) => {
     const handle = shellHandles.get(id)
     if (handle) handle.writeInterrupt()
   }))
-  await jail.set('$__utils_rune_spawn_stdin_write', new ivm.Reference((id, chunk) => {
+  setGlobal('$__utils_rune_spawn_stdin_write', new ivm.Reference((id, chunk) => {
     const handle = shellHandles.get(id)
     if (handle) handle.stdin.write(chunk)
   }))
-  await jail.set('$__utils_rune_job_start', asyncRef(async (runeKey, args, opts) => {
+  setGlobal('$__utils_rune_job_start', asyncRef(async (runeKey, args, opts) => {
     const repl = opts?.repl ?? false
     checkPermission(repl ? 'rune.repl' : 'rune.job.start', runeKey)
     const cliPath = process.argv[1]
@@ -550,7 +552,7 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
     await updateJobPid(projectDir, id, pid)
     return { id }
   }))
-  await jail.set('$__utils_rune_job_kill', asyncRef(async (id, signal) => {
+  setGlobal('$__utils_rune_job_kill', asyncRef(async (id, signal) => {
     const sig = signal ?? 'SIGTERM'
     if (!VALID_SIGNALS.has(sig)) throw new Error(`Invalid signal: ${sig}`)
     checkPermission('rune.job.kill', null)
@@ -558,13 +560,13 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
     if (!record) return
     try { process.kill(record.pid, sig) } catch { /* already gone */ }
   }))
-  await jail.set('$__utils_rune_job_exists', asyncRef(async (id) => {
+  setGlobal('$__utils_rune_job_exists', asyncRef(async (id) => {
     checkPermission('rune.job.exists', null)
     const record = await getJob(projectDir, id)
     if (!record) return false
     try { process.kill(record.pid, 0); return true } catch { return false }
   }))
-  await jail.set('$__utils_rune_job_stdout', asyncRef(async (id) => {
+  setGlobal('$__utils_rune_job_stdout', asyncRef(async (id) => {
     checkPermission('rune.job.read', null)
     const record = await getJob(projectDir, id)
     if (!record) throw new Error(`Unknown job: ${id}`)
@@ -572,7 +574,7 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
     if (!fsSync.existsSync(logPath)) return ''
     return fsSync.promises.readFile(logPath, 'utf8')
   }))
-  await jail.set('$__utils_rune_job_stderr', asyncRef(async (id) => {
+  setGlobal('$__utils_rune_job_stderr', asyncRef(async (id) => {
     checkPermission('rune.job.read', null)
     const record = await getJob(projectDir, id)
     if (!record) throw new Error(`Unknown job: ${id}`)
@@ -580,7 +582,7 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
     if (!fsSync.existsSync(logPath)) return ''
     return fsSync.promises.readFile(logPath, 'utf8')
   }))
-  await jail.set('$__utils_rune_job_sections', asyncRef(async (id) => {
+  setGlobal('$__utils_rune_job_sections', asyncRef(async (id) => {
     checkPermission('rune.job.read', null)
     const record = await getJob(projectDir, id)
     if (!record) throw new Error(`Unknown job: ${id}`)
@@ -597,14 +599,14 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
     }
     return sections
   }))
-  await jail.set('$__utils_rune_job_write', asyncRef(async (id, text) => {
+  setGlobal('$__utils_rune_job_write', asyncRef(async (id, text) => {
     checkPermission('rune.job.write', null)
     const record = await getJob(projectDir, id)
     if (!record) throw new Error(`Unknown job: ${id}`)
     const logPath = jobStdinPath(projectDir, id)
     await fsSync.promises.appendFile(logPath, JSON.stringify({ type: 'line', text }) + '\n', 'utf8')
   }))
-  await jail.set('$__utils_rune_job_write_command', asyncRef(async (id, nameOrText, args) => {
+  setGlobal('$__utils_rune_job_write_command', asyncRef(async (id, nameOrText, args) => {
     checkPermission('rune.job.write', null)
     const record = await getJob(projectDir, id)
     if (!record) throw new Error(`Unknown job: ${id}`)
@@ -622,20 +624,20 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
     }
     await fsSync.promises.appendFile(logPath, JSON.stringify(payload) + '\n', 'utf8')
   }))
-  await jail.set('$__utils_rune_job_write_eof', asyncRef(async (id) => {
+  setGlobal('$__utils_rune_job_write_eof', asyncRef(async (id) => {
     checkPermission('rune.job.write', null)
     const record = await getJob(projectDir, id)
     if (!record) throw new Error(`Unknown job: ${id}`)
     const logPath = jobStdinPath(projectDir, id)
     await fsSync.promises.appendFile(logPath, JSON.stringify({ type: 'eof', text: '' }) + '\n', 'utf8')
   }))
-  await jail.set('$__utils_time_after', new ivm.Reference((ms) => {
+  setGlobal('$__utils_time_after', new ivm.Reference((ms) => {
     return new Promise(resolve => setTimeout(resolve, ms).unref())
   }))
-  await jail.set('$__utils_time_after_ref', new ivm.Reference((ms) => {
+  setGlobal('$__utils_time_after_ref', new ivm.Reference((ms) => {
     return new Promise(resolve => setTimeout(resolve, ms))
   }))
-  await jail.set('$__utils_notify_send', new ivm.Reference(async (title, message, opts) => {
+  setGlobal('$__utils_notify_send', new ivm.Reference(async (title, message, opts) => {
     return utils.notify.send(title, message, opts)
   }))
 
@@ -657,39 +659,39 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
     return key
   }
 
-  await jail.set('$__webcrypto_random_uuid', new ivm.Reference(() => globalThis.crypto.randomUUID()))
+  setGlobal('$__webcrypto_random_uuid', new ivm.Reference(() => globalThis.crypto.randomUUID()))
 
-  await jail.set('$__webcrypto_get_random_values', new ivm.Reference((arrayBuffer) => {
+  setGlobal('$__webcrypto_get_random_values', new ivm.Reference((arrayBuffer) => {
     const arr = new Uint8Array(arrayBuffer)
     globalThis.crypto.getRandomValues(arr)
     return arr.buffer
   }))
 
-  await jail.set('$__webcrypto_subtle_digest', new ivm.Reference(async (algorithm, data) => {
+  setGlobal('$__webcrypto_subtle_digest', new ivm.Reference(async (algorithm, data) => {
     return subtle.digest(algorithm, data)
   }))
 
-  await jail.set('$__webcrypto_subtle_sign', new ivm.Reference(async (algorithm, keyHandle, data) => {
+  setGlobal('$__webcrypto_subtle_sign', new ivm.Reference(async (algorithm, keyHandle, data) => {
     const key = resolveKey(keyHandle)
     return subtle.sign(algorithm, key, data)
   }))
 
-  await jail.set('$__webcrypto_subtle_verify', new ivm.Reference(async (algorithm, keyHandle, signature, data) => {
+  setGlobal('$__webcrypto_subtle_verify', new ivm.Reference(async (algorithm, keyHandle, signature, data) => {
     const key = resolveKey(keyHandle)
     return subtle.verify(algorithm, key, signature, data)
   }))
 
-  await jail.set('$__webcrypto_subtle_encrypt', new ivm.Reference(async (algorithm, keyHandle, data) => {
+  setGlobal('$__webcrypto_subtle_encrypt', new ivm.Reference(async (algorithm, keyHandle, data) => {
     const key = resolveKey(keyHandle)
     return subtle.encrypt(algorithm, key, data)
   }))
 
-  await jail.set('$__webcrypto_subtle_decrypt', new ivm.Reference(async (algorithm, keyHandle, data) => {
+  setGlobal('$__webcrypto_subtle_decrypt', new ivm.Reference(async (algorithm, keyHandle, data) => {
     const key = resolveKey(keyHandle)
     return subtle.decrypt(algorithm, key, data)
   }))
 
-  await jail.set('$__webcrypto_subtle_generate_key', new ivm.Reference(async (algorithm, extractable, usages) => {
+  setGlobal('$__webcrypto_subtle_generate_key', new ivm.Reference(async (algorithm, extractable, usages) => {
     const result = await subtle.generateKey(algorithm, extractable, usages)
     if (result.privateKey) {
       return { privateKey: storeCryptoKey(result.privateKey), publicKey: storeCryptoKey(result.publicKey) }
@@ -697,147 +699,147 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
     return storeCryptoKey(result)
   }))
 
-  await jail.set('$__webcrypto_subtle_import_key', new ivm.Reference(async (format, keyData, algorithm, extractable, usages) => {
+  setGlobal('$__webcrypto_subtle_import_key', new ivm.Reference(async (format, keyData, algorithm, extractable, usages) => {
     const key = await subtle.importKey(format, keyData, algorithm, extractable, usages)
     return storeCryptoKey(key)
   }))
 
-  await jail.set('$__webcrypto_subtle_export_key', new ivm.Reference(async (format, keyHandle) => {
+  setGlobal('$__webcrypto_subtle_export_key', new ivm.Reference(async (format, keyHandle) => {
     const key = resolveKey(keyHandle)
     return subtle.exportKey(format, key)
   }))
 
-  await jail.set('$__webcrypto_subtle_derive_key', new ivm.Reference(async (algorithm, baseKeyHandle, derivedKeyAlg, extractable, usages) => {
+  setGlobal('$__webcrypto_subtle_derive_key', new ivm.Reference(async (algorithm, baseKeyHandle, derivedKeyAlg, extractable, usages) => {
     const baseKey = resolveKey(baseKeyHandle)
     const key = await subtle.deriveKey(algorithm, baseKey, derivedKeyAlg, extractable, usages)
     return storeCryptoKey(key)
   }))
 
-  await jail.set('$__webcrypto_subtle_derive_bits', new ivm.Reference(async (algorithm, baseKeyHandle, length) => {
+  setGlobal('$__webcrypto_subtle_derive_bits', new ivm.Reference(async (algorithm, baseKeyHandle, length) => {
     const baseKey = resolveKey(baseKeyHandle)
     return subtle.deriveBits(algorithm, baseKey, length)
   }))
 
-  await jail.set('$__webcrypto_subtle_wrap_key', new ivm.Reference(async (format, keyHandle, wrappingKeyHandle, wrapAlgorithm) => {
+  setGlobal('$__webcrypto_subtle_wrap_key', new ivm.Reference(async (format, keyHandle, wrappingKeyHandle, wrapAlgorithm) => {
     const key = resolveKey(keyHandle)
     const wrappingKey = resolveKey(wrappingKeyHandle)
     return subtle.wrapKey(format, key, wrappingKey, wrapAlgorithm)
   }))
 
-  await jail.set('$__webcrypto_subtle_unwrap_key', new ivm.Reference(async (format, wrappedData, unwrappingKeyHandle, unwrapAlg, unwrappedAlg, extractable, usages) => {
+  setGlobal('$__webcrypto_subtle_unwrap_key', new ivm.Reference(async (format, wrappedData, unwrappingKeyHandle, unwrapAlg, unwrappedAlg, extractable, usages) => {
     const unwrappingKey = resolveKey(unwrappingKeyHandle)
     const key = await subtle.unwrapKey(format, wrappedData, unwrappingKey, unwrapAlg, unwrappedAlg, extractable, usages)
     return storeCryptoKey(key)
   }))
 
-  await jail.set('$__utils_json_read', new ivm.Reference(async (relPath, opts) => {
+  setGlobal('$__utils_json_read', new ivm.Reference(async (relPath, opts) => {
     return utils.json.read(relPath, opts)
   }))
-  await jail.set('$__utils_json_readPath', new ivm.Reference(async (relPath, jsonPath, fallback, opts) => {
+  setGlobal('$__utils_json_readPath', new ivm.Reference(async (relPath, jsonPath, fallback, opts) => {
     return utils.json.readPath(relPath, jsonPath, fallback, opts)
   }))
-  await jail.set('$__utils_json_readPathAll', new ivm.Reference(async (relPath, jsonPath, fallback, opts) => {
+  setGlobal('$__utils_json_readPathAll', new ivm.Reference(async (relPath, jsonPath, fallback, opts) => {
     return utils.json.readPathAll(relPath, jsonPath, fallback, opts)
   }))
-  await jail.set('$__utils_json_write', new ivm.Reference(async (relPath, data, opts) => {
+  setGlobal('$__utils_json_write', new ivm.Reference(async (relPath, data, opts) => {
     await utils.json.write(relPath, data, opts)
   }))
-  await jail.set('$__utils_json_writePath', new ivm.Reference(async (relPath, jsonPath, value, opts) => {
+  setGlobal('$__utils_json_writePath', new ivm.Reference(async (relPath, jsonPath, value, opts) => {
     await utils.json.writePath(relPath, jsonPath, value, opts)
   }))
-  await jail.set('$__utils_json_parse', new ivm.Reference((text, opts) => {
+  setGlobal('$__utils_json_parse', new ivm.Reference((text, opts) => {
     return utils.json.parse(text, opts)
   }))
-  await jail.set('$__utils_json_stringify', new ivm.Reference((data, opts) => {
+  setGlobal('$__utils_json_stringify', new ivm.Reference((data, opts) => {
     return utils.json.stringify(data, opts)
   }))
-  await jail.set('$__utils_yaml_read', new ivm.Reference(async (relPath, opts) => {
+  setGlobal('$__utils_yaml_read', new ivm.Reference(async (relPath, opts) => {
     return utils.yaml.read(relPath, opts)
   }))
-  await jail.set('$__utils_yaml_write', new ivm.Reference(async (relPath, data, opts) => {
+  setGlobal('$__utils_yaml_write', new ivm.Reference(async (relPath, data, opts) => {
     await utils.yaml.write(relPath, data, opts)
   }))
-  await jail.set('$__utils_yaml_parse', new ivm.Reference((text) => {
+  setGlobal('$__utils_yaml_parse', new ivm.Reference((text) => {
     return utils.yaml.parse(text)
   }))
-  await jail.set('$__utils_yaml_stringify', new ivm.Reference((data, opts) => {
+  setGlobal('$__utils_yaml_stringify', new ivm.Reference((data, opts) => {
     return utils.yaml.stringify(data, opts)
   }))
-  await jail.set('$__utils_yaml_readPath', new ivm.Reference(async (relPath, jsonPath, fallback) => {
+  setGlobal('$__utils_yaml_readPath', new ivm.Reference(async (relPath, jsonPath, fallback) => {
     return utils.yaml.readPath(relPath, jsonPath, fallback)
   }))
-  await jail.set('$__utils_yaml_readPathAll', new ivm.Reference(async (relPath, jsonPath, fallback) => {
+  setGlobal('$__utils_yaml_readPathAll', new ivm.Reference(async (relPath, jsonPath, fallback) => {
     return utils.yaml.readPathAll(relPath, jsonPath, fallback)
   }))
-  await jail.set('$__utils_yaml_writePath', new ivm.Reference(async (relPath, jsonPath, value, opts) => {
+  setGlobal('$__utils_yaml_writePath', new ivm.Reference(async (relPath, jsonPath, value, opts) => {
     await utils.yaml.writePath(relPath, jsonPath, value, opts)
   }))
-  await jail.set('$__utils_xml_read', new ivm.Reference(async (relPath, opts) => {
+  setGlobal('$__utils_xml_read', new ivm.Reference(async (relPath, opts) => {
     return utils.xml.read(relPath, opts)
   }))
-  await jail.set('$__utils_xml_write', new ivm.Reference(async (relPath, data, opts) => {
+  setGlobal('$__utils_xml_write', new ivm.Reference(async (relPath, data, opts) => {
     await utils.xml.write(relPath, data, opts)
   }))
-  await jail.set('$__utils_xml_parse', new ivm.Reference((text) => {
+  setGlobal('$__utils_xml_parse', new ivm.Reference((text) => {
     return utils.xml.parse(text)
   }))
-  await jail.set('$__utils_xml_stringify', new ivm.Reference((data, opts) => {
+  setGlobal('$__utils_xml_stringify', new ivm.Reference((data, opts) => {
     return utils.xml.stringify(data, opts)
   }))
-  await jail.set('$__utils_xml_readPath', new ivm.Reference(async (relPath, jsonPath, fallback) => {
+  setGlobal('$__utils_xml_readPath', new ivm.Reference(async (relPath, jsonPath, fallback) => {
     return utils.xml.readPath(relPath, jsonPath, fallback)
   }))
-  await jail.set('$__utils_xml_readPathAll', new ivm.Reference(async (relPath, jsonPath, fallback) => {
+  setGlobal('$__utils_xml_readPathAll', new ivm.Reference(async (relPath, jsonPath, fallback) => {
     return utils.xml.readPathAll(relPath, jsonPath, fallback)
   }))
-  await jail.set('$__utils_xml_writePath', new ivm.Reference(async (relPath, jsonPath, value, opts) => {
+  setGlobal('$__utils_xml_writePath', new ivm.Reference(async (relPath, jsonPath, value, opts) => {
     await utils.xml.writePath(relPath, jsonPath, value, opts)
   }))
 
   // csv streams share the same streams Map as fs streams
-  await jail.set('$__utils_csv_read', new ivm.Reference(async (relPath, opts) => {
+  setGlobal('$__utils_csv_read', new ivm.Reference(async (relPath, opts) => {
     return utils.csv.read(relPath, opts)
   }))
-  await jail.set('$__utils_csv_read_objects', new ivm.Reference(async (relPath, opts) => {
+  setGlobal('$__utils_csv_read_objects', new ivm.Reference(async (relPath, opts) => {
     return utils.csv.readObjects(relPath, opts)
   }))
-  await jail.set('$__utils_csv_write', new ivm.Reference(async (relPath, rows, opts) => {
+  setGlobal('$__utils_csv_write', new ivm.Reference(async (relPath, rows, opts) => {
     await utils.csv.write(relPath, rows, opts)
   }))
-  await jail.set('$__utils_csv_write_objects', new ivm.Reference(async (relPath, data, opts) => {
+  setGlobal('$__utils_csv_write_objects', new ivm.Reference(async (relPath, data, opts) => {
     await utils.csv.writeObjects(relPath, data, opts)
   }))
-  await jail.set('$__utils_csv_headers', new ivm.Reference(async (relPath, opts) => {
+  setGlobal('$__utils_csv_headers', new ivm.Reference(async (relPath, opts) => {
     return utils.csv.headers(relPath, opts)
   }))
-  await jail.set('$__utils_csv_count', new ivm.Reference(async (relPath, opts) => {
+  setGlobal('$__utils_csv_count', new ivm.Reference(async (relPath, opts) => {
     return utils.csv.count(relPath, opts)
   }))
-  await jail.set('$__utils_csv_append', new ivm.Reference(async (relPath, rows, opts) => {
+  setGlobal('$__utils_csv_append', new ivm.Reference(async (relPath, rows, opts) => {
     await utils.csv.append(relPath, rows, opts)
   }))
-  await jail.set('$__utils_csv_append_objects', new ivm.Reference(async (relPath, data, opts) => {
+  setGlobal('$__utils_csv_append_objects', new ivm.Reference(async (relPath, data, opts) => {
     await utils.csv.appendObjects(relPath, data, opts)
   }))
-  await jail.set('$__utils_csv_parse', new ivm.Reference((content, opts) => {
+  setGlobal('$__utils_csv_parse', new ivm.Reference((content, opts) => {
     return utils.csv.parse(content, opts)
   }))
-  await jail.set('$__utils_csv_parse_objects', new ivm.Reference((content, opts) => {
+  setGlobal('$__utils_csv_parse_objects', new ivm.Reference((content, opts) => {
     return utils.csv.parseObjects(content, opts)
   }))
-  await jail.set('$__utils_csv_stringify', new ivm.Reference((rows, opts) => {
+  setGlobal('$__utils_csv_stringify', new ivm.Reference((rows, opts) => {
     return utils.csv.stringify(rows, opts)
   }))
-  await jail.set('$__utils_csv_stringify_objects', new ivm.Reference((data, opts) => {
+  setGlobal('$__utils_csv_stringify_objects', new ivm.Reference((data, opts) => {
     return utils.csv.stringifyObjects(data, opts)
   }))
-  await jail.set('$__utils_csv_readStream', new ivm.Reference(async (relPath, opts) => {
+  setGlobal('$__utils_csv_readStream', new ivm.Reference(async (relPath, opts) => {
     const iter = utils.csv.readStreamIter(relPath, opts)[Symbol.asyncIterator]()
     const id = nextStreamId++
     streams.set(id, iter)
     return id
   }))
-  await jail.set('$__utils_csv_readStream_next', new ivm.Reference(async (id) => {
+  setGlobal('$__utils_csv_readStream_next', new ivm.Reference(async (id) => {
     const iter = streams.get(id)
     if (!iter) throw new Error(`Invalid csv read stream ID: ${id}`)
     const { value, done } = await iter.next()
@@ -847,20 +849,20 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
     }
     return value
   }))
-  await jail.set('$__utils_csv_readObjectsStream', new ivm.Reference(async (relPath, opts) => {
+  setGlobal('$__utils_csv_readObjectsStream', new ivm.Reference(async (relPath, opts) => {
     const { columns, aliases, rows } = utils.csv.readObjectsStreamIter(relPath, opts)
     const id = nextStreamId++
     const iter = rows[Symbol.asyncIterator]()
     streams.set(id, { iter, columns, aliases })
     return id
   }))
-  await jail.set('$__utils_csv_readObjectsStream_meta', new ivm.Reference(async (id) => {
+  setGlobal('$__utils_csv_readObjectsStream_meta', new ivm.Reference(async (id) => {
     const entry = streams.get(id)
     if (!entry) throw new Error(`Invalid csv read objects stream ID: ${id}`)
     const [columns, aliases] = await Promise.all([entry.columns, entry.aliases])
     return { columns, aliases }
   }))
-  await jail.set('$__utils_csv_readObjectsStream_next', new ivm.Reference(async (id) => {
+  setGlobal('$__utils_csv_readObjectsStream_next', new ivm.Reference(async (id) => {
     const entry = streams.get(id)
     if (!entry) throw new Error(`Invalid csv read objects stream ID: ${id}`)
     const { value, done } = await entry.iter.next()
@@ -870,42 +872,42 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
     }
     return value
   }))
-  await jail.set('$__utils_csv_writeStream', new ivm.Reference(async (relPath, opts) => {
+  setGlobal('$__utils_csv_writeStream', new ivm.Reference(async (relPath, opts) => {
     const ref = utils.csv.writeStreamRef(relPath, opts)
     const id = nextStreamId++
     streams.set(id, ref)
     return id
   }))
-  await jail.set('$__utils_csv_writeStream_write', new ivm.Reference(async (id, row) => {
+  setGlobal('$__utils_csv_writeStream_write', new ivm.Reference(async (id, row) => {
     const ref = streams.get(id)
     if (!ref) throw new Error(`Invalid csv write stream ID: ${id}`)
     await ref.write(row)
   }))
-  await jail.set('$__utils_csv_writeStream_close', new ivm.Reference(async (id) => {
+  setGlobal('$__utils_csv_writeStream_close', new ivm.Reference(async (id) => {
     const ref = streams.get(id)
     if (!ref) throw new Error(`Invalid csv write stream ID: ${id}`)
     await ref.close()
     streams.delete(id)
   }))
-  await jail.set('$__utils_csv_writeObjectsStream', new ivm.Reference(async (relPath, opts) => {
+  setGlobal('$__utils_csv_writeObjectsStream', new ivm.Reference(async (relPath, opts) => {
     const ref = utils.csv.writeObjectsStreamRef(relPath, opts)
     const id = nextStreamId++
     streams.set(id, ref)
     return id
   }))
-  await jail.set('$__utils_csv_writeObjectsStream_write', new ivm.Reference(async (id, record) => {
+  setGlobal('$__utils_csv_writeObjectsStream_write', new ivm.Reference(async (id, record) => {
     const ref = streams.get(id)
     if (!ref) throw new Error(`Invalid csv write objects stream ID: ${id}`)
     await ref.write(record)
   }))
-  await jail.set('$__utils_csv_writeObjectsStream_close', new ivm.Reference(async (id) => {
+  setGlobal('$__utils_csv_writeObjectsStream_close', new ivm.Reference(async (id) => {
     const ref = streams.get(id)
     if (!ref) throw new Error(`Invalid csv write objects stream ID: ${id}`)
     await ref.close()
     streams.delete(id)
   }))
 
-  await jail.set('$__utils_http_fetch', new ivm.Reference(async (urlRef, optsRef, onChunk, onEnd, onError, signalListenerRef) => {
+  setGlobal('$__utils_http_fetch', new ivm.Reference(async (urlRef, optsRef, onChunk, onEnd, onError, signalListenerRef) => {
     const url  = urlRef.copySync()
     const opts = optsRef.copySync()
     let body = opts?.body
@@ -956,7 +958,7 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
       await onError.apply(undefined, [err.message], { arguments: { copy: true }, result: { promise: true } })
     }
   }))
-  await jail.set('$__utils_http_body_reader', new ivm.Reference(async (urlRef, optsRef, pullChunk, onChunk, onEnd, onError) => {
+  setGlobal('$__utils_http_body_reader', new ivm.Reference(async (urlRef, optsRef, pullChunk, onChunk, onEnd, onError) => {
     const url = typeof urlRef === 'object' && urlRef.copySync ? urlRef.copySync() : urlRef
     const opts = typeof optsRef === 'object' && optsRef.copySync ? optsRef.copySync() : optsRef
     const { Readable } = await import('node:stream')
@@ -993,57 +995,57 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
       await onError.apply(undefined, [err.message], { arguments: { copy: true }, result: { promise: true } })
     }
   }))
-  await jail.set('$__utils_env_read', new ivm.Reference(async (key, fallback) => {
+  setGlobal('$__utils_env_read', new ivm.Reference(async (key, fallback) => {
     const result = utils.env.read(key, fallback)
     return result !== undefined ? result : null
   }))
-  await jail.set('$__utils_env_has', new ivm.Reference(async (key) => {
+  setGlobal('$__utils_env_has', new ivm.Reference(async (key) => {
     return utils.env.has(key)
   }))
-  await jail.set('$__utils_archive_unzip', new ivm.Reference(async (source, dest) => {
+  setGlobal('$__utils_archive_unzip', new ivm.Reference(async (source, dest) => {
     await utils.archive.unzip(source, dest)
   }))
-  await jail.set('$__utils_archive_zip', new ivm.Reference(async (source, dest) => {
+  setGlobal('$__utils_archive_zip', new ivm.Reference(async (source, dest) => {
     await utils.archive.zip(source, dest)
   }))
-  await jail.set('$__utils_archive_untar', new ivm.Reference(async (source, dest, opts) => {
+  setGlobal('$__utils_archive_untar', new ivm.Reference(async (source, dest, opts) => {
     await utils.archive.untar(source, dest, opts)
   }))
-  await jail.set('$__utils_archive_tar', new ivm.Reference(async (source, dest, opts) => {
+  setGlobal('$__utils_archive_tar', new ivm.Reference(async (source, dest, opts) => {
     await utils.archive.tar(source, dest, opts)
   }))
 
   const cacheHandles    = new Map()
   let   nextCacheHandle = 0
 
-  await jail.set('$__utils_cache_open', new ivm.Reference(async (location, name) => {
+  setGlobal('$__utils_cache_open', new ivm.Reference(async (location, name) => {
     const handle = await utils.cache.openHandle(location, name ?? 'default')
     const id = String(nextCacheHandle++)
     cacheHandles.set(id, handle)
     return id
   }))
-  await jail.set('$__utils_cache_set', new ivm.Reference(async (id, key, value, ttl) => {
+  setGlobal('$__utils_cache_set', new ivm.Reference(async (id, key, value, ttl) => {
     const handle = cacheHandles.get(id)
     if (!handle) throw new Error(`Invalid cache handle: ${id}`)
     await handle.set(key, value, ttl !== null ? Number(ttl) : null)
   }))
-  await jail.set('$__utils_cache_get', new ivm.Reference(async (id, key) => {
+  setGlobal('$__utils_cache_get', new ivm.Reference(async (id, key) => {
     const handle = cacheHandles.get(id)
     if (!handle) throw new Error(`Invalid cache handle: ${id}`)
     const value = await handle.get(key)
     return value !== null ? value : null
   }))
-  await jail.set('$__utils_cache_delete', new ivm.Reference(async (id, key) => {
+  setGlobal('$__utils_cache_delete', new ivm.Reference(async (id, key) => {
     const handle = cacheHandles.get(id)
     if (!handle) throw new Error(`Invalid cache handle: ${id}`)
     await handle.delete(key)
   }))
-  await jail.set('$__utils_cache_clear', new ivm.Reference(async (id) => {
+  setGlobal('$__utils_cache_clear', new ivm.Reference(async (id) => {
     const handle = cacheHandles.get(id)
     if (!handle) throw new Error(`Invalid cache handle: ${id}`)
     await handle.clear()
   }))
-  await jail.set('$__utils_cache_has', new ivm.Reference(async (id, key) => {
+  setGlobal('$__utils_cache_has', new ivm.Reference(async (id, key) => {
     const handle = cacheHandles.get(id)
     if (!handle) throw new Error(`Invalid cache handle: ${id}`)
     return handle.has(key)
@@ -1052,18 +1054,18 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
   const sqliteHandles    = new Map()
   let   nextSqliteHandle = 0
 
-  await jail.set('$__utils_sqlite_open', asyncRef(async (location, name) => {
+  setGlobal('$__utils_sqlite_open', asyncRef(async (location, name) => {
     const handle = await utils.sqlite.openHandle(location, name ?? 'default')
     const id = String(nextSqliteHandle++)
     sqliteHandles.set(id, handle)
     return id
   }))
-  await jail.set('$__utils_sqlite_query', new ivm.Reference(async (id, sql, params) => {
+  setGlobal('$__utils_sqlite_query', new ivm.Reference(async (id, sql, params) => {
     const handle = sqliteHandles.get(id)
     if (!handle) throw new Error(`Invalid sqlite handle: ${id}`)
     try { return handle.query(sql, params || []) } catch (e) { return Promise.reject(e) }
   }))
-  await jail.set('$__utils_sqlite_get', new ivm.Reference(async (id, sql, params) => {
+  setGlobal('$__utils_sqlite_get', new ivm.Reference(async (id, sql, params) => {
     const handle = sqliteHandles.get(id)
     if (!handle) throw new Error(`Invalid sqlite handle: ${id}`)
     try {
@@ -1071,68 +1073,68 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
       return row !== null ? row : null
     } catch (e) { return Promise.reject(e) }
   }))
-  await jail.set('$__utils_sqlite_exec', new ivm.Reference(async (id, sql, params) => {
+  setGlobal('$__utils_sqlite_exec', new ivm.Reference(async (id, sql, params) => {
     const handle = sqliteHandles.get(id)
     if (!handle) throw new Error(`Invalid sqlite handle: ${id}`)
     try { return handle.exec(sql, params || []) } catch (e) { return Promise.reject(e) }
   }))
-  await jail.set('$__utils_sqlite_run', new ivm.Reference(async (id, sql) => {
+  setGlobal('$__utils_sqlite_run', new ivm.Reference(async (id, sql) => {
     const handle = sqliteHandles.get(id)
     if (!handle) throw new Error(`Invalid sqlite handle: ${id}`)
     try { handle.run(sql) } catch (e) { return Promise.reject(e) }
   }))
-  await jail.set('$__utils_sqlite_close', new ivm.Reference(async (id) => {
+  setGlobal('$__utils_sqlite_close', new ivm.Reference(async (id) => {
     const handle = sqliteHandles.get(id)
     if (!handle) return
     handle.close()
     sqliteHandles.delete(id)
   }))
 
-  await jail.set('$__utils_ws_client', new ivm.Reference((url, options) => {
+  setGlobal('$__utils_ws_client', new ivm.Reference((url, options) => {
     return utils.ws.client(url, options)
   }))
-  await jail.set('$__utils_ws_on', new ivm.Reference((sessionIdRef, eventRef, callbackRef) => {
+  setGlobal('$__utils_ws_on', new ivm.Reference((sessionIdRef, eventRef, callbackRef) => {
     const sessionId = sessionIdRef.copySync()
     const event = eventRef.copySync()
     utils.ws._getSession(sessionId).setHandler(event, callbackRef)
   }))
-  await jail.set('$__utils_ws_open', new ivm.Reference(async (sessionId) => {
+  setGlobal('$__utils_ws_open', new ivm.Reference(async (sessionId) => {
     await utils.ws._getSession(sessionId).open()
   }))
-  await jail.set('$__utils_ws_send_text', new ivm.Reference(async (sessionId, message) => {
+  setGlobal('$__utils_ws_send_text', new ivm.Reference(async (sessionId, message) => {
     await utils.ws._getSession(sessionId).sendText(message)
   }))
-  await jail.set('$__utils_ws_send_binary', new ivm.Reference(async (sessionId, arrayBuffer, byteOffset, byteLength) => {
+  setGlobal('$__utils_ws_send_binary', new ivm.Reference(async (sessionId, arrayBuffer, byteOffset, byteLength) => {
     await utils.ws._getSession(sessionId).sendBinary(arrayBuffer, byteOffset, byteLength)
   }))
-  await jail.set('$__utils_ws_close', new ivm.Reference(async (sessionId) => {
+  setGlobal('$__utils_ws_close', new ivm.Reference(async (sessionId) => {
     return utils.ws._getSession(sessionId).close()
   }))
-  await jail.set('$__utils_ws_closed', new ivm.Reference(async (sessionId) => {
+  setGlobal('$__utils_ws_closed', new ivm.Reference(async (sessionId) => {
     return utils.ws._getSession(sessionId).closedPromise
   }))
 
-  await jail.set('$__utils_http_server_create', new ivm.Reference((port, opts) => {
+  setGlobal('$__utils_http_server_create', new ivm.Reference((port, opts) => {
     return utils.http.server(port, opts)
   }))
-  await jail.set('$__utils_http_server_set_handler', new ivm.Reference(async (idRef, handlerRef) => {
+  setGlobal('$__utils_http_server_set_handler', new ivm.Reference(async (idRef, handlerRef) => {
     const id = typeof idRef === 'object' && idRef !== null && typeof idRef.copySync === 'function' ? idRef.copySync() : idRef
     utils.http._getServerSession(id).setHandler(handlerRef)
   }))
-  await jail.set('$__utils_http_server_open', new ivm.Reference(async (idRef) => {
+  setGlobal('$__utils_http_server_open', new ivm.Reference(async (idRef) => {
     const id = typeof idRef === 'object' && idRef !== null && typeof idRef.copySync === 'function' ? idRef.copySync() : idRef
     await utils.http._getServerSession(id).open()
     return utils.http._getServerSession(id).port
   }))
-  await jail.set('$__utils_http_server_close', new ivm.Reference(async (idRef) => {
+  setGlobal('$__utils_http_server_close', new ivm.Reference(async (idRef) => {
     const id = typeof idRef === 'object' && idRef !== null && typeof idRef.copySync === 'function' ? idRef.copySync() : idRef
     await utils.http._getServerSession(id).close()
   }))
-  await jail.set('$__utils_http_server_closed', new ivm.Reference(async (idRef) => {
+  setGlobal('$__utils_http_server_closed', new ivm.Reference(async (idRef) => {
     const id = typeof idRef === 'object' && idRef !== null && typeof idRef.copySync === 'function' ? idRef.copySync() : idRef
     await utils.http._getServerSession(id).closed()
   }))
-  await jail.set('$__utils_http_server_request_closed', new ivm.Reference(async (idRef, reqIdRef) => {
+  setGlobal('$__utils_http_server_request_closed', new ivm.Reference(async (idRef, reqIdRef) => {
     const id = typeof idRef === 'object' && idRef !== null && typeof idRef.copySync === 'function' ? idRef.copySync() : idRef
     const reqId = typeof reqIdRef === 'object' && reqIdRef !== null && typeof reqIdRef.copySync === 'function' ? reqIdRef.copySync() : reqIdRef
     const session = utils.http._getServerSession(id)
@@ -1141,128 +1143,128 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
     return new Promise(resolve => abort.signal.addEventListener('abort', resolve))
   }))
 
-  await jail.set('$__utils_ws_server_create', new ivm.Reference((portOrHttpId, opts, isHttpSession) => {
+  setGlobal('$__utils_ws_server_create', new ivm.Reference((portOrHttpId, opts, isHttpSession) => {
     const portOrSession = isHttpSession ? utils.http._getServerSession(portOrHttpId) : portOrHttpId
     return utils.ws.server(portOrSession, opts)
   }))
-  await jail.set('$__utils_ws_server_set_connection_handler', new ivm.Reference(async (idRef, handlerRef) => {
+  setGlobal('$__utils_ws_server_set_connection_handler', new ivm.Reference(async (idRef, handlerRef) => {
     const id = typeof idRef === 'object' && idRef !== null && typeof idRef.copySync === 'function' ? idRef.copySync() : idRef
     utils.ws._getWsServerSession(id).setConnectionHandler(handlerRef)
   }))
-  await jail.set('$__utils_ws_server_set_error_handler', new ivm.Reference(async (idRef, handlerRef) => {
+  setGlobal('$__utils_ws_server_set_error_handler', new ivm.Reference(async (idRef, handlerRef) => {
     const id = typeof idRef === 'object' && idRef !== null && typeof idRef.copySync === 'function' ? idRef.copySync() : idRef
     utils.ws._getWsServerSession(id).setErrorHandler(handlerRef)
   }))
-  await jail.set('$__utils_ws_server_open', new ivm.Reference(async (id) => {
+  setGlobal('$__utils_ws_server_open', new ivm.Reference(async (id) => {
     await utils.ws._getWsServerSession(id).open()
     return utils.ws._getWsServerSession(id).port
   }))
-  await jail.set('$__utils_ws_server_close', new ivm.Reference(async (id) => {
+  setGlobal('$__utils_ws_server_close', new ivm.Reference(async (id) => {
     await utils.ws._getWsServerSession(id).close()
   }))
-  await jail.set('$__utils_ws_server_closed', new ivm.Reference(async (id) => {
+  setGlobal('$__utils_ws_server_closed', new ivm.Reference(async (id) => {
     await utils.ws._getWsServerSession(id).closed()
   }))
-  await jail.set('$__utils_ws_server_conn_on', new ivm.Reference(async (connIdRef, eventRef, handlerRef) => {
+  setGlobal('$__utils_ws_server_conn_on', new ivm.Reference(async (connIdRef, eventRef, handlerRef) => {
     const connId = typeof connIdRef === 'object' && connIdRef !== null && typeof connIdRef.copySync === 'function' ? connIdRef.copySync() : connIdRef
     const event = typeof eventRef === 'object' && eventRef !== null && typeof eventRef.copySync === 'function' ? eventRef.copySync() : eventRef
     utils.ws._getWsServerConn(connId).setHandler(event, handlerRef)
   }))
-  await jail.set('$__utils_ws_server_conn_send_text', new ivm.Reference(async (connId, msg) => {
+  setGlobal('$__utils_ws_server_conn_send_text', new ivm.Reference(async (connId, msg) => {
     await utils.ws._getWsServerConn(connId).sendText(msg)
   }))
-  await jail.set('$__utils_ws_server_conn_send_binary', new ivm.Reference(async (connId, ab, byteOffset, byteLength) => {
+  setGlobal('$__utils_ws_server_conn_send_binary', new ivm.Reference(async (connId, ab, byteOffset, byteLength) => {
     await utils.ws._getWsServerConn(connId).sendBinary(ab, byteOffset, byteLength)
   }))
-  await jail.set('$__utils_ws_server_conn_close', new ivm.Reference(async (connId, code, reason) => {
+  setGlobal('$__utils_ws_server_conn_close', new ivm.Reference(async (connId, code, reason) => {
     return utils.ws._getWsServerConn(connId).close(code, reason)
   }))
-  await jail.set('$__utils_ws_server_conn_closed', new ivm.Reference(async (connId) => {
+  setGlobal('$__utils_ws_server_conn_closed', new ivm.Reference(async (connId) => {
     return utils.ws._getWsServerConn(connId).closed()
   }))
 
   const dbHandles = new Map()
   let nextDbHandle = 0
 
-  await jail.set('$__utils_db_connect', new ivm.Reference(async (connectionString) => {
+  setGlobal('$__utils_db_connect', new ivm.Reference(async (connectionString) => {
     const handle = await utils.db.connect(connectionString)
     const id = String(nextDbHandle++)
     dbHandles.set(id, handle)
     return id
   }))
-  await jail.set('$__utils_db_query', new ivm.Reference(async (id, sql, params) => {
+  setGlobal('$__utils_db_query', new ivm.Reference(async (id, sql, params) => {
     const handle = dbHandles.get(id)
     if (!handle) throw new Error(`Invalid db handle: ${id}`)
     return handle.query(sql, params || [])
   }))
-  await jail.set('$__utils_db_get', new ivm.Reference(async (id, sql, params) => {
+  setGlobal('$__utils_db_get', new ivm.Reference(async (id, sql, params) => {
     const handle = dbHandles.get(id)
     if (!handle) throw new Error(`Invalid db handle: ${id}`)
     const row = await handle.get(sql, params || [])
     return row !== null ? row : null
   }))
-  await jail.set('$__utils_db_exec', new ivm.Reference(async (id, sql, params) => {
+  setGlobal('$__utils_db_exec', new ivm.Reference(async (id, sql, params) => {
     const handle = dbHandles.get(id)
     if (!handle) throw new Error(`Invalid db handle: ${id}`)
     return handle.exec(sql, params || [])
   }))
-  await jail.set('$__utils_db_close', new ivm.Reference(async (id) => {
+  setGlobal('$__utils_db_close', new ivm.Reference(async (id) => {
     const handle = dbHandles.get(id)
     if (!handle) return
     await handle.close()
     dbHandles.delete(id)
   }))
 
-  await jail.set('$__utils_crypt_hash', new ivm.Reference((algorithm, data) => {
+  setGlobal('$__utils_crypt_hash', new ivm.Reference((algorithm, data) => {
     return hash(algorithm, data)
   }))
-  await jail.set('$__utils_crypt_hash_hex', new ivm.Reference((algorithm, data) => {
+  setGlobal('$__utils_crypt_hash_hex', new ivm.Reference((algorithm, data) => {
     return hashAsHex(algorithm, data)
   }))
-  await jail.set('$__utils_crypt_hash_base64', new ivm.Reference((algorithm, data) => {
+  setGlobal('$__utils_crypt_hash_base64', new ivm.Reference((algorithm, data) => {
     return hashAsBase64(algorithm, data)
   }))
-  await jail.set('$__utils_crypt_uuid', new ivm.Reference(cryptoUuid))
-  await jail.set('$__utils_crypt_random_hex', new ivm.Reference(cryptoHex))
-  await jail.set('$__utils_crypt_random_base64', new ivm.Reference(cryptoBase64))
-  await jail.set('$__utils_crypt_random_bytes', new ivm.Reference((size) => {
+  setGlobal('$__utils_crypt_uuid', new ivm.Reference(cryptoUuid))
+  setGlobal('$__utils_crypt_random_hex', new ivm.Reference(cryptoHex))
+  setGlobal('$__utils_crypt_random_base64', new ivm.Reference(cryptoBase64))
+  setGlobal('$__utils_crypt_random_bytes', new ivm.Reference((size) => {
     return randomBytesFn(size)
   }))
   
-  await jail.set('$__utils_crypt_hmac', new ivm.Reference((algorithm, key, data) => {
+  setGlobal('$__utils_crypt_hmac', new ivm.Reference((algorithm, key, data) => {
     return hmac(algorithm, key, data)
   }))
-  await jail.set('$__utils_crypt_hmac_hex', new ivm.Reference((algorithm, key, data) => {
+  setGlobal('$__utils_crypt_hmac_hex', new ivm.Reference((algorithm, key, data) => {
     return hmacAsHex(algorithm, key, data)
   }))
-  await jail.set('$__utils_crypt_hmac_base64', new ivm.Reference((algorithm, key, data) => {
+  setGlobal('$__utils_crypt_hmac_base64', new ivm.Reference((algorithm, key, data) => {
     return hmacAsBase64(algorithm, key, data)
   }))
 
-  await jail.set('$__utils_crypt_encrypt', new ivm.Reference((algorithm, key, iv, data) => {
+  setGlobal('$__utils_crypt_encrypt', new ivm.Reference((algorithm, key, iv, data) => {
     return encrypt(algorithm, key, iv, data)
   }))
 
-  await jail.set('$__utils_crypt_decrypt', new ivm.Reference((algorithm, key, iv, ciphertext) => {
+  setGlobal('$__utils_crypt_decrypt', new ivm.Reference((algorithm, key, iv, ciphertext) => {
     return decrypt(algorithm, key, iv, ciphertext)
   }))
 
   // Streaming Cryptography Host Bridges
   const hashStates = new Map()
   let nextHashId = 1
-  await jail.set('$__utils_crypt_hash_init', new ivm.Reference(async (algorithm) => {
+  setGlobal('$__utils_crypt_hash_init', new ivm.Reference(async (algorithm) => {
     const { createHash } = await import('node:crypto')
     const h = createHash(algorithm)
     const id = nextHashId++
     hashStates.set(id, h)
     return id
   }))
-  await jail.set('$__utils_crypt_hash_update', new ivm.Reference((id, arrayBuffer) => {
+  setGlobal('$__utils_crypt_hash_update', new ivm.Reference((id, arrayBuffer) => {
     const h = hashStates.get(id)
     if (!h) throw new Error(`Invalid hash stream ID: ${id}`)
     h.update(Buffer.from(arrayBuffer))
   }))
-  await jail.set('$__utils_crypt_hash_digest', new ivm.Reference((id) => {
+  setGlobal('$__utils_crypt_hash_digest', new ivm.Reference((id) => {
     const h = hashStates.get(id)
     if (!h) throw new Error(`Invalid hash stream ID: ${id}`)
     const digest = h.digest()
@@ -1274,7 +1276,7 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
 
   const cipherStates = new Map()
   let nextCipherId = 1
-  await jail.set('$__utils_crypt_cipher_init', new ivm.Reference(async (algorithm, keyRef, ivRef, isEncrypt) => {
+  setGlobal('$__utils_crypt_cipher_init', new ivm.Reference(async (algorithm, keyRef, ivRef, isEncrypt) => {
     const { createCipheriv, createDecipheriv } = await import('node:crypto')
     const key = Buffer.from(keyRef)
     const iv = Buffer.from(ivRef)
@@ -1291,7 +1293,7 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
     cipherStates.set(id, state)
     return id
   }))
-  await jail.set('$__utils_crypt_cipher_update', new ivm.Reference((id, arrayBuffer) => {
+  setGlobal('$__utils_crypt_cipher_update', new ivm.Reference((id, arrayBuffer) => {
     const state = cipherStates.get(id)
     if (!state) throw new Error(`Invalid cipher stream ID: ${id}`)
     const chunk = Buffer.from(arrayBuffer)
@@ -1325,7 +1327,7 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
       }
     }
   }))
-  await jail.set('$__utils_crypt_cipher_final', new ivm.Reference((id) => {
+  setGlobal('$__utils_crypt_cipher_final', new ivm.Reference((id) => {
     const state = cipherStates.get(id)
     if (!state) throw new Error(`Invalid cipher stream ID: ${id}`)
     
@@ -1352,14 +1354,14 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
   }))
 
   // Streaming Archive Host Bridges
-  await jail.set('$__utils_archive_zipStream', new ivm.Reference(async (source) => {
+  setGlobal('$__utils_archive_zipStream', new ivm.Reference(async (source) => {
     const stream = utils.archive.zipStream(source)
     const iter = stream[Symbol.asyncIterator]()
     const id = nextStreamId++
     streams.set(id, iter)
     return id
   }))
-  await jail.set('$__utils_archive_tarStream', new ivm.Reference(async (source, optsRef) => {
+  setGlobal('$__utils_archive_tarStream', new ivm.Reference(async (source, optsRef) => {
     const opts = optsRef ? optsRef.copySync() : undefined
     const stream = await utils.archive.tarStream(source, opts)
     const iter = stream[Symbol.asyncIterator]()
@@ -1367,13 +1369,13 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
     streams.set(id, iter)
     return id
   }))
-  await jail.set('$__utils_archive_unzipStream', new ivm.Reference(async (dest) => {
+  setGlobal('$__utils_archive_unzipStream', new ivm.Reference(async (dest) => {
     const writeStream = utils.archive.unzipStream(dest)
     const id = nextStreamId++
     streams.set(id, writeStream)
     return id
   }))
-  await jail.set('$__utils_archive_untarStream', new ivm.Reference(async (dest, optsRef) => {
+  setGlobal('$__utils_archive_untarStream', new ivm.Reference(async (dest, optsRef) => {
     const opts = optsRef ? optsRef.copySync() : undefined
     const writeStream = await utils.archive.untarStream(dest, opts)
     const id = nextStreamId++
@@ -1381,24 +1383,25 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
     return id
   }))
 
-  await jail.set('$__performance_now', new ivm.Reference(() => performance.now()))
-  await jail.set('$__vars', JSON.stringify(vars))
-  await jail.set('$__os', JSON.stringify(createOsInfo()))
-  await jail.set('$__stdin_is_tty', Boolean(utils.stdin?.isTTY))
-  await jail.set('$__utils_stdin_read_bytes', new ivm.Reference(async (opts) => {
+  setGlobal('$__performance_now', new ivm.Reference(() => performance.now()))
+  setGlobal('$__vars', JSON.stringify(vars))
+  setGlobal('$__os', JSON.stringify(createOsInfo()))
+  setGlobal('$__stdin_is_tty', Boolean(utils.stdin?.isTTY))
+  setGlobal('$__utils_stdin_read_bytes', new ivm.Reference(async (opts) => {
     const bytes = await utils.stdin.readBytes(opts)
     if (!bytes) return null
     const copy = new Uint8Array(bytes.length)
     copy.set(bytes)
     return copy.buffer
   }))
-  await jail.set('$__projectDir', projectDir)
-  await jail.set('$__rune_key',             runeContext?.key ?? null)
-  await jail.set('$__rune_lifecycle',       runeContext?.lifecycle ?? 'run')
-  await jail.set('$__rune_args_schema',     JSON.stringify(runeContext?.argsSchema ?? null))
-  await jail.set('$__rune_commands_schema', JSON.stringify(runeContext?.commandsSchema ?? null))
+  setGlobal('$__projectDir', projectDir)
+  setGlobal('$__rune_key',             runeContext?.key ?? null)
+  setGlobal('$__rune_lifecycle',       runeContext?.lifecycle ?? 'run')
+  setGlobal('$__rune_args_schema',     JSON.stringify(runeContext?.argsSchema ?? null))
+  setGlobal('$__rune_commands_schema', JSON.stringify(runeContext?.commandsSchema ?? null))
 
-  const [mdMod, treeMod, utilsMod] = await Promise.all([
+  const [, mdMod, treeMod, utilsMod] = await Promise.all([
+    Promise.all(setOps),
     compileStaticModule(isolate, 'md'),
     compileStaticModule(isolate, 'tree'),
     compileStaticModule(isolate, 'utils'),
@@ -1421,23 +1424,28 @@ async function injectUtils(isolate, context, utils, _runeCallback, vars, project
 
 async function injectConsole(isolate, context, onEvent) {
   const jail = context.global
-  if (onEvent) {
-    await jail.set('$__utils_console_emit', new ivm.Reference((level, ...args) => {
-      onEvent({ type: 'log', level, message: args.join(' ') })
-    }))
-    await jail.set('$__utils_logger_emit', new ivm.Reference((level, message, meta) => {
-      onEvent({ type: 'log', level, message, ...(meta != null ? { meta } : {}) })
-    }))
-  } else {
-    await jail.set('$__utils_console_emit', new ivm.Reference((level, ...args) => {
-      process.stderr.write(args.join(' ') + '\n')
-    }))
-    await jail.set('$__utils_logger_emit', new ivm.Reference((level, message) => {
-      process.stderr.write(`[${level}] ${message}\n`)
-    }))
-  }
+  const consoleOps = onEvent
+    ? [
+        jail.set('$__utils_console_emit', new ivm.Reference((level, ...args) => {
+          onEvent({ type: 'log', level, message: args.join(' ') })
+        })),
+        jail.set('$__utils_logger_emit', new ivm.Reference((level, message, meta) => {
+          onEvent({ type: 'log', level, message, ...(meta != null ? { meta } : {}) })
+        })),
+      ]
+    : [
+        jail.set('$__utils_console_emit', new ivm.Reference((level, ...args) => {
+          process.stderr.write(args.join(' ') + '\n')
+        })),
+        jail.set('$__utils_logger_emit', new ivm.Reference((level, message) => {
+          process.stderr.write(`[${level}] ${message}\n`)
+        })),
+      ]
 
-  const consoleMod = await compileStaticModule(isolate, 'console')
+  const [, consoleMod] = await Promise.all([
+    Promise.all(consoleOps),
+    compileStaticModule(isolate, 'console'),
+  ])
   await consoleMod.instantiate(context, (spec) => { throw new Error(`Unexpected import in console-bootstrap: ${spec}`) })
   await consoleMod.evaluate()
 }
@@ -1505,21 +1513,12 @@ export async function runRuneInIsolate(runeFile, effective, args, projectDir, {
         runeContext.argsSchema = await getArgsSchema(runeFile, effective, projectDir, { vars, nodeModulesDir, pluginDeps, pluginDir, pluginId, runeKey })
       } catch { /* schema unavailable, help renders empty */ }
     }
-    const utilsMod = await injectUtils(isolate, context, utils, runeCallback, vars, projectDir, checkPermission, sections, wrappedOnEvent, runeContext, isolateMemoryMb)
-    await injectConsole(isolate, context, wrappedOnEvent)
-
-    if (pluginDir != null) {
-      await context.global.set('CRUNES_PLUGIN_ROOT', pluginDir)
-    }
-
-    // Remove $__hostRequire from the global after bootstrap modules are instantiated.
-    // Builtin proxy modules call it during their own evaluation (triggered by runeMod.evaluate),
-    // so it must stay until then — but must not remain accessible to rune code after that.
-    // We delete it via context.eval after evaluate() completes below.
-    // Compile the rune module. Conditionally capture the target export into globalThis
-    // so context.eval() can call it. The typeof guard prevents ReferenceError when the
-    // rune does not export it — the missing-export check below handles that case.
-    const runeSrc    = await fs.readFile(runeFile, 'utf8')
+    const [utilsMod, , , runeSrc] = await Promise.all([
+      injectUtils(isolate, context, utils, runeCallback, vars, projectDir, checkPermission, sections, wrappedOnEvent, runeContext, isolateMemoryMb),
+      injectConsole(isolate, context, wrappedOnEvent),
+      pluginDir != null ? context.global.set('CRUNES_PLUGIN_ROOT', pluginDir) : Promise.resolve(),
+      fs.readFile(runeFile, 'utf8'),
+    ])
     assertNoDynamicImport(runeSrc, runeFile)
     const exportBinding = `\nif (typeof ${lifecycle} !== "undefined") globalThis.__crunes_target = ${lifecycle};\nif (typeof args !== "undefined") globalThis.__crunes_args = args;\nif (typeof dispose !== "undefined") globalThis.__crunes_dispose = dispose;\n`
     const patchedSrc = runeSrc + exportBinding
